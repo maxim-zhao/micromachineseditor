@@ -116,31 +116,34 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="LeftArrow.png" />
+    <None Include="Graphics\123.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="UpArrow.png" />
+    <None Include="Graphics\BlankPage.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="DownArrow.png" />
+    <None Include="Graphics\DownArrow.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="RightArrow.png" />
+    <None Include="Graphics\EyeDropper.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="BlankPage.png" />
+    <None Include="Graphics\Grid.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Grid.png" />
+    <None Include="Graphics\LeftArrow.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Undo.png" />
+    <None Include="Graphics\Redo.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="123.png" />
+    <None Include="Graphics\RightArrow.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="EyeDropper.png" />
+    <None Include="Graphics\Undo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Graphics\UpArrow.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

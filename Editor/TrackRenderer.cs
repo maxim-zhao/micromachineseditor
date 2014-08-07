@@ -17,7 +17,7 @@ namespace MicroMachinesEditor
         private bool showGrid;
         private Pen gridPen = new Pen(Color.Gray);
         private Brush nonTrackBrush = new SolidBrush(Color.FromArgb(127, Color.Black));
-        private Font positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 36);
+        private Font positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 30);
         private StringFormat positionNumberStringFormat = new StringFormat() { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center, };
         private bool showPositions;
         private bool showMetaTileFlags;
