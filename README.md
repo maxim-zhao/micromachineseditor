@@ -3,6 +3,8 @@ Micro Machines Editor
 
 Editor for the Master System version of Micro Machines, based on disassembly of the original Z80 code, implemented in C#.
 
+![Imgur](http://i.imgur.com/3y9WZBk.png)
+
 Status
 ----
 
