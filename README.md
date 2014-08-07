@@ -31,7 +31,7 @@ What remains to be done
 - Upgrading from 3bpp to 4bpp graphics (as an enhancement to the game) 
 - Hacking all the known cheats to check for any more 
 
-Not all of this is necessary for a first release - just being able to editr tracks in-place would be the majority of the usefulness.
+Not all of this is necessary for a first release - just being able to edit tracks in-place would be the majority of the usefulness.
 
 The disassembly
 ----
