@@ -1,0 +1,110 @@
+b x 7b21 Decompression entry
+b x 7b2b Decompression exit
+
+!!!Stage 1
+
+Tiles are loaded based on the number in $db97, which holds the course/vehicle type:
+
+||!Value ||!Type ||
+|| 00||Desk/sportscars ||
+|| 01||Breakfast table/four by four ||
+|| 02||Bathtub/powerboats ||
+|| 03||Sandpit/turbo wheels ||
+|| 04||Pool table/formula one ||
+|| 05||Garage/warriors ||
+|| 06||Bedroom/tanks ||
+|| 07||Bonus stage/rufftrux ||
+
+This is loaded from a table at $766a, which holds some other info:
+- Per-type track indices, usually in the range 0-2 but sometimes 3
+- Car parameters - acceleration, top speed, deceleration, steering speed. This is stored per-track but is always the same for the same vehicle.
+
+!!!Stage 2
+
+A table at 
+
+Data decompressed to $cc7c. First four bytes seem to be a header which is never used.
+The data lengths vary per track.
+
+!!!Stage 3
+
+Data decompressed to $c7fc. First four bytes again seem to be a header. 
+The data length for this part is exacty half that of stage 2 (after ignoring the headers). For the largest tracks, this overwrites the first four bytes from stage 2.
+
+!!!Stage 3
+The previous data was all per-track-type. This last part is the only part that varies per track: data is decompressed to
+$c000..$c7ff. This overwrites the first four bytes from Stage 3 above.
+
+06000..????? Car graphics?
+
+0e480..0e798 0904 bytes to cc7c..d580 Desktop Dropoff #2
+0e799..0e810 0484 bytes to c7fc..cc80 Desktop Dropoff #3
+0e811..0ea33 0800 bytes to c000..c800 Desktop Dropoff #4: metatiles, course indices
+
+11e50..12104 07c0 bytes to cc7c Breakfast Bends #2
+12105..12151 03e2 bytes to c7fc Breakfast Bends #3
+
+12378..12465 0800 bytes to c000 Breakfast Bends #4: metatiles, course indices
+
+15d30..15fe2 0874 bytes to cc7c Qualifying #2: ???
+15fe3..1603b 043c bytes to c7fc Qualifying #3: solidity data - track type
+1603c..16133 0800 bytes to c000 Qualifying #4: metatiles, course indices
+
+34000..34957 1800 bytes to c000 Pool table graphics
+
+38000..39167 1800 bytes to c000 Sandpit graphics
+39168..39c82 1800 bytes to c000 Bedroom graphics
+39c83..3a859 1800 bytes to c000 Breakfast table graphics
+
+3a8fa..3b32e 1800 bytes to c000 Garage graphics
+
+3c000..3cd8c 1800 bytes to c000 Desk graphics
+3cd8d..3d900 1800 bytes to c000 Bonus stage graphics
+3d901..3e5d6 1800 bytes to c000 Bathtub graphics: Each $800 byte chunk is one bitplane, fourth bitplane is zero. Copied to VRAM by fn at $7f02.
+3e5d7..3ec66 2688 bytes ???
+
+
+
+
+
+!!Metatiles
+
+Metatlle tile data is looked up by:
+
+1. Get the metatile number. This is in the range $00..$3f.
+2. Convert it to a global metatile index using a table at $da20.
+   - This comes from a table at $4225, with 64 bytes per track type.
+3. Get a pointer from a split table at $4000 (low byte) and $4041 (high byte) using this global index. For example, index 0 -> $8080
+4. This points at the tile indices in a 
+
+
+!!Track titles
+
+Table at 0xaace holds 16-bit pointers to text encoded as runs of 20 tile numbers, padded with spaces. Decoded:
+
+"THE BREAKFAST BENDS "
+"  DESKTOP DROP-OFF  "
+"    OILCAN ALLEY    "
+"  SANDY STRAIGHTS   "
+"OATMEAL IN OVERDRIVE"
+"THE CUE-BALL CIRCUIT"
+"  HANDYMANS CURVE   "
+"  BERMUDA BATHTUB   "
+"   SAHARA SANDPIT   "
+" THE POTTED PASSAGE "
+"FRUIT-JUICE FOLLIES "
+"    FOAMY FJORDS    "
+"BEDROOM BATTLEFIELD "
+"  PITFALL POCKETS   "
+"  PENCIL PLATEAUX   "
+"THE DARE-DEVIL DUNES"
+"THE SHRUBBERY TWIST "
+" PERILOUS PIT-STOP  "
+"WIDE-AWAKE WAR-ZONE "
+"   CRAYON CANYONS   "
+"  SOAP-LAKE CITY !  "
+"  THE LEAFY BENDS   "
+" CHALK-DUST CHICANE "
+"     GO FOR IT!     "
+" WIN THIS RACE TO BE CHAMPION!" <-- odd one out
+"RUFFTRUX BONUS STAGE"

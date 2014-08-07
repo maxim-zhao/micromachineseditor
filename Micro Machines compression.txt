@@ -1,0 +1,40 @@
+3d901 Qualifying level
+
+%00101100 ; mask
+$20 $00 ; raw -> $c000-1
+$10 ; repeat previous byte 2 times $00 $00 -> $c002-3
+$10 ; raw -> $c004
+%1 10 00001 ; Copy 2+1 bytes from offset -(2+1+1) = $c000
+$10 ; repeat previous byte 2 times 
+$40 $80 ; raw
+%10110000
+%1 00 00010 ; copy 1 byte from offset -(1+2)
+$04 ; raw
+89 70 02 03
+
+
+
+
+
+Format:
+
+Compression mask %mmmmmmmm
+8 bits, MSB to LSB: 0 = raw, 1 = compressed
+Raw: copy one byte to destination
+Compressed: next byte is a control byte:
+- If all bits are set, it's the end of the data
+- If high bit is set, it is an LZ reference in the form %1nnooooo. Copy n+2 bytes from relative offset -(n+o+2).
+- Else, it is one of the following:
+$0f $ff $nnnn: Raw run. Copy n bytes to destination.
+$0f $nn: Raw run. Copy n+30 bytes to destination.
+$0x: Raw run. Copy x+8 bytes to destination. Then consume the next byte as a control byte. (?)
+$1f $cc: RLE: repeat the previous byte c+17 times.
+$1x: RLE. Repeat the previous byte x+2 times.
+$2x $nn: LZ. Copy x+3 bytes from offset -(n+2)
+$3x $nn: LZ. Copy x+3 bytes from offset -(n+258)
+$4x $nn: LZ. Copy x+3 bytes from offset -(n+514)
+$5f $hh $oo $cc : LZ. Copy cc+4 bytes from relative offset -($hhoo-1).
+$5x $oo $cc: LZ. Copy cc+4 bytes from relative offset -($0xoo-1).
+$6x $oo: Reversed LZ. Next byte is the offset. Copy x+3 bytes from -(o+1) to -(o+1+x+3-1) inclusive.
+$7f $cc: Incrementing run. Output c+17 bytes incrementing from last value written.
+$7x: Incrementing run. Output x+2 bytes incrementing from last value written.
