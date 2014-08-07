@@ -1,7 +1,7 @@
 Micro Machines Editor
 ===================
 
-Editor for the Master System version of Micro Machines
+Editor for the Master System version of Micro Machines, based on disassembly of the original Z80 code, implemented in C#.
 
 Status
 ----
