@@ -1,39 +1,57 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 
 namespace MicroMachinesEditor
 {
-    public partial class MetaTileSelector : UserControl
+    public sealed partial class MetaTileSelector : ScrollableControl
     {
-        private IList<MetaTile> metaTiles;
-        private int selectedIndex;
-        private Pen selectionPen = new Pen(SystemColors.Highlight, 2) { Alignment = PenAlignment.Inset, };
-        private Brush selectionBrush = new SolidBrush(Color.FromArgb(128, SystemColors.Highlight));
+        #region constants
+
+        private const int TileSizeInPixels = 96;
+
+        #endregion
+
+        #region Fields
+
+        // The actual data
+        private IList<MetaTile> _metaTiles;
+
+        // State
+        private int _columnCount;
+        private int _rowCount;
+        private int _hoveredIndex = -1;
+        private int _selectedIndex = -1;
+
+        // Drawing objects
+        private readonly Pen _selectionPen = new Pen(SystemColors.Highlight, 2) { Alignment = PenAlignment.Inset, };
+        private readonly Brush _selectionBrush = new SolidBrush(Color.FromArgb(128, SystemColors.Highlight));
+        private readonly Pen _hoverPen = new Pen(SystemColors.HotTrack, 2) { Alignment = PenAlignment.Inset, };
+
+        #endregion
 
         public MetaTileSelector()
         {
             SelectedMetaTileIndex = 0;
             DoubleBuffered = true;
+            ResizeRedraw = true;
             InitializeComponent();
         }
+
+        #region Properties
 
         public IList<MetaTile> MetaTiles {
             get
             {
-                return this.metaTiles;
+                return _metaTiles;
             }
             set
             {
-                this.metaTiles = value;
-                this.Invalidate();
+                _metaTiles = value;
+                // Trigger a reevaluation of the layout
+                OnSizeChanged(null);
             }
         }
 
@@ -41,105 +59,154 @@ namespace MicroMachinesEditor
         { 
             get
             {
-                return this.selectedIndex;
+                return _selectedIndex;
             }
             set
             {
-                if (value < 0 || this.metaTiles == null || value > this.metaTiles.Count)
+                if (value < 0 || _metaTiles == null || value > _metaTiles.Count || value == _selectedIndex)
                 {
                     return;
                 }
+                // See if we should scroll it into view
+                Rectangle newRect = ScreenRectFromIndex(value); // in display coordinates
+                if (newRect.Top < 0)
+                {
+                    // Note that when you read AutoScrollPosition, you get negative numbers
+                    // when scrolled; but when setting it, you have to use positive numbers.
+                    // Note also that we don't bother checking the X - we should never have 
+                    // horizontal scrolling.
+                    AutoScrollPosition = new Point(-AutoScrollPosition.X, newRect.Top - AutoScrollPosition.Y);
+                }
+                else if (newRect.Bottom > Height)
+                {
+                    AutoScrollPosition = new Point(-AutoScrollPosition.X, newRect.Bottom - Height - AutoScrollPosition.Y);
+                }
                 // Invalidate rects
-                Invalidate(RectFromIndex(this.selectedIndex));
-                Invalidate(RectFromIndex(value));
-                this.selectedIndex = value;
+                Invalidate(ScreenRectFromIndex(_selectedIndex));
+                Invalidate(newRect);
+                _selectedIndex = value;
             } 
         }
 
-        // Makes autosizing work, so long as the control is docked :)
-        public override Size GetPreferredSize(Size proposedSize)
-        {
-            if (this.metaTiles == null)
-            {
-                return new Size(96, 96);
-            }
-            int w = proposedSize.Width / 96;
-            int h = (int)Math.Ceiling((double)this.metaTiles.Count / w);
-            return new Size(w * 96, h * 96);        
-        }
+        #endregion
 
-        protected override void OnPaint(PaintEventArgs e)
+        #region UI event handlers
+
+        protected override void OnSizeChanged(EventArgs e)
         {
-            e.Graphics.FillRectangle(SystemBrushes.Window, e.ClipRectangle);
-            if (this.metaTiles == null)
+            base.OnSizeChanged(e);
+            if (_metaTiles == null)
             {
-                e.Graphics.DrawString("No metatiles", SystemFonts.DefaultFont, SystemBrushes.WindowText, 0, 0);
                 return;
             }
-            // Get the width of the control
-            for (int index = 0; index < this.metaTiles.Count; ++index)
-            {
-                // Is this tile in the clip rectangle?
-                Rectangle tileRect = RectFromIndex(index);
-                if (tileRect.IntersectsWith(e.ClipRectangle))
-                {
-                    MetaTile tile = this.metaTiles[index];
-                    lock (tile.Bitmap)
-                    {
-                        e.Graphics.DrawImageUnscaled(tile.Bitmap, tileRect.Location);
-                    }
-                    // Is it selected?
-                    if (index == SelectedMetaTileIndex)
-                    {
-                        e.Graphics.FillRectangle(selectionBrush, tileRect);
-                        e.Graphics.DrawRectangle(selectionPen, tileRect);
-                    }
-                }
-            }
+            // Set the row/column count
+            _columnCount = (Width - SystemInformation.VerticalScrollBarWidth) / TileSizeInPixels;
+            _rowCount = (int)Math.Ceiling((double)_metaTiles.Count / _columnCount);
+            AutoScrollMinSize = new Size(_columnCount * TileSizeInPixels, _rowCount * TileSizeInPixels);
         }
 
-        private Rectangle RectFromIndex(int index)
+        protected override void OnMouseMove(MouseEventArgs e)
         {
-            if (this.metaTiles == null)
-            {
-                return new Rectangle();
-            }
-            int maxX = this.Width / 96;
-            int x = index % maxX;
-            int y = index / maxX;
-            return new Rectangle(x * 96, y * 96, 96, 96);
+            base.OnMouseMove(e);
+            SetHoveredIndex(IndexFromScreenPoint(e.Location));
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            SetHoveredIndex(-1);
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
-            int index = TileFromPoint(e.Location);
-            if (index > -1)
-            {
-                this.SelectedMetaTileIndex = index;
-            }
-// 	        base.OnMouseClick(e);
+            SelectedMetaTileIndex = IndexFromScreenPoint(e.Location);
         }
 
-        private int TileFromPoint(Point point)
+        protected override void OnPaint(PaintEventArgs e)
         {
-            if (this.metaTiles == null)
+            // Clear the area first
+            e.Graphics.FillRectangle(SystemBrushes.Window, e.ClipRectangle);
+            if (_metaTiles == null)
+            {
+                e.Graphics.DrawString("No metatiles", SystemFonts.DefaultFont, SystemBrushes.WindowText, 0, 0);
+                return;
+            }
+            // Draw all tiles overlapping the rect
+            for (int index = 0; index < _metaTiles.Count; ++index)
+            {
+                // Is this tile in the clip rectangle?
+                Rectangle tileRect = ScreenRectFromIndex(index);
+                if (!tileRect.IntersectsWith(e.ClipRectangle))
+                {
+                    continue;
+                }
+                MetaTile tile = _metaTiles[index];
+                lock (tile.Bitmap)
+                {
+                    e.Graphics.DrawImageUnscaled(tile.Bitmap, tileRect.Location);
+                }
+                // Is it selected?
+                if (index == SelectedMetaTileIndex)
+                {
+                    e.Graphics.FillRectangle(_selectionBrush, tileRect);
+                    e.Graphics.DrawRectangle(_selectionPen, tileRect);
+                }
+                    // Is it hovered?
+                else if (index == _hoveredIndex)
+                {
+                    e.Graphics.DrawRectangle(_hoverPen, tileRect);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Private methods
+
+        private void SetHoveredIndex(int index)
+        {
+            if (index == _hoveredIndex)
+            {
+                return;
+            }
+            Invalidate(ScreenRectFromIndex(_hoveredIndex));
+            _hoveredIndex = index;
+            Invalidate(ScreenRectFromIndex(_hoveredIndex));
+        }
+
+        // Returns the bounding rect for the given metatile, in screen coordinates.
+        private Rectangle ScreenRectFromIndex(int index)
+        {
+            if (_metaTiles == null || index < 0 || index >= _metaTiles.Count)
+            {
+                return new Rectangle();
+            }
+            int x = index % _columnCount;
+            int y = index / _columnCount;
+            return new Rectangle(x * TileSizeInPixels + AutoScrollPosition.X, y * TileSizeInPixels + AutoScrollPosition.Y, TileSizeInPixels, TileSizeInPixels);
+        }
+
+        // Returns the metatile index for the given screen point, or -1 if there isn't one
+        private int IndexFromScreenPoint(Point point)
+        {
+            if (_metaTiles == null)
             {
                 return -1;
             }
-            int columnCount = this.Width / 96;
-            int rowCount = (int)Math.Ceiling((double)this.metaTiles.Count / columnCount);
-            int x = (point.X / 96);
-            int y = (point.Y / 96);
-            if (x < 0 || y < 0 || x >= columnCount || y >= rowCount)
+            var x = (point.X - AutoScrollPosition.X) / TileSizeInPixels;
+            var y = (point.Y - AutoScrollPosition.Y) / TileSizeInPixels;
+            if (x < 0 || y < 0 || x >= _columnCount || y >= _rowCount)
             {
                 return -1;
             }
-            int index = y * columnCount + x;
-            if (index >= this.metaTiles.Count)
+            var index = y * _columnCount + x;
+            if (index >= _metaTiles.Count)
             {
-                index = -1;
+                return -1;
             }
             return index;
         }
+
+        #endregion
     }
 }

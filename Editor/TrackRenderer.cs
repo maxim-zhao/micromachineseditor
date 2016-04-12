@@ -1,43 +1,38 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using System.Collections.Generic;
 using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Globalization;
 using System.Windows.Forms;
 
 namespace MicroMachinesEditor
 {
-    public partial class TrackRenderer : UserControl
+    public sealed partial class TrackRenderer : UserControl
     {
-        private TrackLayout trackLayout;
-        private IList<MetaTile> metaTiles;
-        private bool showGrid;
-        private Pen gridPen = new Pen(Color.Gray);
-        private Brush nonTrackBrush = new SolidBrush(Color.FromArgb(127, Color.Black));
-        private Font positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 30);
-        private StringFormat positionNumberStringFormat = new StringFormat() { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center, };
-        private bool showPositions;
-        private bool showMetaTileFlags;
+        private TrackLayout _trackLayout;
+        private IList<MetaTile> _metaTiles;
+        private bool _showGrid;
+        private bool _showPositions;
+        private bool _showMetaTileFlags;
+        private readonly Pen _gridPen = new Pen(Color.Gray);
+        private readonly Brush _nonTrackBrush = new SolidBrush(Color.FromArgb(127, Color.Black));
+        private readonly Font _positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 30);
+        private readonly StringFormat _positionNumberStringFormat = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center, };
 
         public TrackRenderer()
         {
             InitializeComponent();
-            this.MinimumSize = this.MaximumSize = new Size(32 * 96, 32 * 96);
-            this.DoubleBuffered = true;
+            MinimumSize = MaximumSize = new Size(32 * 96, 32 * 96);
+            DoubleBuffered = true;
         }
 
         public TrackLayout TrackLayout
         {
             get
             {
-                return trackLayout;
+                return _trackLayout;
             }
             set
             {
-                this.trackLayout = value;
+                _trackLayout = value;
                 Invalidate();
             }
         }
@@ -46,18 +41,18 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return this.metaTiles;
+                return _metaTiles;
             }
             set
             {
-                this.metaTiles = value;
+                _metaTiles = value;
                 Invalidate();
             }
         }
 
         private void TrackEditor_Paint(object sender, PaintEventArgs e)
         {
-            if (this.trackLayout == null || this.metaTiles == null)
+            if (_trackLayout == null || _metaTiles == null)
             {
                 e.Graphics.FillRectangle(SystemBrushes.Window, e.ClipRectangle);
                 e.Graphics.DrawString("No track data", SystemFonts.DefaultFont, SystemBrushes.WindowText, 0, 0);
@@ -73,46 +68,46 @@ namespace MicroMachinesEditor
             {
                 for (int x = minX; x <= maxX; ++x)
                 {
-                    int index = this.trackLayout.TileIndexAt(x, y);
-                    Rectangle tileRect = new Rectangle(x * 96, y * 96, 96, 96);
-                    if (index < 0 || index >= this.metaTiles.Count)
+                    int index = _trackLayout.TileIndexAt(x, y);
+                    var tileRect = new Rectangle(x * 96, y * 96, 96, 96);
+                    if (index < 0 || index >= _metaTiles.Count)
                     {
                         // Error
                         e.Graphics.FillRectangle(Brushes.Red, tileRect);
                         e.Graphics.DrawString(string.Format("Invalid metatile index {0}", index), SystemFonts.DefaultFont, Brushes.White, 0, 0);
                     }
-                    MetaTile tile = this.metaTiles[index];
+                    MetaTile tile = _metaTiles[index];
                     lock (tile.Bitmap)
                     {
                         e.Graphics.DrawImageUnscaled(tile.Bitmap, tileRect);
                     }
 
-                    if (this.showPositions)
+                    if (ShowPositions)
                     {
-                        int trackPosition = this.trackLayout.TrackPositionAt(x, y);
+                        int trackPosition = _trackLayout.TrackPositionAt(x, y);
                         if (trackPosition == 0)
                         {
-                            e.Graphics.FillRectangle(nonTrackBrush, tileRect);
+                            e.Graphics.FillRectangle(_nonTrackBrush, tileRect);
                         }
                         else
                         {
-                            e.Graphics.DrawString(trackPosition.ToString(), this.positionNumberFont, Brushes.Black, tileRect, this.positionNumberStringFormat);
+                            e.Graphics.DrawString(trackPosition.ToString(CultureInfo.InvariantCulture), _positionNumberFont, Brushes.Black, tileRect, _positionNumberStringFormat);
                             tileRect.Offset(-1, -1);
-                            e.Graphics.DrawString(trackPosition.ToString(), this.positionNumberFont, Brushes.White, tileRect, this.positionNumberStringFormat);
+                            e.Graphics.DrawString(trackPosition.ToString(CultureInfo.InvariantCulture), _positionNumberFont, Brushes.White, tileRect, _positionNumberStringFormat);
                         }
                     }
 
-                    if (this.showGrid)
+                    if (ShowGrid)
                     {
-                        e.Graphics.DrawRectangle(this.gridPen, tileRect);
+                        e.Graphics.DrawRectangle(_gridPen, tileRect);
                     }
 
-                    if (this.ShowMetaTileFlags)
+                    if (ShowMetaTileFlags)
                     {
-                        int flags = this.trackLayout.FlagsAt(x, y);
+                        int flags = _trackLayout.FlagsAt(x, y);
                         if (flags != 0)
                         {
-                            e.Graphics.DrawString(flags.ToString(), SystemFonts.CaptionFont, Brushes.Fuchsia, tileRect);
+                            e.Graphics.DrawString(flags.ToString(CultureInfo.InvariantCulture), SystemFonts.CaptionFont, Brushes.Fuchsia, tileRect);
                         }
                     }
                 }
@@ -124,12 +119,12 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return this.showGrid;
+                return _showGrid;
             }
             set
             {
-                this.showGrid = value;
-                this.Invalidate();
+                _showGrid = value;
+                Invalidate();
             }
         }
 
@@ -137,12 +132,12 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return this.showPositions;
+                return _showPositions;
             }
             set
             {
-                this.showPositions = value;
-                this.Invalidate();
+                _showPositions = value;
+                Invalidate();
             }
         }
 
@@ -150,12 +145,12 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return this.showMetaTileFlags;
+                return _showMetaTileFlags;
             }
             set
             {
-                this.showMetaTileFlags = value;
-                this.Invalidate();
+                _showMetaTileFlags = value;
+                Invalidate();
             }
         }
     }

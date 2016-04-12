@@ -1,6 +1,6 @@
 ﻿namespace MicroMachinesEditor
 {
-    partial class ScrollingPanel
+    sealed partial class ScrollingPanel
     {
         /// <summary> 
         /// Required designer variable.

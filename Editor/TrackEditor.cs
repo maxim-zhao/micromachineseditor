@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace MicroMachinesEditor
@@ -23,47 +17,47 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return this.track;
+                return track;
             }
             set
             {
-                this.track = value;
+                track = value;
                 if (value == null)
                 {
-                    this.trackRenderer.TrackLayout = null;
-                    this.trackRenderer.MetaTiles = null;
-                    this.metaTileSelector.MetaTiles = null;
+                    trackRenderer.TrackLayout = null;
+                    trackRenderer.MetaTiles = null;
+                    metaTileSelector.MetaTiles = null;
                 }
                 else
                 {
-                    this.trackRenderer.TrackLayout = this.track.Layout;
-                    this.trackRenderer.MetaTiles = this.track.MetaTiles;
-                    this.metaTileSelector.MetaTiles = this.track.MetaTiles;
+                    trackRenderer.TrackLayout = track.Layout;
+                    trackRenderer.MetaTiles = track.MetaTiles;
+                    metaTileSelector.MetaTiles = track.MetaTiles;
                 }
             }
         }
 
         private void btnTrackRotateUp_Click(object sender, EventArgs e)
         {
-            this.track.Layout.Rotate(0, -1);
+            track.Layout.Rotate(0, -1);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateDown_Click(object sender, EventArgs e)
         {
-            this.track.Layout.Rotate(0, +1);
+            track.Layout.Rotate(0, +1);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateLeft_Click(object sender, EventArgs e)
         {
-            this.track.Layout.Rotate(-1, 0);
+            track.Layout.Rotate(-1, 0);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateRight_Click(object sender, EventArgs e)
         {
-            this.track.Layout.Rotate(+1, 0);
+            track.Layout.Rotate(+1, 0);
             trackRenderer.Invalidate();
         }
 
@@ -74,9 +68,9 @@ namespace MicroMachinesEditor
                 null,
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question,
-                MessageBoxDefaultButton.Button2) == System.Windows.Forms.DialogResult.Yes)
+                MessageBoxDefaultButton.Button2) == DialogResult.Yes)
             {
-                this.track.Layout.Blank(metaTileSelector.SelectedMetaTileIndex);
+                track.Layout.Blank(metaTileSelector.SelectedMetaTileIndex);
                 trackRenderer.Invalidate();
             }
         }
@@ -88,9 +82,9 @@ namespace MicroMachinesEditor
 
         private void trackRenderer_MouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            if (e.Button == MouseButtons.Left)
             {
-                if (tbEyeDropper.Checked || Control.ModifierKeys == Keys.Control)
+                if (tbEyeDropper.Checked || ModifierKeys == Keys.Control)
                 {
                     EyeDropper(e.Location);
                     tbEyeDropper.Checked = false;
@@ -104,7 +98,7 @@ namespace MicroMachinesEditor
 
         private void EyeDropper(Point p)
         {
-            if (this.track == null)
+            if (track == null)
             {
                 return;
             }
@@ -115,13 +109,13 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            int indexUnderMouse = this.track.Layout.TileIndexAt(x, y);
+            int indexUnderMouse = track.Layout.TileIndexAt(x, y);
             metaTileSelector.SelectedMetaTileIndex = indexUnderMouse;
         }
 
         private void trackRenderer_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            if (e.Button == MouseButtons.Left)
             {
                 SetMetaTile(e.Location);
             }
@@ -129,7 +123,7 @@ namespace MicroMachinesEditor
 
         private void SetMetaTile(Point p)
         {
-            if (this.track == null)
+            if (track == null)
             {
                 return;
             }
@@ -145,12 +139,12 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            int existingIndex = this.track.Layout.TileIndexAt(x, y);
+            int existingIndex = track.Layout.TileIndexAt(x, y);
             if (existingIndex == metaTileIndex)
             {
                 return;
             }
-            this.track.Layout.SetTileIndex(x, y, (byte)metaTileIndex);
+            track.Layout.SetTileIndex(x, y, (byte)metaTileIndex);
             Rectangle tileRect = new Rectangle(x * 96, y * 96, 96, 96);
             trackRenderer.Invalidate(tileRect);
         }

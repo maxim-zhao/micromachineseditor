@@ -1,6 +1,6 @@
 ﻿namespace MicroMachinesEditor
 {
-    partial class TrackRenderer
+    sealed partial class TrackRenderer
     {
         /// <summary> 
         /// Required designer variable.

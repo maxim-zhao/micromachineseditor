@@ -1,54 +1,62 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
-using System.Linq;
-using System.Text;
+using System.Drawing.Drawing2D;
 
 namespace MicroMachinesEditor
 {
     public class Track
     {
-        private TrackLayout layout;
-        private TrackTypeData trackTypeData;
-        private string name;
+        private readonly TrackLayout _layout;
+        private readonly TrackTypeData _trackTypeData;
+        private string _name;
 
         public string Name { 
-            get { return this.name; }
+            get { return _name; }
             set
             {
-                this.name = Codec.ValidateString(value, 20);
+                _name = Codec.ValidateString(value, 20);
             } 
         }
 
         public Track(string name, TrackLayout layout, TrackTypeData trackTypeData)
         {
-            this.name = name;
-            this.layout = layout;
-            this.trackTypeData = trackTypeData;
+            _name = name;
+            _layout = layout;
+            _trackTypeData = trackTypeData;
         }
 
         public Bitmap GetThumbnail(int size)
         {
-            Bitmap result = new Bitmap(size, size);
-            Graphics g = Graphics.FromImage(result);
-            Bitmap bm = layout.render(trackTypeData.MetaTiles);
-            g.DrawImage(bm, 0, 0, size, size);
+            var result = new Bitmap(size, size);
+            using (var g = Graphics.FromImage(result))
+            {
+                using (Bitmap bm = _layout.render(_trackTypeData.MetaTiles))
+                {
+                    g.DrawImage(bm, 0, 0, size, size);
+                }
+            }
             return result;
         }
 
-        public TrackLayout Layout { get { return this.layout; } }
-        public IList<MetaTile> MetaTiles { get { return this.trackTypeData.MetaTiles; } }
-        public IList<SMSGraphics.Tile> Tiles { get { return this.trackTypeData.Tiles; } }
+        internal TrackLayout Layout { get { return _layout; } }
+        internal IList<MetaTile> MetaTiles { get { return _trackTypeData.MetaTiles; } }
+        internal IList<SMSGraphics.Tile> Tiles { get { return _trackTypeData.Tiles; } }
 
-        public int Acceleration { get; set; }
+        [Description("The rate at which the vehicle speeds up when accelerating. Original values are 6 (strong acceleration) to 18 (weak).")]
+        public int AccelerationDelay { get; set; }
 
-        public int Deceleration { get; set; }
+        [Description("How long it takes to decelerate (when not accelerating). Original values are 5 (strong deceleration) to 39 (weak).")]
+        public int DecelerationDelay { get; set; }
 
+        [Description("Vehicle top speed, from 1 to 15. Larger values cause glitches. Original values are 7 (slow) to 11 (fast).")]
         public int TopSpeed { get; set; }
 
-        public int SteeringSpeed { get; set; }
+        [Description("How long it takes to steer. Original values are 6 (fast) to 9 (slow).")]
+        public int SteeringDelay { get; set; }
 
-        public enum VehicleTypeEnum
+        public enum VehicleTypes
         {
             Desk = 0,
             Breakfast = 1,
@@ -60,7 +68,7 @@ namespace MicroMachinesEditor
             Bonus = 7
         }
 
-        public VehicleTypeEnum VehicleType { get; set; }
+        public VehicleTypes VehicleType { get; set; }
 
         public int TrackIndex { get; set; }
     }

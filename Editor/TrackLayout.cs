@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
+using System.Drawing.Drawing2D;
 
 namespace MicroMachinesEditor
 {
@@ -30,8 +29,8 @@ namespace MicroMachinesEditor
             Bitmap result = new Bitmap(dimensions, dimensions);
             Graphics g = Graphics.FromImage(result);
 
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
             Font font = new Font("Tahoma", 8);
 
@@ -117,8 +116,8 @@ namespace MicroMachinesEditor
 
         internal void Rotate(int dx, int dy)
         {
-            Rotate(ref this.metaTileIndices, dx, dy);
-            Rotate(ref this.positions, dx, dy);
+            Rotate(ref metaTileIndices, dx, dy);
+            Rotate(ref positions, dx, dy);
         }
 
         private void Rotate(ref byte[,] array, int dx, int dy)
@@ -143,8 +142,8 @@ namespace MicroMachinesEditor
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    this.metaTileIndices[x, y] = (byte)metatileIndex;
-                    this.positions[x, y] = 0;
+                    metaTileIndices[x, y] = (byte)metatileIndex;
+                    positions[x, y] = 0;
                 }
             }
         }

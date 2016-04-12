@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MicroMachinesEditor
 {
@@ -11,7 +7,7 @@ namespace MicroMachinesEditor
     {
         public static IList<Color> ReadPalette(byte[] data, int offset, int count)
         {
-            List<Color> result = new List<Color>(count);
+            var result = new List<Color>(count);
             for (int i = 0; i < 32; ++i)
             {
                 byte b = data[offset + i];
@@ -38,12 +34,11 @@ namespace MicroMachinesEditor
         public static IList<Tile> ReadTiles(byte[] data, int offset, int byteCount, IList<Color> palette)
         {
             // Build collection of tiles
-            List<Tile> result = new List<Tile>();
-
             int numTiles = byteCount / 32;
+            var result = new List<Tile>(numTiles);
             for (int i = 0; i < numTiles; ++i)
             {
-                Tile tile = new Tile(data, offset, palette);
+                var tile = new Tile(data, offset, palette);
                 offset += 32;
                 result.Add(tile);
             }
@@ -54,7 +49,7 @@ namespace MicroMachinesEditor
         {
             public Bitmap Bitmap { get; private set; }
 
-            public Tile(byte[] data, int offset, IList<Color> palette)
+            public Tile(IList<byte> data, int offset, IList<Color> palette)
             {
                 Bitmap = new Bitmap(8, 8);
 

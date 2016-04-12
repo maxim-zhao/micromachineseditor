@@ -1,24 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace MicroMachinesEditor
 {
+    /// <summary>
+    /// Wraps a binary blob and exposes Offset, Next() and HasNext() methods for it
+    /// </summary>
     class BufferHelper
     {
         public BufferHelper(IList<byte> data, int offset)
         {
-            m_data = data;
+            _data = data;
             Offset = offset;
         }
 
-        public bool HasNext() { return Offset < m_data.Count; }
+        public bool HasNext() { return Offset < _data.Count; }
 
-        public byte Next() { return m_data[Offset++]; }
+        public byte Next() { return _data[Offset++]; }
 
-        private IList<byte> m_data;
+        private readonly IList<byte> _data;
 
         public int Offset { get; set; }
         /*

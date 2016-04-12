@@ -91,19 +91,19 @@ Table at 0xaace holds 16-bit pointers to text encoded as runs of 20 tile numbers
 "  HANDYMANS CURVE   "
 "  BERMUDA BATHTUB   "
 "   SAHARA SANDPIT   "
-" THE POTTED PASSAGE "
+" THE POTTED PASSAGE " <-- Unused Helicopter track
 "FRUIT-JUICE FOLLIES "
 "    FOAMY FJORDS    "
 "BEDROOM BATTLEFIELD "
 "  PITFALL POCKETS   "
 "  PENCIL PLATEAUX   "
 "THE DARE-DEVIL DUNES"
-"THE SHRUBBERY TWIST "
+"THE SHRUBBERY TWIST " <-- Unused Helicopter track
 " PERILOUS PIT-STOP  "
 "WIDE-AWAKE WAR-ZONE "
 "   CRAYON CANYONS   "
 "  SOAP-LAKE CITY !  "
-"  THE LEAFY BENDS   "
+"  THE LEAFY BENDS   " <-- Unused Helicopter track
 " CHALK-DUST CHICANE "
 "     GO FOR IT!     "
 " WIN THIS RACE TO BE CHAMPION!" <-- odd one out

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Drawing;
 
 namespace MicroMachinesEditor
 {
@@ -32,7 +31,7 @@ namespace MicroMachinesEditor
             MetaTiles = Codec.LoadMetaTiles(file, trackType, Tiles);
         }
 
-        public IList<System.Drawing.Color> Palette { get; private set; }
+        public IList<Color> Palette { get; private set; }
 
         public IList<SMSGraphics.Tile> Tiles { get; private set; }
 
