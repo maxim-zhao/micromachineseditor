@@ -1,6 +1,173 @@
 b x 7b21 Decompression entry
 b x 7b2b Decompression exit
 
+!!!Tracks table
+
+The table at $766a holds data for 29 tracks, with data for any one track every 29 bytes, in the form:
+
+||!Offset ||!Data (byte) || Copied to RAM location
+|| n+0 ||[[#tracktypes|Track type]] || ||
+|| n+29 ||Track index for this vehicle type [^Typically 0-2, used for "car display case" screens^] || $db96||
+|| n+58 ||Player vehicle top speed [^Mostly consistent per vehicle type, but not always. Range 7-10 used, but seems to work up to 15.^] || $db98||
+|| n+87 ||Player acceleration delay [^Higher numbers mean slower acceleration] || $db99||
+|| n+116 ||Player deceleration (not braking) delay [^Higher numbers mean slower deceleration] || $db9a||
+|| n+116 ||Player steering delay [^Higher numbers mean slower turns] || $db9b||
+
+This is followed by another 29*5 bytes which are used for the last five rows of the table when the game is in GG mode. 
+This is not detected at runtime, but the game spends some time choosing code paths at runtime based on a baked-in value written to RAM, rather than being compiled for the platform in question. 
+In general, the GG data makes the cars slower but more manoeuvrable.
+
+[@
+02 01 00 05 03 01 04 05 02 03 08 01 02 06 04 00 03 08 05 06 00 02 08 04 06 00 07 07 07 Track type
+00 01 00 00 01 00 00 01 01 00 00 02 03 00 01 01 02 01 02 01 02 02 02 02 02 02 00 01 02 Track index
+09 08 0B 0A 0B 09 0B 0A 09 0B 08 09 09 07 0B 0B 0B 08 0A 07 0B 09 08 0B 07 0B 08 08 08 Top speed (SMS)
+10 12 09 12 0D 12 0F 12 10 0E 12 12 10 06 0F 09 0D 12 12 06 09 10 12 0F 06 09 13 13 13 Acceleration delay (SMS)
+12 05 16 27 19 12 1A 27 12 19 12 12 12 06 1A 16 19 12 27 06 16 12 12 1A 06 16 15 15 15 Deceleration delay (SMS)
+07 06 07 07 06 06 06 06 07 06 06 06 07 09 06 06 06 06 06 09 06 07 06 06 09 06 06 06 06 Steering delay (SMS)
+07 06 0A 08 09 07 09 08 07 09 06 07 07 05 09 0A 09 06 08 05 0A 07 06 09 05 0A 06 06 06 Top speed (GG)
+14 14 09 17 0D 14 11 17 14 10 14 14 14 08 11 09 0D 14 17 08 09 14 14 11 08 09 15 15 15 Acceleration delay (GG)
+14 07 18 29 1B 14 1C 29 14 1B 14 14 14 08 1C 18 1B 14 29 08 18 14 14 1C 08 18 17 17 17 Deceleration delay (GG)
+08 07 08 08 07 07 07 07 08 07 07 07 08 0A 07 07 07 07 07 0A 07 08 07 07 0A 07 07 07 07 Steering delay (GG)
+@]
+
+!!!Track type data
+
+!!!!Tiles
+
+Tables at $3dc8 and $3ddc point to compressed tile data for each of the track types:
+
+||!Offset ||!Size ||!Data ||
+|| $3dc8+n || 1||Page number ||
+|| $3ddc+n, $3ddc+n+8 || 2||Offset of (compressed) 3bpp tile data with a (discarded) 4 byte header ||
+
+Tile data is always exactly 256 tiles (8192 bytes decompressed), setting unused tiles to zero.
+There's no technical reason not to use 4 bit data, or to leave unused tiles undefined.
+
+[@
+0F 0E 0F 0E 0D 0E 0E 0F 0D -- Page
+00 83 01 00 00 FA 68 8D -- Offset low
+80 9C 99 80 80 A8 91 8D -- Offset high
+@]
+
+!!!!Palette
+
+A table at $17ec2 holds pointers to the palette for each track type. Only 8 colours are defined in each palette, to match the three bit tile data.
+
+[@
+.org $17ec2
+.dw $BED2 $BEF2 $BF12 $BF32 $BF52 $BF72 $BF92 $BFB2
+.orga $bed2
+.db 00 05 06 3F 2A 15 02 24 00 00 00 00 00 00 00 00
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00
+.orga $bef2
+.db 00 06 05 3F 2A 24 39 0B 00 00 00 00 00 00 00 00 
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00 
+.orga $bf12
+.db 25 00 3F 0F 05 0A 14 29 21 25 3A 3F 3A 25 21 10 
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00 
+.orga $bf32
+.db 00 2A 3F 0B 06 05 35 02 00 00 00 00 00 00 00 00 
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00
+.orga $bf52
+.db 00 08 04 3F 2A 05 0B 03 30 35 3A 3F 30 35 3A 3F
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00 
+.orga $bf72
+.db 00 15 2A 3F 02 04 06 0B 21 25 3A 3F 3A 25 21 10
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00
+.orga $bf92
+.db 00 30 35 3A 3F 01 02 08 21 25 3A 3F 3A 25 21 10
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00
+.orga $bfb2
+.db 00 3F 1A 04 38 06 05 01 21 25 3A 3F 3A 25 21 10 
+.db 00 17 0D 00 39 15 2A 3F 0B 00 00 00 00 00 00 00
+@]
+
+!!!!Metatiles
+
+For a given track type:
+* There are always 64 metatiles
+* A metatile index translation table is loaded from a set at $4225 (64 bytes per track type) to $da20. 
+  This gives an indirection between the "metatile index" in the track data and the "data index" used in the data below.
+  A track may have fewer than 64 "data items" mapped to its 64 metatiles. This allows metatiles with identical behaviour to share the underlying data.
+* Data is held in a single page of ROM, given by a table at $3e3a
+[@
+.db $03 $04 $05 $06 $07 $08 $09 $0A $0B ; goes up to 8
+@]
+* The first four bytes in that page are pointers to two compressed blobs of data. 
+** The first contains behaviour info for each metatile. 
+   This is 36 bytes per metatile plus a 4 byte header which is discarded.
+   It is decompressed to RAM at $cc80..$d57f (for the maximum 64 metatiles).
+   The 36 bytes correspond to a 6x6 grid (row-major, LSB first) (16px squares) across the metatile.
+   The player's current value is stored in RAM at $df79 and also $dc51.
+   The previous non-identical value seen is stored in RAM at $dc52.
+   Bits %00011000 are shifted right 1 and sent to $df7b.
+   Bits %11110000 define a "behaviour" for the metatile. 
+     Each track type therefore has a maximum of 16 "behaviours" from a set of 17 in the game (this could have been much higher).
+     The "real" behaviour is looked up from a 16 (entries) x 8 (track types) table at $242e.
+     The game behaviours control things like skidding, jumping, death and directional passability.
+   Bit %00010000 from a earlier-visited metatile is sometimes used for unknown reasons.
+   The low bits seem unused? If removed, compression would improve.
+** The second contains "wall data" for each metatile. 
+   This is 18 bytes per metatile plus a 4 byte header which is discarded.
+   Each 18 bytes specify 144 bits, for a 12*12 grid (row-major, LSB first) (8px squares) where 1 = solid, 0 = passable.
+   It is decompressed to RAM at $c800..$cc7f (for the maximum 64 metatiles).
+** A split table at $4000 and $4041 points to offsets in the page for tile indices; these are all 144 bytes apart so could be calculated. 
+   They also include a value for index $40 which seems not to be possible to use?
+   The 144 bytes specify 12x12 (row-major) tile indices to be used (with no tile flipping or priority bits).
+   These take the space from $0080 to $247f (or is it $250f for index $40?)
+
+Metatile index translation tables at $4225:
+
+[@
+; Desk: 61 unique entries
+00 01 06 0D 15 16 20 23 2A 2F 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 24 25 26 27 28 29 02 03 04 07 08 09 0A 0B 0C 0E 0F 10 11 17 18 19 1A 1B 1C 1D 1E 1F 12 13 14 21 22 05 2B 00 2C 00 00 
+
+; Breakfast table: 53 unique entries
+00 0F 12 14 15 16 17 18 19 1A 1B 1C 1D 10 27 28 29 2A 2B 2C 2D 2E 1E 1F 20 21 11 2F 32 33 13 30 31 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 22 23 24 25 26 34 14 15 00 00 00 00 00 00 00 00 00 
+
+; Bathtub: 51 uique entries
+00 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 01 16 17 2A 32 18 19 1A 1C 20 21 22 23 25 24 26 27 28 29 2B 01 01 01 0E 12 2D 2E 2F 30 31 2C 1D 1B 1E 1F 01 08 0D 01 00 00 00 00 
+
+; Sandpit: 64 unique entries
+00 01 18 19 33 34 35 36 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 3E 3F 37 38 39 32 03 04 05 06 2B 2C 2D 2E 2F 24 25 23 29 02 3A 3B 3C 3D 26 28 27 1B 1C 1D 1E 1F 20 22 21 30 31 1A 17 2A 
+
+; Pool tabel: 63 unique entries
+00 01 02 03 04 05 06 14 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 16 17 18 19 1A 1B 1C 1D 1E 1F 20 21 22 23 24 25 26 27 15 28 2A 2B 2C 2D 2E 2F 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F 1A 
+
+; Garage: 49 unique entries
+00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 19 1C 1D 1E 1F 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F 30 31 32 18 2D 18 18 00 00 00 00 00 00 00 00 00 00 00 00 
+
+; Bedroom: 52 unique entries
+00 02 03 06 07 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 01 04 05 08 09 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F 30 31 32 33 34 35 17 1F 36 22 29 00 00 00 00 00 00 00 00 00 00 
+
+; Garden: 59 unique entries
+00 01 03 04 06 07 19 1A 31 32 18 16 34 35 37 1D 20 1E 1F 05 0D 0E 0F 10 11 12 13 14 15 33 02 0B 0C 38 39 3A 17 36 1B 1C 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F 30 08 09 0A 00 00 00 00 00 
+
+; Helicopters: invalid data
+FF FE 0C 04 06 06 08 0A 0A 00 0E 0E 02 02 FE 0C 04 FE FE FE 00 08 00 FF FF FE FF FF FE FE 0C FF 04 0C FF FF FF FF FE FE FE FE FE FF 00 FE 08 FE 0C 04 FE FF FF FF FF FF FF FF FF FF FF FF FF FF
+@]
+
+!!!!Behaviours
+
+The "behaviours" are code handling what happens to the player's car when driving across 16px square sections of the track.
+
+
+
+[[#tracktypes]]
+Track types:
+||!Value ||!Type ||
+|| 00||Desk/sportscars ||
+|| 01||Breakfast table/four by four ||
+|| 02||Bathtub/powerboats ||
+|| 03||Sandpit/turbo wheels ||
+|| 04||Pool table/formula one ||
+|| 05||Garage/warriors ||
+|| 06||Bedroom/tanks ||
+|| 07||Bonus stage/rufftrux ||
+|| 08||Helicopters (do not work, missing data in many places) ||
+
+
+
 !!!Stage 1
 
 Tiles are loaded based on the number in $db97, which holds the course/vehicle type:
@@ -17,11 +184,9 @@ Tiles are loaded based on the number in $db97, which holds the course/vehicle ty
 
 This is loaded from a table at $766a, which holds some other info:
 - Per-type track indices, usually in the range 0-2 but sometimes 3
-- Car parameters - acceleration, top speed, deceleration, steering speed. This is stored per-track but is always the same for the same vehicle.
+- Car parameters - acceleration, top speed, deceleration, steering speed. This is stored per-track but is always (?) the same for the same vehicle.
 
 !!!Stage 2
-
-A table at 
 
 Data decompressed to $cc7c. First four bytes seem to be a header which is never used.
 The data lengths vary per track.
@@ -69,7 +234,7 @@ $c000..$c7ff. This overwrites the first four bytes from Stage 3 above.
 
 !!Metatiles
 
-Metatlle tile data is looked up by:
+Metatile tile data is looked up by:
 
 1. Get the metatile number. This is in the range $00..$3f.
 2. Convert it to a global metatile index using a table at $da20.
@@ -108,3 +273,6 @@ Table at 0xaace holds 16-bit pointers to text encoded as runs of 20 tile numbers
 "     GO FOR IT!     "
 " WIN THIS RACE TO BE CHAMPION!" <-- odd one out
 "RUFFTRUX BONUS STAGE"
+
+!!RAM
+dd04 = most recent course index visited
