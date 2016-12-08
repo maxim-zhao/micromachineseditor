@@ -7,22 +7,22 @@ namespace MicroMachinesEditor
 {
     public class TrackLayout
     {
-        private byte[,] metaTileIndices = new byte[32,32];
-        private byte[,] positions = new byte[32,32];
+        private byte[,] _metaTileIndices = new byte[32,32];
+        private byte[,] _positions = new byte[32,32];
 
-        public TrackLayout(List<byte> metaTileData, List<byte> positionData)
+        public TrackLayout(IReadOnlyList<byte> metaTileData, IReadOnlyList<byte> positionData)
         {
             for (int y = 0; y < 32; ++y)
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    metaTileIndices[x,y] = metaTileData[x + y * 32];
-                    positions[x,y] = positionData[x + y * 32];
+                    _metaTileIndices[x,y] = metaTileData[x + y * 32];
+                    _positions[x,y] = positionData[x + y * 32];
                 }
             }
         }
 
-        public Bitmap render(IList<MetaTile> metaTiles)
+        public Bitmap Render(IList<MetaTile> metaTiles)
         {
             // We always render the whole 32x32 range, although the actual level is a subset of it
             int dimensions = 32*96;
@@ -34,12 +34,11 @@ namespace MicroMachinesEditor
 
             Font font = new Font("Tahoma", 8);
 
-            int index = 0;
             for (int y = 0; y < 32; ++y)
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    int metaTileIndex = metaTileIndices[x,y] & 0x3f; // Other bits do something
+                    int metaTileIndex = _metaTileIndices[x,y] & 0x3f; // Other bits do something
                     Rectangle tileRect = new Rectangle(x*96, y*96, 96, 96);
                     Bitmap metaTile = metaTiles[metaTileIndex].Bitmap;
                     lock (metaTile)
@@ -47,22 +46,20 @@ namespace MicroMachinesEditor
                         g.DrawImageUnscaled(metaTile, tileRect);
                     }
 
-                    byte trackPosition = positions[x,y];
+                    byte trackPosition = _positions[x,y];
                     if (trackPosition != 0)
                     {
                         g.DrawRectangle(SystemPens.ActiveCaption, tileRect);
-                        String s = trackPosition.ToString();
+                        var s = trackPosition.ToString();
                         DrawTextInBox(g, tileRect, s, font, 1);
                     }
 
-                    int otherBits = metaTileIndices[x,y] >> 6;
+                    int otherBits = _metaTileIndices[x,y] >> 6;
                     if (otherBits != 0)
                     {
-                        String s = otherBits.ToString();
+                        var s = otherBits.ToString();
                         DrawTextInBox(g, tileRect, s, font, 2);
                     }
-
-                    ++index;
                 }
             }
 
@@ -102,7 +99,7 @@ namespace MicroMachinesEditor
             {
                 return -1;
             }
-            return metaTileIndices[x, y] & 0x3f;
+            return _metaTileIndices[x, y] & 0x3f;
         }
 
         internal int FlagsAt(int x, int y)
@@ -111,13 +108,13 @@ namespace MicroMachinesEditor
             {
                 return -1;
             }
-            return metaTileIndices[x, y] >> 6;
+            return _metaTileIndices[x, y] >> 6;
         }
 
         internal void Rotate(int dx, int dy)
         {
-            Rotate(ref metaTileIndices, dx, dy);
-            Rotate(ref positions, dx, dy);
+            Rotate(ref _metaTileIndices, dx, dy);
+            Rotate(ref _positions, dx, dy);
         }
 
         private void Rotate(ref byte[,] array, int dx, int dy)
@@ -142,8 +139,8 @@ namespace MicroMachinesEditor
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    metaTileIndices[x, y] = (byte)metatileIndex;
-                    positions[x, y] = 0;
+                    _metaTileIndices[x, y] = (byte)metatileIndex;
+                    _positions[x, y] = 0;
                 }
             }
         }
@@ -154,7 +151,7 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            metaTileIndices[x, y] = (byte)((metaTileIndices[x, y] & 0xc0) | (metaTileIndex & 0x3f));
+            _metaTileIndices[x, y] = (byte)((_metaTileIndices[x, y] & 0xc0) | (metaTileIndex & 0x3f));
         }
 
         internal int TrackPositionAt(int x, int y)
@@ -163,7 +160,7 @@ namespace MicroMachinesEditor
             {
                 return -1;
             }
-            return positions[x, y];
+            return _positions[x, y];
         }
     }
 }

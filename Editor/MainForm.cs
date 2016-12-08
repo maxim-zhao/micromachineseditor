@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -67,15 +66,7 @@ namespace MicroMachinesEditor
                 MessageBox.Show(ex.Message);
             }
             tbOutput.Text = HexToString(decoded);
-            string message = string.Format(
-                "Decoded {0} bytes from {1:X} to {2:X} to {3} bytes of data ({4:P2} compression)",
-                bufferHelper.Offset - offset,
-                offset,
-                bufferHelper.Offset - 1,
-                decoded.Count,
-                CompressionRatio(bufferHelper.Offset - offset, decoded.Count)
-                );
-            Log(message);
+            Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -93,7 +84,7 @@ namespace MicroMachinesEditor
                     break; // Nasty!
                 }
                 catch (Exception) {
-                    Log("Failed to find data at {0:X}", offset);
+                    Log($"Failed to find data at {offset:X}");
                     Application.DoEvents();
                 } // Failure is OK
                 bufferHelper = new BufferHelper(file, offset);
@@ -104,23 +95,15 @@ namespace MicroMachinesEditor
             }
             tbOffset.Text = Convert.ToString(offset, 16);
             tbOutput.Text = HexToString(decoded);
-            Log("Decoded {0} bytes from {1:X} to {2:X} to {3} bytes of data ({4:P2} compression)",
-                bufferHelper.Offset - offset,
-                offset,
-                bufferHelper.Offset - 1,
-                decoded.Count,
-                CompressionRatio(bufferHelper.Offset - offset, decoded.Count));
+            Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
         }
 
         private void btnText_Click(object sender, EventArgs e)
         {
-            byte[] file = File.ReadAllBytes(tbFilename.Text);
-            int offset = Convert.ToInt32(tbOffset.Text, 16);
-            String text = Codec.DecodeString(file, offset);
-            tbOutput.Text = text;
+            tbOutput.Text = Codec.DecodeString(File.ReadAllBytes(tbFilename.Text), Convert.ToInt32(tbOffset.Text, 16));
         }
 
-private static double CompressionRatio(int compressed, int uncompressed)
+        private static double CompressionRatio(int compressed, int uncompressed)
         {
             return (double)(uncompressed - compressed) / uncompressed;
         }
@@ -197,6 +180,9 @@ private static double CompressionRatio(int compressed, int uncompressed)
             Graphics g = Graphics.FromImage(bm);
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            // Set to transparent
+            g.Clear(Color.Transparent);
 
             int x = 0;
             int y = 0;
@@ -315,14 +301,10 @@ private static double CompressionRatio(int compressed, int uncompressed)
             PopulateTrackList();
         }
 
-        private void Log(string message, params object[] args)
+        private void Log(string message)
         {
             // May be called on any thread, so we marshal it back to the UI
             var now = DateTime.Now;
-            if (args.Length > 0)
-            {
-                message = string.Format(message, args);
-            }
             BeginInvoke(new Action(() =>
             {
                 tbLog.AppendText(now.ToString("HH:mm:ss.fff") + " " + message + Environment.NewLine);
@@ -336,7 +318,7 @@ private static double CompressionRatio(int compressed, int uncompressed)
             lvTracks.Items.Clear();
             var il = new ImageList { ImageSize = new Size(128, 128), ColorDepth = ColorDepth.Depth24Bit, };
             lvTracks.LargeImageList = il;
-            foreach (Track track in _tracks)
+            foreach (var track in _tracks)
             {
                 // Prettify the name
                 string displayName = track.Name.Trim(); // Remove padding
@@ -356,7 +338,7 @@ private static double CompressionRatio(int compressed, int uncompressed)
                         int index = il.Images.Count;
                         il.Images.Add(t.Result);
                         item.ImageIndex = index;
-                        Log("Loaded {0}/{1} thumbnails...", index + 1, _tracks.Count);
+                        Log($"Loaded {index + 1}/{_tracks.Count} thumbnails...");
                     },
                     _uiContext
                 );
@@ -376,6 +358,7 @@ private static double CompressionRatio(int compressed, int uncompressed)
             const int stride = 29; // Offset between chunks
             for (int i = 0; i < 29; ++i)
             {
+                Log($"Loading track {i}");
                 int offset = trackTableOffset + i;
                 int trackType = file[offset];
 
@@ -395,6 +378,7 @@ private static double CompressionRatio(int compressed, int uncompressed)
                 TrackTypeData trackTypeData;
                 if (!_trackTypeData.TryGetValue(trackType, out trackTypeData))
                 {
+                    Log($"Loading track tyoe data for type {trackType}");
                     trackTypeData = new TrackTypeData(file, trackType);
                     _trackTypeData.Add(trackType, trackTypeData);
                 }
@@ -412,6 +396,8 @@ private static double CompressionRatio(int compressed, int uncompressed)
                         name = Codec.DecodeString(file, Codec.AbsoluteOffset(3, BitConverter.ToUInt16(file, 0xaace + (i - 1) * 2)), 20);
                         break;
                 }
+
+                Log($"Track name is \"{name}\"");
 
                 // We decompress it...
                 byte trackTypeDataPageNumber = file[0x3e3a + trackType];

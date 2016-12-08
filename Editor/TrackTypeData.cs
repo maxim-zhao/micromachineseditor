@@ -9,12 +9,12 @@ namespace MicroMachinesEditor
         public TrackTypeData(byte[] file, int trackType)
         {
             // Most of the tables are at the start of a page given by a table at 0x3e3a
-            int trackTypeDataPageNumber = Codec.TrackTypeDataPageNumber(file, trackType);
-            int tableOffset = trackTypeDataPageNumber * 16 * 1024;
+//            int trackTypeDataPageNumber = Codec.TrackTypeDataPageNumber(file, trackType);
+//            int tableOffset = trackTypeDataPageNumber * 16 * 1024;
 
             // But there's tile data (and other stuff) at 0x3dc8
             byte trackTypeTileDataPageNumber = file[0x3dc8 + trackType];
-            byte[] offset1Buffer = new byte[] { file[0x3ddc + trackType], file[0x3de4 + trackType] };
+            byte[] offset1Buffer = { file[0x3ddc + trackType], file[0x3de4 + trackType] };
             int offsetTiles = Codec.AbsoluteOffset(trackTypeTileDataPageNumber, BitConverter.ToUInt16(offset1Buffer, 0));
 
             // And the palette table at 0x17ec2. Palettes are in page 5.

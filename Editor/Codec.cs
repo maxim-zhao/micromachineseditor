@@ -19,7 +19,7 @@ namespace MicroMachinesEditor
         public static List<byte> Decompress(BufferHelper data)
         {
             var result = new List<byte>();
-            for (; ; )
+            for (;;)
             {
                 byte mask = data.Next();
                 // Iterate over its bits, left to right
@@ -268,11 +268,11 @@ namespace MicroMachinesEditor
             int metatileTableOffset = 0x4225 + trackType * 64;
 
             int trackDataOffset = pageNumber * 16 * 1024;
-            int offset2 = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 0));
+            int offsetBehaviourData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 0));
             int offsetWallData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 2));
 
-            // Decode data2
-            IList<byte> data2 = Decompress(file, offset2);
+            // Decode behaviour data
+            IList<byte> behaviourData = Decompress(file, offsetBehaviourData);
 
             // Decode wall data
             IList<byte> wallData = Decompress(file, offsetWallData);
@@ -285,11 +285,11 @@ namespace MicroMachinesEditor
                 int index = file[metatileTableOffset + i];
                 // Calculate the data offsets
                 int offsetTiles = AbsoluteOffset(pageNumber, DecodeSplitPointer(file, 0x4000, 0x41, index));
-                offset2 = i * 36 + 4;
+                offsetBehaviourData = i * 36 + 4;
                 offsetWallData = i * 18 + 4;
 
                 // Create a metatile from it
-                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, data2, offset2, behaviourLookup);
+                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, behaviourData, offsetBehaviourData, behaviourLookup);
 
                 // Add it to the list
                 result.Add(metaTile);

@@ -9,5 +9,11 @@ namespace MicroMachinesEditor
         {
             AutoScroll = true;
         }
+
+        protected override Point ScrollToControl(Control activeControl)
+        {
+            // Keep scroll position on focus
+            return base.DisplayRectangle.Location;
+        }
     }
 }

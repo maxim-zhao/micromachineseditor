@@ -31,7 +31,7 @@ namespace MicroMachinesEditor
 
         #region Properties
 
-        public Bitmap Bitmap { get; private set; }
+        public Bitmap Bitmap { get; }
 
         #endregion
 
@@ -97,15 +97,63 @@ namespace MicroMachinesEditor
                         {
                             g.DrawString(behaviour.ToString("x"), SystemFonts.DefaultFont, Brushes.Fuchsia, x * 16, y * 16);
                             g.DrawRectangle(Pens.Fuchsia, x * 16, y * 16, 15, 15);
+                            // Values seem to be:
+                            // 0 = normal
+                            // 1 = fall to floor/die
+                            // 2 = chalk/dust
+                            // 3 = ?? (book sides, enter only from 7?)
+                            // 4 = big jump (folders, enter only from 7?)
+                            // 5 = skid (milk, ink, oil, cards)
+                            // 6 = bump (cereal, bubbles, soap, top of book, ruler, nails, lego, pencils)
+                            // 7 = ?? (books inner edge)
+                            // 8 = sticky (orange juice, glue)
+                            // 9 = pool table hole
+                            // a = death? (pool table edges)
+                            // b = ?? (cereal box top, exit only except from d?) (also pool table hole edges)
+                            // c = ?? (place mat)
+                            // d = ?? (place mat, bumps?)
+                            // e = deep water/die (ruff trux)
+                            // f = ?? (not used in the game, code exists)
+                            // 12 = deep water/die (turbo wheels)
+                            // 13 = pool cue (no effect?)
                         }
-                        */
+*/
+/*
+                        // Low nibble is unused?
                         int lowNibble = data2Value & 0xf;
-                        if (lowNibble > 0)
+                        if (lowNibble > -1)
                         {
-                            g.DrawString(lowNibble.ToString("x"), SystemFonts.DefaultFont, Brushes.Blue, x * 16, y * 16);
-                            g.DrawRectangle(Pens.Blue, x * 16, y * 16, 15, 15);
-                        }
- 
+                            g.DrawString(lowNibble.ToString("x"), SystemFonts.DefaultFont, Brushes.Yellow, x * 16, y * 16);
+                            //g.DrawRectangle(Pens.Blue, x * 16, y * 16, 15, 15);
+                            switch (lowNibble & 0x3)
+                            {
+                                case 0:
+                                    // -
+                                    g.DrawLine(Pens.Blue, x*16, y*16 + 8, x*16 + 16, y*16 + 8);
+                                    break;
+                                case 1:
+                                    // /
+                                    g.DrawLine(Pens.Blue, x * 16, y * 16, x * 16 + 16, y * 16 + 16);
+                                    break;
+                                case 2:
+                                    // |
+                                    g.DrawLine(Pens.Blue, x*16 + 8, y*16, x*16 + 8, y*16 + 16);
+                                    break;
+                                case 3:
+                                    // \
+                                    g.DrawLine(Pens.Blue, x * 16, y * 16 + 16, x * 16 + 16, y * 16);
+                                    break;
+                            }
+*/
+/*                            if ((lowNibble & 0x8) != 0)
+                            {
+                                g.DrawString("1", SystemFonts.DefaultFont, Brushes.Red, x*16, y*16);
+                            }
+                            else
+                            {
+                                g.DrawString("0", SystemFonts.DefaultFont, Brushes.Red, x * 16, y * 16);
+                            }*/
+                        //}
                     }
                 }
             }

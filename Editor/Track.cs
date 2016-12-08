@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 
 namespace MicroMachinesEditor
 {
@@ -12,6 +11,7 @@ namespace MicroMachinesEditor
         private readonly TrackTypeData _trackTypeData;
         private string _name;
 
+        [SuppressMessage("ReSharper", "UnusedMember.Global")]
         public string Name { 
             get { return _name; }
             set
@@ -32,7 +32,7 @@ namespace MicroMachinesEditor
             var result = new Bitmap(size, size);
             using (var g = Graphics.FromImage(result))
             {
-                using (Bitmap bm = _layout.render(_trackTypeData.MetaTiles))
+                using (Bitmap bm = _layout.Render(_trackTypeData.MetaTiles))
                 {
                     g.DrawImage(bm, 0, 0, size, size);
                 }
@@ -40,22 +40,27 @@ namespace MicroMachinesEditor
             return result;
         }
 
-        internal TrackLayout Layout { get { return _layout; } }
-        internal IList<MetaTile> MetaTiles { get { return _trackTypeData.MetaTiles; } }
-        internal IList<SMSGraphics.Tile> Tiles { get { return _trackTypeData.Tiles; } }
+        internal TrackLayout Layout => _layout;
+        internal IList<MetaTile> MetaTiles => _trackTypeData.MetaTiles;
+        internal IList<SMSGraphics.Tile> Tiles => _trackTypeData.Tiles;
 
         [Description("The rate at which the vehicle speeds up when accelerating. Original values are 6 (strong acceleration) to 18 (weak).")]
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public int AccelerationDelay { get; set; }
 
         [Description("How long it takes to decelerate (when not accelerating). Original values are 5 (strong deceleration) to 39 (weak).")]
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public int DecelerationDelay { get; set; }
 
         [Description("Vehicle top speed, from 1 to 15. Larger values cause glitches. Original values are 7 (slow) to 11 (fast).")]
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public int TopSpeed { get; set; }
 
         [Description("How long it takes to steer. Original values are 6 (fast) to 9 (slow).")]
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public int SteeringDelay { get; set; }
 
+        [SuppressMessage("ReSharper", "UnusedMember.Global")]
         public enum VehicleTypes
         {
             Desk = 0,
@@ -68,8 +73,10 @@ namespace MicroMachinesEditor
             Bonus = 7
         }
 
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public VehicleTypes VehicleType { get; set; }
 
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
         public int TrackIndex { get; set; }
     }
 }

@@ -74,7 +74,7 @@ namespace MicroMachinesEditor
                     {
                         // Error
                         e.Graphics.FillRectangle(Brushes.Red, tileRect);
-                        e.Graphics.DrawString(string.Format("Invalid metatile index {0}", index), SystemFonts.DefaultFont, Brushes.White, 0, 0);
+                        e.Graphics.DrawString($"Invalid metatile index {index}", SystemFonts.DefaultFont, Brushes.White, 0, 0);
                     }
                     MetaTile tile = _metaTiles[index];
                     lock (tile.Bitmap)
