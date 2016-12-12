@@ -79,33 +79,35 @@ map "-" = $B5
 map "?" = $B6
 .enda
 
+.define PAGING_REGISTER $8000
+
 .macro CallPagedFunction args function
 	ld a, :function
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	call function
 	call _LABEL_AFD_RestorePaging_fromDE8E
 .endm
 
 .macro JumpToPagedFunction args function
 	ld a, :function
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	call function
 	jp _LABEL_AFD_RestorePaging_fromDE8E
 .endm
 
 .macro JrToPagedFunction args function
 	ld a, :function
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	call function
 	jr _LABEL_AFD_RestorePaging_fromDE8E
 .endm
 
 .macro CallPagedFunction2 args function
 	ld a, :function
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	call function
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 .endm
 
 .enum $C000 export
@@ -987,7 +989,7 @@ _RAM_DB82_ db
 _RAM_DB83_ db
 _RAM_DB84_ db
 _RAM_DB85_ db
-_RAM_DB86_ dsb 16 ; ??? Related to skidding, thresholds when turning?
+_RAM_DB86_HandlingData dsb 16 ; ??? Related to skidding, thresholds when turning?
 .ende
 
 .enum $DB96 export
@@ -1931,14 +1933,14 @@ _LABEL_0_:
 	xor a
 	ld (_RAM_DC41_GearToGearActive), a
 	ld a, $02
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	jp _LABEL_8000_Main
 
 _LABEL_14_EnterMenus: 
   ; Code jumps here when transitioning from game to menus
 	di
-	ld a, $02
-	ld ($8000), a
+	ld a, :_LABEL_8021_MenuScreenEntryPoint
+	ld (PAGING_REGISTER), a
 	ld a, $01
 	ld (_RAM_DC3E_InMenus), a
 	ld hl, $DFFF
@@ -2001,13 +2003,13 @@ _LABEL_75_EnterGameTrampolineImpl:
 ; Data from AE to BF (18 bytes), copied to RAM $dc99..$dcaa
 _LABEL_AE_EnterMenuTrampolineImpl:
   di
-  ld a,2
-  ld ($8000),a
+  ld a,:_LABEL_8000_Main
+  ld (PAGING_REGISTER),a
   ld a,1
   ld (_RAM_DC3E_InMenus),a
   ld hl,$dfff
   ld sp, hl
-  jp $8000
+  jp _LABEL_8000_Main
 
 ; Data from C0 to FF (64 bytes)
 _DATA_C0_FloorTilesRawTileData:
@@ -2141,7 +2143,7 @@ _LABEL_199_GameVBlank:
         CallPagedFunction _LABEL_2B5D2_
 +:
       pop af
-      ld ($8000), a
+      ld (PAGING_REGISTER), a
     pop iy
     pop ix
     pop de
@@ -3235,11 +3237,11 @@ _LABEL_AEB_:
 
 _LABEL_AF5_:
 	ld a, :_LABEL_1BAFD_ ; $06
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	call _LABEL_1BAFD_
 _LABEL_AFD_RestorePaging_fromDE8E:
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ret
 
 _LABEL_B04_:
@@ -4234,7 +4236,7 @@ _LABEL_1282_:
 	ret
 
 +:
-	ld hl, _RAM_DB86_ ; Else look something up
+	ld hl, _RAM_DB86_HandlingData ; Else look something up
 	ld de, (_RAM_DE96_)
 	add hl, de
 	ld a, (hl)
@@ -5745,7 +5747,7 @@ _LABEL_1DF2_:
 	add hl, de
 	ld a, (hl)
 	ld (_RAM_D587_), a
-	ld hl, _DATA_254E_
+	ld hl, _DATA_254E_TimesTable18Lo
 	ld a, (_RAM_DE7D_)
 	and $3F
 	ld e, a
@@ -5753,7 +5755,7 @@ _LABEL_1DF2_:
 	add hl, de
 	ld a, (hl)
 	ld c, a
-	ld hl, _DATA_258F_
+	ld hl, _DATA_258F_TimesTable18Hi
 	add hl, de
 	ld a, (hl)
 	ld d, a
@@ -5762,7 +5764,7 @@ _LABEL_1DF2_:
 	add hl, de
 	ld b, h
 	ld c, l
-	ld hl, $2652
+	ld hl, _DATA_2652_TimesTable12Lo
 	ld de, (_RAM_DE77_)
 	add hl, de
 	ld a, (hl)
@@ -5775,14 +5777,14 @@ _LABEL_1DF2_:
 	ld (_RAM_DE6B_), a
 	ld a, h
 	ld (_RAM_DE6C_), a
-	ld de, $AA38
+	ld de, _DATA_16A38_
 	add hl, de
-	ld a, $05
-	ld ($8000), a
+	ld a, :_DATA_16A38_
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld l, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	xor a
 	ld h, a
 	add hl, bc
@@ -5792,14 +5794,14 @@ _LABEL_1DF2_:
 	ld l, a
 	ld a, (_RAM_DE6C_)
 	ld h, a
-	ld de, $A9A8
+	ld de, _DATA_169A8_
 	add hl, de
-	ld a, $05
-	ld ($8000), a
+	ld a, :_DATA_169A8_
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld b, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_Powerboats
 	jr nz, +
@@ -5815,8 +5817,8 @@ _LABEL_1DF2_:
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_FourByFour
 	jr nz, ++
-	ld a, $0D
-	ld ($8000), a
+	ld a, :_DATA_37232_
+	ld (PAGING_REGISTER), a
 	ld hl, _DATA_37232_
 	ld d, $00
 	ld a, (_RAM_DE7D_)
@@ -5826,7 +5828,7 @@ _LABEL_1DF2_:
 	ld a, (hl)
 	ld l, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, l
 	or a
 	jr nz, _LABEL_1FDC_
@@ -5912,14 +5914,14 @@ _LABEL_1FDC_:
 	ld l, a
 	ld a, (_RAM_DE6C_)
 	ld h, a
-	ld a, $06
-	ld ($8000), a
+	ld a, :_DATA_1B1A2_
+	ld (PAGING_REGISTER), a
 	ld de, _DATA_1B1A2_
 	add hl, de
 	ld a, (hl)
 	ld l, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	xor a
 	ld h, a
 	add hl, bc
@@ -6311,15 +6313,15 @@ _LABEL_22CD_:
 	ld a, (_RAM_DF00_)
 	or a
 	jp z, _LABEL_23C2_
-	ld hl, $B232
+	ld hl, _DATA_1B232_ ; $B232
 	ld e, a
 	add hl, de
-	ld a, $06
-	ld ($8000), a
+	ld a, :_DATA_1B232_ ; $06
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld b, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, b
 	ld (_RAM_DEF5_), a
 	ld a, (_RAM_DF0A_)
@@ -6531,87 +6533,51 @@ _DATA_251E_:
 .db $14 $15 $16 $17 $18 $19 $1A $1B $20 $21 $22 $23 $24 $25 $26 $27
 .db $28 $29 $2A $2B $30 $31 $32 $33 $34 $35 $36 $37 $38 $39 $3A $3B
 
+.macro TimesTableLo args start, step, count
+.define x start
+.rept count
+.db <x
+.redefine x x+step
+.endr
+.undef x
+.endm
+
+.macro TimesTableHi args start, step, count
+.define x start
+.rept count
+.db >x
+.redefine x x+step
+.endr
+.undef x
+.endm
+
+.macro TimesTable16 args start, step, count
+.define x start
+.rept count
+.dw x
+.redefine x x+step
+.endr
+.undef x
+.endm
+
 ; Data from 254E to 258E (65 bytes)
-_DATA_254E_:
-.db $00 $12 $24 $36 $48 $5A $6C $7E $90 $A2 $B4 $C6 $D8 $EA $FC $0E
-.db $20 $32 $44 $56 $68 $7A $8C $9E $B0 $C2 $D4 $E6 $F8 $0A $1C $2E
-.db $40 $52 $64 $76 $88 $9A $AC $BE $D0 $E2 $F4 $06 $18 $2A $3C $4E
-.db $60 $72 $84 $96 $A8 $BA $CC $DE $F0 $02 $14 $26 $38 $4A $5C $6E
-.db $80
+_DATA_254E_TimesTable18Lo:
+  TimesTableLo 0, 18, 65
 
 ; Data from 258F to 25CF (65 bytes)
-_DATA_258F_:
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $02 $02 $02
-.db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $03 $03 $03 $03 $03
-.db $03 $03 $03 $03 $03 $03 $03 $03 $03 $04 $04 $04 $04 $04 $04 $04
-.db $04
+_DATA_258F_TimesTable18Hi:
+  TimesTableHi 0, 18, 65
 
 ; Data from 25D0 to 2610 (65 bytes)
 _DATA_25D0_:
-.db $00 $24 $48 $6C $90 $B4 $D8 $FC $20 $44 $68 $8C $B0 $D4 $F8 $1C
-.db $40 $64 $88 $AC $D0 $F4 $18 $3C $60 $84 $A8 $CC $F0 $14 $38 $5C
-.db $80 $A4 $C8 $EC $10 $34 $58 $7C $A0 $C4 $E8 $0C $30 $54 $78 $9C
-.db $C0 $E4 $08 $2C $50 $74 $98 $BC $E0 $04 $28 $4C $70 $94 $B8 $DC
-.db $00
+  TimesTableLo 0, 36, 65
 
 ; Data from 2611 to 261F (15 bytes)
 _DATA_2611_:
-.db $00 $00 $00 $00 $00 $00 $00 $00 $01 $01 $01 $01 $01 $01 $01
+  TimesTableHi 0, 36, 65
 
-_LABEL_2620_:
-	ld (bc), a
-	ld (bc), a
-	ld (bc), a
-	ld (bc), a
-	ld (bc), a
-	ld (bc), a
-	ld (bc), a
-	inc bc
-	inc bc
-	inc bc
-	inc bc
-	inc bc
-	inc bc
-	inc bc
-	inc b
-	inc b
-	inc b
-	inc b
-	inc b
-	inc b
-	inc b
-	dec b
-	dec b
-	dec b
-	dec b
-	dec b
-	dec b
-	dec b
-	ld b, $06
-	ld b, $06
-	ld b, $06
-	ld b, $07
-	rlca
-	rlca
-	rlca
-	rlca
-	rlca
-	rlca
-	ex af, af'
-	ex af, af'
-	ex af, af'
-	ex af, af'
-	ex af, af'
-	ex af, af'
-	ex af, af'
-	add hl, bc
-	nop
-	inc c
-	jr +
-
-; Data from 2656 to 265D (8 bytes)
-.db $30 $3C $48 $54 $60 $6C $78 $84
+_DATA_2652_TimesTable12Lo:
+  TimesTableLo 0, 12, 12
 
 -:
 	ret
@@ -8080,9 +8046,16 @@ _LABEL_3100_:
 	ret
 
 ; Data from 3116 to 313A (37 bytes)
-.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $EF
-.db $F9 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
+_DATA_3116_:
+; Bitmask
+.db %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111
+.db %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111110 %11101111
+.db %11111001 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111
+.db %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111
+; Data (4 bytes)
 .db $00 $10 $00 $10 $00
+; Expands to:
+; 0, 0, ... 0, 10, 10, 10, 10, 0, 0, ... 0, 10, 0, 0, ... 0
 
 ; Data from 313B to 3163 (41 bytes)
 _DATA_313B_:
@@ -8309,7 +8282,7 @@ _LABEL_324C_UpdatePerFrameTiles:
 	ld e, a
 	ld d, $00
 	ld a, :_DATA_30C68_LapRemainingIndicators ; $0C
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld hl, _DATA_30C68_LapRemainingIndicators
 	add hl, de
 	ld b, $20
@@ -9374,13 +9347,13 @@ _LABEL_3ACF_:
 	sla a
 	sla a
 	sla a
-	ld hl, $9C2D
+	ld hl, _DATA_35C2D_
 	ld d, $00
 	ld e, a
 	add hl, de
 	ld c, $11
-	ld a, $0D
-	ld ($8000), a
+	ld a, :_DATA_35C2D_
+	ld (PAGING_REGISTER), a
 -:
 	ld a, (hl)
 	ld (ix+1), a
@@ -9390,7 +9363,7 @@ _LABEL_3ACF_:
 	dec c
 	jr nz, -
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	xor a
 	ld (ix-2), a
 	ld (iy-1), a
@@ -9731,6 +9704,7 @@ _LABEL_3E2F_:
 ; Data from 3E3A to 3E42 (9 bytes)
 _DATA_3E3A_TrackTypeDataPageNumbers:
 .db $03 $04 $05 $06 $07 $08 $09 $0A $0B
+; Desk	Breakfast	Bathtub	Sandpit	F1	Garage	Tanks	Bonus
 
 _LABEL_3E43_:
 	ld a, (_RAM_DE87_)
@@ -9787,15 +9761,15 @@ _DATA_3EA4_:
 .db $04 $0B $02 $08 $02 $16 $00 $00
 
 ; Data from 3EEC to 3EF3 (8 bytes)
-_DATA_3EEC_:
+_DATA_3EEC_CarTileDataLookup_Lo:
 .db $58 $F0 $48 $50 $00 $30 $D0 $6A     ; Pointer low bytes
 
 ; Data from 3EF4 to 3EFC (9 bytes)
-_DATA_3EF4_:
+_DATA_3EF4_CarTilesDataLookup_PageNumber:
 .db $0D $0D $0D $0D $0C $0C $0C $04 $0C ; Page numbers per track type
 
 ; Data from 3EFD to 3F04 (8 bytes)
-_DATA_3EFD_:
+_DATA_3EFD_CarTileDataLookup_Hi:
 .db $89 $8C $90 $93 $80 $83 $86 $A9     ; Pointer high bytes
 
 ; Rearranged:
@@ -9804,8 +9778,17 @@ _DATA_3EFD_:
 ; $58 $F0 $48 $50 $00 $30 $D0 $6A     Low
 ; ->
 ; $0d, $8958 = $34958
-; $0d, $8cf0
+; $0d, $8cf0 = $34CF0
 ; etc
+; Desk        $34958
+; Breakfast   $34CF0
+; Bathtub     $35048
+; Sandpit     $35350
+; F1          $30000
+; Garage      $30330
+; Tanks       $306D0
+; Bonus       $1296A
+
 
 ; Pointer Table from 3F05 to 3F16 (9 entries, indexed by _RAM_DE88_)
 _DATA_3F05_:
@@ -10438,7 +10421,7 @@ _LABEL_470C_:
 +:
 	ld bc, $B0D1
 ++:
-	ld hl, $2652
+	ld hl, _DATA_2652_TimesTable12Lo
 	ld de, (_RAM_DE77_)
 	add hl, de
 	ld a, (hl)
@@ -10447,12 +10430,12 @@ _LABEL_470C_:
 	ld de, (_RAM_DE75_)
 	add hl, de
 	add hl, bc
-	ld a, $0D
-	ld ($8000), a
+	ld a, $0D ; ??? relates to value in _RAM_DE75_
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld b, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, b
 _LABEL_473F_:
 	ld b, a
@@ -10578,7 +10561,7 @@ _LABEL_479E_:
 +:
 	ld bc, $B0D1
 ++:
-	ld hl, $2652
+	ld hl, _DATA_2652_TimesTable12Lo
 	ld d, $00
 	ld a, (ix+8)
 	ld e, a
@@ -10592,11 +10575,11 @@ _LABEL_479E_:
 	add hl, de
 	add hl, bc
 	ld a, $0D
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld b, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, b
 +++:
 	ld b, a
@@ -10684,11 +10667,7 @@ _LABEL_48BF_:
 	jp _LABEL_4DD4_
 
 _LABEL_48C2_:
-	ld a, $08
-	ld ($8000), a
-	call _LABEL_23BF1_
-	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+  CallPagedFunction2 _LABEL_23BF1_
 	ret
 
 _LABEL_48D1_:
@@ -11901,14 +11880,14 @@ _LABEL_5451_:
 	ld (ix+10), a
 	and $C0
 	ld (_RAM_DE53_), a
-	ld hl, _DATA_254E_
+	ld hl, _DATA_254E_TimesTable18Lo
 	ld a, (ix+10)
 	and $3F
 	ld e, a
 	ld d, $00
 	add hl, de
 	ld c, (hl)
-	ld hl, _DATA_258F_
+	ld hl, _DATA_258F_TimesTable18Hi
 	add hl, de
 	ld d, (hl)
 	ld e, c
@@ -11916,7 +11895,7 @@ _LABEL_5451_:
 	add hl, de
 	ld b, h
 	ld c, l
-	ld hl, $2652
+	ld hl, _DATA_2652_TimesTable12Lo
 	ld d, $00
 	ld e, (ix+8)
 	add hl, de
@@ -11929,13 +11908,13 @@ _LABEL_5451_:
 	ld (_RAM_DE6D_), a
 	ld a, h
 	ld (_RAM_DE6E_), a
-	ld de, $AA38
+	ld de, _DATA_16A38_
 	add hl, de
-	ld a, $05
-	ld ($8000), a
+	ld a, :_DATA_16A38_
+	ld (PAGING_REGISTER), a
 	ld l, (hl)
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld h, $00
 	add hl, bc
 	ld a, (hl)
@@ -11944,13 +11923,13 @@ _LABEL_5451_:
 	ld l, a
 	ld a, (_RAM_DE6E_)
 	ld h, a
-	ld de, $A9A8
+	ld de, _DATA_169A8_
 	add hl, de
-	ld a, $05
-	ld ($8000), a
+	ld a, :_DATA_169A8_
+	ld (PAGING_REGISTER), a
 	ld b, (hl)
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	xor a
 	ld (_RAM_D5DF_), a
 	ld a, (_RAM_DC3D_IsHeadToHead)
@@ -11985,8 +11964,8 @@ _LABEL_5451_:
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_FourByFour
 	jr nz, +
-	ld a, $0D
-	ld ($8000), a
+	ld a, :_DATA_37232_
+	ld (PAGING_REGISTER), a
 	ld hl, _DATA_37232_
 	ld d, $00
 	ld a, (_RAM_DCF6_)
@@ -11996,7 +11975,7 @@ _LABEL_5451_:
 	ld a, (hl)
 	ld l, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, l
 	or a
 	jr nz, _LABEL_5608_
@@ -12060,14 +12039,14 @@ _LABEL_5608_:
 	ld l, a
 	ld a, (_RAM_DE6E_)
 	ld h, a
-	ld a, $06
-	ld ($8000), a
+	ld a, :_DATA_1B1A2_
+	ld (PAGING_REGISTER), a
 	ld de, _DATA_1B1A2_
 	add hl, de
 	ld a, (hl)
 	ld l, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld h, $00
 	add hl, bc
 	ld a, (hl)
@@ -12706,15 +12685,15 @@ _LABEL_5A88_:
 	ld a, (ix+20)
 	or a
 	jp z, _LABEL_5B77_
-	ld hl, $B232
+	ld hl, _DATA_1B232_
 	ld e, a
 	add hl, de
-	ld a, $06
-	ld ($8000), a
+	ld a, :_DATA_1B232_
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld b, a
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, b
 	ld (_RAM_DEF5_), a
 	ld a, (ix+36)
@@ -14157,8 +14136,8 @@ _LABEL_663D_InitialisePlugholeTiles:
 	jr z, + ; Only for powerboats...
 	ret
 
-+:ld a, $0D     ; page 13
-	ld ($8000), a
++:ld a, :_DATA_35708_PlugholeTilesPart1
+	ld (PAGING_REGISTER), a
 	ld hl, _DATA_35708_PlugholeTilesPart1 ; Tile data
 	ld de, $5B63        ; Tile $db bitplane 3?
 	ld bc, $0068        ; Data to copy in - 13 tiles?
@@ -14279,29 +14258,30 @@ _LABEL_6677_:
 	ld (_RAM_DF0E_), a
 	ret
 
-_LABEL_6704_:
+_LABEL_6704_LoadHUDTiles:
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_RuffTrux
 	jr z, _LABEL_6755_ret
-  ; Normal cars
+  ; Normal cars only
 	ld a, (_RAM_DC3D_IsHeadToHead)
 	or a
 	jr z, +
-	ld a, $0D
-	ld ($8000), a
-	ld a, $80
+  ; Head to head
+	ld a, :_DATA_35D2D_HeadToHeadHUDTiles
+	ld (PAGING_REGISTER), a
+	ld a, $80 ; Tile $194
 	out ($BF), a
 	ld a, $72
 	out ($BF), a
-	ld bc, $00A0
-	ld hl, _DATA_35D2D_
+	ld bc, $00A0 ; 20 tiles * 8 rows
+	ld hl, _DATA_35D2D_HeadToHeadHUDTiles
 -:
 	push bc
-	ld b, $03
-	ld c, $BE
-	otir
-	xor a
-	out ($BE), a
+    ld b, $03 ; Emit 3bpp tile data
+    ld c, $BE
+    otir
+    xor a
+    out ($BE), a
 	pop bc
 	dec bc
 	ld a, b
@@ -14309,20 +14289,20 @@ _LABEL_6704_:
 	jr nz, -
 	ret
 
-+:
-	ld a, $0C
-	ld ($8000), a
-	ld a, $80
++:; Head to head
+	ld a, :_DATA_30A68_TournamentHUDTiles ;$0C
+	ld (PAGING_REGISTER), a
+	ld a, $80 ; Tile $194
 	out ($BF), a
 	ld a, $72
 	out ($BF), a
-	ld bc, $00A0
-	ld hl, _DATA_30A68_
+	ld bc, $00A0 ; 20 tiles * 8 rows
+	ld hl, _DATA_30A68_TournamentHUDTiles
 -:
 	push bc
-	ld b, $04
-	ld c, $BE
-	otir
+    ld b, $04 ; Emit four bytes = 1 row
+    ld c, $BE
+    otir
 	pop bc
 	dec bc
 	ld a, b
@@ -16248,15 +16228,16 @@ _LABEL_7573_EnterGame:
 ++:add hl, de
 	ld a, (hl)
 	ld (_RAM_DB9B_SteeringDelay), a
-  ; Page 8
-	ld a, $08
-	ld ($8000), a
+
+  ; Unpack 16 nibbles
+	ld a, :_DATA_23ECF_HandlingData_SMS
+	ld (PAGING_REGISTER), a
 	ld a, (_RAM_DC54_IsGameGear)
 	cp $00
 	jr z, +
-	ld hl, _DATA_23ECF_
+	ld hl, _DATA_23ECF_HandlingData_SMS
 	jr ++
-+:ld hl, _DATA_23DE7_
++:ld hl, _DATA_23DE7_HandlingData_GG
 ++:ld a, e ; The course index
 	sla a ; x8
 	sla a
@@ -16265,7 +16246,8 @@ _LABEL_7573_EnterGame:
 	ld e, a
 	ld d, $00
 	add hl, de ; -> hl
-	ld de, _RAM_DB86_
+  
+	ld de, _RAM_DB86_HandlingData
 	ld bc, $0008
 -:ld a, (hl) ; Read byte
 	srl a ; High nibble
@@ -16285,7 +16267,7 @@ _LABEL_7573_EnterGame:
 	jr nz, -
   ; Restore paging
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	jp _LABEL_383_
 
 ; Data from 766A to 7686 (29 bytes)
@@ -16776,7 +16758,7 @@ _LABEL_7A38_:
 
 _LABEL_7A58_:
 	ld hl, (_RAM_DF20_)
-	rr h
+	rr h ; Divide by 4
 	rr l
 	rr h
 	rr l
@@ -16786,22 +16768,23 @@ _LABEL_7A58_:
 	rr l
 	srl l
 	ld h, $00
-	ld de, $9B8D
+	ld de, _DATA_35B8D_
 	add hl, de
-	ld a, $0D
-	ld ($8000), a
+	ld a, :_DATA_35B8D_
+	ld (PAGING_REGISTER), a
 	ld a, (hl)
 	ld (_RAM_DF22_), a
+
 	sla a
 	ld l, a
 	ld h, $00
-	ld de, _DATA_35BED_
+	ld de, _DATA_35BED_96TimesTable
 	add hl, de
 	ld e, (hl)
 	inc hl
 	ld d, (hl)
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld hl, (_RAM_DF20_)
 	or a
 	sbc hl, de
@@ -17227,22 +17210,21 @@ _LABEL_7C7D_:
 	jr z, +++
 	cp TT_FormulaOne
 	jr nz, +
-	ld de, $3116
+  ; F1
+	ld de, _DATA_3116_
 	jp ++++
-
-+:
-	cp TT_RuffTrux
++:cp TT_RuffTrux
 	jr nz, +
+  ; RuffTrux -> all 1
 	ld a, $01
 	ld (_RAM_DF1D_), a
 	jp ++
-
-+:
-	xor a
++:; Other cars -> all 0
+  xor a
 	ld (_RAM_DF1D_), a
 ++:
 	ld hl, _RAM_D800_
-	ld bc, $0100
+	ld bc, $0100 ; Byte count
 -:
 	ld a, (_RAM_DF1D_)
 	ld (hl), a
@@ -17254,9 +17236,10 @@ _LABEL_7C7D_:
 	jp +++++
 
 +++:
+  ; Powerboats
 	ld de, _DATA_313B_
 ++++:
-	ld hl, $0020
+	ld hl, $0020 ; 32 bytes = 256 bits
 	add hl, de
 	ld b, h
 	ld c, l
@@ -17275,7 +17258,7 @@ _LABEL_7C7D_:
 	adc a, $00
 	ld h, a
 	ld a, (hl)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld a, (_RAM_DB97_TrackType)
 	ld hl, _DATA_3DE4_TrackTypeTileDataPointerHi
 	add a, l
@@ -17299,7 +17282,7 @@ _LABEL_7C7D_:
 	call _LABEL_7B21_Decompress
 	call _LABEL_7F02_Copy3bppTileDataToVRAM
 	call _LABEL_663D_InitialisePlugholeTiles
-	ld hl, _DATA_3EF4_
+	ld hl, _DATA_3EF4_CarTilesDataLookup_PageNumber
 	ld a, (_RAM_DB97_TrackType) ; Index into table
 	add a, l
 	ld l, a
@@ -17307,10 +17290,10 @@ _LABEL_7C7D_:
 	adc a, $00
 	ld h, a
 	ld a, (hl)
-	ld ($8000), a               ; Set page
+	ld (PAGING_REGISTER), a               ; Set page
   
 	ld a, (_RAM_DB97_TrackType) ; Index into next table
-	ld hl, _DATA_3EFD_
+	ld hl, _DATA_3EFD_CarTileDataLookup_Hi
 	add a, l
 	ld l, a
 	ld a, h
@@ -17319,7 +17302,7 @@ _LABEL_7C7D_:
 	ld a, (hl)
 	ld d, a                   ; -> d
 	ld a, (_RAM_DB97_TrackType) ; One more time
-	ld hl, _DATA_3EEC_
+	ld hl, _DATA_3EEC_CarTileDataLookup_Lo
 	add a, l
 	ld l, a
 	ld a, h
@@ -17343,7 +17326,7 @@ _LABEL_7C7D_:
 	ld hl, _RAM_C000_DecompressionTemporaryBuffer
 	call _LABEL_7EBE_DecompressRunCompressed
 	call _LABEL_7F4E_CarAndShadowSpriteTilesToVRAM
-	call _LABEL_6704_
+	call _LABEL_6704_LoadHUDTiles
 
   ; Look up the page number and page it in
 	ld hl, _DATA_3E3A_TrackTypeDataPageNumbers
@@ -17354,7 +17337,7 @@ _LABEL_7C7D_:
 	adc a, $00
 	ld h, a
 	ld a, (hl)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ld (_RAM_DE8E_PageNumber), a ; And make that the "page to keep there"
 
 	ld hl, $8000 ; Read data from that page. First word points to compressed behaviour data.
@@ -17393,12 +17376,13 @@ _LABEL_7C7D_:
 	jr nz, -
 +:
 
+  ; Load track layout
 	ld a, (_RAM_DB96_TrackIndexForThisType)
-	add a, $02
+	add a, $02  ; +2
 	or a
-	rl a
+	rl a        ; *2
 	ld l, a
-	ld a, $80
+	ld a, $80   ; Look up -> 0 @ 8004, 1 @ 8006, 2 @ 8008
 	ld h, a
 	ld a, (hl)
 	ld e, a
@@ -17408,48 +17392,56 @@ _LABEL_7C7D_:
 	ld hl, _RAM_C000_DecompressionTemporaryBuffer
 	ex de, hl
 	call _LABEL_7B21_Decompress
+  
+  ; Load palette
 	ld a, (_RAM_DC54_IsGameGear)
 	cp $00
 	jr z, +
-	ld de, $800C
+  ; Game Gear
+	ld de, $800C ; GG palette at +c
 	ld a, (de)
 	ld l, a
 	inc de
 	ld a, (de)
 	ld h, a
-	ld a, $00
+	ld a, $00 ; Palette 0
 	out ($BF), a
 	ld a, $C0
 	out ($BF), a
-	ld b, $40
+	ld b, $40 ; 64 bytes = full palette
 	ld c, $BE
 	otir
 	jp ++
 
-+:
-	ld a, $05
-	ld ($8000), a
++:; SMS
+  ; Look up palette in table
+	ld a, :_DATA_17EC2_SMSPalettes
+	ld (PAGING_REGISTER), a
 	ld a, (_RAM_DB97_TrackType)
 	sla a
 	ld d, $00
 	ld e, a
-	ld hl, _DATA_17EC2_
+	ld hl, _DATA_17EC2_SMSPalettes
 	add hl, de
 	ld e, (hl)
 	inc hl
 	ld d, (hl)
 	ex de, hl
-	ld a, $00
+  ; Emit to VDP
+	ld a, $00 ; Palette
 	out ($BF), a
 	ld a, $C0
 	out ($BF), a
-	ld b, $20
+	ld b, $20 ; 32 entries
 	ld c, $BE
 	otir
+  ; Restore paging
 	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
+
 ++:
 	CallPagedFunction _LABEL_1BEB1_ChangePoolTableColour
+  
   ; Load "decorator" 1bpp tile data to RAM buffer
 	ld hl, $800E ; Pointer here in each car's bank
 	ld a, (hl)
@@ -17469,6 +17461,7 @@ _LABEL_7C7D_:
 	or c
 	jr nz, -
   
+  ; Next pointer -> 64 bytes to _RAM_D900_
 	ld hl, $8010
 	ld a, (hl)
 	ld e, a
@@ -17477,8 +17470,7 @@ _LABEL_7C7D_:
 	ld d, a
 	ld bc, $0040
 	ld hl, _RAM_D900_
--:
-	ld a, (de)
+-:ld a, (de)
 	ld (hl), a
 	inc hl
 	inc de
@@ -17486,6 +17478,8 @@ _LABEL_7C7D_:
 	ld a, b
 	or c
 	jr nz, -
+  
+  ; Next pointer
 	ld hl, $8012
 	ld a, (hl)
 	ld e, a
@@ -17496,18 +17490,18 @@ _LABEL_7C7D_:
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_RuffTrux
 	jr z, +
-	ld a, $A0
+  ; Not RuffTrux
+	ld a, $A0 ; Tile $1ad
 	out ($BF), a
 	ld a, $75
 	out ($BF), a
-	ld bc, $0058
--:
-	push bc
-	ld b, $03
-	ld c, $BE
-	otir
-	ld a, $00
-	out ($BE), a
+	ld bc, $0058 ; 88 rows = 11 tiles
+-:push bc
+    ld b, $03
+    ld c, $BE
+    otir
+    ld a, $00
+    out ($BE), a
 	pop bc
 	dec bc
 	ld a, b
@@ -17579,7 +17573,7 @@ _LABEL_7EBE_DecompressRunCompressed:
   ; bc = source data raw bytes
   ; hl = destination
   ; Decomresses data. The data at de is a bitmask read left to right, where 1 = repeat, 0 = new raw byte.
-  ; The data at bc contains only the raw bytes.
+  ; The data at bc contains only the raw bytes. The first raw byte is assumed.
   ; It's not RLE because the run length is not encoded as a number?
   ; e.g.
   ; hl = $c000 (RAM buffer)
@@ -17680,13 +17674,9 @@ _DATA_7F46_BitsLookup: ; Index 0 = bit 7, 1 = bit 6, etc
 .db $80 $40 $20 $10 $08 $04 $02 $01
 
 _LABEL_7F4E_CarAndShadowSpriteTilesToVRAM:
-	ld a, $0D
-	ld ($8000), a
-	call _LABEL_357F8_CarTilesToVRAM ; load decompressed data from RAM to VRAM, generating flipped versions (sometimes)
+  CallPagedFunction2 _LABEL_357F8_CarTilesToVRAM
 
   ; Then load the shadow tiles
-	ld a, (_RAM_DE8E_PageNumber)
-	ld ($8000), a
 	ld a, (_RAM_DB97_TrackType)
 	cp TT_RuffTrux
 	jr z, +
@@ -23522,10 +23512,10 @@ _LABEL_AFAE_RamCodeLoader:
 +:
 	ld a, :_LABEL_3B971_RamCodeLoaderStage2
 	ld (_RAM_D741_RAMDecompressorPageIndex), a
-	ld ($8000), a ; page in and call
+	ld (PAGING_REGISTER), a ; page in and call
 	call _LABEL_3B971_RamCodeLoaderStage2
 	ld a, $02 ; restore paging
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ret
 
 _LABEL_AFCD_:
@@ -25640,4741 +25630,66 @@ _DATA_BF6F_:
 
 ; Data from BFFF to BFFF (1 bytes)
 _DATA_BFFF_Value02:
-.db $02
+.db :CADDR
 
 .BANK 3
 .ORG $0000
 
-; Data from C000 to CD35 (3382 bytes)
-.incbin "Micro Machines_c000.inc"
+; Desk tracks data
+_LABEL_C000_TrackData_Desk:
+; Track data format:
+; $8000 dw Pointer to behaviour data (compressed)
+; $8002 dw Pointer to wall data (compressed)
+; $8004 dw Pointer to track 0 layout (compressed)
+; $8006 dw Pointer to track 1 layout (compressed)
+; $8008 dw Pointer to track 2 layout (compressed)
+; $800a dw Pointer to ???
+; $800c dw Pointer to GG palette (64 bytes)
+; $800e dw Pointer to "decorator" tile data (16 * 1bpp tile = 128 bytes)
+; $8010 dw Pointer to ??? (64 bytes, copied to _RAM_D900_)
+; $8012 dw Pointer to 11 tiles @3bpp (108 bytes)
+.dw _LABEL_E480_Desk_BehaviourData ; 2308B
+.dw _LABEL_E799_Desk_WallData ; 1156B = 12*12 bits * 64 tiles + 4 byte header
+.dw _LABEL_E811_Desk_Track0Layout ; 2048B
+.dw _LABEL_EA34_Desk_Track1Layout ; 2048B
+.dw _LABEL_ED79_Desk_Track2Layout ; 2048B
+.dw _LABEL_F155_Desk_GGPalette
+.dw _LABEL_F155_Desk_GGPalette ; GG palette, raw
+.dw _LABEL_F195_Desk_DecoratorTiles
+.dw _LABEL_F215_Desk_Data
+.dw _LABEL_F255_Desk_ExtraTiles
 
-_LABEL_CD36_:
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	ld d, l
-	ld d, a
-	rrca
-	ld c, $0F
-	ld b, $07
-	inc b
-	dec b
-	nop
-	rlca
-	ld d, l
-	ld d, (hl)
-	ld b, $07
-	nop
-	ld bc, $0F0E
-	inc c
-	dec c
-	add hl, bc
-	ld d, l
-	ld d, a
-	rrca
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc b
-	dec b
-	ld de, $5507
-	ld d, (hl)
-	nop
-	ld bc, $0504
-	ld de, $0C03
-	dec c
-	ld (de), a
-	ld d, l
-	ld d, a
-	rrca
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	rlca
-	ld d, l
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, l
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld b, $07
-	nop
-	ld bc, $5E11
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	ld (de), a
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld de, $0403
-	dec b
-	ld b, $5E
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	ld c, $5E
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld b, $07
-	nop
-	ld bc, $5E04
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	inc b
-	dec b
-	ld b, $07
-	nop
-	ld e, (hl)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	nop
-	ld bc, $0504
-	ld de, $585E
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld (de), a
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld b, $07
-	ld de, $0603
-	ld e, (hl)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld c, $0F
-	ld (de), a
-	dec bc
-	ld c, $5E
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	inc b
-	dec b
-	nop
-	ld bc, $5E04
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	inc b
-	dec b
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	inc c
-	dec c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	nop
-	ld bc, $5B5A
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	add hl, bc
-	ld a, (bc)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	inc b
-	dec b
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	inc c
-	dec c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	inc b
-	dec b
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	inc c
-	dec c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld de, $5A03
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld (de), a
-	dec bc
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	nop
-	ld bc, $5B5A
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	add hl, bc
-	ld a, (bc)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld h, b
-	ld e, h
-	ld e, h
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld b, $07
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld c, $0F
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld b, $07
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld c, $0F
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	inc b
-	dec b
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld h, c
-	ld h, d
-	ld h, d
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld b, $07
-	inc b
-	dec b
-	ld b, $07
-	ld de, $0003
-	ld bc, $0504
-	ld c, $0F
-	inc c
-	dec c
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld de, $0403
-	dec b
-	ld b, $07
-	ld b, $07
-	ld de, $0403
-	dec b
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld b, $07
-	nop
-	ld bc, $5E00
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld de, $0603
-	rlca
-	ld de, $585E
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, d
-	ld h, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld e, h
-	ld de, $0603
-	rlca
-	inc b
-	dec b
-	ld b, $07
-	nop
-	ld bc, $0504
-	ld (de), a
-	dec bc
-	ld c, $0F
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	nop
-	ld d, l
-	ld h, h
-	ld h, h
-	inc hl
-	inc bc
-	ld d, l
-	ld h, h
-	ld h, l
-	ld h, (hl)
-	ld h, a
-	ld h, l
-	ld h, (hl)
-	ld d, a
-	rrca
-	dec h
-	inc h
-	inc hl
-	ld d, a
-	rrca
-	ld b, $07
-	ld de, $0403
-	dec b
-	nop
-	ld bc, $2425
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	dec b
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0F23
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	ld h, h
-	ld h, a
-	ld h, l
-	ld h, a
-	ld h, (hl)
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld h, l
-	ld h, (hl)
-	ld h, h
-	inc hl
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	dec h
-	inc h
-	ld de, $0403
-	dec b
-	ld b, $5E
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	ld c, $5E
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	inc b
-	dec b
-	inc b
-	dec b
-	ld b, $5E
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	inc c
-	dec c
-	inc c
-	dec c
-	ld c, $5E
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld de, $1716
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	ld (de), a
-	jr +
+.incbin "Micro Machines_c000.inc" skip $0014 read $246c ; Unmapped
 
-; Data from D34F to D367 (25 bytes)
-.db $19 $19 $19 $19 $19 $19 $19 $19 $19 $00 $1A $1B $1B $1B $1B $1B
-.db $1B $1B $1B $1B $1B $09 $1C $1D $1D
+_LABEL_E480_Desk_BehaviourData:
+.incbin "Micro Machines_c000.inc" skip $2480 read $0319 ; compressed
+_LABEL_E799_Desk_WallData:
+.incbin "Micro Machines_c000.inc" skip $2799 read $0078 ; compressed
+_LABEL_E811_Desk_Track0Layout:
+.incbin "Micro Machines_c000.inc" skip $2811 read $0223 ; compressed
+_LABEL_EA34_Desk_Track1Layout:
+.incbin "Micro Machines_c000.inc" skip $2a34 read $0345 ; compressed
+_LABEL_ED79_Desk_Track2Layout:
+.incbin "Micro Machines_c000.inc" skip $2d79 read $03dc ; compressed
+_LABEL_F155_Desk_GGPalette:
+.incbin "Micro Machines_c000.inc" skip $3155 read $0040 ; raw
+_LABEL_F195_Desk_DecoratorTiles:
+.incbin "Micro Machines_c000.inc" skip $3195 read $0080 ; raw
+_LABEL_F215_Desk_Data:
+.incbin "Micro Machines_c000.inc" skip $3215 read $0040 ; raw
+_LABEL_F255_Desk_ExtraTiles:
+.incbin "Micro Machines_c000.inc" skip $3255 read $0108 ; raw
 
-+:
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld l, b
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld c, $0F
-	inc c
-	dec c
-	add hl, bc
-	ld e, (hl)
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	inc b
-	dec b
-	ld de, $0603
-	ld e, (hl)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $5E
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld b, $07
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld c, $0F
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld de, $5A03
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld (de), a
-	dec bc
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	rla
-	ld e, $19
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	add hl, de
-	rra
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	dec de
-	jr nz, +
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	dec e
-	ld hl, $5958
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld l, c
-	nop
-	ld bc, $5B5A
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-+:
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	add hl, bc
-	ld a, (bc)
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, c
-	ld e, b
-	ld e, a
-	ld b, $07
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, e
-	ld e, d
-	ld e, a
-	ld c, $0F
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	ld de, $0C03
-	ld d, l
-	ld h, h
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld h, (hl)
-	ld h, h
-	inc hl
-	rrca
-	ld (de), a
-	dec bc
-	ld d, l
-	ld d, (hl)
-	ld b, $07
-	ld de, $0403
-	dec h
-	ld h, h
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld d, a
-	rrca
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	dec b
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0F0E
-	inc c
-	dec c
-	ld d, l
-	ld h, l
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld d, l
-	ld h, (hl)
-	ld h, a
-	ld h, h
-	ld d, a
-	rlca
-	nop
-	ld bc, $0504
-	ld de, $5703
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	ld de, $6B6A
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (de), a
-	ld l, h
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld b, $6E
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld c, $6E
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld b, $6E
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld c, $6E
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	inc bc
-	ld l, (hl)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	dec bc
-	ld l, (hl)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	rlca
-	ld l, (hl)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	rrca
-	ld l, (hl)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	inc bc
-	ld l, (hl)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	dec bc
-	ld l, a
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), c
-	rlca
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld l, l
-	ld (hl), d
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	ld bc, $6B6B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	ld a, (bc)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	inc bc
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	dec bc
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	rlca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	rlca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), e
-	ld bc, $7070
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), b
-	ld (hl), h
-	ld a, (bc)
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	halt
-	rlca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	ld bc, $6B6B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	ld a, (bc)
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	inc bc
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	dec bc
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	rlca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	rlca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	rrca
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (hl), a
-	ld bc, $7878
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, c
-	ld a, (bc)
-	ld b, $7A
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld (hl), l
-	ld c, $7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld de, $6B7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (de), a
-	ld a, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld b, $7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld c, $7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld b, $7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld c, $7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld de, $6B7B
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (de), a
-	ld a, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld de, $6B7C
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld l, e
-	ld (de), a
-	ld a, l
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld a, b
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	add a, d
-	add a, e
-	add a, h
-	add a, l
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, h
-	ld e, h
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	adc a, d
-	ld e, h
-	ld b, $07
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld b, $07
-	ld c, $0F
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld c, $0F
-	inc b
-	dec b
-	ex af, af'
-	ld bc, $0504
-	nop
-	ld bc, $0806
-	ld de, $0C03
-	ld d, l
-	ld h, h
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $64
-	inc hl
-	dec bc
-	ld d, l
-	ld h, h
-	ld b, $07
-	ld de, $0403
-	dec b
-	nop
-	ex af, af'
-	ld h, h
-	inc hl
-	ld d, a
-	ld (bc), a
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	djnz ++
-	nop
-	ex af, af'
-	inc b
-	dec b
-	ld b, $55
-	ld h, h
-	inc hl
-	inc b
-	dec b
-	ex af, af'
-	dec b
-	add hl, bc
-	djnz +
-	dec c
-	ld c, $57
-	ld (bc), a
-	inc h
-	inc c
-	dec c
-	ld (bc), a
-	dec c
-	ld de, $0010
-+:
-	ld bc, $0706
-	ex af, af'
-	inc bc
-	nop
-	ld bc, $0710
-++:
-	ld (de), a
-	ex af, af'
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ex af, af'
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ex af, af'
-	rrca
-	inc h
-	ld h, h
-	ld h, a
-	ld h, l
-	ld h, a
-	ld h, l
-	ld h, (hl)
-	ld h, a
-	ld h, l
-	ld h, a
-	ld h, h
-	ld d, (hl)
-	ld c, $64
-	ld (bc), a
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $55
-	ld h, h
-	ld a, (bc)
-	inc b
-	djnz 8
-	inc bc
-	ld b, $07
-	nop
-	ld bc, $0204
-	ld de, $0C03
-	dec c
-	djnz +
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ex af, af'
-	ld (de), a
-	dec bc
-	inc b
-	dec b
-	nop
-+:
-	ld bc, $0504
-	nop
-	ld bc, $2306
-	ld de, $0C03
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld d, l
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld h, h
-	ld h, (hl)
-	dec bc
-	ld h, h
-	inc hl
-	ld b, $07
-	ld d, l
-	ld d, (hl)
-	inc b
-	dec b
-	nop
-	ld bc, $2324
-	add hl, bc
-	inc h
-	ld h, a
-	ld h, l
-	ld d, a
-	rrca
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	dec h
-	inc h
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	dec h
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	inc hl
-	rlca
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $2324
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	dec h
-	ld h, h
-	ld h, l
-	ld h, a
-	ld h, h
-	ld h, a
-	ld h, (hl)
-	ld bc, $0504
-	ld de, $0C03
-	dec c
-	ld (de), a
-	dec bc
-	dec h
-	ld h, h
-	ld h, l
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	ld h, l
-	ld h, (hl)
-	ld b, $07
-	ld de, $0403
-	dec b
-	inc b
-	dec b
-	ld b, $07
-	ld de, $0E03
-	rrca
-	adc a, a
-	sub b
-	sub c
-	sub d
-	inc c
-	dec c
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc b
-	dec b
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	adc a, a
-	sub b
-	sub c
-	sub d
-	ld b, $07
-	ld h, d
-	ld h, d
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	sub e
-	ld h, d
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	add a, d
-	add a, e
-	add a, h
-	add a, l
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, h
-	ld e, h
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	adc a, d
-	ld e, h
-	inc b
-	dec b
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld de, $0C03
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld (de), a
-	dec bc
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	add a, d
-	add a, e
-	add a, h
-	add a, l
-	ld e, b
-	ld e, c
-	ld e, d
-	ld e, e
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld e, d
-	ld e, e
-	ld e, b
-	ld e, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld e, b
-	ld e, c
-	ld e, h
-	ld e, h
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	adc a, d
-	ld e, h
-	inc b
-	dec b
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld a, (hl)
-	ld a, a
-	add a, b
-	add a, c
-	ld de, $0C03
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	adc a, e
-	adc a, h
-	adc a, l
-	adc a, (hl)
-	ld (de), a
-	dec bc
-	ld de, $9594
-	dec b
-	ld de, $1103
-	inc bc
-	inc b
-	dec b
-	inc b
-	dec b
-	sub (hl)
-	sub a
-	sbc a, b
-	sbc a, c
-	ld (de), a
-	dec bc
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	inc c
-	dec c
-	sbc a, d
-	sbc a, e
-	sbc a, h
-	sbc a, l
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0100
-	inc c
-	sbc a, (hl)
-	sbc a, a
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	nop
-	ld bc, $0311
-	nop
-	ld bc, $8382
-	add a, h
-	add a, l
-	ld b, $07
-	add hl, bc
-	ld a, (bc)
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld c, $0F
-	ld de, $0003
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	inc b
-	dec b
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	inc c
-	dec c
-	nop
-	ld bc, $0504
-	ld de, $0003
-	ld bc, $0100
-	nop
-	ld bc, $0A09
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	and b
-	and b
-	and c
-	and d
-	and d
-	and d
-	and e
-	and h
-	inc b
-	dec b
-	nop
-	ld bc, _DATA_E5A5_
-	and l
-	and (hl)
-	and (hl)
-	and (hl)
-	and a
-	xor b
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	ld de, $0C03
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld d, l
-	ld h, l
-	ld h, (hl)
-	ld h, l
-	ld h, a
-	inc hl
-	inc hl
-	ld bc, $6555
-	ld h, (hl)
-	ld h, a
-	ld d, a
-	dec b
-	nop
-	ld bc, $2425
-	ld h, h
-	ld h, a
-	ld d, a
-	rrca
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $25
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	dec b
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0F0E
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld d, l
-	ld d, l
-	ld h, l
-	ld h, (hl)
-	ld h, (hl)
-	ld h, a
-	ld h, l
-	inc hl
-	ld bc, $0504
-	ld d, l
-	ld d, (hl)
-	ld d, a
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	ld h, h
-	ld h, a
-	ld h, (hl)
-	ld h, l
-	ld d, a
-	rrca
-	inc b
-	dec b
-	ld (bc), a
-	ld bc, $0504
-	nop
-	ld bc, $0806
-	ld de, $0C03
-	dec c
-	ex af, af'
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $02
-	ld (de), a
-	dec bc
-	nop
-	ld bc, $0710
-	ld de, $0403
-	dec b
-	nop
-	ex af, af'
-	ld b, $07
-	add hl, bc
-	ld a, (bc)
-	ld h, h
-	inc hl
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld h, h
-	inc hl
-	rrca
-	nop
-	ld bc, $6425
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc h
-	inc hl
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld (bc), a
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	dec h
-	ld h, h
-	ld de, $0003
-	djnz 6
-	rlca
-	ld de, $0003
-	ld bc, $0806
-	ld (de), a
-	dec bc
-	add hl, bc
-	ex af, af'
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $02
-	ld b, $07
-	inc b
-	ex af, af'
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	djnz 14
-	rrca
-	inc c
-	djnz +
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ex af, af'
-	inc b
-	dec b
-+:
-	ld de, $0608
-	rlca
-	nop
-	ld bc, $0504
-	ld de, $0C02
-	dec c
-	ld (de), a
-	ld (bc), a
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld (de), a
-	djnz 4
-	ld d, l
-	ld d, a
-	ld bc, $0504
-	nop
-	ld bc, $5755
-	ld de, $0C03
-	djnz +
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	djnz ++
-	ld (de), a
-	dec bc
-+:
-	nop
-	ex af, af'
-	ld b, $07
-	ld de, $0403
-	dec b
-	ex af, af'
-	ld bc, $0706
-	rlca
-++:
-	djnz 14
-	rrca
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	djnz 10
-	ld c, $0F
-	ld d, l
-	ld d, a
-	rrca
-	dec b
-	ld b, $07
-	nop
-	ld bc, $0502
-	inc b
-	dec b
-	djnz +
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	ex af, af'
-	dec c
-	inc c
-	dec c
-+:
-	ld (bc), a
-	inc bc
-	nop
-	ld bc, $0706
-	ld de, $0803
-	ld bc, $0706
-	ex af, af'
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	djnz +
-	ld c, $0F
-	ex af, af'
-	rlca
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-+:
-	ex af, af'
-	rlca
-	nop
-	ld bc, $0F08
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	djnz +
-	add hl, bc
-	ld a, (bc)
-	ld (bc), a
-	dec b
-	ld de, $0603
-	rlca
-	nop
-	ld bc, $0502
-	ld de, $1003
-+:
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	ld h, h
-	inc hl
-	ld (de), a
-	dec bc
-	inc b
-	dec b
-	ld d, l
-	ld d, (hl)
-	inc b
-	dec b
-	nop
-	ld bc, $0706
-	ld d, l
-	ld d, (hl)
-	inc c
-	dec c
-	djnz +
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	djnz 11
-	nop
-	ld d, l
-+:
-	ld d, (hl)
-	rlca
-	ld de, $0403
-	dec b
-	nop
-	ld bc, $0708
-	add hl, bc
-	djnz 14
-	rrca
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	djnz +
-	nop
-	ex af, af'
-	inc b
-	dec b
-	ld b, $07
-	nop
-	ld bc, $0504
-	ld (bc), a
-	dec b
-	add hl, bc
-	ld (bc), a
-	inc c
-+:
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ex af, af'
-	dec c
-	ld de, $0010
-	ld bc, $0706
-	ld de, $0003
-	rlca
-	djnz +
-	ld (de), a
-	ex af, af'
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-+:
-	dec bc
-	add hl, bc
-	ld d, l
-	ld d, a
-	rrca
-	ld b, $10
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $10
-	nop
-	ld bc, $640E
-	inc hl
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $10
-	add hl, bc
-	ld a, (bc)
-	inc b
-	dec h
-	ld h, h
-	inc bc
-	ld b, $07
-	nop
-	ld bc, $0804
-	ld de, $0C03
-	dec c
-	ex af, af'
-	dec bc
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld (bc), a
-	ld (de), a
-	dec bc
-	inc h
-	inc hl
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $2406
-	inc hl
-	inc bc
-	dec h
-	inc h
-	inc hl
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $25
-	inc h
-	inc hl
-	nop
-	dec h
-	inc h
-	inc hl
-	ld de, $0403
-	dec b
-	nop
-	ld bc, $6425
-	add hl, bc
-	ld a, (bc)
-	dec h
-	inc h
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $10
-	nop
-	ld bc, $0204
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	ex af, af'
-	add hl, bc
-	ld a, (bc)
-	ld d, l
-	ld d, (hl)
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	ex af, af'
-	ld de, $1003
-	ld bc, $0706
-	ld de, $0003
-	rlca
-	ld d, l
-	ld d, (hl)
-	ld (de), a
-	dec bc
-	ex af, af'
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld d, l
-	ld d, a
-	rrca
-	ld b, $07
-	ld (bc), a
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $10
-	nop
-	ld bc, $0F0E
-	djnz 13
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $08
-	add hl, bc
-	ld a, (bc)
-	inc b
-	dec b
-	ex af, af'
-	inc bc
-	ld b, $07
-	nop
-	ld bc, $0804
-	ld de, $0C03
-	dec c
-	djnz +
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	ld (bc), a
-	ld (de), a
-	dec bc
-	inc b
-	dec b
-	nop
-+:
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	ld de, $0C03
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	ld h, l
-	ld h, l
-	ld h, h
-	inc hl
-	add a, d
-	add a, e
-	add a, h
-	add a, l
-	nop
-	ld bc, $6555
-	add hl, bc
-	ld a, (bc)
-	dec h
-	inc h
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld d, l
-	ld h, l
-	ld d, a
-	rrca
-	nop
-	ld bc, $2504
-	ld h, h
-	ld h, l
-	ld h, l
-	ld h, l
-	ld d, a
-	dec b
-	inc b
-	dec b
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld d, l
-	ld h, l
-	ld h, l
-	ld h, l
-	ld h, h
-	inc hl
-	ld c, $0F
-	ld b, $55
-	ld h, l
-	ld h, l
-	ld d, a
-	sub h
-	sub l
-	dec b
-	dec h
-	inc h
-	inc hl
-	ld bc, $5765
-	inc c
-	dec c
-	sub (hl)
-	sub a
-	sbc a, b
-	sbc a, c
-	ld c, $25
-	ld h, h
-	ld h, l
-	inc b
-	dec b
-	ld de, $9A03
-	sbc a, e
-	sbc a, h
-	sbc a, l
-	inc b
-	dec b
-	ld de, $0C03
-	dec c
-	ld (de), a
-	dec bc
-	inc c
-	sbc a, (hl)
-	sbc a, a
-	ld a, (bc)
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	ld de, $0C03
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	nop
-	ld bc, $0706
-	ld de, $0403
-	dec b
-	nop
-	ld bc, $0706
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0504
-	inc b
-	dec b
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	ld de, $0003
-	ld bc, $0706
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld bc, $0504
-	ld b, $07
-	nop
-	ld bc, $0F0E
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc b
-	dec b
-	ld de, $0603
-	rlca
-	nop
-	ld bc, $0504
-	ld de, $0C03
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	ld b, $07
-	inc b
-	dec b
-	ld de, $0003
-	rlca
-	ld b, $07
-	inc b
-	dec b
-	ld c, $0F
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	add hl, bc
-	rrca
-	ld c, $A9
-	xor c
-	xor c
-	inc b
-	dec b
-	ld b, $07
-	ld b, $07
-	inc b
-	rlca
-	ld b, $AA
-	xor d
-	xor d
-	inc c
-	dec c
-	ld c, $0F
-	ld c, $0F
-	inc c
-	rrca
-	ld c, $36
-	ld (hl), $36
-	inc b
-	dec b
-	ld de, $0603
-	rlca
-	ld b, $01
-	nop
-	xor e
-	xor e
-	xor e
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	ld c, $0F
-	ld c, $0A
-	add hl, bc
-	xor e
-	xor e
-	xor e
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0700
-	ld b, $AB
-	xor e
-	xor e
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	rrca
-	ld c, $AB
-	xor e
-	xor e
-	inc b
-	dec b
-	inc b
-	dec b
-	ld de, $0403
-	dec b
-	inc b
-	xor e
-	xor e
-	xor e
-	inc c
-	dec c
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	inc c
-	xor e
-	xor e
-	xor e
-	ld de, $0003
-	ld bc, $0100
-	ld b, $01
-	nop
-	xor e
-	xor e
-	xor e
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	ld c, $0A
-	add hl, bc
-	xor e
-	xor e
-	xor e
-	ld b, $07
-	nop
-	ld bc, $0706
-	ld de, $0603
-	rlca
-	inc b
-	xor h
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor c
-	xor l
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor d
-	xor (hl)
-	ld (hl), $36
-	ld (hl), $36
-	ld (hl), $36
-	ld (hl), $36
-	ld (hl), $36
-	ld (hl), $AF
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or b
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	ld b, $07
-	inc b
-	dec b
-	ld b, $07
-	nop
-	rlca
-	ld b, $AB
-	xor e
-	xor e
-	ld c, $0F
-	inc c
-	dec c
-	ld c, $0F
-	add hl, bc
-	rrca
-	ld c, $AB
-	xor e
-	xor e
-	ld b, $07
-	ld de, $0403
-	dec b
-	inc b
-	rlca
-	ld b, $AB
-	xor e
-	xor e
-	ld c, $0F
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	inc c
-	rrca
-	ld c, $AB
-	xor e
-	xor e
-	nop
-	ld bc, $0706
-	inc b
-	dec b
-	ld b, $01
-	nop
-	xor e
-	xor e
-	xor e
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	inc c
-	dec c
-	ld c, $0A
-	add hl, bc
-	xor e
-	xor e
-	xor e
-	ld b, $07
-	ld b, $07
-	inc b
-	dec b
-	nop
-	rlca
-	ld b, $AB
-	xor e
-	xor e
-	ld c, $0F
-	ld c, $0F
-	inc c
-	dec c
-	add hl, bc
-	rrca
-	ld c, $AB
-	xor e
-	xor e
-	inc b
-	dec b
-	ld de, $0003
-	ld bc, $0504
-	inc b
-	xor e
-	xor e
-	xor e
-	inc c
-	dec c
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	xor e
-	xor e
-	xor e
-	nop
-	ld bc, $0706
-	inc b
-	dec b
-	ld b, $01
-	nop
-	xor e
-	xor e
-	xor e
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	inc c
-	dec c
-	ld c, $0A
-	add hl, bc
-	ld a, (bc)
-	ld c, h
-	ld c, e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or c
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	xor e
-	or d
-	ld c, h
-	ld c, e
-	ld c, h
-	ld c, e
-	ld c, h
-	ld c, e
-	ld c, h
-	ld c, e
-	ld c, h
-	ld c, e
-	ld c, h
-	ld c, e
-	ld de, $0D03
-	ld bc, $0706
-	inc b
-	dec b
-	ld b, $07
-	ld de, $1203
-	dec bc
-	ld b, $B3
-	or h
-	rrca
-	inc c
-	dec c
-	ld c, $0F
-	ld (de), a
-	dec bc
-	ld b, $06
-	or e
-	or l
-	rlca
-	dec b
-	ld de, $0403
-	dec b
-	ld b, $07
-	ld c, $B6
-	or l
-	ld b, $0F
-	dec c
-	ld (de), a
-	dec bc
-	inc c
-	dec c
-	ld c, $0F
-	ld b, $B7
-	ld b, $07
-	cp b
-	dec b
-	ld b, $07
-	ld b, $07
-	inc b
-	dec b
-	ld c, $0F
-	ld c, $0F
-	cp c
-	dec c
-	ld c, $0F
-	ld c, $0F
-	inc c
-	dec c
-	ld b, $07
-	ld de, $B903
-	or d
-	inc b
-	dec b
-	ld de, $9594
-	dec b
-	ld c, $0F
-	ld (de), a
-	dec bc
-	cp c
-	ld c, e
-	inc c
-	dec c
-	sub (hl)
-	sub a
-	sbc a, b
-	sbc a, c
-	inc b
-	dec b
-	ld b, $07
-	cp c
-	or d
-	ld b, $07
-	sbc a, d
-	sbc a, e
-	sbc a, h
-	sbc a, l
-	inc c
-	dec c
-	ld c, $0F
-	cp c
-	ld c, e
-	ld c, $0F
-	inc c
-	sbc a, (hl)
-	sbc a, a
-	ld a, (bc)
-	ld b, $07
-	inc b
-	dec b
-	cp c
-	or d
-	ld de, $0603
-	rlca
-	inc b
-	dec b
-	ld c, $0F
-	inc c
-	dec c
-	cp c
-	ld c, e
-	ld (de), a
-	dec bc
-	ld c, $0F
-	inc c
-	dec c
-	ld b, $07
-	nop
-	ld bc, $B2B9
-	ld de, $0003
-	ld bc, $0504
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	cp c
-	ld c, e
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld de, $0603
-	rlca
-	cp c
-	or d
-	nop
-	ld bc, $0706
-	nop
-	ld bc, $0B12
-	ld c, $0F
-	cp c
-	ld c, e
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	nop
-	ld bc, $0504
-	cp c
-	or d
-	ld b, $07
-	ld de, $0603
-	rlca
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	inc c
-	ld c, e
-	ld c, $0F
-	ld (de), a
-	dec bc
-	ld c, $0F
-	inc b
-	dec b
-	ld b, $07
-	inc b
-	dec b
-	nop
-	ld bc, $0100
-	inc b
-	dec b
-	inc c
-	dec c
-	ld c, $0F
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	ld de, $0003
-	ld bc, $0706
-	add a, d
-	add a, e
-	add a, h
-	add a, l
-	ld b, $07
-	ld (de), a
-	dec bc
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	add a, (hl)
-	add a, a
-	adc a, b
-	adc a, c
-	ld c, $0F
-	ld b, $07
-	nop
-	ld bc, $0504
-	nop
-	ld bc, $0706
-	inc b
-	dec b
-	ld c, $0F
-	add hl, bc
-	ld a, (bc)
-	inc c
-	dec c
-	add hl, bc
-	ld a, (bc)
-	ld c, $0F
-	inc c
-	dec c
-	cp d
-	cp e
-	cp h
-	cp l
-	ld de, $0003
-	dec b
-	inc b
-	dec b
-	inc b
-	dec b
-	cp (hl)
-	cp a
-	cp a
-	cp a
-	ret nz
-	pop bc
-	add hl, bc
-	dec c
-	inc c
-	dec c
-	jp nz, $C4C3	; Possibly invalid
-; Data from E259 to E5A4 (844 bytes)
-.db $C5 $BF $BF $BF $C6 $11 $07 $04 $C7 $C8 $C9 $09 $0A $CA $CB $CC
-.db $CD $05 $04 $CE $CF $D0 $D1 $00 $01 $06 $07 $05 $04 $04 $CE $CF
-.db $D0 $D1 $03 $09 $05 $04 $05 $04 $0C $CE $CF $D0 $D1 $12 $0B $04
-.db $0D $0C $0D $04 $CE $CF $D0 $D1 $05 $04 $05 $0E $07 $00 $01 $CE
-.db $CF $D0 $D1 $0C $0D $0C $0D $05 $04 $04 $CE $CF $D0 $D1 $05 $06
-.db $07 $00 $01 $0D $0C $D2 $CF $D0 $D1 $0C $0D $0E $0F $09 $0A $07
-.db $00 $D3 $D4 $11 $03 $11 $D5 $D6 $D6 $D6 $D7 $0C $07 $00 $01 $12
-.db $0B $12 $D8 $D8 $D8 $D8 $D9 $11 $94 $95 $05 $11 $03 $11 $03 $04
-.db $05 $04 $05 $96 $97 $98 $99 $12 $0B $12 $0B $0C $0D $0C $0D $9A
-.db $9B $9C $9D $00 $01 $04 $05 $00 $01 $00 $01 $0C $9E $9F $0A $09
-.db $0A $0C $0D $09 $0A $09 $0A $00 $01 $11 $03 $00 $01 $82 $83 $84
-.db $85 $06 $07 $09 $0A $12 $0B $09 $0A $86 $87 $88 $89 $0E $0F $11
-.db $03 $00 $01 $04 $05 $00 $01 $06 $07 $04 $05 $12 $0B $09 $0A $0C
-.db $0D $09 $0A $0E $0F $0C $0D $00 $01 $04 $05 $11 $03 $00 $01 $00
-.db $01 $00 $01 $09 $0A $0C $0D $12 $0B $09 $0A $09 $0A $09 $0A $A0
-.db $A0 $A1 $A2 $A2 $A2 $A3 $A4 $04 $05 $00 $01 $A5 $A5 $A5 $A6 $A6
-.db $A6 $A7 $A8 $0C $0D $09 $0A $04 $05 $00 $01 $04 $05 $00 $01 $DA
-.db $DB $00 $01 $0C $0D $09 $0A $0C $0D $09 $DC $DD $DE $DF $0A $23
-.db $55 $64 $23 $11 $03 $E0 $E1 $E2 $E3 $E4 $E5 $64 $57 $25 $24 $23
-.db $0B $E6 $E7 $E8 $E9 $EA $EB $00 $01 $04 $25 $24 $23 $EC $ED $EE
-.db $EF $F0 $F1 $09 $0A $0C $0D $25 $F2 $F3 $F4 $F5 $F6 $F7 $0B $11
-.db $03 $00 $BA $F8 $F9 $FA $11 $03 $01 $06 $07 $12 $0B $09 $BE $BF
-.db $BF $BF $C0 $C1 $0A $0E $0F $06 $07 $04 $C4 $C5 $BF $BF $BF $C6
-.db $07 $00 $01 $0E $0F $0C $09 $0A $CA $CB $CC $CD $0F $55 $65 $55
-.db $65 $66 $67 $64 $23 $00 $01 $04 $55 $57 $03 $57 $0D $12 $0B $25
-.db $64 $65 $66 $67 $57 $12 $0B $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $40 $00 $11 $01 $49 $02 $02 $4A $03
-.db $DD $50 $05 $1B $13 $48 $13 $21 $32 $16 $4F $13 $40 $07 $13 $48
-.db $08 $01 $01 $09 $49 $77 $00 $E2 $98 $C3 $07 $E2 $98 $C3 $C5 $BE
-.db $A4 $02 $0A $03 $11 $49 $E2 $7F $09 $E2 $20 $31 $A4 $21 $38 $85
-.db $22 $3F $85 $4A $4A $94 $0B $4B $E0 $04 $E0 $0C $AA $E0 $05 $E0
-.db $05 $E0 $05 $21 $8E $09 $55 $02 $E0 $0A $E0 $4A $E0 $03 $E0 $4B
-.db $03 $E0 $0B $41 $10 $42 $10 $22 $28 $3B $09 $08 $11 $86 $23 $B8
-.db $0F $62 $00 $23 $B8 $54 $02 $61 $20 $01 $21 $23 $41 $60 $DC $08
-.db $08 $93 $27 $DA $40 $40 $9C $47 $47 $21 $D8 $D9 $5D $41 $A0 $48
-.db $9C $68 $14 $21 $46 $0F $62 $1C $C7 $12 $22 $22 $41 $40 $40 $31
-.db $02 $39 $1E $62 $1F $39 $0F $46 $10 $21 $22 $30 $66 $0A $43 $29
-.db $04 $D4 $30 $00 $C2 $42 $84 $03 $24 $04 $41 $09 $C8 $31 $8A $2F
-.db $04 $41 $01 $25 $04 $42 $03 $08 $BE $C3 $43 $83 $B6 $22 $2E $29
-.db $04 $35 $C6 $41 $8F $AE $03 $4B $01 $21 $58 $E1 $29 $76 $35 $EA
-.db $22 $02 $06 $11 $02 $41 $42 $87 $42 $0E $41 $08 $02 $48 $60 $00
-.db $21 $F4 $82 $47 $4F $46 $95 $46 $47 $B8 $BE $39 $EA $1F $07 $CA
-.db $30 $8D $10 $06 $04 $12 $00 $50 $05 $14 $06 $79 $06 $41 $22 $50
-.db $47 $1A $50 $41 $1A $41 $36 $03 $02 $50 $41 $1A $C3 $30 $0A $10
-.db $01 $05 $05 $07 $20 $6C $60 $4D $BB $83 $07 $20
-
-; Data from E5A5 to FFFF (6747 bytes)
-_DATA_E5A5_:
-.incbin "Micro Machines_e5a5.inc"
+; Unknown data
+_LABEL_F35D_:
+.incbin "Micro Machines_c000.inc" skip $335d read $0ca3 ; Length unknown
 
 .BANK 4
 .ORG $0000
 
 ; Data from 10000 to 13FFF (16384 bytes)
 .incbin "Micro Machines_10000.inc"
+; 1296a = ruff trux car tiles run encoded
 
 .BANK 5
 .ORG $0000
@@ -30443,61 +25758,71 @@ _LABEL_17EB4_:
 	ret
 
 ; Pointer Table from 17EC2 to 17ED1 (8 entries, indexed by _RAM_DB97_TrackType)
-_DATA_17EC2_:
-.dw _DATA_17ED2_ _DATA_17EF2_ _DATA_17F12_ _DATA_17F32_ _DATA_17F52_ _DATA_17F72_ _DATA_17F92_ _DATA_17FB2_
+_DATA_17EC2_SMSPalettes:
+.dw _DATA_17ED2_SMSPalette_Desk 
+.dw _DATA_17EF2_SMSPalette_Breakfast 
+.dw _DATA_17F12_SMSPalette_Sandpit 
+.dw _DATA_17F32_SMSPalette_F1 
+.dw _DATA_17F52_SMSPalette_Garage 
+.dw _DATA_17F72_SMSPalette_Tanks 
+.dw _DATA_17F92_SMSPalette_RuffTrux 
+.dw _DATA_17FB2_Helicopter
 
 ; 1st entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17ED2 to 17EF1 (32 bytes)
-_DATA_17ED2_:
+_DATA_17ED2_SMSPalette_Desk:
 .db $00 $05 $06 $3F $2A $15 $02 $24 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 2nd entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17EF2 to 17F11 (32 bytes)
-_DATA_17EF2_:
+_DATA_17EF2_SMSPalette_Breakfast:
 .db $00 $06 $05 $3F $2A $24 $39 $0B $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 3rd entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F12 to 17F31 (32 bytes)
-_DATA_17F12_:
+_DATA_17F12_SMSPalette_Sandpit:
 .db $25 $00 $3F $0F $05 $0A $14 $29 $21 $25 $3A $3F $3A $25 $21 $10
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 4th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F32 to 17F51 (32 bytes)
-_DATA_17F32_:
+_DATA_17F32_SMSPalette_F1:
 .db $00 $2A $3F $0B $06 $05 $35 $02 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 5th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F52 to 17F71 (32 bytes)
-_DATA_17F52_:
+_DATA_17F52_SMSPalette_Garage:
 .db $00 $08 $04 $3F $2A $05 $0B $03 $30 $35 $3A $3F $30 $35 $3A $3F
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 6th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F72 to 17F91 (32 bytes)
-_DATA_17F72_:
+_DATA_17F72_SMSPalette_Tanks:
 .db $00 $15 $2A $3F $02 $04 $06 $0B $21 $25 $3A $3F $3A $25 $21 $10
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 7th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F92 to 17FB1 (32 bytes)
-_DATA_17F92_:
+_DATA_17F92_SMSPalette_RuffTrux:
 .db $00 $30 $35 $3A $3F $01 $02 $08 $21 $25 $3A $3F $3A $25 $21 $10
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
 ; 8th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17FB2 to 17FFF (78 bytes)
-_DATA_17FB2_:
+_DATA_17FB2_Helicopter: ; Unused
 .db $00 $3F $1A $04 $38 $06 $05 $01 $21 $25 $3A $3F $3A $25 $21 $10
 .db $00 $17 $0D $00 $39 $15 $2A $3F $0B $00 $00 $00 $00 $00 $00 $00
 
-
+; Uninitialised data?
 .db $FF $FF $FF $FF $FF $FF $FF $DF $FF $FF $FF $DF $FF $FF $FF $7F
 .db $FF $7F $FF $FF $FF $7F $FF $FF $FF $7F $FE $FF $FF $FF $FF $FF
-.db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $05
+.db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF 
+
+; Bank index marker
+.db :CADDR
 
 .BANK 6
 .ORG $0000
@@ -32441,45 +27766,87 @@ _LABEL_23DB6_:
 	ret
 
 ; Data from 23DE7 to 23ECE (232 bytes)
-_DATA_23DE7_:
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $24 $66 $66 $66 $66
-.db $11 $11 $11 $14 $69 $CD $DD $DD $11 $11 $45 $79 $BD $DD $DD $DD
-.db $11 $11 $11 $47 $AC $DD $DD $DD $11 $11 $11 $24 $66 $66 $66 $66
-.db $11 $11 $11 $24 $68 $99 $99 $99 $11 $11 $45 $79 $BD $DD $DD $DD
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $47 $AC $DD $DD $DD
-.db $11 $14 $8B $DF $FF $FF $FF $FF $11 $11 $11 $24 $66 $66 $66 $66
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11
-.db $11 $11 $11 $24 $68 $99 $99 $99 $11 $11 $11 $14 $69 $CD $DD $DD
-.db $11 $11 $11 $47 $AC $DD $DD $DD $11 $14 $8B $DF $FF $FF $FF $FF
-.db $11 $11 $45 $79 $BD $DD $DD $DD $11 $11 $11 $11 $12 $33 $33 $33
-.db $11 $11 $11 $14 $69 $CD $DD $DD $11 $11 $11 $11 $11 $11 $11 $11
-.db $11 $14 $8B $DF $FF $FF $FF $FF $11 $11 $11 $24 $68 $99 $99 $99
-.db $11 $11 $11 $11 $12 $33 $33 $33 $11 $11 $11 $14 $69 $CD $DD $DD
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11
+_DATA_23DE7_HandlingData_GG:
+; More forgiving handing on GG?
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $11 $11 $24 $66 $66 $66 $66
+.db $11 $11 $11 $14 $69 $CD $DD $DD
+.db $11 $11 $45 $79 $BD $DD $DD $DD
+.db $11 $11 $11 $47 $AC $DD $DD $DD
+.db $11 $11 $11 $24 $66 $66 $66 $66
+.db $11 $11 $11 $24 $68 $99 $99 $99
+.db $11 $11 $45 $79 $BD $DD $DD $DD
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $11 $11 $47 $AC $DD $DD $DD
+.db $11 $14 $8B $DF $FF $FF $FF $FF
+.db $11 $11 $11 $24 $66 $66 $66 $66
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $11 $11 $24 $68 $99 $99 $99
+.db $11 $11 $11 $14 $69 $CD $DD $DD
+.db $11 $11 $11 $47 $AC $DD $DD $DD
+.db $11 $14 $8B $DF $FF $FF $FF $FF
+.db $11 $11 $45 $79 $BD $DD $DD $DD
+.db $11 $11 $11 $11 $12 $33 $33 $33
+.db $11 $11 $11 $14 $69 $CD $DD $DD
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $14 $8B $DF $FF $FF $FF $FF
+.db $11 $11 $11 $24 $68 $99 $99 $99
+.db $11 $11 $11 $11 $12 $33 $33 $33
+.db $11 $11 $11 $14 $69 $CD $DD $DD
+.db $11 $11 $11 $11 $11 $11 $11 $11
+.db $11 $11 $11 $11 $11 $11 $11 $11
 .db $11 $11 $11 $11 $11 $11 $11 $11
 
 ; Data from 23ECF to 23FFF (305 bytes)
-_DATA_23ECF_:
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $12 $46 $66 $66 $66 $66
-.db $11 $11 $11 $46 $9C $DD $DD $DD $11 $14 $57 $9B $DD $DD $DD $DD
-.db $11 $11 $14 $7A $CD $DD $DD $DD $11 $11 $12 $46 $66 $66 $66 $66
-.db $11 $11 $12 $46 $89 $99 $99 $99 $11 $14 $57 $9B $DD $DD $DD $DD
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $14 $7A $CD $DD $DD $DD
-.db $11 $48 $BD $FF $FF $FF $FF $FF $11 $11 $12 $46 $66 $66 $66 $66
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11
-.db $11 $11 $12 $46 $89 $99 $99 $99 $11 $11 $11 $46 $9C $DD $DD $DD
-.db $11 $11 $14 $7A $CD $DD $DD $DD $11 $48 $BD $FF $FF $FF $FF $FF
-.db $11 $14 $57 $9B $DD $DD $DD $DD $11 $11 $11 $11 $23 $33 $33 $33
-.db $11 $11 $11 $46 $9C $DD $DD $DD $11 $11 $11 $11 $11 $11 $11 $11
-.db $11 $48 $BD $FF $FF $FF $FF $FF $11 $11 $12 $46 $89 $99 $99 $99
-.db $11 $11 $11 $11 $23 $33 $33 $33 $11 $11 $11 $46 $9C $DD $DD $DD
-.db $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11 $11
-.db $11 $11 $11 $11 $11 $11 $11 $11 $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00
-.db $08
+_DATA_23ECF_HandlingData_SMS:
+; 16 nibbles per track
+; Unpacked, left to right, from _RAM_DB86_HandlingData
+; Maps speed to skidding?
+; Per-track data, but actually the same for all tracks of the same type
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bathtub
+.db $11 $11 $12 $46 $66 $66 $66 $66 ; Breakfast
+.db $11 $11 $11 $46 $9C $DD $DD $DD ; Desk
+.db $11 $14 $57 $9B $DD $DD $DD $DD ; Garage
+.db $11 $11 $14 $7A $CD $DD $DD $DD ; Sandpit
+.db $11 $11 $12 $46 $66 $66 $66 $66 ; Breakfast
+.db $11 $11 $12 $46 $89 $99 $99 $99 ; F1
+.db $11 $14 $57 $9B $DD $DD $DD $DD ; Garage
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bathtub
+.db $11 $11 $14 $7A $CD $DD $DD $DD ; Sandpit
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Garden (unused)
+.db $11 $11 $12 $46 $66 $66 $66 $66 ; Breakfast
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bathtub
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Tanks
+.db $11 $11 $12 $46 $89 $99 $99 $99 ; F1
+.db $11 $11 $11 $46 $9C $DD $DD $DD ; Desk
+.db $11 $11 $14 $7A $CD $DD $DD $DD ; Sandpit
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Garden (unused)
+.db $11 $14 $57 $9B $DD $DD $DD $DD ; Garage
+.db $11 $11 $11 $11 $23 $33 $33 $33 ; Tanks
+.db $11 $11 $11 $46 $9C $DD $DD $DD ; Desk
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bathtub
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Garden (unused)
+.db $11 $11 $12 $46 $89 $99 $99 $99 ; F1
+.db $11 $11 $11 $11 $23 $33 $33 $33 ; Tanks
+.db $11 $11 $11 $46 $9C $DD $DD $DD ; Desk
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
+.db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
+
+; Fill to end of bank
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+.db $FF $FF $00 $00 $FF $FF $00 $00
+
+; Bank number
+.db :CADDR
 
 .BANK 9
 .ORG $0000
@@ -32899,35 +28266,47 @@ _DATA_2B911_:
 .ORG $0000
 
 ; Data from 30000 to 30A67 (2664 bytes)
-.incbin "Micro Machines_30000.inc"
+_DATA_30000_F1CarTiles
+.incbin "Micro Machines_30000.inc" skip $0000 read $0330
+_DATA_30330_WarriorsCarTiles
+.incbin "Micro Machines_30000.inc" skip $0330 read $03a0
+_DATA_306D0_TanksCarTiles
+.incbin "Micro Machines_30000.inc" skip $06d0 read $0398
+
 
 ; Data from 30A68 to 30C67 (512 bytes)
-_DATA_30A68_:
-.db $00 $00 $00 $00 $7F $7F $7F $00 $7F $41 $41 $00 $7F $41 $41 $00
+_DATA_30A68_TournamentHUDTiles:
+; 4bpp tiles (32 bytes per tile)
+; - Car colour squares *4
+; - "st", "nd", "rd", "th"
+; - Car colour "finished" squares *4
+; - Smoke?
+; - Numbers 1-4?
+.db $00 $00 $00 $00 $7F $7F $7F $00 $7F $41 $41 $00 $7F $41 $41 $00 ; red
 .db $7F $41 $41 $00 $7F $41 $41 $00 $7F $41 $41 $00 $7F $7F $7F $00
-.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $7F $00 $00 $41 $7F $00 $00
+.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $7F $00 $00 $41 $7F $00 $00 ; green
 .db $41 $7F $00 $00 $41 $7F $00 $00 $41 $7F $00 $00 $7F $7F $00 $00
-.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $41 $3E $00 $41 $41 $3E $00
+.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $41 $3E $00 $41 $41 $3E $00 ; blue
 .db $41 $41 $3E $00 $41 $41 $3E $00 $41 $41 $3E $00 $7F $7F $00 $00
-.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $41 $00 $3E $41 $41 $00 $3E
+.db $00 $00 $00 $00 $7F $7F $00 $00 $41 $41 $00 $3E $41 $41 $00 $3E ; yellow
 .db $41 $41 $00 $3E $41 $41 $00 $3E $41 $41 $00 $3E $7F $7F $00 $00
-.db $1C $1C $00 $00 $1C $1C $08 $00 $7E $7E $08 $00 $FE $BE $6C $00
+.db $1C $1C $00 $00 $1C $1C $08 $00 $7E $7E $08 $00 $FE $BE $6C $00 ; st
 .db $FE $FE $48 $00 $FF $FF $28 $00 $FF $D7 $EE $00 $EF $EF $00 $00
-.db $07 $07 $00 $00 $07 $07 $02 $00 $FF $FF $02 $00 $FF $D7 $EE $00
+.db $07 $07 $00 $00 $07 $07 $02 $00 $FF $FF $02 $00 $FF $D7 $EE $00 ; nd
 .db $FF $FF $AA $00 $FF $FF $AA $00 $FF $F7 $AE $00 $FF $FF $00 $00
-.db $07 $07 $00 $00 $07 $07 $02 $00 $FF $FF $02 $00 $FF $77 $EE $00
+.db $07 $07 $00 $00 $07 $07 $02 $00 $FF $FF $02 $00 $FF $77 $EE $00 ; rd
 .db $FF $FF $8A $00 $FF $FF $8A $00 $FF $F7 $8E $00 $FF $FF $00 $00
-.db $DC $DC $00 $00 $DC $DC $88 $00 $FE $FE $88 $00 $FF $FD $CE $00
+.db $DC $DC $00 $00 $DC $DC $88 $00 $FE $FE $88 $00 $FF $FD $CE $00 ; th
 .db $FF $FF $8A $00 $FF $FF $8A $00 $FF $7F $EA $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $8F $00 $00 $FF $8F $00 $00 $FF $8F $00 $00
+.db $FF $FF $00 $00 $FF $8F $00 $00 $FF $8F $00 $00 $FF $8F $00 $00 ; red
 .db $FF $F1 $00 $00 $FF $F1 $00 $00 $FF $F1 $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $8F $FF $00 $00 $8F $FF $00 $00 $8F $FF $00 $00
+.db $FF $FF $00 $00 $8F $FF $00 $00 $8F $FF $00 $00 $8F $FF $00 $00 ; green
 .db $F1 $FF $00 $00 $F1 $FF $00 $00 $F1 $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $8F $8F $70 $00 $8F $8F $70 $00 $8F $8F $70 $00
+.db $FF $FF $00 $00 $8F $8F $70 $00 $8F $8F $70 $00 $8F $8F $70 $00 ; blue
 .db $F1 $F1 $0E $00 $F1 $F1 $0E $00 $F1 $F1 $0E $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $8F $8F $00 $70 $8F $8F $00 $70 $8F $8F $00 $70
+.db $FF $FF $00 $00 $8F $8F $00 $70 $8F $8F $00 $70 $8F $8F $00 $70 ; yellow
 .db $F1 $F1 $00 $0E $F1 $F1 $00 $0E $F1 $F1 $00 $0E $FF $FF $00 $00
-.db $00 $00 $00 $00 $18 $18 $00 $00 $38 $38 $10 $00 $5C $64 $38 $00
+.db $00 $00 $00 $00 $18 $18 $00 $00 $38 $38 $10 $00 $5C $64 $38 $00 ; smoke
 .db $74 $6C $38 $00 $38 $38 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $18 $18 $00 $00 $34 $3C $18 $00 $3A $3E $1C $00 $56 $6A $3C $00
 .db $AA $FE $7C $00 $5A $66 $3C $00 $3C $3C $00 $00 $00 $00 $00 $00
@@ -32935,6 +28314,7 @@ _DATA_30A68_:
 .db $E6 $BA $7C $00 $B5 $FF $7E $00 $49 $77 $3E $00 $3E $3E $00 $00
 .db $1C $1C $00 $00 $36 $2A $1C $00 $22 $3E $1C $00 $36 $2A $1C $00
 .db $7E $7E $00 $00 $D7 $B5 $62 $00 $7D $5B $26 $00 $26 $26 $00 $00
+; must be followed by:
 
 ; Data from 30C68 to 30CE7 (128 bytes)
 _DATA_30C68_LapRemainingIndicators: ; Number tiles
@@ -33763,7 +29143,17 @@ _DATA_3150F_:
 .ORG $0000
 
 ; Data from 34000 to 35707 (5896 bytes)
-.incbin "Micro Machines_34000.inc"
+_DATA_34000_Compressed:
+.incbin "Micro Machines_34000.inc" skip $0000 read $0958 ; -> 6144 uncompressed, contents TBC
+_DATA_34958_DeskCarTiles:
+.incbin "Micro Machines_34000.inc" skip $0958 read $0398 ; RLE, size TBC
+_DATA_34CF0_FourByFourTiles:
+.incbin "Micro Machines_34000.inc" skip $0cf0 read $0358 ; RLE, size TBC
+_DATA_35048_SpeedboatTiles:
+.incbin "Micro Machines_34000.inc" skip $1048 read $0308 ; RLE, size TBC
+_DATA_35350_TurboWheelsCars:
+.incbin "Micro Machines_34000.inc" skip $1350 read $03b8 ; RLE, size TBC
+
 
 ; Data from 35708 to 3576F (104 bytes)
 _DATA_35708_PlugholeTilesPart1:
@@ -34292,9 +29682,9 @@ _DATA_35AED_CarTileAddresses:
 
 ; Data from 35B4D to 35B8C (64 bytes)
 _DATA_35B4D_CarDrawingData:
-; Rotation generation data?
+; Rotation generation data
 ;    ,,- index of underlying data (car position unflipped)
-;    ||  ,,- index of rotation?
+;    ||  ,,- index of rotation
 ;    ||  ||  ,,- horizontal flip
 ;    ||  ||  ||  ,,- vertical flip
 .db $00 $00 $00 $00 
@@ -34316,6 +29706,7 @@ _DATA_35B4D_CarDrawingData:
 
 ; Data from 35B8D to 35BEC (96 bytes)
 _DATA_35B8D_:
+; Gradual ramp from 0 to $1f
 .db $00 $00 $00 $01 $01 $01 $02 $02 $02 $03 $03 $03 $04 $04 $04 $05
 .db $05 $05 $06 $06 $06 $07 $07 $07 $08 $08 $08 $09 $09 $09 $0A $0A
 .db $0A $0B $0B $0B $0C $0C $0C $0D $0D $0D $0E $0E $0E $0F $0F $0F
@@ -34324,11 +29715,8 @@ _DATA_35B8D_:
 .db $1A $1B $1B $1B $1C $1C $1C $1D $1D $1D $1E $1E $1E $1F $1F $1F
 
 ; Data from 35BED to 35C2C (64 bytes)
-_DATA_35BED_:
-.db $00 $00 $60 $00 $C0 $00 $20 $01 $80 $01 $E0 $01 $40 $02 $A0 $02
-.db $00 $03 $60 $03 $C0 $03 $20 $04 $80 $04 $E0 $04 $40 $05 $A0 $05
-.db $00 $06 $60 $06 $C0 $06 $20 $07 $80 $07 $E0 $07 $40 $08 $A0 $08
-.db $00 $09 $60 $09 $C0 $09 $20 $0A $80 $0A $E0 $0A $40 $0B $A0 $0B
+_DATA_35BED_96TimesTable:
+  TimesTable16 0 96 32
 
 ; Data from 35C2D to 35D2C (256 bytes)
 _DATA_35C2D_:
@@ -34350,37 +29738,56 @@ _DATA_35C2D_:
 .db $9C $9D $9E $9F $BC $BD $BE $BF $DC $DD $DE $DF $FC $FD $FE $FF
 
 ; Data from 35D2D to 35F0C (480 bytes)
-_DATA_35D2D_:
-.db $00 $00 $00 $38 $38 $00 $7C $44 $00 $FE $B2 $30 $FE $B2 $30 $FE
-.db $82 $00 $7C $44 $00 $38 $38 $00 $00 $00 $00 $38 $38 $00 $44 $44
-.db $38 $B2 $B2 $7C $B2 $B2 $7C $82 $82 $7C $44 $44 $38 $38 $38 $00
-.db $7A $7A $00 $7F $7F $30 $7F $7F $32 $7F $7F $37 $5F $7F $3F $7F
-.db $7F $1D $3F $3F $18 $3D $3D $00 $FF $FF $00 $FF $FF $6D $FF $FF
-.db $6D $FF $FF $6D $DF $FF $ED $FF $FF $CD $FF $FF $CD $FF $FF $00
-.db $DF $DF $00 $FF $FF $8D $FF $FF $CD $FF $FF $ED $FF $FF $BD $FF
-.db $FF $9D $FF $FF $8D $DF $DF $00 $DF $DF $00 $FF $FF $8D $FF $FF
-.db $CD $FF $FF $ED $FF $FF $BD $FF $FF $9D $FF $FF $8D $DF $DF $00
-.db $FF $FF $00 $FF $FF $FD $FF $FF $81 $FF $FF $F9 $FF $FF $81 $FF
-.db $FF $FD $FF $FF $FD $FF $FF $00 $FC $FC $00 $FE $FA $FC $FE $FE
-.db $8C $FE $FA $FC $BC $FC $F0 $FE $FE $98 $FE $FE $8C $DE $DE $00
-.db $0F $0F $00 $0F $0F $07 $0F $0F $06 $0F $0F $07 $0F $0F $06 $0F
-.db $0F $07 $0F $0F $07 $0F $0F $00 $FF $FF $00 $FF $EB $F7 $FF $BF
-.db $76 $FF $EF $F6 $FF $BF $76 $FF $FF $F7 $FF $EB $F7 $FF $FF $00
-.db $FF $FF $00 $FF $EF $F6 $FF $FF $37 $7F $7F $37 $FF $FF $36 $FF
-.db $FF $F6 $FF $EF $F6 $FF $FF $00 $7F $7F $00 $FF $FF $36 $FF $FF
-.db $36 $FF $FF $B6 $FF $FF $F6 $FF $FF $77 $FF $FF $33 $7F $7F $00
-.db $00 $00 $00 $18 $18 $00 $38 $38 $10 $5C $64 $38 $74 $6C $38 $38
-.db $38 $00 $00 $00 $00 $00 $00 $00 $18 $18 $00 $34 $3C $18 $3A $3E
-.db $1C $56 $6A $3C $AA $FE $7C $5A $66 $3C $3C $3C $00 $00 $00 $00
-.db $1C $1C $00 $2A $3E $1C $2D $3F $1E $53 $6D $3E $E6 $BA $7C $B5
-.db $FF $7E $49 $77 $3E $3E $3E $00 $1C $1C $00 $36 $2A $1C $22 $3E
-.db $1C $36 $2A $1C $7E $7E $00 $D7 $B5 $62 $7D $5B $26 $26 $26 $00
-.db $7F $7F $00 $7F $7B $37 $7F $7F $36 $7F $7B $37 $FF $FF $30 $FF
-.db $FF $F6 $FF $FB $E7 $FF $FF $00 $F0 $F0 $00 $F0 $F0 $E0 $F0 $F0
-.db $00 $F8 $E8 $F0 $F8 $F8 $30 $F8 $F8 $30 $F8 $E8 $F0 $F0 $F0 $00
-.db $00 $00 $00 $3E $3E $00 $7F $5D $3E $7F $7F $36 $7F $7D $0E $7F
-.db $7B $1C $7F $7F $3E $7F $7F $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+_DATA_35D2D_HeadToHeadHUDTiles:
+; 3bpp tile data (24 bytes per tile)
+; - Red dot
+; - Blue dot
+; - "WINNER" (6 tiles)
+; - "BONUS" (first 4 tiles)
+; - Exhaust smoke? TODO supposed to be showing this I guess, on the sprites following cars - broken?
+; - "BONUS" (last 2 tiles)
+; - 4 digit for laps remaining
+; - Blank tile
+.db $00 $00 $00 $38 $38 $00 $7C $44 $00 $FE $B2 $30 ; red
+.db $FE $B2 $30 $FE $82 $00 $7C $44 $00 $38 $38 $00
+.db $00 $00 $00 $38 $38 $00 $44 $44 $38 $B2 $B2 $7C ; blue
+.db $B2 $B2 $7C $82 $82 $7C $44 $44 $38 $38 $38 $00
+.db $7A $7A $00 $7F $7F $30 $7F $7F $32 $7F $7F $37 ; WINNER
+.db $5F $7F $3F $7F $7F $1D $3F $3F $18 $3D $3D $00
+.db $FF $FF $00 $FF $FF $6D $FF $FF $6D $FF $FF $6D
+.db $DF $FF $ED $FF $FF $CD $FF $FF $CD $FF $FF $00
+.db $DF $DF $00 $FF $FF $8D $FF $FF $CD $FF $FF $ED
+.db $FF $FF $BD $FF $FF $9D $FF $FF $8D $DF $DF $00
+.db $DF $DF $00 $FF $FF $8D $FF $FF $CD $FF $FF $ED
+.db $FF $FF $BD $FF $FF $9D $FF $FF $8D $DF $DF $00
+.db $FF $FF $00 $FF $FF $FD $FF $FF $81 $FF $FF $F9
+.db $FF $FF $81 $FF $FF $FD $FF $FF $FD $FF $FF $00
+.db $FC $FC $00 $FE $FA $FC $FE $FE $8C $FE $FA $FC
+.db $BC $FC $F0 $FE $FE $98 $FE $FE $8C $DE $DE $00
+.db $0F $0F $00 $0F $0F $07 $0F $0F $06 $0F $0F $07 ; BONU-
+.db $0F $0F $06 $0F $0F $07 $0F $0F $07 $0F $0F $00
+.db $FF $FF $00 $FF $EB $F7 $FF $BF $76 $FF $EF $F6
+.db $FF $BF $76 $FF $FF $F7 $FF $EB $F7 $FF $FF $00
+.db $FF $FF $00 $FF $EF $F6 $FF $FF $37 $7F $7F $37
+.db $FF $FF $36 $FF $FF $F6 $FF $EF $F6 $FF $FF $00
+.db $7F $7F $00 $FF $FF $36 $FF $FF $36 $FF $FF $B6
+.db $FF $FF $F6 $FF $FF $77 $FF $FF $33 $7F $7F $00
+.db $00 $00 $00 $18 $18 $00 $38 $38 $10 $5C $64 $38 ; smoke
+.db $74 $6C $38 $38 $38 $00 $00 $00 $00 $00 $00 $00
+.db $18 $18 $00 $34 $3C $18 $3A $3E $1C $56 $6A $3C
+.db $AA $FE $7C $5A $66 $3C $3C $3C $00 $00 $00 $00
+.db $1C $1C $00 $2A $3E $1C $2D $3F $1E $53 $6D $3E
+.db $E6 $BA $7C $B5 $FF $7E $49 $77 $3E $3E $3E $00
+.db $1C $1C $00 $36 $2A $1C $22 $3E $1C $36 $2A $1C
+.db $7E $7E $00 $D7 $B5 $62 $7D $5B $26 $26 $26 $00
+.db $7F $7F $00 $7F $7B $37 $7F $7F $36 $7F $7B $37 ; -US
+.db $FF $FF $30 $FF $FF $F6 $FF $FB $E7 $FF $FF $00
+.db $F0 $F0 $00 $F0 $F0 $E0 $F0 $F0 $00 $F8 $E8 $F0
+.db $F8 $F8 $30 $F8 $F8 $30 $F8 $E8 $F0 $F0 $F0 $00
+.db $00 $00 $00 $3E $3E $00 $7F $5D $3E $7F $7F $36 ; 4
+.db $7F $7D $0E $7F $7B $1C $7F $7F $3E $7F $7F $00
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 ; blank
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 
 _LABEL_35F0D_:
 	ld a, $00
@@ -34938,7 +30345,7 @@ _LABEL_36287_:
 	jp _LABEL_3608C_
 
 _LABEL_362C7_:
-	ld hl, _RAM_DB86_
+	ld hl, _RAM_DB86_HandlingData
 	ld de, (_RAM_DCF7_)
 	ld d, $00
 	add hl, de
@@ -38640,7 +34047,7 @@ _LABEL_37FF7_:
 	ld l, h
 	add a, d
 	add a, b
-	call z, _LABEL_2620_
+	call z, $2620
 	ld h, b
 	ld l, h
 	ld (bc), a
@@ -39058,13 +34465,13 @@ _LABEL_3BAF1_MenusVBlank:
     jr z, + ; almost always the case
     ld a, ($BFFF) ; Last byte of currently mapped page is (usually) the bank number
     ld (_RAM_D742_VBlankSavedPageIndex), a ; save
-    ld a, $0c
-    ld ($8000), a
+    ld a, :_LABEL_30D36_MainVBlankImpl
+    ld (PAGING_REGISTER), a
     call _LABEL_30D36_MainVBlankImpl
     ld a, (_RAM_D742_VBlankSavedPageIndex)
-    ld ($8000), a
+    ld (PAGING_REGISTER), a
 +:  ld a, 1
-    ld ($d6d3), a
+    ld (_RAM_D6D3_VBlankDone), a
     in a, ($bf) ; ack INT
 	pop iy
 	pop ix
@@ -39077,8 +34484,8 @@ _LABEL_3BAF1_MenusVBlank:
 
 ; Executed in RAM at d966
 _LABEL_3BB26_:
-	ld a, $0C
-	ld ($8000), a
+	ld a, :_LABEL_30D36_MainVBlankImpl
+	ld (PAGING_REGISTER), a
 	call _LABEL_30D36_MainVBlankImpl
 	jp $DB48	; Code is loaded from _LABEL_3BD08_BackToSlot2
 
@@ -39411,7 +34818,7 @@ _LABEL_3BCE6_:
 ; Executed in RAM at db35
 _LABEL_3BCF5_RestorePagingFromD741:
 	ld a, (_RAM_D741_RAMDecompressorPageIndex)
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ret
 
 ; Data from 3BCFC to 3BD07 (12 bytes)
@@ -39420,7 +34827,7 @@ _LABEL_3BCF5_RestorePagingFromD741:
 ; Executed in RAM at db48
 _LABEL_3BD08_BackToSlot2:
 	ld a, $02
-	ld ($8000), a
+	ld (PAGING_REGISTER), a
 	ret
 
 ; Data from 3BD0E to 3BFFF (754 bytes)
