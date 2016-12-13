@@ -1,5 +1,6 @@
 ; this file was created with wlalink by ville helin <vhelin@iki.fi>.
 ; no$gmb symbolic information for "C:\Users\Maxim\Documents\Code\C#\MicroMachinesEditor\Analysis\Micro Machines.sms".
+00:c000 _RAM_C000_StartOfRam
 00:c000 _RAM_C000_DecompressionTemporaryBuffer
 00:c001 _RAM_C001_
 00:c04c _RAM_C04C_
@@ -280,9 +281,9 @@
 00:d6d4 _RAM_D6D4_
 00:d6d5 _RAM_D6D5_
 00:d6d6 _RAM_D6D6_
-00:d6e1 _RAM_D6E1_
-00:d701 _RAM_D701_
-00:d721 _RAM_D721_
+00:d6e1 _RAM_D6E1_SpriteX
+00:d701 _RAM_D701_SpriteN
+00:d721 _RAM_D721_SpriteY
 00:d741 _RAM_D741_RAMDecompressorPageIndex
 00:d742 _RAM_D742_VBlankSavedPageIndex
 00:d744 _RAM_D744_
@@ -528,7 +529,7 @@
 00:dc3c _RAM_DC3C_IsGameGear
 00:dc3d _RAM_DC3D_IsHeadToHead
 00:dc3e _RAM_DC3E_InMenus
-00:dc3f _RAM_DC3F_IsHeadToHead
+00:dc3f _RAM_DC3F_GameMode
 00:dc40 _RAM_DC40_
 00:dc41 _RAM_DC41_GearToGearActive
 00:dc42 _RAM_DC42_GearToGear_IAmPlayer1
@@ -930,14 +931,14 @@
 00:df0f _RAM_DF0F_
 00:df10 _RAM_DF10_
 00:df11 _RAM_DF11_
-00:df13 _RAM_DF13_BitIndex
-00:df14 _RAM_DF14_LastWrittenByte
-00:df15 _RAM_DF15_
-00:df16 _RAM_DF16_
+00:df13 _RAM_DF13_RunCompressed_BitIndex
+00:df14 _RAM_DF14_RunCompressed_LastWrittenByte
+00:df15 _RAM_DF15_RunCompressedRawDataStartLo
+00:df16 _RAM_DF16_RunCompressedRawDataStartHi
 00:df17 _RAM_DF17_HaveFloorTiles
 00:df18 _RAM_DF18_FloorTilesVRAMAddress
 00:df1c _RAM_DF1C_CopyToVRAMUpperBoundHi
-00:df1d _RAM_DF1D_
+00:df1d _RAM_DF1D_TileHighBytes_ConstantValue
 00:df1e _RAM_DF1E_
 00:df1f _RAM_DF1F_
 00:df20 _RAM_DF20_
@@ -1278,8 +1279,8 @@
 00:3085 _LABEL_3085_
 00:30ea _LABEL_30EA_
 00:3100 _LABEL_3100_
-00:3116 _DATA_3116_
-00:313b _DATA_313B_
+00:3116 _DATA_3116_F1_TileHighBytesRunCompressed
+00:313b _DATA_313B_Powerboats_TileHighBytesRunCompressed
 00:3164 _LABEL_3164_
 00:317c _LABEL_317C_
 00:318e _LABEL_318E_
@@ -1585,7 +1586,7 @@
 00:79c8 _LABEL_79C8_
 00:7a38 _LABEL_7A38_
 00:7a58 _LABEL_7A58_
-00:7a9f _LABEL_7A9F_
+00:7a9f _LABEL_7A9F_SetBackdropColour
 00:7aa6 _LABEL_7AA6_
 00:7aaf _LABEL_7AAF_
 00:7ac4 _LABEL_7AC4_
@@ -2005,7 +2006,7 @@
 02:baff _LABEL_BAFF_
 02:bb13 _LABEL_BB13_
 02:bb49 _LABEL_BB49_
-02:bb5b _LABEL_BB5B_
+02:bb5b _LABEL_BB5B_SetBackdropToColour0
 02:bb6c _LABEL_BB6C_ScreenOff
 02:bb75 _LABEL_BB75_
 02:bb85 _LABEL_BB85_
@@ -2034,7 +2035,7 @@
 02:bed9 _TEXT_BED9_And
 02:bee4 _TEXT_BEE4_DavidSaunders
 02:bef5 _LABEL_BEF5_
-02:bf2e _LABEL_BF2E_
+02:bf2e _LABEL_BF2E_LoadPalette
 02:bf3e _DATA_BF3E_
 02:bf50 _DATA_BF50_
 02:bf6f _DATA_BF6F_

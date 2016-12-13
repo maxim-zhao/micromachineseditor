@@ -1,29 +1,44 @@
 ; This disassembly was created using Emulicious (http://www.emulicious.net)
-.MEMORYMAP
-SLOTSIZE $7FF0
-SLOT 0 $0000
-SLOTSIZE $10
-SLOT 1 $7FF0
-SLOTSIZE $4000
-SLOT 2 $8000
-DEFAULTSLOT 2
-.ENDME
-.ROMBANKMAP
-BANKSTOTAL 16
-BANKSIZE $7FF0
-BANKS 1
-BANKSIZE $10
-BANKS 1
-BANKSIZE $4000
-BANKS 14
-.ENDRO
+.memorymap
+slotsize $7ff0
+slot 0 $0000
+slotsize $10
+slot 1 $7ff0
+slotsize $4000
+slot 2 $8000
+defaultslot 2
+.endme
+.rombankmap
+bankstotal 16
+banksize $7ff0
+banks 1
+banksize $10
+banks 1
+banksize $4000
+banks 14
+.endro
 
 ; SMS stuff
 .define PORT_VDP_STATUS $bf
 .define PORT_VDP_REGISTER $bf
 .define PORT_VDP_ADDRESS $bf
 .define PORT_VDP_DATA $be
-.define PORT_VDP_LINECOUNTER $be
+.define PORT_VDP_LINECOUNTER $7e
+.define PORT_PSG $7e
+
+.enum $80 ; VDP registers
+VDP_REGISTER_MODECONTROL1 db
+VDP_REGISTER_MODECONTROL2 db
+VDP_REGISTER_NAMETABLEBASEADDRESS db
+VDP_REGISTER_UNUSED3 db
+VDP_REGISTER_UNUSED4 db
+VDP_REGISTER_SPRITETABLEBASEADDRESS db
+VDP_REGISTER_UNUSED6 db
+VDP_REGISTER_BACKDROP_COLOUR db
+VDP_REGISTER_XSCROLL db
+VDP_REGISTER_YSCROLL db
+VDP_REGISTER_LINEINTERRUPTCOUNTER db
+.ende
 
 .enum 0 ; TrackTypes
 TT_SportsCars   db ; 0
@@ -122,6 +137,7 @@ map "?" = $B6
 .endm
 
 .enum $C000 export
+_RAM_C000_StartOfRam .db
 _RAM_C000_DecompressionTemporaryBuffer db
 _RAM_C001_ dw
 .ende
@@ -696,18 +712,9 @@ _RAM_D6D6_ db
 .ende
 
 .enum $D6E1 export
-_RAM_D6E1_ db
-.ende
-
-.enum $D701 export
-_RAM_D701_ db
-.ende
-
-.enum $D721 export
-_RAM_D721_ db
-.ende
-
-.enum $D741 export
+_RAM_D6E1_SpriteX dsb 32
+_RAM_D701_SpriteN dsb 32
+_RAM_D721_SpriteY dsb 32
 _RAM_D741_RAMDecompressorPageIndex db
 _RAM_D742_VBlankSavedPageIndex db
 .ende
@@ -1118,7 +1125,7 @@ _RAM_DC3B_ db
 _RAM_DC3C_IsGameGear db ; Most code is common with the GG game
 _RAM_DC3D_IsHeadToHead db
 _RAM_DC3E_InMenus db ; 1 in menus, 0 otherwise
-_RAM_DC3F_IsHeadToHead db
+_RAM_DC3F_GameMode db
 _RAM_DC40_ db
 _RAM_DC41_GearToGearActive db
 _RAM_DC42_GearToGear_IAmPlayer1 db
@@ -1811,17 +1818,17 @@ _RAM_DF11_ db
 .ende
 
 .enum $DF13 export
-_RAM_DF13_BitIndex db
-_RAM_DF14_LastWrittenByte db
-_RAM_DF15_ db
-_RAM_DF16_ db
+_RAM_DF13_RunCompressed_BitIndex db
+_RAM_DF14_RunCompressed_LastWrittenByte db
+_RAM_DF15_RunCompressedRawDataStartLo db
+_RAM_DF16_RunCompressedRawDataStartHi db
 _RAM_DF17_HaveFloorTiles db
 _RAM_DF18_FloorTilesVRAMAddress dw
 .ende
 
 .enum $DF1C export
 _RAM_DF1C_CopyToVRAMUpperBoundHi db
-_RAM_DF1D_ db
+_RAM_DF1D_TileHighBytes_ConstantValue db
 _RAM_DF1E_ db
 _RAM_DF1F_ db
 _RAM_DF20_ db
@@ -2033,7 +2040,7 @@ _DATA_C0_FloorTilesRawTileData:
 
 _LABEL_100_Startup:
   ; Blank RAM
-  ld hl, $C000
+  ld hl, _RAM_C000_StartOfRam
   ld bc, $1F9A ; Not all of it (!)
 -:xor a
   ld (hl), a
@@ -2248,7 +2255,7 @@ _LABEL_29D_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, +
-  in a, ($7E)
+  in a, (PORT_PSG)
   cp $B8
   jr nc, _LABEL_315_
 +:
@@ -2294,7 +2301,7 @@ _LABEL_318_:
   ld a, (_RAM_D5D7_)
   or a
   ret nz
-  in a, ($7E)
+  in a, (PORT_PSG)
   cp $B8
   jr c, + ; ret
   cp $F0
@@ -2321,11 +2328,11 @@ _LABEL_33A_:
   ; Update scroll registers
   ld a, (_RAM_DED4_VScrollValue)
   out (PORT_VDP_REGISTER), a
-  ld a, $89
+  ld a, VDP_REGISTER_YSCROLL
   out (PORT_VDP_REGISTER), a
   ld a, (_RAM_DED3_HScrollValue)
   out (PORT_VDP_REGISTER), a
-  ld a, $88
+  ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
   
   call _LABEL_31F1_UpdateSpriteTable
@@ -2389,7 +2396,7 @@ _LABEL_383_:
   or a
   jr nz, --
 -:
-  in a, ($7E)
+  in a, (PORT_PSG)
   cp $B8
   jr c, -
   cp $F0
@@ -3910,7 +3917,7 @@ _LABEL_102B_:
   jp _LABEL_1081_
 
 +:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_D59D_)
@@ -8066,7 +8073,7 @@ _LABEL_3100_:
   ret
 
 ; Data from 3116 to 313A (37 bytes)
-_DATA_3116_:
+_DATA_3116_F1_TileHighBytesRunCompressed:
 ; Bitmask
 .db %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111111
 .db %11111111 %11111111 %11111111 %11111111 %11111111 %11111111 %11111110 %11101111
@@ -8078,7 +8085,7 @@ _DATA_3116_:
 ; 0, 0, ... 0, 10, 10, 10, 10, 0, 0, ... 0, 10, 0, 0, ... 0
 
 ; Data from 313B to 3163 (41 bytes)
-_DATA_313B_:
+_DATA_313B_Powerboats_TileHighBytesRunCompressed:
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 .db $FF $FF $FF $FF $FF $FE $EF $FF $FC $E7 $FF $FF $FF $7B $FF $FF
 .db $00 $10 $00 $10 $00 $10 $00 $10 $00
@@ -9831,7 +9838,7 @@ _LABEL_3F22_ScreenOff:
 */
   ld a, $10
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -9841,7 +9848,7 @@ _LABEL_3F2B_:
 _LABEL_3F36_ScreenOn:
   ld a, $70
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -11486,13 +11493,13 @@ _LABEL_517F_NMI_SMS:
     jr z, +
     ; If we became paused, silence the PSG
     ld a, $FF
-    out ($7E), a
+    out (PORT_PSG), a
     ld a, $9F
-    out ($7E), a
+    out (PORT_PSG), a
     ld a, $BF
-    out ($7E), a
+    out (PORT_PSG), a
     ld a, $DF
-    out ($7E), a
+    out (PORT_PSG), a
 +:
   pop af
   retn
@@ -11520,7 +11527,7 @@ _LABEL_51CF_:
   JumpToPagedFunction _LABEL_3779F_
 
 _LABEL_51DA_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld ix, _RAM_DCEC_
@@ -11656,7 +11663,7 @@ _LABEL_5304_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jp z, _LABEL_536C_
   ld a, (_RAM_DD1A_)
@@ -11749,7 +11756,7 @@ _LABEL_537F_:
   jp ++++
 
 +:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -11835,7 +11842,7 @@ _LABEL_544A_:
   ret
 
 _LABEL_5451_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -12142,7 +12149,7 @@ _LABEL_5608_:
   ld a, (hl)
   ld (ix+12), a
 _LABEL_56C0_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -12245,7 +12252,7 @@ _LABEL_575D_:
   ret
 
 _LABEL_5764_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   ret nz
 _LABEL_5769_:
@@ -15121,7 +15128,7 @@ _LABEL_6D43_:
   ld a, (_RAM_DC55_CourseIndex) ; Qualifying early win?
   cp $00
   jr nz, _LABEL_6DDB_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, _LABEL_6DDB_
   ld a, (_RAM_DF2A_)
@@ -16079,7 +16086,7 @@ _LABEL_74E6_:
   ld (_RAM_DBCF_LastRacePosition), a
   ld a, (_RAM_DF2B_)
   ld (_RAM_DBD0_HeadToHeadLost2), a
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +++
   ld a, (_RAM_DC55_CourseIndex)
@@ -16173,7 +16180,8 @@ _LABEL_7573_EnterGame:
   xor a ; Set to black
   out (PORT_VDP_DATA), a
   out (PORT_VDP_DATA), a
-  call _LABEL_7A9F_
+  ; Set that as the backdrop colour
+  call _LABEL_7A9F_SetBackdropColour
   call _LABEL_156_
   call _LABEL_3214_BlankSpriteTable
   call _LABEL_31F1_UpdateSpriteTable
@@ -16184,7 +16192,7 @@ _LABEL_7573_EnterGame:
   ld a, $05
   ld (_RAM_DC09_Lives), a
 +:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   ld a, $01
@@ -16338,14 +16346,14 @@ _DATA_776F_CourseList_SteeringDelay_GG:
 _LABEL_778C_ScreenOn:
   ld a, $70
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
 _LABEL_7795_ScreenOff:
   ld a, $10
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -16819,9 +16827,9 @@ _LABEL_7A58_:
   ld (_RAM_DF20_), a
   ret
 
-_LABEL_7A9F_:
+_LABEL_7A9F_SetBackdropColour:
   out (PORT_VDP_REGISTER), a
-  ld a, $87
+  ld a, VDP_REGISTER_BACKDROP_COLOUR
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -17230,28 +17238,29 @@ _LABEL_7C72_:
 
 _LABEL_7C7D_:
   call _LABEL_3214_BlankSpriteTable
+  
+  ; Load tile high bytes
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
   jr z, +++
   cp TT_FormulaOne
   jr nz, +
   ; F1
-  ld de, _DATA_3116_
+  ld de, _DATA_3116_F1_TileHighBytesRunCompressed
   jp ++++
 +:cp TT_RuffTrux
   jr nz, +
-  ; RuffTrux -> all 1
+  ; RuffTrux -> all 1 (low 256 are used for sprites)
   ld a, $01
-  ld (_RAM_DF1D_), a
+  ld (_RAM_DF1D_TileHighBytes_ConstantValue), a
   jp ++
-+:; Other cars -> all 0
++:; Other cars -> all 0 (no priority bits)
   xor a
-  ld (_RAM_DF1D_), a
-++:
+  ld (_RAM_DF1D_TileHighBytes_ConstantValue), a
+++:; Fill with constant
   ld hl, _RAM_D800_TileHighBytes
-  ld bc, $0100 ; Byte count
--:
-  ld a, (_RAM_DF1D_)
+  ld bc, 256 ; Byte count
+-:ld a, (_RAM_DF1D_TileHighBytes_ConstantValue)
   ld (hl), a
   inc hl
   dec bc
@@ -17259,22 +17268,23 @@ _LABEL_7C7D_:
   or c
   jr nz, -
   jp +++++
-
-+++:
-  ; Powerboats
-  ld de, _DATA_313B_
-++++:
-  ld hl, $0020 ; 32 bytes = 256 bits
++++: ; Powerboats
+  ld de, _DATA_313B_Powerboats_TileHighBytesRunCompressed
+++++: ; Fill with compressed date
+  ld hl, 256 / 8 ; 256 bits
   add hl, de
   ld b, h
   ld c, l
   ld a, c
-  ld (_RAM_DF15_), a
+  ld (_RAM_DF15_RunCompressedRawDataStartLo), a
   ld a, b
-  ld (_RAM_DF16_), a
+  ld (_RAM_DF16_RunCompressedRawDataStartHi), a
   ld hl, _RAM_D800_TileHighBytes
   call _LABEL_7EBE_DecompressRunCompressed
 +++++:
+
+  ; Load tile data
+  ; First page it in...
   ld hl, _DATA_3DC8_TrackTypeTileDataPages
   ld a, (_RAM_DB97_TrackType)
   add a, l
@@ -17284,6 +17294,7 @@ _LABEL_7C7D_:
   ld h, a
   ld a, (hl)
   ld (PAGING_REGISTER), a
+  ; Then look it up...
   ld a, (_RAM_DB97_TrackType)
   ld hl, _DATA_3DE4_TrackTypeTileDataPointerHi
   add a, l
@@ -17302,11 +17313,18 @@ _LABEL_7C7D_:
   ld h, a
   ld a, (hl)
   ld e, a
+  ; Then decompress it
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
   ex de, hl
   call _LABEL_7B21_Decompress
+  ; Then to VRAM
   call _LABEL_7F02_Copy3bppTileDataToVRAM
+  
+  ; Then extra tiles
   call _LABEL_663D_InitialisePlugholeTiles
+  
+  ; Car tiles
+  ; Page...
   ld hl, _DATA_3EF4_CarTilesDataLookup_PageNumber
   ld a, (_RAM_DB97_TrackType) ; Index into table
   add a, l
@@ -17315,8 +17333,8 @@ _LABEL_7C7D_:
   adc a, $00
   ld h, a
   ld a, (hl)
-  ld (PAGING_REGISTER), a               ; Set page
-  
+  ld (PAGING_REGISTER), a
+  ; Pointer...
   ld a, (_RAM_DB97_TrackType) ; Index into next table
   ld hl, _DATA_3EFD_CarTileDataLookup_Hi
   add a, l
@@ -17345,9 +17363,9 @@ _LABEL_7C7D_:
   ld b, h                     ; -> bc
   ld c, l
   ld a, c
-  ld (_RAM_DF15_), a          ; then to RAM
+  ld (_RAM_DF15_RunCompressedRawDataStartLo), a          ; then to RAM
   ld a, b
-  ld (_RAM_DF16_), a
+  ld (_RAM_DF16_RunCompressedRawDataStartHi), a
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
   call _LABEL_7EBE_DecompressRunCompressed
   call _LABEL_7F4E_CarAndShadowSpriteTilesToVRAM
@@ -17583,14 +17601,14 @@ _LABEL_7EA5_:
   ; RuffTrux
   ld a, $04
   out (PORT_VDP_REGISTER), a
-  ld a, $86
+  ld a, VDP_REGISTER_UNUSED6
   out (PORT_VDP_REGISTER), a
   ret
 
 +:; Other cars
   ld a, $00
   out (PORT_VDP_REGISTER), a
-  ld a, $86
+  ld a, VDP_REGISTER_UNUSED6
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -17612,24 +17630,24 @@ result -> 00 (00 00) 01 (01) 00 03 02 01 07 (07) 01 07 04 03 0F
 
 */  
   xor a               ; Set bit index to 0
-  ld (_RAM_DF13_BitIndex), a
+  ld (_RAM_DF13_RunCompressed_BitIndex), a
 --:
   ld a, (bc)          ; read byte from source
   ld (hl), a          ; write to dest
-  ld (_RAM_DF14_LastWrittenByte), a  ; save it
+  ld (_RAM_DF14_RunCompressed_LastWrittenByte), a  ; save it
   inc bc              ; next source byte
 -:
-  ld a, (_RAM_DF13_BitIndex)  ; Next bit index (wrap 7->0)
+  ld a, (_RAM_DF13_RunCompressed_BitIndex)  ; Next bit index (wrap 7->0)
   add a, $01
   and $07
-  ld (_RAM_DF13_BitIndex), a
+  ld (_RAM_DF13_RunCompressed_BitIndex), a
   cp $00              ; Do work until it hits 0, else check if we hit de and loop until we do
   jr nz, +
   inc de              ; next bitmask
-  ld a, (_RAM_DF15_)  ; Unless we ran out
+  ld a, (_RAM_DF15_RunCompressedRawDataStartLo)  ; Unless we ran out
   cp e
   jr nz, +
-  ld a, (_RAM_DF16_)
+  ld a, (_RAM_DF16_RunCompressedRawDataStartHi)
   cp d
   jr nz, +
   ret                 ; else we are done
@@ -17638,7 +17656,7 @@ result -> 00 (00 00) 01 (01) 00 03 02 01 07 (07) 01 07 04 03 0F
   inc hl              ; next dest byte
   push hl
     ld hl, _DATA_7F46_BitsLookup
-    ld a, (_RAM_DF13_BitIndex)  ; Look up the bit
+    ld a, (_RAM_DF13_RunCompressed_BitIndex)  ; Look up the bit
     add a, l
     ld l, a
     ld a, h
@@ -17651,7 +17669,7 @@ result -> 00 (00 00) 01 (01) 00 03 02 01 07 (07) 01 07 04 03 0F
   pop hl
   cp $00            ; If we get a 0, go get another byte
   jr z, --
-  ld a, (_RAM_DF14_LastWrittenByte)  ; Else emit last written byte
+  ld a, (_RAM_DF14_RunCompressed_LastWrittenByte)  ; Else emit last written byte
   ld (hl), a
   jp -
 
@@ -17831,8 +17849,8 @@ _LABEL_8021_MenuScreenEntryPoint:
   call _LABEL_BB6C_ScreenOff
   call _LABEL_BB49_
   call _LABEL_B44E_
-  call _LABEL_BB5B_
-  call _LABEL_BF2E_ ; Loads palette
+  call _LABEL_BB5B_SetBackdropToColour0
+  call _LABEL_BF2E_LoadPalette ; Loads palette
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
@@ -17972,7 +17990,7 @@ _LABEL_8114_Menu0:
   ld (_RAM_D7B8_), a
   ld (_RAM_D7B9_), a
   ld (_RAM_D7B4_), a
-  ld (_RAM_DC3F_IsHeadToHead), a
+  ld (_RAM_DC3F_GameMode), a
   ld (_RAM_DC3D_IsHeadToHead), a
   ld (_RAM_DBD8_CourseSelectIndex), a
   ld (_RAM_DC3B_), a
@@ -18005,7 +18023,7 @@ _LABEL_8114_Menu0:
   ld (_RAM_DC35_), a
   ld a, $1A
   ld (_RAM_DC39_), a
-  call _LABEL_BF2E_
+  call _LABEL_BF2E_LoadPalette
   ld a, (_RAM_DC3C_IsGameGear)
   ld (_RAM_DC40_), a
   ld c, $01
@@ -18193,14 +18211,14 @@ _LABEL_8360_:
   ld (_RAM_D6B8_), a
   ld a, $03
   ld (_RAM_DC09_Lives), a
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   ld a, (_RAM_DBD8_CourseSelectIndex)
   add a, $01
   ld (_RAM_DBD8_CourseSelectIndex), a
 +:
-  ld hl, $4480
+  ld hl, $4480 ; Tile $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   call _LABEL_9F40_
@@ -18318,7 +18336,7 @@ _LABEL_8486_:
 
 _LABEL_84AA_:
   call _LABEL_BB85_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, _LABEL_84C7_
   ld a, (_RAM_DBCF_LastRacePosition)
@@ -18334,7 +18352,7 @@ _LABEL_84C7_:
   ld a, $09
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2BB_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call _LABEL_A7B3_
@@ -18588,21 +18606,21 @@ _LABEL_866C_:
   call _LABEL_A673_
   ld a, (_RAM_DC09_Lives)
   add a, $1B
-  ld (_RAM_D701_), a
+  ld (_RAM_D701_SpriteN), a
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld a, $96
-  ld (_RAM_D6E1_), a
+  ld (_RAM_D6E1_SpriteX), a
   ld a, $B0
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
   jr ++
 
 +:
   ld a, $90
-  ld (_RAM_D6E1_), a
+  ld (_RAM_D6E1_SpriteX), a
   ld a, $A8
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
 ++:
   call _LABEL_93CE_
   ld c, $0A
@@ -18693,7 +18711,7 @@ _LABEL_876B_:
   call _LABEL_A673_
   ld a, (_RAM_DC09_Lives)
   add a, $1A
-  ld (_RAM_D701_), a
+  ld (_RAM_D701_SpriteN), a
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr nz, +
@@ -18703,9 +18721,9 @@ _LABEL_876B_:
 +:
   ld a, $90
 ++:
-  ld (_RAM_D6E1_), a
+  ld (_RAM_D6E1_SpriteX), a
   ld a, $E0
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
   call _LABEL_93CE_
   ld c, $06
   call _LABEL_B1EC_
@@ -19127,7 +19145,7 @@ _LABEL_8B9D_:
   call _LABEL_A14F_
   xor a
   ld (_RAM_D6CB_), a
-  call _LABEL_BF2E_
+  call _LABEL_BF2E_LoadPalette
   call _LABEL_BB75_
   ret
 
@@ -19405,7 +19423,7 @@ _LABEL_8D79_:
   ld a, $01
   ld (_RAM_D6B9_), a
   call _LABEL_B1F4_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
   call _LABEL_841C_
@@ -19691,16 +19709,16 @@ _LABEL_8FC4_:
   ld a, (_RAM_DC38_)
   or a
   jr nz, +
-  ld a, (_RAM_D721_)
+  ld a, (_RAM_D721_SpriteY)
   cp $E0
   jr z, _LABEL_902E_
   add a, $01
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
   call _LABEL_93CE_
   jp _LABEL_902E_
 
 +:
-  ld a, (_RAM_D721_)
+  ld a, (_RAM_D721_SpriteY)
   cp $E1
   jr z, _LABEL_902E_
   ld a, (_RAM_DC38_)
@@ -19709,18 +19727,18 @@ _LABEL_8FC4_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, (_RAM_D721_)
+  ld a, (_RAM_D721_SpriteY)
   cp $B0
   jr z, +++
   jr ++
 
 +:
-  ld a, (_RAM_D721_)
+  ld a, (_RAM_D721_SpriteY)
   cp $A8
   jr z, +++
 ++:
   sub $01
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
   call _LABEL_93CE_
   jp _LABEL_902E_
 
@@ -19741,7 +19759,7 @@ _LABEL_8FC4_:
   xor a
   out (PORT_VDP_DATA), a
   ld a, $E1
-  ld (_RAM_D721_), a
+  ld (_RAM_D721_SpriteY), a
   call _LABEL_93CE_
 _LABEL_902E_:
   ld a, (_RAM_D6AC_)
@@ -19766,7 +19784,7 @@ _LABEL_902E_:
   ld a, (_RAM_DC38_)
   dec a
   jr z, ++
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call _LABEL_8486_
@@ -19920,14 +19938,14 @@ _LABEL_90FF_ReadControllers:
 _LABEL_915E_ScreenOn:
   ld a, $70
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
 _LABEL_9167_ScreenOff:
   ld a, $10
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -20166,8 +20184,8 @@ _LABEL_9317_:
   ld hl, _DATA_939E_
   ld de, _DATA_93B6_
 ++:
-  ld ix, _RAM_D6E1_
-  ld iy, _RAM_D721_
+  ld ix, _RAM_D6E1_SpriteX
+  ld iy, _RAM_D721_SpriteY
   ld bc, $0018
 -:
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -20226,11 +20244,11 @@ _DATA_93B6_:
 .db $88 $88 $90 $90 $90 $90 $90 $90
 
 _LABEL_93CE_:
-  ld hl, $7F80
+  ld hl, $7F80 ; sprite XN
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0020
-  ld hl, _RAM_D6E1_
-  ld de, _RAM_D701_
+  ld hl, _RAM_D6E1_SpriteX
+  ld de, _RAM_D701_SpriteN
 -:
   ld a, (hl)
   out (PORT_VDP_DATA), a
@@ -20242,10 +20260,10 @@ _LABEL_93CE_:
   ld a, c
   or a
   jr nz, -
-  ld hl, $7F00
+  ld hl, $7F00 ; Sprite Y
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0020
-  ld hl, _RAM_D721_
+  ld hl, _RAM_D721_SpriteY
 -:
   ld a, (hl)
   out (PORT_VDP_DATA), a
@@ -20280,7 +20298,7 @@ _LABEL_9400_:
   or a
   jr nz, -
   ld bc, $0060
-  ld hl, _RAM_D6E1_
+  ld hl, _RAM_D6E1_SpriteX
 -:
   xor a
   ld (hl), a
@@ -20532,7 +20550,7 @@ _LABEL_95C3_:
   jp ++
 
 +:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   cp $01
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
@@ -20600,7 +20618,7 @@ _LABEL_9636_:
   ld (_RAM_D6A3_), a
   ld a, $08
   ld (_RAM_D6AB_), a
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   ld a, (_RAM_D7B3_)
@@ -20850,7 +20868,7 @@ _LABEL_988D_:
 +:
   ld hl, _DATA_990E_
 ++:
-  ld de, _RAM_D6E1_
+  ld de, _RAM_D6E1_SpriteX
   ld bc, $0060
 -:
   ld a, (hl)
@@ -20885,7 +20903,7 @@ _LABEL_996E_:
   ld a, (_RAM_D6C6_)
   dec a
   jr nz, +
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jp z, _LABEL_9A0E_
 +:
@@ -22433,7 +22451,7 @@ _TEXT_A670_Two:
 _LABEL_A673_:
   ld a, $00
   out (PORT_VDP_REGISTER), a
-  ld a, $86
+  ld a, VDP_REGISTER_UNUSED6
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -23094,7 +23112,7 @@ _LABEL_ABB3_:
   ret
 
 _LABEL_AC1E_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
   ld hl, $4480
@@ -23117,7 +23135,7 @@ _LABEL_AC1E_:
 +++:
   ld hl, $4840
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   ld a, (_RAM_DBD4_)
@@ -23147,7 +23165,7 @@ _LABEL_AC1E_:
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld hl, $4C00
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   ld a, (_RAM_DBD5_)
@@ -23174,7 +23192,7 @@ _LABEL_AC1E_:
 ++:
   add hl, de
   call _LABEL_BCCF_EmitTilemapRectangleSequence
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
   ld hl, $4FC0
@@ -23198,7 +23216,7 @@ _LABEL_AC1E_:
   ret
 
 _LABEL_ACEE_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   ld hl, $7A86
@@ -23219,7 +23237,7 @@ _LABEL_ACEE_:
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call _LABEL_B35A_VRAMAddressToHL
@@ -23646,13 +23664,13 @@ _LABEL_B06C_:
   dec a
   jr nz, +
   xor a
-  ld (_RAM_DC3F_IsHeadToHead), a
+  ld (_RAM_DC3F_GameMode), a
   call _LABEL_8205_
   jp _LABEL_80FC_MenuScreenHandler_Null
 
 +:
   ld a, $01
-  ld (_RAM_DC3F_IsHeadToHead), a
+  ld (_RAM_DC3F_GameMode), a
   call _LABEL_8953_
   jp _LABEL_80FC_MenuScreenHandler_Null
 
@@ -23695,7 +23713,7 @@ _LABEL_B09F_:
 
 +:
   call _LABEL_B1F4_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call _LABEL_89E2_
@@ -23757,7 +23775,7 @@ _LABEL_B132_:
   jp _LABEL_80FC_MenuScreenHandler_Null
 
 _LABEL_B154_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
   xor a
@@ -24651,7 +24669,7 @@ _LABEL_B70B_:
   call _LABEL_9317_
   ld hl, $B356
   call $D9F5  ; Code is loaded from _LABEL_3BBB5_
-  call _LABEL_BF2E_
+  call _LABEL_BF2E_LoadPalette
   call _LABEL_BB75_
   ret
 
@@ -24879,7 +24897,7 @@ _LABEL_B911_:
   sra a
   and $01
   jp nz, +++
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, ++
   ld hl, $79CC
@@ -25160,19 +25178,16 @@ _LABEL_BB49_:
   jr z, +
   ld a, $06
   jr ++
-
-+:
-  xor a
-++:
-  out (PORT_VDP_REGISTER), a
-  ld a, $88
++:xor a
+++:out (PORT_VDP_REGISTER), a
+  ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
   ret
 
-_LABEL_BB5B_:
+_LABEL_BB5B_SetBackdropToColour0:
   xor a
   out (PORT_VDP_REGISTER), a
-  ld a, $87
+  ld a, VDP_REGISTER_BACKDROP_COLOUR
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -25188,7 +25203,7 @@ _LABEL_BB6C_ScreenOff:
 
 _LABEL_BB75_:
   ; Wait for line $ff
--:in a, ($7E)
+-:in a, (PORT_VDP_LINECOUNTER)
   cp $FF
   jr nz, -
   ; Screen on
@@ -25202,7 +25217,7 @@ _LABEL_BB75_:
 _LABEL_BB85_:
 -:di
   ; Wait for line $ff
-  in a, ($7E)
+  in a, (PORT_VDP_LINECOUNTER)
   cp $FF
   jr nz, -
   ; Screen on
@@ -25641,8 +25656,8 @@ _LABEL_BEF5_:
   jr nz, -
   ret
 
-_LABEL_BF2E_:
-  ld hl, $C000
+_LABEL_BF2E_LoadPalette:
+  ld hl, $C000 ; Palette address
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _DATA_BF3E_
   ld b, $20
@@ -25656,7 +25671,7 @@ _DATA_BF3E_:
 .db $21 $3F
 
 ; Data from BF50 to BF6E (31 bytes)
-_DATA_BF50_:
+_DATA_BF50_: ; false location?
 .db $08 $02 $17 $0B $3A $00 $00 $00 $00 $00 $00 $00 $00 $00 $18 $00
 .db $CD $58 $B3 $0E $05 $3E $0E $D3 $BE $AF $D3 $BE $0D $20 $F6
 
@@ -26492,27 +26507,27 @@ _LABEL_1BDF3_:
 _LABEL_1BE82_:
   ld a, $26
   out (PORT_VDP_REGISTER), a
-  ld a, $80
+  ld a, VDP_REGISTER_MODECONTROL1
   out (PORT_VDP_REGISTER), a
   ld a, $0E
   out (PORT_VDP_REGISTER), a
-  ld a, $82
+  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
   ld a, $7F
   out (PORT_VDP_REGISTER), a
-  ld a, $85
+  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
   ld a, $04
   out (PORT_VDP_REGISTER), a
-  ld a, $86
+  ld a, VDP_REGISTER_UNUSED6
   out (PORT_VDP_REGISTER), a
   xor a
   out (PORT_VDP_REGISTER), a
-  ld a, $88
+  ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
   xor a
   out (PORT_VDP_REGISTER), a
-  ld a, $89
+  ld a, VDP_REGISTER_YSCROLL
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -26843,7 +26858,7 @@ _LABEL_1FA3D_:
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   or a
   jr nz, _LABEL_1FA95_
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_D59D_)
@@ -27588,7 +27603,7 @@ _LABEL_23C68_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, -
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_D59D_)
@@ -27618,13 +27633,13 @@ _LABEL_23C68_:
   ld (_RAM_D599_IsPaused), a
   ; Mute PSG
   ld a, $FF
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $9F
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $BF
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $DF
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 ++:
@@ -27909,13 +27924,13 @@ _LABEL_2B5D2_:
 
 _LABEL_2B5D5_:
   ld a, $FF
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $9F
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $BF
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $DF
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 ; Data from 2B5E6 to 2B615 (48 bytes)
@@ -27954,12 +27969,12 @@ _LABEL_2B616_Sound:
   ld a, (_RAM_D94C_Sound1Channel0Volume)
   and $0F
   or $90
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D94D_Sound1Channel1Volume)
   or $80
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D94E_Sound1Channel2Volume)
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D964_Sound1Control)
   cp $02
   ret nz
@@ -27974,12 +27989,12 @@ _LABEL_2B616_Sound:
   ld a, (_RAM_D94F_Sound2Channel0Volume)
   and $0F
   or $B0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D950_Sound2_Channel1Volume)
   or $A0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D951_Sound2_Channel2Volume)
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D975_Sound2Control)
   cp $02
   ret nz
@@ -28003,19 +28018,19 @@ _LABEL_2B699_Sound:
   or a
   jr z, +
   ld a, $E0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (hl)
-  out ($7E), a
+  out (PORT_PSG), a
 +:inc hl
   ld a, (hl)
   cpl
   and $0F
   or $F0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $C0
-  out ($7E), a
+  out (PORT_PSG), a
   xor a
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 _LABEL_2B6C9_Sound:
@@ -28032,7 +28047,7 @@ _LABEL_2B6C9_Sound:
   cpl
   and $0F
   or $90
-  out ($7E), a
+  out (PORT_PSG), a
   inc hl
   ld a, (_RAM_D956_)
   ld c, a
@@ -28053,11 +28068,11 @@ _LABEL_2B6C9_Sound:
   and $0F
   ld (_RAM_D953_), a
   ld a, $80
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, h
   and $3F
   ld (_RAM_D952_), a
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 _LABEL_2B70D_:
@@ -28074,7 +28089,7 @@ _LABEL_2B70D_:
   cpl
   and $0F
   or $B0
-  out ($7E), a
+  out (PORT_PSG), a
   inc hl
   ld a, (_RAM_D956_)
   ld c, a
@@ -28097,11 +28112,11 @@ _LABEL_2B72B_:
   and $0F
   ld (_RAM_D955_), a
   ld a, $A0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, h
   and $3F
   ld (_RAM_D954_), a
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 _LABEL_2B751_:
@@ -28118,10 +28133,10 @@ _LABEL_2B751_:
   add a, c
   and $0F
   or $C0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D952_)
   and $3F
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 +:
@@ -28135,10 +28150,10 @@ _LABEL_2B751_:
   add a, c
   and $0F
   or $C0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D954_)
   and $3F
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 ; Data from 2B791 to 2B7A0 (16 bytes)
@@ -28260,11 +28275,11 @@ _LABEL_2B7A1_SoundFunction:
   or c
   ret nz
   ld a, $FF
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $E0
-  out ($7E), a
+  out (PORT_PSG), a
   xor a
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 +:
@@ -28274,11 +28289,11 @@ _LABEL_2B7A1_SoundFunction:
   ex af, af'
   ld a, (_RAM_D958_)
   or $F0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $E3
-  out ($7E), a
+  out (PORT_PSG), a
   ex af, af'
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, $01
   ld (ix+8), a
 +:
@@ -28743,7 +28758,7 @@ _LABEL_30F7D_:
   ld c, $90
   ld a, (_RAM_D922_)
   or c
-  out ($7E), a
+  out (PORT_PSG), a
   inc ix
   inc ix
   ld c, $A0
@@ -28751,7 +28766,7 @@ _LABEL_30F7D_:
   ld c, $B0
   ld a, (_RAM_D923_)
   or c
-  out ($7E), a
+  out (PORT_PSG), a
   inc ix
   inc ix
   ld c, $C0
@@ -28759,21 +28774,21 @@ _LABEL_30F7D_:
   ld c, $D0
   ld a, (_RAM_D924_)
   or c
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, (_RAM_D920_)
   bit 7, a
   jr nz, +
   ld c, a
   ld a, $E0
-  out ($7E), a
+  out (PORT_PSG), a
   ld a, c
   and $07
-  out ($7E), a
+  out (PORT_PSG), a
 +:
   ld a, (_RAM_D921_)
   ld c, $F0
   or c
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 _LABEL_30FCA_:
@@ -28782,7 +28797,7 @@ _LABEL_30FCA_:
   ld a, e
   and $0F
   or c
-  out ($7E), a
+  out (PORT_PSG), a
   rr d
   rr e
   rr d
@@ -28792,7 +28807,7 @@ _LABEL_30FCA_:
   rr d
   rr e
   ld a, e
-  out ($7E), a
+  out (PORT_PSG), a
   ret
 
 _LABEL_30FEA_:
@@ -29913,7 +29928,7 @@ _LABEL_35F41_:
   ret
 
 _LABEL_35F8A_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, _LABEL_35FEB_
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -30288,7 +30303,7 @@ _LABEL_36209_:
   dec a
   ld (_RAM_D5B7_), a
 +:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -33480,7 +33495,7 @@ _DATA_37B5E_:
 .db $A0 $A0 $A0 $A1 $A1 $A1 $A2 $A2 $A2 $A3 $A3 $A3 $AC
 
 _LABEL_37B6B_:
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
   ld a, (_RAM_DC54_IsGameGear)
@@ -33772,7 +33787,7 @@ _LABEL_37D9C_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, ++
-  ld a, (_RAM_DC3F_IsHeadToHead)
+  ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, ++
   ld a, (_RAM_DC54_IsGameGear)
@@ -34650,7 +34665,7 @@ _LABEL_3BBB5_:
   ld a, $0A
   ld ($D741), a
   call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
-  ld de, _RAM_D701_
+  ld de, _RAM_D701_SpriteN
   ld bc, $0018
 ; Executed in RAM at da03
 -:
