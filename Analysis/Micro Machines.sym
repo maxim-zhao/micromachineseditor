@@ -1,26 +1,8 @@
 ; this file was created with wlalink by ville helin <vhelin@iki.fi>.
 ; no$gmb symbolic information for "C:\Users\Maxim\Documents\Code\C#\MicroMachinesEditor\Analysis\Micro Machines.sms".
 00:c000 _RAM_C000_StartOfRam
+00:c000 _RAM_C000_LevelLayout
 00:c000 _RAM_C000_DecompressionTemporaryBuffer
-00:c001 _RAM_C001_
-00:c04c _RAM_C04C_
-00:c061 _RAM_C061_
-00:c062 _RAM_C062_
-00:c0a0 _RAM_C0A0_
-00:c0a8 _RAM_C0A8_
-00:c0ab _RAM_C0AB_
-00:c0ac _RAM_C0AC_
-00:c0ff _RAM_C0FF_
-00:c108 _RAM_C108_
-00:c10c _RAM_C10C_
-00:c111 _RAM_C111_
-00:c112 _RAM_C112_
-00:c2e3 _RAM_C2E3_
-00:c2e4 _RAM_C2E4_
-00:c2e6 _RAM_C2E6_
-00:c2e7 _RAM_C2E7_
-00:c2e8 _RAM_C2E8_
-00:c3e0 _RAM_C3E0_
 00:c800 _RAM_C800_WallData
 00:ca18 _RAM_CA18_
 00:ca1a _RAM_CA1A_
@@ -1054,7 +1036,7 @@
 00:033a _LABEL_33A_
 00:0383 _LABEL_383_
 00:03ed _LABEL_3ED_
-00:0458 _LABEL_458_
+00:0458 _LABEL_458_PatchForLevelTrampoline
 00:046e _DATA_46E_
 00:04ae _DATA_4AE_
 00:04b1 _DATA_4B1_
@@ -1096,7 +1078,7 @@
 00:0ab1 _LABEL_AB1_
 00:0abb _LABEL_ABB_
 00:0ac5 _LABEL_AC5_
-00:0ad7 _LABEL_AD7_
+00:0ad7 _LABEL_AD7_DelayIfPlayer2
 00:0ae1 _LABEL_AE1_
 00:0aeb _LABEL_AEB_
 00:0af5 _LABEL_AF5_
@@ -1631,6 +1613,15 @@
 00:7f46 _DATA_7F46_BitsLookup
 00:7f4e _LABEL_7F4E_CarAndShadowSpriteTilesToVRAM
 00:7fc9 _LABEL_7FC9_EmitTileData3bpp
+00:7fe0 Header
+00:7fe0 Header.PageCount
+00:7fe1 Header.Day
+00:7fe2 Header.Month
+00:7fe3 Header.Year
+00:7fe4 Header.Hour
+00:7fe5 Header.Minute
+00:7fe6 Header.Checksum
+00:7fe8 Header.ChecksumComplement
 02:8000 _LABEL_8000_Main
 02:8021 _LABEL_8021_MenuScreenEntryPoint
 02:80be _DATA_80BE_MenuScreenHandlers
@@ -2073,7 +2064,7 @@
 06:bafd _LABEL_1BAFD_
 06:bbaf _LABEL_1BBAF_
 06:bc3f _LABEL_1BC3F_
-06:bccb _LABEL_1BCCB_
+06:bccb _LABEL_1BCCB_DelayIfPlayer2
 06:bce2 _LABEL_1BCE2_
 06:bdf3 _LABEL_1BDF3_
 06:be82 _LABEL_1BE82_
@@ -2212,10 +2203,10 @@
 0d:a43d _LABEL_3643D_
 0d:a454 _LABEL_36454_
 0d:a45b _LABEL_3645B_
-0d:a484 _LABEL_36484_
-0d:a65f _LABEL_3665F_
-0d:a66d _LABEL_3666D_
-0d:a6cb _LABEL_366CB_
+0d:a484 _LABEL_36484_PatchForLevel
+0d:a65f _LABEL_3665F_Tanks
+0d:a66d _LABEL_3666D_Powerboats
+0d:a6cb _LABEL_366CB_SportsCars
 0d:a6de _LABEL_366DE_
 0d:a736 _LABEL_36736_
 0d:a752 _LABEL_36752_

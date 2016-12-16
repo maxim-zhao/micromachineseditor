@@ -19,26 +19,7 @@ banks 14
 .endro
 
 ; SMS stuff
-.define PORT_VDP_STATUS $bf
-.define PORT_VDP_REGISTER $bf
-.define PORT_VDP_ADDRESS $bf
-.define PORT_VDP_DATA $be
-.define PORT_VDP_LINECOUNTER $7e
-.define PORT_PSG $7e
-
-.enum $80 ; VDP registers
-VDP_REGISTER_MODECONTROL1 db
-VDP_REGISTER_MODECONTROL2 db
-VDP_REGISTER_NAMETABLEBASEADDRESS db
-VDP_REGISTER_UNUSED3 db
-VDP_REGISTER_UNUSED4 db
-VDP_REGISTER_SPRITETABLEBASEADDRESS db
-VDP_REGISTER_UNUSED6 db
-VDP_REGISTER_BACKDROP_COLOUR db
-VDP_REGISTER_XSCROLL db
-VDP_REGISTER_YSCROLL db
-VDP_REGISTER_LINEINTERRUPTCOUNTER db
-.ende
+.include "System definitions.inc"
 
 .enum 0 ; TrackTypes
 TT_SportsCars   db ; 0
@@ -101,10 +82,6 @@ map "-" = $B5
 map "?" = $B6
 .enda
 
-.define PAGING_REGISTER_Slot0 $0000
-.define PAGING_REGISTER_Slot1 $4000
-.define PAGING_REGISTER_Slot2 $8000
-.define PAGING_REGISTER PAGING_REGISTER_Slot2
 .define STACK_TOP $dfff
 
 .macro CallPagedFunction args function
@@ -138,62 +115,8 @@ map "?" = $B6
 
 .enum $C000 export
 _RAM_C000_StartOfRam .db
+_RAM_C000_LevelLayout .db
 _RAM_C000_DecompressionTemporaryBuffer db
-_RAM_C001_ dw
-.ende
-
-.enum $C04C export
-_RAM_C04C_ dw
-.ende
-
-.enum $C061 export
-_RAM_C061_ db
-_RAM_C062_ dw
-.ende
-
-.enum $C0A0 export
-_RAM_C0A0_ dw
-.ende
-
-.enum $C0A8 export
-_RAM_C0A8_ db
-.ende
-
-.enum $C0AB export
-_RAM_C0AB_ db
-_RAM_C0AC_ db
-.ende
-
-.enum $C0FF export
-_RAM_C0FF_ dw
-.ende
-
-.enum $C108 export
-_RAM_C108_ db
-.ende
-
-.enum $C10C export
-_RAM_C10C_ db
-.ende
-
-.enum $C111 export
-_RAM_C111_ db
-_RAM_C112_ db
-.ende
-
-.enum $C2E3 export
-_RAM_C2E3_ db
-_RAM_C2E4_ db
-.ende
-
-.enum $C2E6 export
-_RAM_C2E6_ db
-_RAM_C2E7_ db
-_RAM_C2E8_ db
-.ende
-
-.enum $C3E0 export
-_RAM_C3E0_ db
 .ende
 
 .enum $C800 export
@@ -2413,7 +2336,7 @@ _LABEL_3ED_:
   call _LABEL_3A2E_
   call _LABEL_31B6_InitialiseFloorTiles
   call _LABEL_3C54_
-  call _LABEL_458_
+  call _LABEL_458_PatchForLevelTrampoline
   call _LABEL_51A8_
   call _LABEL_1345_
   call _LABEL_77CD_
@@ -2437,7 +2360,7 @@ _LABEL_3ED_:
   ld a, $38
   out ($05), a
   call _LABEL_7564_SetControlsToNoButtons
-  call _LABEL_AD7_
+  call _LABEL_AD7_DelayIfPlayer2
 +:
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
@@ -2452,8 +2375,8 @@ _LABEL_3ED_:
   di
   ret
 
-_LABEL_458_:
-  JumpToPagedFunction _LABEL_36484_
+_LABEL_458_PatchForLevelTrampoline:
+  JumpToPagedFunction _LABEL_36484_PatchForLevel
 
 ++:
   JumpToPagedFunction _LABEL_2B5D5_
@@ -3247,8 +3170,8 @@ _LABEL_AC5_:
   JrToPagedFunction _LABEL_3616B_
 +:ret
 
-_LABEL_AD7_:
-  JrToPagedFunction _LABEL_1BCCB_
+_LABEL_AD7_DelayIfPlayer2:
+  JrToPagedFunction _LABEL_1BCCB_DelayIfPlayer2
 
 _LABEL_AE1_:
   JrToPagedFunction _LABEL_1F8D8_
@@ -17799,12 +17722,19 @@ _LABEL_7FC9_EmitTileData3bpp:
 .dsb 5 $FF
 
 ; Codemasters header
-.db 16 ; Pages
-.db $24 $11 $93 ; Date
-.db $13 $11 ; Time
-.dw $B5B4 ; Checksum
-.dw $10000 - $B5B4 ; Checksum complement
-.dsb 6 $00 ; Unused
+.struct CodemastersHeader
+PageCount db
+Day db
+Month db
+Year db
+Hour db
+Minute db
+Checksum dw
+ChecksumComplement dw
+Unused dsb 6
+.endst
+
+.dstruct Header instanceof CodemastersHeader DATA 16 /* pages */ $24 $11 $93 /* Date */ $13 $11 /* Time */ $B5B4 ($10000 - $B5B4) /* Checksum and complement */
 
 .BANK 1 SLOT 1
 .ORG $0000
@@ -26229,19 +26159,17 @@ _LABEL_1BC3F_:
   ld (_RAM_DEB1_), a
   ret
 
-_LABEL_1BCCB_:
+_LABEL_1BCCB_DelayIfPlayer2:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr z, ++
+  jr z, ++ ; ret
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
   jr z, +
-  jr ++
-
-+:
-  ld hl, $0000
--:
-  dec hl
+  jr ++ ; ret
++:; Player 2
+  ld hl, $0000 ; Waste some time
+-:dec hl
   ld a, h
   or l
   jr nz, -
@@ -30676,21 +30604,24 @@ _LABEL_3645B_:
   ld (_RAM_DE57_), a
   ret
 
-_LABEL_36484_:
+_LABEL_36484_PatchForLevel:
+  ; Patch layout after loading
+  ; Strange, maybe they couldn't easily alter it at some stage?
+  ; Also patches other stuff - code?
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
-  jp z, _LABEL_3666D_
+  jp z, _LABEL_3666D_Powerboats
   cp TT_SportsCars
-  jp z, _LABEL_366CB_
+  jp z, _LABEL_366CB_SportsCars
   cp TT_Tanks
-  jp z, _LABEL_3665F_
+  jp z, _LABEL_3665F_Tanks
   cp TT_FormulaOne
   jr z, ++
   cp TT_TurboWheels
   jr z, +
   ret
 
-+:
++:; Turbo Wheels
   ld a, $0F
   ld (_RAM_D293_), a
   ld a, $02
@@ -30700,7 +30631,7 @@ _LABEL_36484_:
   ld (_RAM_D2A5_), a
   ret
 
-++:
+++: ; F1
   ld a, $C0
   ld (_RAM_CC14_), a
   ld a, $F0
@@ -30869,7 +30800,7 @@ _LABEL_36484_:
   ld (_RAM_D4C1_), a
   ret
 
-_LABEL_3665F_:
+_LABEL_3665F_Tanks:
   ld a, (_RAM_DB96_TrackIndexForThisType)
   cp $01
   jr z, +
@@ -30877,10 +30808,10 @@ _LABEL_3665F_:
 
 +:
   ld a, $19
-  ld (_RAM_C0A8_), a
+  ld (_RAM_C000_LevelLayout + $A8), a
   ret
 
-_LABEL_3666D_:
+_LABEL_3666D_Powerboats:
   ld a, $04
   ld (_RAM_D1A8_), a
   ld (_RAM_D1A9_), a
@@ -30895,50 +30826,54 @@ _LABEL_3666D_:
   jr z, +++
   cp $02
   jr z, +
-  ld a, $B5
-  ld (_RAM_C2E3_), a
-  ld a, $9E
-  ld (_RAM_C2E4_), a
-  ld a, $9F
-  ld (_RAM_C2E6_), a
+  ; Race 3 - Foamy Fjords
+  ; Change soap and bottle at start further from the track
+  ; from ---S++BB----
+  ; to   --S-++-BB---
+  ld a, $B5 ; Move soap left at start
+  ld (_RAM_C000_LevelLayout + $2E3), a
+  ld a, $9E ; Fill space next to it
+  ld (_RAM_C000_LevelLayout + $2E4), a
+  ld a, $9F ; 
+  ld (_RAM_C000_LevelLayout + $2E6), a
   ld a, $B6
-  ld (_RAM_C2E7_), a
+  ld (_RAM_C000_LevelLayout + $2E7), a
   ld a, $B7
-  ld (_RAM_C2E8_), a
+  ld (_RAM_C000_LevelLayout + $2E8), a
   ret
 
-+:
++:; Race 2
   ld a, $9D
-  ld (_RAM_C108_), a
+  ld (_RAM_C000_LevelLayout + $108), a
   ret
 
-++:
+++: ; Race 0
   ld a, $1E
-  ld (_RAM_C0AC_), a
+  ld (_RAM_C000_LevelLayout + $AC), a
   ld a, $35
-  ld (_RAM_C0AB_), a
+  ld (_RAM_C000_LevelLayout + $AB), a
   ret
 
-+++:
++++: ; Race 1
   ld a, $9D
-  ld (_RAM_C10C_), a
+  ld (_RAM_C000_LevelLayout + $10C), a
   ld a, $35
-  ld (_RAM_C111_), a
+  ld (_RAM_C000_LevelLayout + $111), a
   ld a, $1E
-  ld (_RAM_C112_), a
+  ld (_RAM_C000_LevelLayout + $112), a
   ret
 
-_LABEL_366CB_:
+_LABEL_366CB_SportsCars:
   ld a, (_RAM_DB96_TrackIndexForThisType)
   cp $02
   jr z, +
   ret
 
-+:
++:; Crayon Canyons layout error at bottom right corner of track
   ld a, $34
-  ld (_RAM_C000_DecompressionTemporaryBuffer), a
+  ld (_RAM_C000_LevelLayout + $0), a
   ld a, $32
-  ld (_RAM_C3E0_), a
+  ld (_RAM_C000_LevelLayout + $3E0), a
   ret
 
 _LABEL_366DE_:
@@ -34952,7 +34887,7 @@ _LABEL_3BD08_BackToSlot2:
 .incbin "Assets/raw/Micro Machines_3c000.inc" skip 0 read $3ED49-$3C000 
 
 _DATA_3ED49_SplashScreenCompressed:
-.incbin "Assets/SplashScreen.compressed"
+.incbin "Assets/SplashScreen/SplashScreen.compressed"
 
 _DATA_3F753_JonsSquinkyTennisCompressed:
 .incbin "Assets/JonsSquinkyTennis.compressed"
