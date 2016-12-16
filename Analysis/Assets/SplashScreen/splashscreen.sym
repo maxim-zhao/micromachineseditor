@@ -1,0 +1,26 @@
+; this file was created with wlalink by ville helin <vhelin@iki.fi>.
+; no$gmb symbolic information for "C:\Users\Maxim\Documents\Code\C#\MicroMachinesEditor\Analysis\Assets\SplashScreen\splashscreen.bin".
+00:c050 _LABEL_C050_ret
+00:c051 _LABEL_c051_WaitForVBlank
+00:c05e _LABEL_c05e_UpdateTiles
+00:c084 _LABEL_C084_PrintSpaceThenHexNumber
+00:c08e _LABEL_C08E_PrintHexNumber
+00:c0a9 _DATA_C0A9_VDPRegisters
+00:c0bf _LABEL_c0bf_InitaliseAndChecksum
+00:c26a _LABEL_C26A_Checksum
+00:c3b6 _LABEL_C3B6_UpdateTiles_Part2
+00:c442 _LABEL_C442_
+00:c469 _LABEL_C469_
+00:c4dd _LABEL_c4dd_AddPageToChecksum
+00:c508 _DATA_c508_Unused
+00:c510 _DATA_C510_CenturyDigits
+00:c512 _DATA_C512_Tiles
+00:c9c2 _DATA_C9C2_Palette
+00:c9c6 _DATA_C9C6_
+00:c9d2 _DATA_C9D2_AnimationXValues
+00:ca74 _LABEL_ca74_UpdateSound
+00:caca _LABEL_CACA_SetPSGFrequency
+00:caee _DATA_CAEE_Notes
+00:cb4f _DATA_CB4F_
+00:cbb1 _DATA_CBB1_
+00:cbed _DATA_CBED_
