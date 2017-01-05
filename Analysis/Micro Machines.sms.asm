@@ -113,332 +113,22 @@ map "?" = $B6
   ld (PAGING_REGISTER), a
 .endm
 
+.struct WallDataMetaTile
+bits dsb 12*12/8 ; 12*12 bits = 18 bytes
+.endst
+
+.struct BehaviourDataMetaTile
+bytes dsb 6*6 ; 6*6 bytes
+.endst
+
 .enum $C000 export
 _RAM_C000_StartOfRam .db
-_RAM_C000_LevelLayout .db
-_RAM_C000_DecompressionTemporaryBuffer db
-.ende
+_RAM_C000_DecompressionTemporaryBuffer .db ; $800?
+_RAM_C000_LevelLayout dsb 32 * 32 ; 32x32 metatiles
+_RAM_C400_TrackIndexes dsb 32 * 32 ; 32x32 metatile track indexes
+_RAM_C800_WallData dsb 64 * _sizeof_WallDataMetaTile ; 64 tiles of 12x12 bits
+_RAM_CC80_BehaviourData dsb 64 * _sizeof_BehaviourDataMetaTile ; 64 tiles of 6x6 bytes
 
-.enum $C800 export
-_RAM_C800_WallData dsb 128 * 12 * 12 / 8 ; 128 tiles of 12x12 bits
-.ende
-
-.enum $CA18 export
-_RAM_CA18_ db
-.ende
-
-.enum $CA1A export
-_RAM_CA1A_ db
-.ende
-
-.enum $CA23 export
-_RAM_CA23_ db
-.ende
-
-.enum $CA25 export
-_RAM_CA25_ db
-.ende
-
-.enum $CA95 export
-_RAM_CA95_ db
-.ende
-
-.enum $CA97 export
-_RAM_CA97_ db
-.ende
-
-.enum $CAA2 export
-_RAM_CAA2_ db
-.ende
-
-.enum $CAA4 export
-_RAM_CAA4_ db
-.ende
-
-.enum $CB3E export
-_RAM_CB3E_ db
-.ende
-
-.enum $CB40 export
-_RAM_CB40_ db
-.ende
-
-.enum $CB55 export
-_RAM_CB55_ db
-.ende
-
-.enum $CB57 export
-_RAM_CB57_ db
-.ende
-
-.enum $CBA9 export
-_RAM_CBA9_ db
-.ende
-
-.enum $CBAB export
-_RAM_CBAB_ db
-.ende
-
-.enum $CBC2 export
-_RAM_CBC2_ db
-.ende
-
-.enum $CBC4 export
-_RAM_CBC4_ db
-.ende
-
-.enum $CC04 export
-_RAM_CC04_ db
-.ende
-
-.enum $CC12 export
-_RAM_CC12_ db
-.ende
-
-.enum $CC14 export
-_RAM_CC14_ db
-_RAM_CC15_ db
-.ende
-
-.enum $CC23 export
-_RAM_CC23_ db
-_RAM_CC24_ db
-.ende
-
-.enum $CC38 export
-_RAM_CC38_ db
-.ende
-
-.enum $CC80 export
-_RAM_CC80_BehaviourData dsb 128 * 6 * 6 ; 128 tiles of 6x6 bytes
-.ende
-
-.enum $D000 export
-_RAM_D000_ db
-.ende
-
-.enum $D097 export
-_RAM_D097_ db
-_RAM_D098_ db
-.ende
-
-.enum $D09C export
-_RAM_D09C_ db
-_RAM_D09D_ db
-.ende
-
-.enum $D09F export
-_RAM_D09F_ db
-.ende
-
-.enum $D0A2 export
-_RAM_D0A2_ db
-.ende
-
-.enum $D0A9 export
-_RAM_D0A9_ db
-.ende
-
-.enum $D0B0 export
-_RAM_D0B0_ db
-.ende
-
-.enum $D0C4 export
-_RAM_D0C4_ db
-.ende
-
-.enum $D191 export
-_RAM_D191_ db
-_RAM_D192_ db
-.ende
-
-.enum $D196 export
-_RAM_D196_ db
-.ende
-
-.enum $D198 export
-_RAM_D198_ db
-_RAM_D199_ db
-.ende
-
-.enum $D19F export
-_RAM_D19F_ db
-.ende
-
-.enum $D1A4 export
-_RAM_D1A4_ db
-.ende
-
-.enum $D1A8 export
-_RAM_D1A8_ db
-_RAM_D1A9_ db
-_RAM_D1AA_ db
-_RAM_D1AB_ db
-_RAM_D1AC_ db
-_RAM_D1AD_ db
-.ende
-
-.enum $D1C5 export
-_RAM_D1C5_ db
-.ende
-
-.enum $D293 export
-_RAM_D293_ db
-.ende
-
-.enum $D299 export
-_RAM_D299_ db
-.ende
-
-.enum $D29F export
-_RAM_D29F_ db
-.ende
-
-.enum $D2A5 export
-_RAM_D2A5_ db
-.ende
-
-.enum $D302 export
-_RAM_D302_ db
-.ende
-
-.enum $D307 export
-_RAM_D307_ db
-.ende
-
-.enum $D30C export
-_RAM_D30C_ db
-.ende
-
-.enum $D312 export
-_RAM_D312_ db
-_RAM_D313_ db
-.ende
-
-.enum $D315 export
-_RAM_D315_ db
-.ende
-
-.enum $D319 export
-_RAM_D319_ db
-_RAM_D31A_ db
-.ende
-
-.enum $D32E export
-_RAM_D32E_ db
-.ende
-
-.enum $D33A export
-_RAM_D33A_ db
-_RAM_D33B_ db
-_RAM_D33C_ db
-_RAM_D33D_ db
-_RAM_D33E_ db
-_RAM_D33F_ db
-.ende
-
-.enum $D346 export
-_RAM_D346_ db
-_RAM_D347_ db
-_RAM_D348_ db
-_RAM_D349_ db
-_RAM_D34A_ db
-_RAM_D34B_ db
-.ende
-
-.enum $D368 export
-_RAM_D368_ db
-_RAM_D369_ db
-.ende
-
-.enum $D36E export
-_RAM_D36E_ db
-_RAM_D36F_ db
-.ende
-
-.enum $D3D7 export
-_RAM_D3D7_ db
-.ende
-
-.enum $D3DE export
-_RAM_D3DE_ db
-.ende
-
-.enum $D3E5 export
-_RAM_D3E5_ db
-.ende
-
-.enum $D3E8 export
-_RAM_D3E8_ db
-.ende
-
-.enum $D3EA export
-_RAM_D3EA_ db
-_RAM_D3EB_ db
-.ende
-
-.enum $D3EF export
-_RAM_D3EF_ db
-_RAM_D3F0_ db
-.ende
-
-.enum $D40B export
-_RAM_D40B_ db
-.ende
-
-.enum $D489 export
-_RAM_D489_ db
-.ende
-
-.enum $D48C export
-_RAM_D48C_ db
-_RAM_D48D_ db
-_RAM_D48E_ db
-.ende
-
-.enum $D491 export
-_RAM_D491_ db
-_RAM_D492_ db
-.ende
-
-.enum $D497 export
-_RAM_D497_ db
-_RAM_D498_ db
-.ende
-
-.enum $D49E export
-_RAM_D49E_ db
-_RAM_D49F_ db
-_RAM_D4A0_ db
-.ende
-
-.enum $D4A7 export
-_RAM_D4A7_ db
-.ende
-
-.enum $D4AF export
-_RAM_D4AF_ db
-_RAM_D4B0_ db
-_RAM_D4B1_ db
-.ende
-
-.enum $D4B7 export
-_RAM_D4B7_ db
-_RAM_D4B8_ db
-.ende
-
-.enum $D4BD export
-_RAM_D4BD_ db
-_RAM_D4BE_ db
-.ende
-
-.enum $D4C1 export
-_RAM_D4C1_ db
-_RAM_D4C2_ db
-_RAM_D4C3_ db
-.ende
-
-.enum $D580 export
 _RAM_D580_ db
 _RAM_D581_ db
 _RAM_D582_ db
@@ -736,7 +426,17 @@ _RAM_D949_ db
 _RAM_D94A_ db
 .ende
 
+.struct SpriteXN
+x db
+n db
+.endst
+
+.struct SpriteY
+y db
+.endst
+
 .enum $D94C export
+_RAM_D94C_SoundData .db ; 51 bytes total, up to $d97f? It's initialised but not all used?
 _RAM_D94C_Sound1Channel0Volume db
 _RAM_D94D_Sound1Channel1Volume db
 _RAM_D94E_Sound1Channel2Volume db
@@ -750,140 +450,37 @@ _RAM_D955_ db
 _RAM_D956_ db
 _RAM_D957_SoundIndex db
 _RAM_D958_ db
-.ende
-
-.enum $D95A export
+_RAM_D959_ db
 _RAM_D95A_ db
 _RAM_D95B_ db
 _RAM_D95C_ db
-.ende
-
-.enum $D95E export
+_RAM_D95D_ db
 _RAM_D95E_ db
-.ende
-
-.enum $D963 export
+_RAM_D95F_ dsb 4 ; unused?
 _RAM_D963_SFXTrigger2 db
 _RAM_D964_Sound1Control db
-.ende
-
-.enum $D96B export
+_RAM_D965_ dsb 6 ; unused?
 _RAM_D96B_SoundMask db
 _RAM_D96C_ db
 _RAM_D96D_ db
-.ende
-
-.enum $D96F export
+_RAM_D96E_ db ; unused?
 _RAM_D96F_ db
-.ende
-
-.enum $D974 export
+_RAM_D970_ dsb 4 ; unused?
 _RAM_D974_SFXTrigger db
 _RAM_D975_Sound2Control db
-.ende
-
-.enum $D97C export
+_RAM_D976_ dsb 6 ; unused?
 _RAM_D97C_Sound db
-.ende
+_RAM_D97D_ dsb 3 ; unused?
 
-.enum $D980 export
-_RAM_D980_CarDecoratorTileData1bpp dsb $40
-.ende
+_RAM_D980_CarDecoratorTileData1bpp dsb 16*8 ; 16 * 1bpp tile data
 
-.enum $DA00 export
-_RAM_DA00_ db
-.ende
+_RAM_DA00_ dsb 32
 
-.enum $DA20 export
 _RAM_DA20_TrackMetatileLookup dsb 64
-_RAM_DA60_SpriteTableXNs dsb 64*2
-.ende
 
-.enum $DAC0 export
-_RAM_DA60_SpriteTableXNs+96 db
-_RAM_DA60_SpriteTableXNs+97 db
-_RAM_DA60_SpriteTableXNs+98 db
-_RAM_DA60_SpriteTableXNs+99 db
-_RAM_DA60_SpriteTableXNs+100 db
-_RAM_DA60_SpriteTableXNs+101 db
-_RAM_DA60_SpriteTableXNs+102 db
-_RAM_DA60_SpriteTableXNs+103 db
-_RAM_DA60_SpriteTableXNs+104 db
-_RAM_DA60_SpriteTableXNs+105 db
-_RAM_DA60_SpriteTableXNs+106 db
-_RAM_DA60_SpriteTableXNs+107 db
-_RAM_DA60_SpriteTableXNs+108 db
-_RAM_DA60_SpriteTableXNs+109 db
-_RAM_DA60_SpriteTableXNs+110 db
-_RAM_DA60_SpriteTableXNs+111 db
-_RAM_DA60_SpriteTableXNs+112 db
-.ende
+_RAM_DA60_SpriteTableXNs instanceof SpriteXN 64 ;dsb 64*2
+_RAM_DAE0_SpriteTableYs instanceof SpriteY 64 ;dsb 64
 
-.enum $DAD2 export
-_RAM_DA60_SpriteTableXNs+114 db
-.ende
-
-.enum $DAD4 export
-_RAM_DAD4_ db
-.ende
-
-.enum $DAD6 export
-_RAM_DAD6_ db
-.ende
-
-.enum $DAD8 export
-_RAM_DAD8_ db
-.ende
-
-.enum $DADA export
-_RAM_DADA_ db
-.ende
-
-.enum $DADC export
-_RAM_DADC_ db
-.ende
-
-.enum $DADE export
-_RAM_DADE_ db
-.ende
-*/
-.enum $DAE0 export
-_RAM_DAE0_SpriteTableYs dsb 64
-.ende
-
-.enum $DAE9 export
-_RAM_DAE9_ db
-.ende
-
-.enum $DAF3 export
-_RAM_DAF3_ db
-.ende
-
-.enum $DAFD export
-_RAM_DAFD_ db
-.ende
-
-.enum $DB07 export
-_RAM_DB07_ db
-.ende
-
-.enum $DB10 export
-_RAM_DB10_ db
-_RAM_DB11_ db
-_RAM_DB12_ db
-_RAM_DB13_ db
-_RAM_DB14_ db
-_RAM_DB15_ db
-_RAM_DB16_ db
-_RAM_DB17_ db
-_RAM_DB18_ db
-_RAM_DB19_ db
-_RAM_DB1A_ db
-_RAM_DB1B_ db
-_RAM_DB1C_ db
-_RAM_DB1D_ db
-_RAM_DB1E_ db
-_RAM_DB1F_ db
 _RAM_DB20_Player1Controls db ; in-game
 _RAM_DB21_Player2Controls db
 _RAM_DB22_ db
@@ -1148,7 +745,7 @@ _RAM_DC97_ db
 .ende
 
 .enum $DC99 export
-_RAM_DC99_EnterMenuTrampoline dsb 18 ; Data copied from ROM, not clear if it's used
+_RAM_DC99_EnterMenuTrampoline dsb 18 ; Code in RAM
 _RAM_DCAB_ dw
 _RAM_DCAD_ dw
 _RAM_DCAF_ db
@@ -2047,7 +1644,7 @@ _LABEL_173_LoadEnterMenuTrampolineToRAM:
 _LABEL_186_InitialiseSoundData:
   ld hl, _RAM_D94C_Sound1Channel0Volume
   ld de, _DATA_650C_SoundInitialisationData
-  ld bc, 52
+  ld bc, _DATA_650C_SoundInitialisationData_End - _DATA_650C_SoundInitialisationData
 -:ld a, (de)
   ld (hl), a
   inc hl
@@ -2915,8 +2512,8 @@ _LABEL_84A_:
   ld a, (_RAM_DBA5_)
   ld (_RAM_DF67_), a
   ld a, (_RAM_DF2A_)
-  ld ix, _RAM_DA60_SpriteTableXNs+56*2
-  ld iy, _RAM_DB18_
+  ld ix, _RAM_DA60_SpriteTableXNs.57
+  ld iy, _RAM_DAE0_SpriteTableYs.57
   call _LABEL_97F_
   jp ++
 
@@ -2943,8 +2540,8 @@ _LABEL_84A_:
 +:ld a, (_RAM_DCBD_)
 ++:ld (_RAM_DF67_), a
   ld a, (_RAM_DF2B_)
-  ld ix, _RAM_DAD4_
-  ld iy, _RAM_DB1A_
+  ld ix, _RAM_DA60_SpriteTableXNs.59
+  ld iy, _RAM_DAE0_SpriteTableYs.59
   call _LABEL_97F_
   jp _LABEL_8DC_
 +++:
@@ -2982,8 +2579,8 @@ _LABEL_8DC_:
 ++:
   ld (_RAM_DF67_), a
   ld a, (_RAM_DF2C_)
-  ld ix, _RAM_DAD8_
-  ld iy, _RAM_DB1C_
+  ld ix, _RAM_DA60_SpriteTableXNs.61
+  ld iy, _RAM_DAE0_SpriteTableYs.61
   call _LABEL_97F_
   jp _LABEL_92D_
 
@@ -3023,8 +2620,8 @@ _LABEL_92D_:
 ++:
   ld (_RAM_DF67_), a
   ld a, (_RAM_DF2D_)
-  ld ix, _RAM_DADC_
-  ld iy, _RAM_DB1E_
+  ld ix, _RAM_DA60_SpriteTableXNs.63
+  ld iy, _RAM_DAE0_SpriteTableYs.63
   jp _LABEL_97F_
 
 +++:
@@ -3225,8 +2822,8 @@ _LABEL_B2B_:
 +++:
   ld hl, _DATA_BAD_
 ++++:
-  ld ix, _RAM_DAF3_
-  ld de, _RAM_DA60_SpriteTableXNs+19*2
+  ld ix, _RAM_DAE0_SpriteTableYs.20
+  ld de, _RAM_DA60_SpriteTableXNs.20
   ld c, $0C
 -:
   ld a, (hl)
@@ -3258,8 +2855,8 @@ _LABEL_B63_:
 ++:
   ld ix, _DATA_BAD_
 +++:
-  ld de, _RAM_DA60_SpriteTableXNs+19*2
-  ld iy, _RAM_DAF3_
+  ld de, _RAM_DA60_SpriteTableXNs.20
+  ld iy, _RAM_DAE0_SpriteTableYs.20
   ld c, $06
 -:
   ld a, (_RAM_D581_)
@@ -5473,7 +5070,7 @@ _DATA_1C6A_TileData_ShadowBottomRight:
 .db $00 $FC $FC $00 $FC $FC $00 $F8 
 .db $F8 $00 $F0 $F0 $00 $C0 $C0 $00
 
-_DATA_1c82_TIleVRAMAddresses: ; VRAM addresses
+_DATA_1c82_TileVRAMAddresses: ; VRAM addresses
 .dw $4D00 $4D60 $4F00 $4F60 ; Tiles $68, $6b, $78, $7b
 .dw $5160 $5300 $5360 $5D00 ; $8b, $98, $9b, $e8
 .dw $5D60 $5F00 $5F60 ; $eb, $f8, $fb
@@ -5693,7 +5290,7 @@ _LABEL_1DF2_:
   ld a, (hl)
   ld (_RAM_DE7D_), a
   ld hl, (_RAM_D585_)
-  ld de, $C400
+  ld de, _RAM_C400_TrackIndexes
   add hl, de
   ld a, (hl)
   ld (_RAM_D587_), a
@@ -8095,7 +7692,7 @@ _LABEL_31F1_UpdateSpriteTable:
   ld a, $7F
   out (PORT_VDP_ADDRESS), a
   ld hl, _RAM_DAE0_SpriteTableYs
-  ld b, 64
+  ld b, 64*_sizeof_SpriteY
   ld c, PORT_VDP_DATA
   otir
   ; Sprite table XN
@@ -8104,14 +7701,14 @@ _LABEL_31F1_UpdateSpriteTable:
   ld a, $7F
   out (PORT_VDP_ADDRESS), a
   ld hl, _RAM_DA60_SpriteTableXNs
-  ld b, 64*2
+  ld b, 64*_sizeof_SpriteXN
   ld c, PORT_VDP_DATA
   otir
   ret
 
 _LABEL_3214_BlankSpriteTable:
   ld hl, _RAM_DAE0_SpriteTableYs
-  ld bc, 64
+  ld bc, 64*_sizeof_SpriteY
 -:xor a
   ld (hl), a
   inc hl
@@ -8120,7 +7717,7 @@ _LABEL_3214_BlankSpriteTable:
   or c
   jr nz, -
   ld hl, _RAM_DA60_SpriteTableXNs
-  ld bc, 64*2
+  ld bc, 64*_sizeof_SpriteXN
 -:xor a
   ld (hl), a
   inc hl
@@ -8688,8 +8285,8 @@ _LABEL_35E0_:
   ld a, (_RAM_DBA5_)
   ld (_RAM_DF09_), a
 ++:
-  ld ix, _RAM_DA60_SpriteTableXNs+18
-  ld iy, _RAM_DAE9_
+  ld ix, _RAM_DA60_SpriteTableXNs.10
+  ld iy, _RAM_DAE0_SpriteTableYs.10
   ld a, (_RAM_DF08_)
   ld (_RAM_DE84_), a
   ld a, (_RAM_DF09_)
@@ -8818,8 +8415,8 @@ _LABEL_370F_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jp z, _LABEL_37BE_
-  ld ix, _RAM_DA60_SpriteTableXNs+19*2
-  ld iy, _RAM_DAF3_
+  ld ix, _RAM_DA60_SpriteTableXNs.20
+  ld iy, _RAM_DAE0_SpriteTableYs.20
   ld a, (_RAM_DCBC_)
   ld (_RAM_DE84_), a
   ld a, (_RAM_DCBD_)
@@ -8891,8 +8488,8 @@ _LABEL_37B5_:
 _LABEL_37BB_:
   call _LABEL_3963_
 _LABEL_37BE_:
-  ld ix, _RAM_DA60_SpriteTableXNs+58
-  ld iy, _RAM_DAFD_
+  ld ix, _RAM_DA60_SpriteTableXNs.30
+  ld iy, _RAM_DAE0_SpriteTableYs.30
   ld a, (_RAM_DCFD_)
   ld (_RAM_DE84_), a
   ld a, (_RAM_DCFE_)
@@ -9012,8 +8609,8 @@ _LABEL_38B9_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jp z, _LABEL_395C_
-  ld ix, _RAM_DA60_SpriteTableXNs+78
-  ld iy, _RAM_DB07_
+  ld ix, _RAM_DA60_SpriteTableXNs.40
+  ld iy, _RAM_DAE0_SpriteTableYs.40
   ld a, (_RAM_DD3E_)
   ld (_RAM_DE84_), a
   ld a, (_RAM_DD3F_)
@@ -9179,28 +8776,28 @@ _LABEL_3A2E_:
   cp TT_RuffTrux
   jr z, +
   ld a, $A8
-  ld (_RAM_DA60_SpriteTableXNs+97), a
-  ld (_RAM_DA60_SpriteTableXNs+105), a
+  ld (_RAM_DA60_SpriteTableXNs.49.n), a
+  ld (_RAM_DA60_SpriteTableXNs.53.n), a
   ld a, $A9
-  ld (_RAM_DA60_SpriteTableXNs+99), a
-  ld (_RAM_DA60_SpriteTableXNs+107), a
+  ld (_RAM_DA60_SpriteTableXNs.50.n), a
+  ld (_RAM_DA60_SpriteTableXNs.54.n), a
   ld a, $AA
-  ld (_RAM_DA60_SpriteTableXNs+101), a
-  ld (_RAM_DA60_SpriteTableXNs+109), a
+  ld (_RAM_DA60_SpriteTableXNs.51.n), a
+  ld (_RAM_DA60_SpriteTableXNs.55.n), a
   ld a, $AB
-  ld (_RAM_DA60_SpriteTableXNs+103), a
-  ld (_RAM_DA60_SpriteTableXNs+111), a
+  ld (_RAM_DA60_SpriteTableXNs.52.n), a
+  ld (_RAM_DA60_SpriteTableXNs.56.n), a
   ret
 
 +:
   ld a, $0B
-  ld (_RAM_DA60_SpriteTableXNs+97), a
+  ld (_RAM_DA60_SpriteTableXNs.49.n), a
   ld a, $18
-  ld (_RAM_DA60_SpriteTableXNs+99), a
+  ld (_RAM_DA60_SpriteTableXNs.50.n), a
   ld a, $1B
-  ld (_RAM_DA60_SpriteTableXNs+101), a
+  ld (_RAM_DA60_SpriteTableXNs.51.n), a
   ld a, $88
-  ld (_RAM_DA60_SpriteTableXNs+103), a
+  ld (_RAM_DA60_SpriteTableXNs.52.n), a
   ret
 
 _LABEL_3A6B_:
@@ -11822,7 +11419,7 @@ _LABEL_5451_:
   ld e, (ix+4)
   add hl, de
   ld (_RAM_D585_), hl
-  ld de, $C400
+  ld de, _RAM_C400_TrackIndexes
   add hl, de
   ld a, (hl)
   ld (ix+24), a
@@ -13949,6 +13546,7 @@ _DATA_650C_SoundInitialisationData:
 .db $03 $03 $0A $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $E8 $03 $03 $00 $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $FF $07 $08
+_DATA_650C_SoundInitialisationData_End:
 
 _LABEL_6540_:
   ld a, (_RAM_D948_)
@@ -16825,7 +16423,8 @@ _LABEL_7B21_Decompress:
 ; de = dest
 ; Returns hc = number of bytes decompressed (i.e. output size)
 ; Uses afbcde
-; Seems to be relocatable, but isn't relocated?
+; Relocatable (no absolute addresses used), but in the end there's another copy 
+; which gets relocated to RAM - this one executes in place.
   push de
     jr _get_next_mask_set_carry
 
@@ -17330,10 +16929,9 @@ _LABEL_7C7D_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
   jr nz, +
-  ld hl, _RAM_CC38_ ; Metatile $3c
-  ld bc, $0012 ; Size of a metatile
--:
-  ld a, $FF
+  ld hl, _RAM_C800_WallData + _sizeof_WallDataMetaTile * $3c; _RAM_CC38_ ; Metatile $3c
+  ld bc, _sizeof_WallDataMetaTile
+-:ld a, $FF
   ld (hl), a ; Set all wall bits -> make it all solid
   inc hl
   dec bc
@@ -17355,7 +16953,7 @@ _LABEL_7C7D_:
   inc hl
   ld a, (hl)
   ld d, a
-  ld hl, _RAM_C000_DecompressionTemporaryBuffer
+  ld hl, _RAM_C000_LevelLayout
   ex de, hl
   call _LABEL_7B21_Decompress
   
@@ -17479,7 +17077,7 @@ _LABEL_7C7D_:
   ld de, $0000
 --:
   push hl
-    ld hl, _DATA_1c82_TIleVRAMAddresses
+    ld hl, _DATA_1c82_TileVRAMAddresses
     add hl, de
     ld a, (hl)
     out (PORT_VDP_ADDRESS), a
@@ -30605,8 +30203,26 @@ _LABEL_3645B_:
   ret
 
 _LABEL_36484_PatchForLevel:
-  ; Patch layout after loading
+  ; Patch level data after loading
   ; Strange, maybe they couldn't easily alter it at some stage?
+
+.macro PatchLayout args x, y, index
+  ld a, index
+  ld (_RAM_C000_LevelLayout + x + y*32), a
+.endm  
+
+.macro PatchWallData args index, offset, value
+  ld a, value
+  ld (_RAM_C800_WallData + index * _sizeof_WallDataMetaTile + offset), a
+.endm  
+
+.macro PatchBehaviourData args index, x, y, value
+.if NARGS == 4
+  ld a, value
+.endif  
+  ld (_RAM_CC80_BehaviourData + index * _sizeof_BehaviourDataMetaTile + y * 6 + x), a
+.endm  
+
   ; Also patches other stuff - code?
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
@@ -30622,182 +30238,110 @@ _LABEL_36484_PatchForLevel:
   ret
 
 +:; Turbo Wheels
-  ld a, $0F
-  ld (_RAM_D293_), a
-  ld a, $02
-  ld (_RAM_D299_), a
-  ld (_RAM_D29F_), a
-  ld a, $01
-  ld (_RAM_D2A5_), a
+  PatchBehaviourData 43, 1, 1, $0f
+  PatchBehaviourData 43, 1, 2, $02
+  PatchBehaviourData 43, 1, 3
+  PatchBehaviourData 43, 1, 4, $01
   ret
 
 ++: ; F1
-  ld a, $C0
-  ld (_RAM_CC14_), a
-  ld a, $F0
-  ld (_RAM_CC23_), a
-  ld a, $0F
-  ld (_RAM_CC15_), a
-  ld a, $0C
-  ld (_RAM_CC24_), a
-  ld a, $0F
-  ld (_RAM_CC04_), a
-  ld a, $F0
-  ld (_RAM_CC12_), a
-  ld a, $04
-  ld (_RAM_CBC2_), a
-  ld a, $60
-  ld (_RAM_CBC4_), a
-  ld a, $0E
-  ld (_RAM_CBA9_), a
-  ld a, $20
-  ld (_RAM_CBAB_), a
-  ld a, $07
-  ld (_RAM_CB3E_), a
-  ld a, $40
-  ld (_RAM_CB40_), a
-  ld a, $F2
-  ld (_RAM_CB55_), a
-  ld a, $60
-  ld (_RAM_CB57_), a
-  ld a, $70
-  ld (_RAM_CA1A_), a
-  ld a, $04
-  ld (_RAM_CA18_), a
-  ld a, $06
-  ld (_RAM_CA23_), a
-  ld a, $20
-  ld (_RAM_CA25_), a
-  ld a, $06
-  ld (_RAM_CAA2_), a
-  ld a, $4F
-  ld (_RAM_CAA4_), a
-  ld a, $02
-  ld (_RAM_CA95_), a
-  ld a, $E0
-  ld (_RAM_CA97_), a
-  ld a, $85
-  ld (_RAM_D1C5_), a
-  ld a, $81
-  ld (_RAM_D1A9_), a
-  ld a, $0F
-  ld (_RAM_D191_), a
-  ld (_RAM_D192_), a
-  ld a, $85
-  ld (_RAM_D196_), a
-  ld a, $80
-  ld (_RAM_D198_), a
-  ld a, $09
-  ld (_RAM_D199_), a
-  ld (_RAM_D19F_), a
-  ld a, $81
-  ld (_RAM_D1A4_), a
-  ld a, $00
-  ld (_RAM_D097_), a
-  ld (_RAM_D098_), a
-  ld a, $0E
-  ld (_RAM_D09C_), a
-  ld a, $85
-  ld (_RAM_D09D_), a
-  ld a, $87
-  ld (_RAM_D09F_), a
-  ld a, $0D
-  ld (_RAM_D0A2_), a
-  ld a, $84
-  ld (_RAM_D0A9_), a
-  ld a, $8F
-  ld (_RAM_D0B0_), a
-  ld a, $8A
-  ld (_RAM_D0C4_), a
-  ld a, $19
-  ld (_RAM_D368_), a
-  ld (_RAM_D369_), a
-  ld (_RAM_D36E_), a
-  ld (_RAM_D36F_), a
-  ld (_RAM_D346_), a
-  ld (_RAM_D347_), a
-  ld (_RAM_D348_), a
-  ld (_RAM_D349_), a
-  ld (_RAM_D34A_), a
-  ld (_RAM_D34B_), a
-  ld a, $1A
-  ld (_RAM_D33A_), a
-  ld (_RAM_D33B_), a
-  ld (_RAM_D33C_), a
-  ld (_RAM_D33D_), a
-  ld (_RAM_D33E_), a
-  ld (_RAM_D33F_), a
-  ld a, $85
-  ld (_RAM_D302_), a
-  ld a, $85
-  ld (_RAM_D307_), a
-  ld a, $0D
-  ld (_RAM_D30C_), a
-  ld a, $05
-  ld (_RAM_D312_), a
-  ld a, $83
-  ld (_RAM_D313_), a
-  ld a, $81
-  ld (_RAM_D315_), a
-  ld a, $04
-  ld (_RAM_D319_), a
-  ld a, $0B
-  ld (_RAM_D31A_), a
-  ld a, $87
-  ld (_RAM_D32E_), a
-  ld a, $87
-  ld (_RAM_D3D7_), a
-  ld a, $87
-  ld (_RAM_D3DE_), a
-  ld a, $09
-  ld (_RAM_D3E5_), a
-  ld a, $83
-  ld (_RAM_D3E8_), a
-  ld a, $81
-  ld (_RAM_D3EA_), a
-  ld a, $0A
-  ld (_RAM_D3EB_), a
-  ld a, $04
-  ld (_RAM_D3EF_), a
-  ld a, $0B
-  ld (_RAM_D3F0_), a
-  ld a, $83
-  ld (_RAM_D40B_), a
-  ld a, $E5
-  ld (_RAM_D489_), a
-  ld a, $E2
-  ld (_RAM_D4A7_), a
-  ld a, $85
-  ld (_RAM_D48C_), a
-  ld (_RAM_D48D_), a
-  ld a, $8D
-  ld (_RAM_D491_), a
-  ld (_RAM_D497_), a
-  ld a, $84
-  ld (_RAM_D492_), a
-  ld (_RAM_D498_), a
-  ld (_RAM_D49E_), a
-  ld a, $83
-  ld (_RAM_D49F_), a
-  ld a, $87
-  ld (_RAM_D4B0_), a
-  ld a, $80
-  ld (_RAM_D4B1_), a
-  ld a, $81
-  ld (_RAM_D4B7_), a
-  ld (_RAM_D4BD_), a
-  ld (_RAM_D4C2_), a
-  ld (_RAM_D4C3_), a
-  ld a, $89
-  ld (_RAM_D4B8_), a
-  ld (_RAM_D4BE_), a
-  ld a, $86
-  ld (_RAM_D48E_), a
-  ld a, $82
-  ld (_RAM_D4A0_), a
-  ld a, $84
-  ld (_RAM_D4AF_), a
-  ld (_RAM_D4C1_), a
+  PatchWallData 58  0 %11000000 ; Hole (right)
+  PatchWallData 58 15 %11110000
+  PatchWallData 58  1 %00001111
+  PatchWallData 58 16 %00001100
+  PatchWallData 57  2 %00001111 ; Hole (right)
+  PatchWallData 57 16 %11110000
+  PatchWallData 53  8 %00000100 ; Hole (bottom right)
+  PatchWallData 53 10 %01100000
+  PatchWallData 52  1 %00001110 ; Hole (bottom right, more)
+  PatchWallData 52  3 %00100000
+  PatchWallData 46  2 %00000111 ; Hole (bottom left)
+  PatchWallData 46  4 %01000000
+  PatchWallData 47  7 %11110010 ; Hole (bottom left, more)
+  PatchWallData 47  9 %01100000
+  PatchWallData 29 16 %01110000 ; Hole (top left)
+  PatchWallData 29 14 %00000100
+  PatchWallData 30  7 %00000110 ; Hole (top left, more)
+  PatchWallData 30  9 %00100000
+  PatchWallData 37  8 %00000110 ; Hole (top right)
+  PatchWallData 37 10 %01001111
+  PatchWallData 36 13 %00000010 ; Hole (top right, more)
+  PatchWallData 36 15 %11100000
+  
+  PatchBehaviourData 37, 5, 2, $85
+  PatchBehaviourData 36, 1, 4, $81
+  PatchBehaviourData 36, 1, 0, $0F
+  PatchBehaviourData 36, 2, 0; $0F
+  PatchBehaviourData 36, 6, 0, $85
+  PatchBehaviourData 36, 8, 0, $80
+  PatchBehaviourData 36, 9, 0, $09
+  PatchBehaviourData 36, 3, 2; $09
+  PatchBehaviourData 36, 2, 3, $81
+  PatchBehaviourData 29, 3, 0, $00
+  PatchBehaviourData 29, 4, 0; $00
+  PatchBehaviourData 29, 2, 1, $0E
+  PatchBehaviourData 29, 3, 1, $85
+  PatchBehaviourData 29, 5, 1, $87
+  PatchBehaviourData 29, 2, 2, $0D
+  PatchBehaviourData 29, 3, 3, $84
+  PatchBehaviourData 29, 4, 4, $8F
+  PatchBehaviourData 30, 0, 2, $8A
+  PatchBehaviourData 49, 4, 0, $19
+  PatchBehaviourData 49, 5, 0; $19
+  PatchBehaviourData 49, 4, 1; $19
+  PatchBehaviourData 49, 5, 1; $19
+  PatchBehaviourData 48, 0, 1; $19
+  PatchBehaviourData 48, 1, 1; $19
+  PatchBehaviourData 48, 2, 1; $19
+  PatchBehaviourData 48, 3, 1; $19
+  PatchBehaviourData 48, 4, 1; $19
+  PatchBehaviourData 48, 5, 1; $19
+  PatchBehaviourData 47, 0, 5, $1A
+  PatchBehaviourData 47, 1, 5; $1A
+  PatchBehaviourData 47, 2, 5; $1A
+  PatchBehaviourData 47, 3, 5; $1A
+  PatchBehaviourData 47, 4, 5; $1A
+  PatchBehaviourData 47, 5, 5; $1A
+  PatchBehaviourData 46, 4, 1, $85
+  PatchBehaviourData 46, 3, 2, $85
+  PatchBehaviourData 46, 2, 3, $0D
+  PatchBehaviourData 46, 2, 4, $05
+  PatchBehaviourData 46, 3, 4, $83
+  PatchBehaviourData 46, 5, 4, $81
+  PatchBehaviourData 46, 3, 5, $04
+  PatchBehaviourData 46, 4, 5, $0B
+  PatchBehaviourData 47, 0, 3, $87
+  PatchBehaviourData 52, 1, 1, $87
+  PatchBehaviourData 52, 2, 2, $87
+  PatchBehaviourData 52, 3, 3, $09
+  PatchBehaviourData 52, 0, 4, $83
+  PatchBehaviourData 52, 2, 4, $81
+  PatchBehaviourData 52, 3, 4, $0A
+  PatchBehaviourData 52, 1, 5, $04
+  PatchBehaviourData 52, 2, 5, $0B
+  PatchBehaviourData 53, 5, 3, $83
+  PatchBehaviourData 57, 5, 0, $E5
+  PatchBehaviourData 57, 5, 5, $E2
+  PatchBehaviourData 57, 2, 1, $85
+  PatchBehaviourData 57, 3, 1; $85
+  PatchBehaviourData 57, 1, 2, $8D
+  PatchBehaviourData 57, 1, 3; $8D
+  PatchBehaviourData 57, 2, 2, $84
+  PatchBehaviourData 57, 2, 3; $84
+  PatchBehaviourData 57, 2, 4; $84
+  PatchBehaviourData 57, 3, 4, $83
+  PatchBehaviourData 58, 2, 1, $87
+  PatchBehaviourData 58, 3, 1, $80
+  PatchBehaviourData 58, 3, 2, $81
+  PatchBehaviourData 58, 3, 3; $81
+  PatchBehaviourData 58, 2, 4; $81
+  PatchBehaviourData 58, 3, 4; $81
+  PatchBehaviourData 58, 4, 2, $89
+  PatchBehaviourData 58, 4, 3; $89
+  PatchBehaviourData 57, 4, 1, $86
+  PatchBehaviourData 57, 4, 4, $82
+  PatchBehaviourData 58, 1, 1, $84
+  PatchBehaviourData 58, 1, 4; $84
   ret
 
 _LABEL_3665F_Tanks:
@@ -30806,19 +30350,17 @@ _LABEL_3665F_Tanks:
   jr z, +
   ret
 
-+:
-  ld a, $19
-  ld (_RAM_C000_LevelLayout + $A8), a
++:; Tanks 1
+  PatchLayout 8, 5, $19
   ret
 
 _LABEL_3666D_Powerboats:
-  ld a, $04
-  ld (_RAM_D1A8_), a
-  ld (_RAM_D1A9_), a
-  ld (_RAM_D1AA_), a
-  ld (_RAM_D1AB_), a
-  ld (_RAM_D1AC_), a
-  ld (_RAM_D1AD_), a
+  PatchBehaviourData 36, 0, 4, $04
+  PatchBehaviourData 36, 1, 4; $04
+  PatchBehaviourData 36, 2, 4; $04
+  PatchBehaviourData 36, 3, 4; $04
+  PatchBehaviourData 36, 4, 4; $04
+  PatchBehaviourData 36, 5, 4; $04
   ld a, (_RAM_DB96_TrackIndexForThisType)
   cp $00
   jr z, ++
@@ -30830,37 +30372,26 @@ _LABEL_3666D_Powerboats:
   ; Change soap and bottle at start further from the track
   ; from ---S++BB----
   ; to   --S-++-BB---
-  ld a, $B5 ; Move soap left at start
-  ld (_RAM_C000_LevelLayout + $2E3), a
-  ld a, $9E ; Fill space next to it
-  ld (_RAM_C000_LevelLayout + $2E4), a
-  ld a, $9F ; 
-  ld (_RAM_C000_LevelLayout + $2E6), a
-  ld a, $B6
-  ld (_RAM_C000_LevelLayout + $2E7), a
-  ld a, $B7
-  ld (_RAM_C000_LevelLayout + $2E8), a
+  PatchLayout 3, 23, $B5 ; Move soap left at start
+  PatchLayout 4, 23, $9E ; Fill space next to it
+  PatchLayout 6, 23, $9F ; 
+  PatchLayout 7, 23, $B6
+  PatchLayout 8, 23, $B7
   ret
 
 +:; Race 2
-  ld a, $9D
-  ld (_RAM_C000_LevelLayout + $108), a
+  PatchLayout 8, 8, $9D
   ret
 
-++: ; Race 0
-  ld a, $1E
-  ld (_RAM_C000_LevelLayout + $AC), a
-  ld a, $35
-  ld (_RAM_C000_LevelLayout + $AB), a
+++: ; Race 0 - qualifying
+  PatchLayout 12, 5, $1E
+  PatchLayout 11, 5, $35
   ret
 
 +++: ; Race 1
-  ld a, $9D
-  ld (_RAM_C000_LevelLayout + $10C), a
-  ld a, $35
-  ld (_RAM_C000_LevelLayout + $111), a
-  ld a, $1E
-  ld (_RAM_C000_LevelLayout + $112), a
+  PatchLayout 12, 8, $9D
+  PatchLayout 17, 8, $35
+  PatchLayout 18, 8, $1E
   ret
 
 _LABEL_366CB_SportsCars:
@@ -30869,11 +30400,9 @@ _LABEL_366CB_SportsCars:
   jr z, +
   ret
 
-+:; Crayon Canyons layout error at bottom right corner of track
-  ld a, $34
-  ld (_RAM_C000_LevelLayout + $0), a
-  ld a, $32
-  ld (_RAM_C000_LevelLayout + $3E0), a
++:; Track 2 - Crayon Canyons - layout error at bottom right corner of track
+  PatchLayout 0, 0, $34
+  PatchLayout 0, 31, $32
   ret
 
 _LABEL_366DE_:
@@ -31393,17 +30922,17 @@ _LABEL_36A85_:
   cp $00
   jr z, _LABEL_36B0B_
   ld a, (ix+0)
-  ld (_RAM_DA60_SpriteTableXNs+96), a
-  ld (_RAM_DA60_SpriteTableXNs+100), a
+  ld (_RAM_DA60_SpriteTableXNs.49.x), a
+  ld (_RAM_DA60_SpriteTableXNs.51.x), a
   add a, $08
-  ld (_RAM_DA60_SpriteTableXNs+98), a
-  ld (_RAM_DA60_SpriteTableXNs+102), a
+  ld (_RAM_DA60_SpriteTableXNs.50.x), a
+  ld (_RAM_DA60_SpriteTableXNs.52.x), a
   ld a, (iy+0)
-  ld (_RAM_DB10_), a
-  ld (_RAM_DB11_), a
+  ld (_RAM_DAE0_SpriteTableYs.49.y), a
+  ld (_RAM_DAE0_SpriteTableYs.50.y), a
   add a, $08
-  ld (_RAM_DB12_), a
-  ld (_RAM_DB13_), a
+  ld (_RAM_DAE0_SpriteTableYs.51.y), a
+  ld (_RAM_DAE0_SpriteTableYs.52.y), a
   ret
 
 +++:
@@ -31411,33 +30940,33 @@ _LABEL_36A85_:
   cp $00
   jr z, +
   ld a, (ix+1)
-  ld (_RAM_DA60_SpriteTableXNs+104), a
-  ld (_RAM_DA60_SpriteTableXNs+108), a
+  ld (_RAM_DA60_SpriteTableXNs.53.x), a
+  ld (_RAM_DA60_SpriteTableXNs.55.x), a
   add a, $08
-  ld (_RAM_DA60_SpriteTableXNs+106), a
-  ld (_RAM_DA60_SpriteTableXNs+110), a
+  ld (_RAM_DA60_SpriteTableXNs.54.x), a
+  ld (_RAM_DA60_SpriteTableXNs.56.x), a
   ld a, (iy+1)
-  ld (_RAM_DB14_), a
-  ld (_RAM_DB15_), a
+  ld (_RAM_DAE0_SpriteTableYs.53.y), a
+  ld (_RAM_DAE0_SpriteTableYs.54.y), a
   add a, $08
-  ld (_RAM_DB16_), a
-  ld (_RAM_DB17_), a
+  ld (_RAM_DAE0_SpriteTableYs.55.y), a
+  ld (_RAM_DAE0_SpriteTableYs.56.y), a
   ret
 
 _LABEL_36B0B_:
   ld a, $F0
-  ld (_RAM_DB10_), a
-  ld (_RAM_DB11_), a
-  ld (_RAM_DB12_), a
-  ld (_RAM_DB13_), a
+  ld (_RAM_DAE0_SpriteTableYs.49.y), a
+  ld (_RAM_DAE0_SpriteTableYs.50.y), a
+  ld (_RAM_DAE0_SpriteTableYs.51.y), a
+  ld (_RAM_DAE0_SpriteTableYs.52.y), a
   ret
 
 +:
   ld a, $F0
-  ld (_RAM_DB14_), a
-  ld (_RAM_DB15_), a
-  ld (_RAM_DB16_), a
-  ld (_RAM_DB17_), a
+  ld (_RAM_DAE0_SpriteTableYs.53.y), a
+  ld (_RAM_DAE0_SpriteTableYs.54.y), a
+  ld (_RAM_DAE0_SpriteTableYs.55.y), a
+  ld (_RAM_DAE0_SpriteTableYs.56.y), a
   ret
 
 _LABEL_36B29_:
@@ -31993,42 +31522,42 @@ _LABEL_36F4B_:
   ld a, (_RAM_D5A6_)
   or a
   jr z, +
-  ld a, (_RAM_DA60_SpriteTableXNs+112)
+  ld a, (_RAM_DA60_SpriteTableXNs.57.x)
   add a, l
-  ld (_RAM_DA60_SpriteTableXNs+112), a
-  ld a, (_RAM_DA60_SpriteTableXNs+114)
+  ld (_RAM_DA60_SpriteTableXNs.57.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.58.x)
   add a, l
-  ld (_RAM_DA60_SpriteTableXNs+114), a
+  ld (_RAM_DA60_SpriteTableXNs.58.x), a
 +:
   ld a, (_RAM_DCEA_)
   or a
   jr z, +
-  ld a, (_RAM_DAD4_)
+  ld a, (_RAM_DA60_SpriteTableXNs.59.x)
   add a, l
-  ld (_RAM_DAD4_), a
-  ld a, (_RAM_DAD6_)
+  ld (_RAM_DA60_SpriteTableXNs.59.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.60.x)
   add a, l
-  ld (_RAM_DAD6_), a
+  ld (_RAM_DA60_SpriteTableXNs.60.x), a
 +:
   ld a, (_RAM_DD2B_)
   or a
   jr z, +
-  ld a, (_RAM_DAD8_)
+  ld a, (_RAM_DA60_SpriteTableXNs.61.x)
   add a, l
-  ld (_RAM_DAD8_), a
-  ld a, (_RAM_DADA_)
+  ld (_RAM_DA60_SpriteTableXNs.61.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.62.x)
   add a, l
-  ld (_RAM_DADA_), a
+  ld (_RAM_DA60_SpriteTableXNs.62.x), a
 +:
   ld a, (_RAM_DD6C_)
   or a
   jr z, _LABEL_36F3E_
-  ld a, (_RAM_DADC_)
+  ld a, (_RAM_DA60_SpriteTableXNs.63.x)
   add a, l
-  ld (_RAM_DADC_), a
-  ld a, (_RAM_DADE_)
+  ld (_RAM_DA60_SpriteTableXNs.63.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.64.x)
   add a, l
-  ld (_RAM_DADE_), a
+  ld (_RAM_DA60_SpriteTableXNs.64.x), a
   jp _LABEL_36F3E_
 
 _LABEL_36F9E_:
@@ -32137,42 +31666,42 @@ _LABEL_3707E_:
   ld a, (_RAM_D5A6_)
   or a
   jr z, +
-  ld a, (_RAM_DB18_)
+  ld a, (_RAM_DAE0_SpriteTableYs.57.y)
   add a, l
-  ld (_RAM_DB18_), a
-  ld a, (_RAM_DB19_)
+  ld (_RAM_DAE0_SpriteTableYs.57.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.58.y)
   add a, l
-  ld (_RAM_DB19_), a
+  ld (_RAM_DAE0_SpriteTableYs.58.y), a
 +:
   ld a, (_RAM_DCEA_)
   or a
   jr z, +
-  ld a, (_RAM_DB1A_)
+  ld a, (_RAM_DAE0_SpriteTableYs.59.y)
   add a, l
-  ld (_RAM_DB1A_), a
-  ld a, (_RAM_DB1B_)
+  ld (_RAM_DAE0_SpriteTableYs.59.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.60.y)
   add a, l
-  ld (_RAM_DB1B_), a
+  ld (_RAM_DAE0_SpriteTableYs.60.y), a
 +:
   ld a, (_RAM_DD2B_)
   or a
   jr z, +
-  ld a, (_RAM_DB1C_)
+  ld a, (_RAM_DAE0_SpriteTableYs.61.y)
   add a, l
-  ld (_RAM_DB1C_), a
-  ld a, (_RAM_DB1D_)
+  ld (_RAM_DAE0_SpriteTableYs.61.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.62.y)
   add a, l
-  ld (_RAM_DB1D_), a
+  ld (_RAM_DAE0_SpriteTableYs.62.y), a
 +:
   ld a, (_RAM_DD6C_)
   or a
   jr z, _LABEL_37071_
-  ld a, (_RAM_DB1E_)
+  ld a, (_RAM_DAE0_SpriteTableYs.63.y)
   add a, l
-  ld (_RAM_DB1E_), a
-  ld a, (_RAM_DB1F_)
+  ld (_RAM_DAE0_SpriteTableYs.63.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.64.y)
   add a, l
-  ld (_RAM_DB1F_), a
+  ld (_RAM_DAE0_SpriteTableYs.64.y), a
   jp _LABEL_37071_
 
 ; Data from 370D1 to 37160 (144 bytes)
@@ -33105,42 +32634,42 @@ _LABEL_378F4_:
   ld a, (_RAM_D5A6_)
   or a
   jr z, +
-  ld a, (_RAM_DB18_)
+  ld a, (_RAM_DAE0_SpriteTableYs.57.y)
   sub l
-  ld (_RAM_DB18_), a
-  ld a, (_RAM_DB19_)
+  ld (_RAM_DAE0_SpriteTableYs.57.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.58.y)
   sub l
-  ld (_RAM_DB19_), a
+  ld (_RAM_DAE0_SpriteTableYs.58.y), a
 +:
   ld a, (_RAM_DCEA_)
   or a
   jr z, +
-  ld a, (_RAM_DB1A_)
+  ld a, (_RAM_DAE0_SpriteTableYs.59.y)
   sub l
-  ld (_RAM_DB1A_), a
-  ld a, (_RAM_DB1B_)
+  ld (_RAM_DAE0_SpriteTableYs.59.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.60.y)
   sub l
-  ld (_RAM_DB1B_), a
+  ld (_RAM_DAE0_SpriteTableYs.60.y), a
 +:
   ld a, (_RAM_DD2B_)
   or a
   jr z, +
-  ld a, (_RAM_DB1C_)
+  ld a, (_RAM_DAE0_SpriteTableYs.61.y)
   sub l
-  ld (_RAM_DB1C_), a
-  ld a, (_RAM_DB1D_)
+  ld (_RAM_DAE0_SpriteTableYs.61.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.62.y)
   sub l
-  ld (_RAM_DB1D_), a
+  ld (_RAM_DAE0_SpriteTableYs.62.y), a
 +:
   ld a, (_RAM_DD6C_)
   or a
   jr z, _LABEL_378E9_
-  ld a, (_RAM_DB1E_)
+  ld a, (_RAM_DAE0_SpriteTableYs.63.y)
   sub l
-  ld (_RAM_DB1E_), a
-  ld a, (_RAM_DB1F_)
+  ld (_RAM_DAE0_SpriteTableYs.63.y), a
+  ld a, (_RAM_DAE0_SpriteTableYs.64.y)
   sub l
-  ld (_RAM_DB1F_), a
+  ld (_RAM_DAE0_SpriteTableYs.64.y), a
   jr _LABEL_378E9_
 
 _LABEL_37946_:
@@ -33248,50 +32777,50 @@ _LABEL_37A23_:
   ld a, (_RAM_D5A6_)
   or a
   jr z, +
-  ld a, (_RAM_DA60_SpriteTableXNs+112)
+  ld a, (_RAM_DA60_SpriteTableXNs.57.x)
   sub l
-  ld (_RAM_DA60_SpriteTableXNs+112), a
-  ld a, (_RAM_DA60_SpriteTableXNs+114)
+  ld (_RAM_DA60_SpriteTableXNs.57.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.58.x)
   sub l
-  ld (_RAM_DA60_SpriteTableXNs+114), a
+  ld (_RAM_DA60_SpriteTableXNs.58.x), a
 +:
   ld a, (_RAM_DCEA_)
   or a
   jr z, +
-  ld a, (_RAM_DAD4_)
+  ld a, (_RAM_DA60_SpriteTableXNs.59.x)
   sub l
-  ld (_RAM_DAD4_), a
-  ld a, (_RAM_DAD6_)
+  ld (_RAM_DA60_SpriteTableXNs.59.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.60.x)
   sub l
-  ld (_RAM_DAD6_), a
+  ld (_RAM_DA60_SpriteTableXNs.60.x), a
 +:
   ld a, (_RAM_DD2B_)
   or a
   jr z, +
-  ld a, (_RAM_DAD8_)
+  ld a, (_RAM_DA60_SpriteTableXNs.61.x)
   sub l
-  ld (_RAM_DAD8_), a
-  ld a, (_RAM_DADA_)
+  ld (_RAM_DA60_SpriteTableXNs.61.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.62.x)
   sub l
-  ld (_RAM_DADA_), a
+  ld (_RAM_DA60_SpriteTableXNs.62.x), a
 +:
   ld a, (_RAM_DD6C_)
   or a
   jr z, _LABEL_37A18_
-  ld a, (_RAM_DADC_)
+  ld a, (_RAM_DA60_SpriteTableXNs.63.x)
   sub l
-  ld (_RAM_DADC_), a
-  ld a, (_RAM_DADE_)
+  ld (_RAM_DA60_SpriteTableXNs.63.x), a
+  ld a, (_RAM_DA60_SpriteTableXNs.64.x)
   sub l
-  ld (_RAM_DADE_), a
+  ld (_RAM_DA60_SpriteTableXNs.64.x), a
   jr _LABEL_37A18_
 
 _LABEL_37A75_:
   ld a, (_RAM_D5A6_)
   or a
   jp z, _LABEL_37B6B_
-  ld ix, _RAM_DA60_SpriteTableXNs+112
-  ld iy, _RAM_DB18_
+  ld ix, _RAM_DA60_SpriteTableXNs.57
+  ld iy, _RAM_DAE0_SpriteTableYs.57
   cp $1A
   jp nc, _LABEL_37B49_
   ld hl, _DATA_1D65_
@@ -33469,8 +32998,8 @@ _LABEL_37B6B_:
   ld (_RAM_D5A6_), a
   ld a, $0A
   ld (_RAM_D963_SFXTrigger2), a
-  ld ix, _RAM_DA60_SpriteTableXNs+112
-  ld iy, _RAM_DB18_
+  ld ix, _RAM_DA60_SpriteTableXNs.57
+  ld iy, _RAM_DAE0_SpriteTableYs.57
   ld (ix+1), $AD
   ld (ix+3), $AE
   ld hl, _DATA_37C0A_
@@ -33524,12 +33053,12 @@ _DATA_37C2A_:
 
 _LABEL_37C45_:
   ld ix, _RAM_DCAB_
-  ld iy, _RAM_DAD4_
+  ld iy, _RAM_DA60_SpriteTableXNs.59
   jr ++
 
 _LABEL_37C4F_:
   ld ix, _RAM_DCEC_
-  ld iy, _RAM_DAD8_
+  ld iy, _RAM_DA60_SpriteTableXNs.61
   jr ++
 
 _LABEL_37C59_:
@@ -33542,7 +33071,7 @@ _LABEL_37C59_:
 
 +:
   ld ix, _RAM_DD2D_
-  ld iy, _RAM_DADC_
+  ld iy, _RAM_DA60_SpriteTableXNs.63
 ++:
   ld a, (ix+63)
   or a
@@ -33612,15 +33141,15 @@ _LABEL_37C59_:
   jr z, +
   cp $02
   jr z, ++
-  ld iy, _RAM_DB1A_
+  ld iy, _RAM_DAE0_SpriteTableYs.59
   jr +++
 
 +:
-  ld iy, _RAM_DB1C_
+  ld iy, _RAM_DAE0_SpriteTableYs.61
   jr +++
 
 ++:
-  ld iy, _RAM_DB1E_
+  ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
   ld hl, _DATA_3FD3_
   ld a, (ix+62)
@@ -33683,18 +33212,18 @@ _LABEL_37D49_:
   jr z, +
   cp $02
   jr z, ++
-  ld iy, _RAM_DB1A_
-  ld ix, _RAM_DAD4_
+  ld iy, _RAM_DAE0_SpriteTableYs.59
+  ld ix, _RAM_DA60_SpriteTableXNs.59
   jp +++
 
 +:
-  ld iy, _RAM_DB1C_
-  ld ix, _RAM_DAD8_
+  ld iy, _RAM_DAE0_SpriteTableYs.61
+  ld ix, _RAM_DA60_SpriteTableXNs.61
   jp +++
 
 ++:
-  ld iy, _RAM_DB1E_
-  ld ix, _RAM_DADC_
+  ld iy, _RAM_DAE0_SpriteTableYs.63
+  ld ix, _RAM_DA60_SpriteTableXNs.63
 +++:
   xor a
   ld (ix+0), a
@@ -33797,15 +33326,15 @@ _LABEL_37D9C_:
   jr z, +
   cp $02
   jr z, ++
-  ld iy, _RAM_DB1A_
+  ld iy, _RAM_DAE0_SpriteTableYs.59
   jr +++
 
 +:
-  ld iy, _RAM_DB1C_
+  ld iy, _RAM_DAE0_SpriteTableYs.61
   jr +++
 
 ++:
-  ld iy, _RAM_DB1E_
+  ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
   ld hl, _DATA_37C1A_
   add hl, de
@@ -33844,8 +33373,8 @@ _LABEL_37E81_:
   call _LABEL_37F11_
   ld ix, _RAM_DD2D_
   call _LABEL_37F11_
-  ld de, _RAM_DAD4_
-  ld bc, _RAM_DB1A_
+  ld de, _RAM_DA60_SpriteTableXNs.59
+  ld bc, _RAM_DAE0_SpriteTableYs.59
   jp +++
 
 +:
@@ -33853,8 +33382,8 @@ _LABEL_37E81_:
   call _LABEL_37F3A_
   ld ix, _RAM_DD2D_
   call _LABEL_37F3A_
-  ld de, _RAM_DAD8_
-  ld bc, _RAM_DB1C_
+  ld de, _RAM_DA60_SpriteTableXNs.61
+  ld bc, _RAM_DAE0_SpriteTableYs.61
   jp +++
 
 ++:
@@ -33862,8 +33391,8 @@ _LABEL_37E81_:
   call _LABEL_37F69_
   ld ix, _RAM_DCEC_
   call _LABEL_37F69_
-  ld de, _RAM_DADC_
-  ld bc, _RAM_DB1E_
+  ld de, _RAM_DA60_SpriteTableXNs.63
+  ld bc, _RAM_DAE0_SpriteTableYs.63
 +++:
   ld a, (_RAM_DF58_)
   or a
@@ -33895,10 +33424,10 @@ _LABEL_37E81_:
 ++:
   xor a
   ld (_RAM_DD2B_), a
-  ld (_RAM_DAD8_), a
-  ld (_RAM_DB1C_), a
-  ld (_RAM_DADA_), a
-  ld (_RAM_DB1D_), a
+  ld (_RAM_DA60_SpriteTableXNs.61.x), a
+  ld (_RAM_DAE0_SpriteTableYs.61.y), a
+  ld (_RAM_DA60_SpriteTableXNs.62.x), a
+  ld (_RAM_DAE0_SpriteTableYs.62.y), a
 +++:
   ret
 
@@ -33908,14 +33437,14 @@ _LABEL_37F11_:
   jr z, +
   ld a, (ix+17)
   ld l, a
-  ld a, (_RAM_DAD4_)
+  ld a, (_RAM_DA60_SpriteTableXNs.59.x)
   sub l
   jr c, +
   cp $18
   jr nc, +
   ld a, (ix+18)
   ld l, a
-  ld a, (_RAM_DB1A_)
+  ld a, (_RAM_DAE0_SpriteTableYs.59.y)
   sub l
   jr c, +
   cp $18
@@ -33935,14 +33464,14 @@ _LABEL_37F3A_:
   jr z, +
   ld a, (ix+17)
   ld l, a
-  ld a, (_RAM_DAD8_)
+  ld a, (_RAM_DA60_SpriteTableXNs.61.x)
   sub l
   jr c, +
   cp $18
   jr nc, +
   ld a, (ix+18)
   ld l, a
-  ld a, (_RAM_DB1C_)
+  ld a, (_RAM_DAE0_SpriteTableYs.61.y)
   sub l
   jr c, +
   cp $18
@@ -33959,14 +33488,14 @@ _LABEL_37F69_:
   jr z, +
   ld a, (ix+17)
   ld l, a
-  ld a, (_RAM_DADC_)
+  ld a, (_RAM_DA60_SpriteTableXNs.63.x)
   sub l
   jr c, +
   cp $18
   jr nc, +
   ld a, (ix+18)
   ld l, a
-  ld a, (_RAM_DB1E_)
+  ld a, (_RAM_DAE0_SpriteTableYs.63.y)
   sub l
   jr c, +
   cp $18
@@ -33982,31 +33511,31 @@ _LABEL_37F92_:
   call +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, _LABEL_37FF7_
+  jr nz, _LABEL_37FF7_ret
   ld ix, _RAM_DCAB_
   call +
   ld ix, _RAM_DD2D_
 +:
   ld a, (ix+46)
   or a
-  jr nz, _LABEL_37FF7_
+  jr nz, _LABEL_37FF7_ret
   ld a, (ix+21)
   or a
-  jr z, _LABEL_37FF7_
+  jr z, _LABEL_37FF7_ret
   ld a, (ix+17)
   ld l, a
-  ld a, (_RAM_DA60_SpriteTableXNs+112)
+  ld a, (_RAM_DA60_SpriteTableXNs.57.x)
   sub l
-  jr c, _LABEL_37FF7_
+  jr c, _LABEL_37FF7_ret
   cp $18
-  jr nc, _LABEL_37FF7_
+  jr nc, _LABEL_37FF7_ret
   ld a, (ix+18)
   ld l, a
-  ld a, (_RAM_DB18_)
+  ld a, (_RAM_DAE0_SpriteTableYs.57.y)
   sub l
-  jr c, _LABEL_37FF7_
+  jr c, _LABEL_37FF7_ret
   cp $18
-  jr nc, _LABEL_37FF7_
+  jr nc, _LABEL_37FF7_ret
   ld a, (ix+45)
   cp $01
   jr nz, +
@@ -34021,15 +33550,19 @@ _LABEL_37F92_:
 +:
   call _LABEL_2961_
 ++:
-  ld ix, _RAM_DA60_SpriteTableXNs+112
-  ld iy, _RAM_DB18_
+  ld ix, _RAM_DA60_SpriteTableXNs.57.x
+  ld iy, _RAM_DAE0_SpriteTableYs.57.y
   jp _LABEL_37B35_
 
-_LABEL_37FF7_:
+_LABEL_37FF7_ret:
   ret
 
 ; Data from 37FF8 to 37FFF (8 bytes)
-.db $FF $00 $00 $FF $FF $00 $00 $0D
+.db $FF $00 $00 $FF 
+.db $FF $00 $00
+
+; Bank marker
+.db :CADDR
 
 .BANK 14
 .ORG $0000
