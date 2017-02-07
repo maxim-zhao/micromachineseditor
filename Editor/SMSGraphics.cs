@@ -31,15 +31,16 @@ namespace MicroMachinesEditor
             return Color.FromArgb(red, green, blue);
         }
 
-        public static IList<Tile> ReadTiles(byte[] data, int offset, int byteCount, IList<Color> palette)
+        public static IList<Tile> ReadTiles(byte[] data, int offset, int byteCount, IList<Color> palette, int bitDepth = 4)
         {
             // Build collection of tiles
-            int numTiles = byteCount / 32;
+            int bytesPerTile = 8*bitDepth;
+            int numTiles = byteCount / bytesPerTile;
             var result = new List<Tile>(numTiles);
             for (int i = 0; i < numTiles; ++i)
             {
-                var tile = new Tile(data, offset, palette);
-                offset += 32;
+                var tile = new Tile(data, offset, palette, bitDepth);
+                offset += bytesPerTile;
                 result.Add(tile);
             }
             return result;
@@ -49,17 +50,17 @@ namespace MicroMachinesEditor
         {
             public Bitmap Bitmap { get; private set; }
 
-            public Tile(IList<byte> data, int offset, IList<Color> palette)
+            public Tile(IList<byte> data, int offset, IList<Color> palette, int bitDepth)
             {
                 Bitmap = new Bitmap(8, 8);
 
-                // Each 4 bytes represents one row
+                // Each bitDepth bytes represents one row
                 for (int y = 0; y < 8; ++y)
                 {
                     byte byte0 = data[offset + 0];
-                    byte byte1 = data[offset + 1];
-                    byte byte2 = data[offset + 2];
-                    byte byte3 = data[offset + 3];
+                    byte byte1 = bitDepth > 1 ? data[offset + 1] : (byte)0;
+                    byte byte2 = bitDepth > 2 ? data[offset + 2] : (byte)0;
+                    byte byte3 = bitDepth > 3 ? data[offset + 3] : (byte)0;
 
                     // Each pixel in the row is given by a bit from each byte, left to right,
                     // least to most significant
@@ -80,7 +81,7 @@ namespace MicroMachinesEditor
                         Bitmap.SetPixel(column, y, color);
                     }
 
-                    offset += 4;
+                    offset += bitDepth;
                 }
             }
         }

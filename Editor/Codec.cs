@@ -194,7 +194,7 @@ namespace MicroMachinesEditor
             }
         }
 
-        private static void LZCopy(List<byte> buffer, int runLength, int runOffset)
+        private static void LZCopy(IList<byte> buffer, int runLength, int runOffset)
         {
             // The source and dest may overlap! So we do a dumb copy.
             int fromIndex = buffer.Count - runOffset;
@@ -298,13 +298,13 @@ namespace MicroMachinesEditor
             return result;
         }
 
-        private static int DecodeSplitPointer(byte[] file, int offsetTable, int tableDelta, int index)
+        private static int DecodeSplitPointer(IReadOnlyList<byte> file, int offsetTable, int tableDelta, int index)
         {
             return file[offsetTable + index] | (file[offsetTable + tableDelta + index] << 8);
         }
 
-        static readonly string lookupLow = "ABCDEFGHIJKLMN PQRSTUVWXYZO123456789";
-        static readonly string lookupHigh = "!-?";
+        private const string LookupLow = "ABCDEFGHIJKLMN PQRSTUVWXYZO123456789";
+        private const string LookupHigh = "!-?";
 
         public static string DecodeString(byte[] file, int offset, int limit = 0)
         {
@@ -313,16 +313,16 @@ namespace MicroMachinesEditor
             for (int i = 0; stopAtInvalid || i < limit; ++i)
             {
                 byte b = file[offset + i];
-                if (b < lookupLow.Length)
+                if (b < LookupLow.Length)
                 {
-                    result += lookupLow[b];
+                    result += LookupLow[b];
                 }
                 else
                 {
                     b -= 0xb4;
-                    if (b < lookupHigh.Length)
+                    if (b < LookupHigh.Length)
                     {
-                        result += lookupHigh[b];
+                        result += LookupHigh[b];
                     }
                     else
                     {
@@ -341,13 +341,13 @@ namespace MicroMachinesEditor
         public static string ValidateString(string value, int width)
         {
             return value
-                .Where(c => !lookupLow.Contains(c) && !lookupHigh.Contains(c))
+                .Where(c => !LookupLow.Contains(c) && !LookupHigh.Contains(c))
                 .Aggregate("", (current, c) => current + c)
                 .PadRight(width, ' ')
                 .Substring(0, width);
         }
 
-        internal static int TrackTypeDataPageNumber(byte[] file, int trackType)
+        private static int TrackTypeDataPageNumber(IReadOnlyList<byte> file, int trackType)
         {
             return file[0x3e3a + trackType];
         }
@@ -856,5 +856,10 @@ namespace MicroMachinesEditor
             }
         }
 */
+
+        public static IList<byte> DecompressRLE(BufferHelper bufferHelper)
+        {
+            return new List<byte>();
+        }
     }
 }

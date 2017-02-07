@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -67,6 +68,37 @@ namespace MicroMachinesEditor
             }
             tbOutput.Text = HexToString(decoded);
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
+
+            // Try as graphics
+            if (_palette == null)
+            {
+                // Load the menu palette
+                _palette = SMSGraphics.ReadPalette(file, 0xbf3e, 32);
+            }
+            var bpp = Convert.ToInt32(numericUpDown1.Value);
+            var tiles = SMSGraphics.ReadTiles(decoded.ToArray(), 0, decoded.Count, _palette, bpp);
+            var bm = new Bitmap(128, 256);
+            Graphics g = Graphics.FromImage(bm);
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            // Set to transparent
+            g.Clear(Color.Transparent);
+
+            int x = 0;
+            int y = 0;
+            foreach (var tile in tiles)
+            {
+                g.DrawImage(tile.Bitmap, x, y, 8, 8);
+                x += 8;
+                if (x >= bm.Width)
+                {
+                    x = 0;
+                    y += 8;
+                }
+            }
+
+            pbRaw.Image = bm;
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -81,7 +113,10 @@ namespace MicroMachinesEditor
                 {
                     bufferHelper.Offset = offset;
                     decoded = Codec.Decompress(bufferHelper);
-                    break; // Nasty!
+                    if (decoded.Count > 16)
+                    {
+                        break; // Nasty!
+                    }
                 }
                 catch (Exception) {
                     Log($"Failed to find data at {offset:X}");
@@ -227,8 +262,8 @@ namespace MicroMachinesEditor
             // Most of the tables are at the start of a page given by a table at 0x3e3a
             byte trackTypeDataPageNumber = file[0x3e3a + trackType];
             int tableOffset = trackTypeDataPageNumber * 16 * 1024;
-            int offset2 = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 0));
-            int offset3 = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 2));
+            int behaviourDataOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 0));
+            int wallDataOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 2));
             int offsetTrack = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 4 + trackNumber * 2));
 
             // But there's tile data (and other stuff) at 0x3dc8
@@ -445,6 +480,24 @@ namespace MicroMachinesEditor
             var track = lvTracks.SelectedItems[0].Tag as Track;
             trackEditor.Track = track;
             tabControl1.SelectedTab = tabTrack;
+        }
+
+        private void btnDecodeRun_Click(object sender, EventArgs e)
+        {
+            byte[] file = File.ReadAllBytes(tbFilename.Text);
+            int offset = Convert.ToInt32(tbOffset.Text, 16);
+            var bufferHelper = new BufferHelper(file, offset);
+            IList<byte> decoded = new List<byte>();
+            try
+            {
+                decoded = Codec.DecompressRLE(bufferHelper);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+            tbOutput.Text = HexToString(decoded);
+            Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
         }
     }
 }

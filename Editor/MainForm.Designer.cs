@@ -42,8 +42,8 @@
             this.lvTracks = new System.Windows.Forms.ListView();
             this.trackListMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.editTrackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pgTrack = new System.Windows.Forms.PropertyGrid();
             this.tabTrack = new System.Windows.Forms.TabPage();
-            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.tabMetaTiles = new System.Windows.Forms.TabPage();
             this.panelMetaTiles = new System.Windows.Forms.Panel();
             this.pbMetaTiles = new System.Windows.Forms.PictureBox();
@@ -53,12 +53,16 @@
             this.tabPalette = new System.Windows.Forms.TabPage();
             this.pbPalette = new System.Windows.Forms.PictureBox();
             this.tabRaw = new System.Windows.Forms.TabPage();
+            this.pbRaw = new System.Windows.Forms.PictureBox();
+            this.tbDelta = new System.Windows.Forms.TextBox();
+            this.btnDecodeRun = new System.Windows.Forms.Button();
             this.btnText = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.tbLog = new System.Windows.Forms.TextBox();
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
             this.cbLevelType = new System.Windows.Forms.ComboBox();
-            this.pgTrack = new System.Windows.Forms.PropertyGrid();
+            this.trackEditor = new MicroMachinesEditor.TrackEditor();
+            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -77,8 +81,10 @@
             this.tabPalette.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).BeginInit();
             this.tabRaw.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).BeginInit();
             this.tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.SuspendLayout();
             // 
             // tbFilename
@@ -99,7 +105,7 @@
             this.tbOffset.Name = "tbOffset";
             this.tbOffset.Size = new System.Drawing.Size(196, 31);
             this.tbOffset.TabIndex = 0;
-            this.tbOffset.Text = "3d901";
+            this.tbOffset.Text = "2fde0";
             // 
             // tbOutput
             // 
@@ -112,7 +118,7 @@
             this.tbOutput.Name = "tbOutput";
             this.tbOutput.ReadOnly = true;
             this.tbOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbOutput.Size = new System.Drawing.Size(1484, 437);
+            this.tbOutput.Size = new System.Drawing.Size(922, 437);
             this.tbOutput.TabIndex = 4;
             // 
             // btnDecode
@@ -141,7 +147,7 @@
             // toolStripStatusLabel1
             // 
             this.toolStripStatusLabel1.Name = "toolStripStatusLabel1";
-            this.toolStripStatusLabel1.Size = new System.Drawing.Size(80, 32);
+            this.toolStripStatusLabel1.Size = new System.Drawing.Size(79, 32);
             this.toolStripStatusLabel1.Text = "Ready";
             // 
             // btnSearch
@@ -177,11 +183,11 @@
             // tabTrackList
             // 
             this.tabTrackList.Controls.Add(this.splitContainer1);
-            this.tabTrackList.Location = new System.Drawing.Point(4, 34);
+            this.tabTrackList.Location = new System.Drawing.Point(8, 39);
             this.tabTrackList.Margin = new System.Windows.Forms.Padding(6);
             this.tabTrackList.Name = "tabTrackList";
             this.tabTrackList.Padding = new System.Windows.Forms.Padding(6);
-            this.tabTrackList.Size = new System.Drawing.Size(1520, 512);
+            this.tabTrackList.Size = new System.Drawing.Size(1512, 503);
             this.tabTrackList.TabIndex = 9;
             this.tabTrackList.Text = "Track list";
             this.tabTrackList.UseVisualStyleBackColor = true;
@@ -201,8 +207,8 @@
             // 
             this.splitContainer1.Panel2.Controls.Add(this.pgTrack);
             this.splitContainer1.Panel2MinSize = 100;
-            this.splitContainer1.Size = new System.Drawing.Size(1508, 500);
-            this.splitContainer1.SplitterDistance = 1211;
+            this.splitContainer1.Size = new System.Drawing.Size(1500, 491);
+            this.splitContainer1.SplitterDistance = 1203;
             this.splitContainer1.TabIndex = 2;
             // 
             // lvTracks
@@ -215,7 +221,7 @@
             this.lvTracks.MultiSelect = false;
             this.lvTracks.Name = "lvTracks";
             this.lvTracks.ShowGroups = false;
-            this.lvTracks.Size = new System.Drawing.Size(1211, 500);
+            this.lvTracks.Size = new System.Drawing.Size(1203, 491);
             this.lvTracks.TabIndex = 0;
             this.lvTracks.UseCompatibleStateImageBehavior = false;
             this.lvTracks.SelectedIndexChanged += new System.EventHandler(this.lvTracks_SelectedIndexChanged);
@@ -226,45 +232,46 @@
             this.trackListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.editTrackToolStripMenuItem});
             this.trackListMenu.Name = "trackListMenu";
-            this.trackListMenu.Size = new System.Drawing.Size(189, 40);
+            this.trackListMenu.Size = new System.Drawing.Size(214, 42);
             // 
             // editTrackToolStripMenuItem
             // 
             this.editTrackToolStripMenuItem.Name = "editTrackToolStripMenuItem";
-            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(188, 36);
+            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(213, 38);
             this.editTrackToolStripMenuItem.Text = "Edit track";
             this.editTrackToolStripMenuItem.Click += new System.EventHandler(this.editTrackToolStripMenuItem_Click);
+            // 
+            // pgTrack
+            // 
+            this.pgTrack.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pgTrack.Location = new System.Drawing.Point(0, 0);
+            this.pgTrack.Margin = new System.Windows.Forms.Padding(6);
+            this.pgTrack.Name = "pgTrack";
+            this.pgTrack.PropertySort = System.Windows.Forms.PropertySort.Alphabetical;
+            this.pgTrack.Size = new System.Drawing.Size(293, 491);
+            this.pgTrack.TabIndex = 1;
+            this.pgTrack.ToolbarVisible = false;
             // 
             // tabTrack
             // 
             this.tabTrack.Controls.Add(this.trackEditor);
-            this.tabTrack.Location = new System.Drawing.Point(4, 34);
+            this.tabTrack.Location = new System.Drawing.Point(8, 39);
             this.tabTrack.Margin = new System.Windows.Forms.Padding(6);
             this.tabTrack.Name = "tabTrack";
             this.tabTrack.Padding = new System.Windows.Forms.Padding(6);
-            this.tabTrack.Size = new System.Drawing.Size(1520, 512);
+            this.tabTrack.Size = new System.Drawing.Size(1512, 503);
             this.tabTrack.TabIndex = 4;
             this.tabTrack.Text = "Track";
             this.tabTrack.UseVisualStyleBackColor = true;
             // 
-            // trackEditor
-            // 
-            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.trackEditor.Location = new System.Drawing.Point(6, 6);
-            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
-            this.trackEditor.Name = "trackEditor";
-            this.trackEditor.Size = new System.Drawing.Size(1508, 500);
-            this.trackEditor.TabIndex = 0;
-            this.trackEditor.Track = null;
-            // 
             // tabMetaTiles
             // 
             this.tabMetaTiles.Controls.Add(this.panelMetaTiles);
-            this.tabMetaTiles.Location = new System.Drawing.Point(4, 34);
+            this.tabMetaTiles.Location = new System.Drawing.Point(8, 39);
             this.tabMetaTiles.Margin = new System.Windows.Forms.Padding(6);
             this.tabMetaTiles.Name = "tabMetaTiles";
             this.tabMetaTiles.Padding = new System.Windows.Forms.Padding(6);
-            this.tabMetaTiles.Size = new System.Drawing.Size(1520, 512);
+            this.tabMetaTiles.Size = new System.Drawing.Size(1512, 503);
             this.tabMetaTiles.TabIndex = 7;
             this.tabMetaTiles.Text = "Metatiles";
             this.tabMetaTiles.UseVisualStyleBackColor = true;
@@ -277,7 +284,7 @@
             this.panelMetaTiles.Location = new System.Drawing.Point(6, 6);
             this.panelMetaTiles.Margin = new System.Windows.Forms.Padding(6);
             this.panelMetaTiles.Name = "panelMetaTiles";
-            this.panelMetaTiles.Size = new System.Drawing.Size(1508, 500);
+            this.panelMetaTiles.Size = new System.Drawing.Size(1500, 491);
             this.panelMetaTiles.TabIndex = 4;
             // 
             // pbMetaTiles
@@ -293,11 +300,11 @@
             // tabTiles
             // 
             this.tabTiles.Controls.Add(this.panelTiles);
-            this.tabTiles.Location = new System.Drawing.Point(4, 34);
+            this.tabTiles.Location = new System.Drawing.Point(8, 39);
             this.tabTiles.Margin = new System.Windows.Forms.Padding(6);
             this.tabTiles.Name = "tabTiles";
             this.tabTiles.Padding = new System.Windows.Forms.Padding(6);
-            this.tabTiles.Size = new System.Drawing.Size(1520, 512);
+            this.tabTiles.Size = new System.Drawing.Size(1512, 503);
             this.tabTiles.TabIndex = 6;
             this.tabTiles.Text = "Tiles";
             this.tabTiles.UseVisualStyleBackColor = true;
@@ -310,7 +317,7 @@
             this.panelTiles.Location = new System.Drawing.Point(6, 6);
             this.panelTiles.Margin = new System.Windows.Forms.Padding(6);
             this.panelTiles.Name = "panelTiles";
-            this.panelTiles.Size = new System.Drawing.Size(1508, 500);
+            this.panelTiles.Size = new System.Drawing.Size(1500, 491);
             this.panelTiles.TabIndex = 3;
             // 
             // pbTiles
@@ -326,11 +333,11 @@
             // tabPalette
             // 
             this.tabPalette.Controls.Add(this.pbPalette);
-            this.tabPalette.Location = new System.Drawing.Point(4, 34);
+            this.tabPalette.Location = new System.Drawing.Point(8, 39);
             this.tabPalette.Margin = new System.Windows.Forms.Padding(6);
             this.tabPalette.Name = "tabPalette";
             this.tabPalette.Padding = new System.Windows.Forms.Padding(6);
-            this.tabPalette.Size = new System.Drawing.Size(1520, 512);
+            this.tabPalette.Size = new System.Drawing.Size(1512, 503);
             this.tabPalette.TabIndex = 5;
             this.tabPalette.Text = "Palette";
             this.tabPalette.UseVisualStyleBackColor = true;
@@ -341,7 +348,7 @@
             this.pbPalette.Location = new System.Drawing.Point(6, 6);
             this.pbPalette.Margin = new System.Windows.Forms.Padding(6);
             this.pbPalette.Name = "pbPalette";
-            this.pbPalette.Size = new System.Drawing.Size(1508, 96);
+            this.pbPalette.Size = new System.Drawing.Size(1500, 96);
             this.pbPalette.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pbPalette.TabIndex = 0;
             this.pbPalette.TabStop = false;
@@ -349,19 +356,53 @@
             // 
             // tabRaw
             // 
+            this.tabRaw.Controls.Add(this.numericUpDown1);
+            this.tabRaw.Controls.Add(this.pbRaw);
+            this.tabRaw.Controls.Add(this.tbDelta);
+            this.tabRaw.Controls.Add(this.btnDecodeRun);
             this.tabRaw.Controls.Add(this.btnText);
             this.tabRaw.Controls.Add(this.tbOffset);
             this.tabRaw.Controls.Add(this.btnSearch);
             this.tabRaw.Controls.Add(this.tbOutput);
             this.tabRaw.Controls.Add(this.btnDecode);
-            this.tabRaw.Location = new System.Drawing.Point(4, 34);
+            this.tabRaw.Location = new System.Drawing.Point(8, 39);
             this.tabRaw.Margin = new System.Windows.Forms.Padding(6);
             this.tabRaw.Name = "tabRaw";
             this.tabRaw.Padding = new System.Windows.Forms.Padding(6);
-            this.tabRaw.Size = new System.Drawing.Size(1520, 512);
+            this.tabRaw.Size = new System.Drawing.Size(1512, 503);
             this.tabRaw.TabIndex = 0;
             this.tabRaw.Text = "Raw";
             this.tabRaw.UseVisualStyleBackColor = true;
+            // 
+            // pbRaw
+            // 
+            this.pbRaw.Location = new System.Drawing.Point(946, 63);
+            this.pbRaw.Margin = new System.Windows.Forms.Padding(6);
+            this.pbRaw.Name = "pbRaw";
+            this.pbRaw.Size = new System.Drawing.Size(768, 768);
+            this.pbRaw.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pbRaw.TabIndex = 7;
+            this.pbRaw.TabStop = false;
+            // 
+            // tbDelta
+            // 
+            this.tbDelta.Location = new System.Drawing.Point(710, 12);
+            this.tbDelta.Margin = new System.Windows.Forms.Padding(6);
+            this.tbDelta.Name = "tbDelta";
+            this.tbDelta.Size = new System.Drawing.Size(196, 31);
+            this.tbDelta.TabIndex = 6;
+            this.tbDelta.Text = "tbDelta";
+            // 
+            // btnDecodeRun
+            // 
+            this.btnDecodeRun.Location = new System.Drawing.Point(918, 7);
+            this.btnDecodeRun.Margin = new System.Windows.Forms.Padding(6);
+            this.btnDecodeRun.Name = "btnDecodeRun";
+            this.btnDecodeRun.Size = new System.Drawing.Size(150, 44);
+            this.btnDecodeRun.TabIndex = 5;
+            this.btnDecodeRun.Text = "Decode RLE";
+            this.btnDecodeRun.UseVisualStyleBackColor = true;
+            this.btnDecodeRun.Click += new System.EventHandler(this.btnDecodeRun_Click);
             // 
             // btnText
             // 
@@ -377,10 +418,10 @@
             // tabPage1
             // 
             this.tabPage1.Controls.Add(this.tbLog);
-            this.tabPage1.Location = new System.Drawing.Point(4, 34);
+            this.tabPage1.Location = new System.Drawing.Point(8, 39);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(1520, 512);
+            this.tabPage1.Size = new System.Drawing.Size(1512, 503);
             this.tabPage1.TabIndex = 10;
             this.tabPage1.Text = "Log";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -395,7 +436,7 @@
             this.tbLog.Name = "tbLog";
             this.tbLog.ReadOnly = true;
             this.tbLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbLog.Size = new System.Drawing.Size(1514, 506);
+            this.tbLog.Size = new System.Drawing.Size(1506, 497);
             this.tbLog.TabIndex = 1;
             // 
             // nudStageIndex
@@ -432,16 +473,37 @@
             this.cbLevelType.TabIndex = 1;
             this.cbLevelType.SelectedIndexChanged += new System.EventHandler(this.TrackParametersChanged);
             // 
-            // pgTrack
+            // trackEditor
             // 
-            this.pgTrack.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pgTrack.Location = new System.Drawing.Point(0, 0);
-            this.pgTrack.Margin = new System.Windows.Forms.Padding(6);
-            this.pgTrack.Name = "pgTrack";
-            this.pgTrack.PropertySort = System.Windows.Forms.PropertySort.Alphabetical;
-            this.pgTrack.Size = new System.Drawing.Size(293, 500);
-            this.pgTrack.TabIndex = 1;
-            this.pgTrack.ToolbarVisible = false;
+            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.trackEditor.Location = new System.Drawing.Point(6, 6);
+            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
+            this.trackEditor.Name = "trackEditor";
+            this.trackEditor.Size = new System.Drawing.Size(1500, 491);
+            this.trackEditor.TabIndex = 0;
+            this.trackEditor.Track = null;
+            // 
+            // numericUpDown1
+            // 
+            this.numericUpDown1.Location = new System.Drawing.Point(1097, 19);
+            this.numericUpDown1.Maximum = new decimal(new int[] {
+            4,
+            0,
+            0,
+            0});
+            this.numericUpDown1.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+            this.numericUpDown1.Name = "numericUpDown1";
+            this.numericUpDown1.Size = new System.Drawing.Size(120, 31);
+            this.numericUpDown1.TabIndex = 8;
+            this.numericUpDown1.Value = new decimal(new int[] {
+            3,
+            0,
+            0,
+            0});
             // 
             // MainForm
             // 
@@ -479,9 +541,11 @@
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).EndInit();
             this.tabRaw.ResumeLayout(false);
             this.tabRaw.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).EndInit();
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -519,6 +583,10 @@
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TextBox tbLog;
         private System.Windows.Forms.PropertyGrid pgTrack;
+        private System.Windows.Forms.Button btnDecodeRun;
+        private System.Windows.Forms.TextBox tbDelta;
+        private System.Windows.Forms.PictureBox pbRaw;
+        private System.Windows.Forms.NumericUpDown numericUpDown1;
     }
 }
 

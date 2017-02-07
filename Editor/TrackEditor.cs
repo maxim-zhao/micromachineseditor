@@ -6,7 +6,7 @@ namespace MicroMachinesEditor
 {
     public partial class TrackEditor : UserControl
     {
-        private Track track;
+        private Track _track;
 
         public TrackEditor()
         {
@@ -17,11 +17,11 @@ namespace MicroMachinesEditor
         {
             get
             {
-                return track;
+                return _track;
             }
             set
             {
-                track = value;
+                _track = value;
                 if (value == null)
                 {
                     trackRenderer.TrackLayout = null;
@@ -30,34 +30,34 @@ namespace MicroMachinesEditor
                 }
                 else
                 {
-                    trackRenderer.TrackLayout = track.Layout;
-                    trackRenderer.MetaTiles = track.MetaTiles;
-                    metaTileSelector.MetaTiles = track.MetaTiles;
+                    trackRenderer.TrackLayout = _track.Layout;
+                    trackRenderer.MetaTiles = _track.MetaTiles;
+                    metaTileSelector.MetaTiles = _track.MetaTiles;
                 }
             }
         }
 
         private void btnTrackRotateUp_Click(object sender, EventArgs e)
         {
-            track.Layout.Rotate(0, -1);
+            _track.Layout.Rotate(0, -1);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateDown_Click(object sender, EventArgs e)
         {
-            track.Layout.Rotate(0, +1);
+            _track.Layout.Rotate(0, +1);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateLeft_Click(object sender, EventArgs e)
         {
-            track.Layout.Rotate(-1, 0);
+            _track.Layout.Rotate(-1, 0);
             trackRenderer.Invalidate();
         }
 
         private void btnTrackRotateRight_Click(object sender, EventArgs e)
         {
-            track.Layout.Rotate(+1, 0);
+            _track.Layout.Rotate(+1, 0);
             trackRenderer.Invalidate();
         }
 
@@ -70,7 +70,7 @@ namespace MicroMachinesEditor
                 MessageBoxIcon.Question,
                 MessageBoxDefaultButton.Button2) == DialogResult.Yes)
             {
-                track.Layout.Blank(metaTileSelector.SelectedMetaTileIndex);
+                _track.Layout.Blank(metaTileSelector.SelectedMetaTileIndex);
                 trackRenderer.Invalidate();
             }
         }
@@ -98,7 +98,7 @@ namespace MicroMachinesEditor
 
         private void EyeDropper(Point p)
         {
-            if (track == null)
+            if (_track == null)
             {
                 return;
             }
@@ -109,7 +109,7 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            int indexUnderMouse = track.Layout.TileIndexAt(x, y);
+            int indexUnderMouse = _track.Layout.TileIndexAt(x, y);
             metaTileSelector.SelectedMetaTileIndex = indexUnderMouse;
         }
 
@@ -119,11 +119,15 @@ namespace MicroMachinesEditor
             {
                 SetMetaTile(e.Location);
             }
+            // Convert to tile coordinates
+            int x = e.Location.X / 96;
+            int y = e.Location.Y / 96;
+            mouseLocation.Text = $"{x}, {y} @ ${x + y * 32:X} = ${_track.Layout.TileIndexAt(x, y):X}";
         }
 
         private void SetMetaTile(Point p)
         {
-            if (track == null)
+            if (_track == null)
             {
                 return;
             }
@@ -139,12 +143,12 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            int existingIndex = track.Layout.TileIndexAt(x, y);
+            int existingIndex = _track.Layout.TileIndexAt(x, y);
             if (existingIndex == metaTileIndex)
             {
                 return;
             }
-            track.Layout.SetTileIndex(x, y, (byte)metaTileIndex);
+            _track.Layout.SetTileIndex(x, y, (byte)metaTileIndex);
             Rectangle tileRect = new Rectangle(x * 96, y * 96, 96, 96);
             trackRenderer.Invalidate(tileRect);
         }
