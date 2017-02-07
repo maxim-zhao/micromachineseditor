@@ -4,6 +4,12 @@
 .define PORT_VDP_DATA $be
 .define PORT_VDP_LINECOUNTER $7e
 .define PORT_PSG $7e
+.define PORT_CONTROL_A $dc
+.define PORT_CONTROL_B $dd
+.define PORT_GG_START $00 ; also region
+.define PORT_GG_LinkSend $03
+.define PORT_GG_LinkReceive $04
+.define PORT_GG_LinkStatus $05
 
 .enum $80 ; VDP registers
 VDP_REGISTER_MODECONTROL1 db
@@ -19,6 +25,10 @@ VDP_REGISTER_YSCROLL db
 VDP_REGISTER_LINEINTERRUPTCOUNTER db
 .ende
 
+; Control port masks
+.define PORT_CONTROL_A_PLAYER1_MASK %00111111
+.define PORT_GG_START_MASK %10000000
+
 ; Codemasters mapper
 .define PAGING_REGISTER_Slot0 $0000
 .define PAGING_REGISTER_Slot1 $4000
@@ -32,7 +42,18 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
 .endm
 
 .macro GGCOLOUR args hex
-; %rrr-----ggg-----bbb-----
-;          -> %0bbb0ggg0rrr
-.dw ((hex >> 21) & %000000111) | ((hex >> 9) & %000111000) | ((hex << 3) & %111000000)
+; %rrrr----gggg----bbbb----
+;          -> %bbbbggggrrrr
+.dw ((hex >> 20) & %000001111) | ((hex >> 8) & %11110000) | ((hex << 4) & %111100000000)
 .endm
+
+.define VDP_WRITE_MASK $4000
+.define NAME_TABLE_ADDRESS $3700 ; Extended height mode!
+.define SPRITE_TABLE_ADDRESS $3f00
+
+.define TILE_DATA_SIZE 8*8*4/8 ; 8x8 pixels at 4bpp
+.define TILEMAP_ENTRY_SIZE 2
+.define TILEMAP_WIDTH 32
+.define TILEMAP_HEIGHT 28
+.define TILEMAP_ROW_SIZE TILEMAP_WIDTH * TILEMAP_ENTRY_SIZE
+.define TILEMAP_SIZE TILEMAP_ROW_SIZE * TILEMAP_HEIGHT

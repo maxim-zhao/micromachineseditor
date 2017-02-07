@@ -31,6 +31,7 @@ TT_Warriors     db ; 5
 TT_Tanks        db ; 6
 TT_RuffTrux     db ; 7
 TT_Helicopters  db ; 8 - Incomplete support
+TT_Unknown9       db ; 9 - for portrait drawing only?
 .ende
 
 .define BUTTON_U_MASK %00000001
@@ -71,12 +72,13 @@ MenuScreen_OnePlayerMode      db ; 13 Challenge or Head to Head
 .ende
 
 ; ASCII mapping for menu screen text
+.define BLANK_TILE_INDEX = $0e
 .asciitable
 map "A" to "N" = $00
 map "O" = $1a
 map "P" to "Z" = $0f
 map "0" to "9" = $1a
-map " " = $0e
+map " " = BLANK_TILE_INDEX
 map "!" = $B4
 map "-" = $B5
 map "?" = $B6
@@ -113,6 +115,64 @@ map "?" = $B6
   ld (PAGING_REGISTER), a
 .endm
 
+.macro TilemapWriteAddressToHL args x, y
+  ld hl, VDP_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
+.endm
+
+.macro TilemapWriteAddressToDE args x, y
+  ld de, VDP_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
+.endm
+
+.macro TilemapWriteAddressToBC args x, y
+  ld bc, VDP_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
+.endm
+
+.macro TilemapWriteAddressData args x, y
+.dw VDP_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
+.endm
+
+.macro TileWriteAddressToHL args index
+  ld hl, VDP_WRITE_MASK | (index * 32)
+.endm
+
+.macro TileWriteAddressData args index
+.dw VDP_WRITE_MASK | (index * 32)
+.endm
+
+.macro SetVRAMAddressImmediate args address
+  ld a, <address
+  out (PORT_VDP_ADDRESS), a
+  ld a, >address
+  out (PORT_VDP_ADDRESS), a
+.endm
+
+.macro SetPaletteAddressImmediateSMS args index
+  SetVRAMAddressImmediate index + $c000
+.endm
+
+.macro SetPaletteAddressImmediateGG args index
+  SetVRAMAddressImmediate index*2 + $c000
+.endm
+
+.macro EmitDataToVDPImmediate8 args data
+  ld a, \1
+  out (PORT_VDP_DATA), a
+.endm
+
+.macro EmitDataToVDPImmediate16 args data
+  EmitDataToVDPImmediate8 <\1
+  EmitDataToVDPImmediate8 >\1
+.endm
+
+.macro EmitSMSColourImmediate args hex
+  EmitDataToVDPImmediate8 ((hex >> 22) & %000011) | ((hex >> 12) & %001100) | ((hex >> 2) & %110000)
+.endm
+
+.macro EmitGGColourImmediate args hex
+  EmitDataToVDPImmediate16 ((hex >> 20) & %000001111) | ((hex >> 8) & %001111000) | ((hex << 4) & %111100000000)
+.endm
+
+; Structs for RAM arrays
 .struct WallDataMetaTile
 bits dsb 12*12/8 ; 12*12 bits = 18 bytes
 .endst
@@ -121,26 +181,37 @@ bits dsb 12*12/8 ; 12*12 bits = 18 bytes
 bytes dsb 6*6 ; 6*6 bytes
 .endst
 
+.struct SpriteXN
+x db
+n db
+.endst
+
+.struct SpriteY
+y db
+.endst
+
+; Word with addressable bytes
+.struct Word
+Lo db
+Hi db
+.endst
+
 .enum $C000 export
 _RAM_C000_StartOfRam .db
 _RAM_C000_DecompressionTemporaryBuffer .db ; $800?
 _RAM_C000_LevelLayout dsb 32 * 32 ; 32x32 metatiles
 _RAM_C400_TrackIndexes dsb 32 * 32 ; 32x32 metatile track indexes
-_RAM_C800_WallData dsb 64 * _sizeof_WallDataMetaTile ; 64 tiles of 12x12 bits
-_RAM_CC80_BehaviourData dsb 64 * _sizeof_BehaviourDataMetaTile ; 64 tiles of 6x6 bytes
+_RAM_C800_WallData instanceof WallDataMetaTile 64 ; 64 tiles of 12x12 bits
+_RAM_CC80_BehaviourData instanceof BehaviourDataMetaTile 64 ; 64 tiles of 6x6 bytes
 
-_RAM_D580_ db
+_RAM_D580_WaitingForGameVBlank db
 _RAM_D581_ db
 _RAM_D582_ db
 _RAM_D583_ db
-.ende
-
-.enum $D585 export
+_RAM_D584_ db ; unused?
 _RAM_D585_ dw
 _RAM_D587_ db
-.ende
-
-.enum $D589 export
+_RAM_D588_ db ; unused?
 _RAM_D589_ db
 _RAM_D58A_ db
 _RAM_D58B_ db
@@ -154,13 +225,11 @@ _RAM_D594_ db
 _RAM_D595_ db
 _RAM_D596_ db
 _RAM_D597_ db
-.ende
-
-.enum $D599 export
+_RAM_D598_ db ; unused?
 _RAM_D599_IsPaused db
 _RAM_D59A_ db
 _RAM_D59B_ db
-_RAM_D59C_ db
+_RAM_D59C_GGStartButtonValue db
 _RAM_D59D_ db
 _RAM_D59E_ db
 _RAM_D59F_ dw
@@ -173,14 +242,10 @@ _RAM_D5A7_ db
 _RAM_D5A8_ db
 _RAM_D5A9_ dw
 _RAM_D5AB_ db
-.ende
-
-.enum $D5B0 export
+_RAM_D5AC_ dsb 4 ; unused?
 _RAM_D5B0_ db
-.ende
-
-.enum $D5B5 export
-_RAM_D5B5_ db
+_RAM_D5B1_ dsb 4 ; unused?
+_RAM_D5B5_EnableGameVBlank db
 _RAM_D5B6_ db
 _RAM_D5B7_ db
 _RAM_D5B8_ db
@@ -205,14 +270,10 @@ _RAM_D5CA_ db
 _RAM_D5CB_ db
 _RAM_D5CC_ db
 _RAM_D5CD_CarIsSkidding db
-.ende
-
-.enum $D5CF export
+_RAM_D5CE_ db ; unused?
 _RAM_D5CF_ db
 _RAM_D5D0_ db
-.ende
-
-.enum $D5D2 export
+_RAM_D5D1_ db ; unused?
 _RAM_D5D2_ db
 _RAM_D5D3_ db
 _RAM_D5D4_ db
@@ -221,48 +282,37 @@ _RAM_D5D6_ db
 _RAM_D5D7_ db
 _RAM_D5D8_ db
 _RAM_D5D9_ db
-.ende
-
-.enum $D5DC export
+_RAM_D5DA_ dsb 2 ; unused?
 _RAM_D5DC_ db
 _RAM_D5DD_ db
 _RAM_D5DE_ db
 _RAM_D5DF_ db
 _RAM_D5E0_ db
-.ende
-
-.enum $D640 export
+_RAM_D5E1_ dsb 95 ; unused?
 _RAM_D640_RamCodeLoader dsb 17
-.ende
-
-.enum $D680 export
+_RAM_D652_ dsb 47 ; unused?
+_RAM_D680_MenuRamStart .db
 _RAM_D680_Player1Controls_Menus db
 _RAM_D681_Player2Controls_Menus db
-.ende
-
-.enum $D687 export
+_RAM_D682_ dsb 5 ; unused?
 _RAM_D687_Player1Controls_PreviousFrame db
 _RAM_D688_ db
-.ende
-
-.enum $D68A export
+_RAM_D689_ db ; unused?
 _RAM_D68A_TilemapRectangleSequence_TileIndex db
-_RAM_D68B_ db
+_RAM_D68B_TilemapRectangleSequence_Row db
 _RAM_D68C_ db
 _RAM_D68D_ db
 _RAM_D68E_ db
 _RAM_D68F_ db
 _RAM_D690_ db
-_RAM_D691_ db
+_RAM_D691_TrackType db
 _RAM_D692_ db
 _RAM_D693_ db
 _RAM_D694_ db
 _RAM_D695_ db
 _RAM_D696_ db
 _RAM_D697_ db
-.ende
-
-.enum $D699 export
+_RAM_D698_ db ; unused?
 _RAM_D699_MenuScreenIndex db
 _RAM_D69A_TilemapRectangleSequence_Width db
 _RAM_D69B_TilemapRectangleSequence_Height db
@@ -270,14 +320,14 @@ _RAM_D69C_TilemapRectangleSequence_Flags db
 _RAM_D69D_EmitTilemapRectangle_Width db
 _RAM_D69E_EmitTilemapRectangle_Height db
 _RAM_D69F_EmitTilemapRectangle_IndexOffset db
-_RAM_D6A0_ db
+_RAM_D6A0_MenuSelection db
 _RAM_D6A1_ db
 _RAM_D6A2_ db
 _RAM_D6A3_ db
 _RAM_D6A4_ db
 _RAM_D6A5_ db
 _RAM_D6A6_DisplayCase_Source dw
-_RAM_D6A8_ dw
+_RAM_D6A8_DisplayCaseTileAddress dw
 _RAM_D6AA_ db
 _RAM_D6AB_ db
 _RAM_D6AC_ db
@@ -286,9 +336,7 @@ _RAM_D6AE_ db
 _RAM_D6AF_ db
 _RAM_D6B0_ db
 _RAM_D6B1_ db
-.ende
-
-.enum $D6B4 export
+_RAM_D6B2_ dsb 2 ; unused?
 _RAM_D6B4_ db
 _RAM_D6B5_ db
 _RAM_D6B6_ db
@@ -304,7 +352,7 @@ _RAM_D6C1_ db
 _RAM_D6C2_DisplayCase_FlashingCarIndex db
 _RAM_D6C3_ db
 _RAM_D6C4_ db ; Per-course value, usually -1, sometimes 0, 1, 2
-_RAM_D6C5_ db
+_RAM_D6C5_PaletteFadeIndex db
 _RAM_D6C6_ db
 _RAM_D6C7_ db
 _RAM_D6C8_ db
@@ -315,62 +363,56 @@ _RAM_D6CC_ db
 _RAM_D6CD_ db
 _RAM_D6CE_ db
 _RAM_D6CF_ db
-_RAM_D6D0_TitleScreenCheatCodeCounterHardMode db
+_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect db
 _RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen db ; Used for "debouncing"
 _RAM_D6D2_Unused db
 _RAM_D6D3_VBlankDone db
 _RAM_D6D4_ db
-_RAM_D6D5_ db
+_RAM_D6D5_InGame db
 _RAM_D6D6_ db
-.ende
-
-.enum $D6E1 export
+_RAM_D6D7_ dsb 10 ; unused?
+_RAM_D6E1_SpriteData .db
 _RAM_D6E1_SpriteX dsb 32
 _RAM_D701_SpriteN dsb 32
 _RAM_D721_SpriteY dsb 32
 _RAM_D741_RAMDecompressorPageIndex db
 _RAM_D742_VBlankSavedPageIndex db
-.ende
-
-.enum $D744 export
+_RAM_D743_ReadPagedByteTemp db
 _RAM_D744_ db
-.ende
-
-.enum $D74D export
+_RAM_D745_ dsb 8 ; unused?
 _RAM_D74D_ db
-.ende
-
-.enum $D769 export
+_RAM_D74E_ dsb 27 ; unused?
 _RAM_D769_ db
-.ende
-
-.enum $D772 export
+_RAM_D76A_ dsb 8 ; unused?
 _RAM_D772_ db
-.ende
-
-.enum $D78E export
+_RAM_D773_ dsb 27 ; unused?
 _RAM_D78E_ db
-.ende
-
-.enum $D797 export
+_RAM_D78F_ dsb 8 ; unused?
 _RAM_D797_ db
-.ende
-
-.enum $D7B3 export
+_RAM_D798_ dsb 27 ; unused?
 _RAM_D7B3_ db
 _RAM_D7B4_ db
-_RAM_D7B5_DecompressorSource db
-_RAM_D7B6_ db
+_RAM_D7B5_DecompressorSource dw
 _RAM_D7B7_ db
 _RAM_D7B8_ db
 _RAM_D7B9_ db
-_RAM_D7BA_ db
+_RAM_D7BA_HardModeTextFlashCounter db
 _RAM_D7BB_ db
+_RAM_D7BB_MenuRamEnd .db
+_RAM_D7BC_ db ; unused?
+_RAM_D7BD_RamCode dsb $392 ; runs over the next bit, needs more labels?
 .ende
 
-.enum $D7BD export
-_RAM_D7BD_RamCode dsb $392
-.ende
+; These macros allow us to call into RAM code from the above address
+.macro CallRamCode args address
+  call address+_RAM_D7BD_RamCode-_LABEL_3B97D_RamCodeStart
+.endm
+.macro JumpToRamCode args address
+  jp address+_RAM_D7BD_RamCode-_LABEL_3B97D_RamCodeStart
+.endm
+.macro CallRamCodeIfZFlag args address
+  call z, address+_RAM_D7BD_RamCode-_LABEL_3B97D_RamCodeStart
+.endm
 
 .enum $D800 export
 _RAM_D800_TileHighBytes dsb 256
@@ -385,17 +427,13 @@ _RAM_D912_ db
 _RAM_D913_ db
 _RAM_D914_ db
 _RAM_D915_ db
-_RAM_D916_ db
-_RAM_D917_ db
-_RAM_D918_ db
+_RAM_D916_MenuSound_ db
+_RAM_D917_MenuSound_ db
+_RAM_D918_MenuSound_ db
 _RAM_D919_ db
-_RAM_D91A_ dw
-_RAM_D91C_ db
+_RAM_D91A_MenuSoundData dsb 15
 .ende
 
-.enum $D91E export
-_RAM_D91E_ db
-.ende
 
 .enum $D920 export
 _RAM_D920_ db
@@ -406,9 +444,9 @@ _RAM_D924_ db
 .ende
 
 .enum $D929 export
-_RAM_D929_ dw
-_RAM_D92B_ db
-_RAM_D92C_ db
+_RAM_D929_MenuSound_ dw
+_RAM_D92B_MenuSound_ db
+_RAM_D92C_MenuSound_ db
 _RAM_D92D_ dw
 _RAM_D92F_ db
 _RAM_D930_ db
@@ -425,15 +463,6 @@ _RAM_D948_ db
 _RAM_D949_ db
 _RAM_D94A_ db
 .ende
-
-.struct SpriteXN
-x db
-n db
-.endst
-
-.struct SpriteY
-y db
-.endst
 
 .enum $D94C export
 _RAM_D94C_SoundData .db ; 51 bytes total, up to $d97f? It's initialised but not all used?
@@ -528,9 +557,6 @@ _RAM_DB83_ db
 _RAM_DB84_ db
 _RAM_DB85_ db
 _RAM_DB86_HandlingData dsb 16 ; ??? Related to skidding, thresholds when turning?
-.ende
-
-.enum $DB96 export
 _RAM_DB96_TrackIndexForThisType db
 _RAM_DB97_TrackType db
 _RAM_DB98_TopSpeed db
@@ -539,9 +565,7 @@ _RAM_DB9A_DecelerationDelay db
 _RAM_DB9B_SteeringDelay db
 _RAM_DB9C_ dw
 _RAM_DB9E_ db
-.ende
-
-.enum $DBA0 export
+_RAM_DB9F_ db ; unused?
 _RAM_DBA0_ dw
 _RAM_DBA2_ dw
 _RAM_DBA4_ db
@@ -569,13 +593,8 @@ _RAM_DBBB_ db
 _RAM_DBBC_ db
 _RAM_DBBD_ db
 _RAM_DBBE_ db
-.ende
-
-.enum $DBC0 export
-_RAM_DBC0_EnterGameTrampoline db
-.ende
-
-.enum $DBCD export
+_RAM_DBBF_ db ; unused?
+_RAM_DBC0_EnterGameTrampoline dsb 13
 _RAM_DBCD_MenuIndex db
 _RAM_DBCE_ db
 _RAM_DBCF_LastRacePosition db
@@ -589,36 +608,19 @@ _RAM_DBD6_ db
 _RAM_DBD7_ db
 _RAM_DBD8_CourseSelectIndex db
 _RAM_DBD9_DisplayCaseData dsb $18 ; includes the following three labels; 0 = blank, 1 = filled, 2 = flashing
-.ende
-
-.enum $DBE8 export
-_RAM_DBE8_ db
-.ende
-
-.enum $DBEC export
-_RAM_DBEC_ db
-.ende
-
-.enum $DBF0 export
-_RAM_DBF0_ db
-.ende
-
-.enum $DBF6 export
-_RAM_DBF6_ db
-_RAM_DBF7_ db
-.ende
-
-.enum $DBF9 export
+_RAM_DBF1_RaceNumberText dsb 8
 _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
 _RAM_DBFD_ db
-_RAM_DBFE_ db
-.ende
-
-.enum $DC09 export
+_RAM_DBFE_ dsb 11
 _RAM_DC09_Lives db
 _RAM_DC0A_ db
+_RAM_DC0B_ db
+.ende
+
+.enum $DC16 export
+_RAM_DC16_ db
 .ende
 
 .enum $DC21 export
@@ -652,7 +654,7 @@ _RAM_DC42_GearToGear_IAmPlayer1 db
 .ende
 
 .enum $DC45 export
-_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect db ; Counts up correct keypresses
+_RAM_DC45_TitleScreenCheatCodeCounter_HardMode db ; Counts up correct keypresses
 _RAM_DC46_Cheat_HardMode db ; 0 = normal 1 = hard 2 = rock hard
 _RAM_DC47_GearToGear_OtherPlayerControls1 db
 _RAM_DC48_GearToGear_OtherPlayerControls2 db
@@ -666,85 +668,12 @@ _RAM_DC4F_Cheat_EasierOpponents db
 _RAM_DC50_Cheat_FasterVehicles db
 _RAM_DC51_PreviousCombinedByte db
 _RAM_DC52_PreviousCombinedByte2 db
-.ende
-
-.enum $DC54 export
+_RAM_DC52_ db ; unused?
 _RAM_DC54_IsGameGear db ; GG mode if 1, SMS mode if 0
 _RAM_DC55_CourseIndex db
-_RAM_DC56_ db ; 
+_RAM_DC56_ db ;
 _RAM_DC57_ dw
-_RAM_DC59_FloorTiles dsb 32*2
-.ende
-
-.enum $DC5B export
-_RAM_DC5B_ db
-.ende
-
-.enum $DC5F export
-_RAM_DC5F_ db
-.ende
-
-.enum $DC63 export
-_RAM_DC63_ db
-.ende
-
-.enum $DC67 export
-_RAM_DC67_ db
-.ende
-
-.enum $DC6B export
-_RAM_DC6B_ db
-.ende
-
-.enum $DC6F export
-_RAM_DC6F_ db
-.ende
-
-.enum $DC73 export
-_RAM_DC73_ db
-.ende
-
-.enum $DC77 export
-_RAM_DC77_ db
-.ende
-
-.enum $DC79 export
-_RAM_DC79_ db
-.ende
-
-.enum $DC7B export
-_RAM_DC7B_ db
-.ende
-
-.enum $DC7F export
-_RAM_DC7F_ db
-.ende
-
-.enum $DC83 export
-_RAM_DC83_ db
-.ende
-
-.enum $DC87 export
-_RAM_DC87_ db
-.ende
-
-.enum $DC8B export
-_RAM_DC8B_ db
-.ende
-
-.enum $DC8F export
-_RAM_DC8F_ db
-.ende
-
-.enum $DC93 export
-_RAM_DC93_ db
-.ende
-
-.enum $DC97 export
-_RAM_DC97_ db
-.ende
-
-.enum $DC99 export
+_RAM_DC59_FloorTiles dsb 32*2 ; 1bpp tile data
 _RAM_DC99_EnterMenuTrampoline dsb 18 ; Code in RAM
 _RAM_DCAB_ dw
 _RAM_DCAD_ dw
@@ -757,9 +686,7 @@ _RAM_DCB5_ db
 _RAM_DCB6_ db
 _RAM_DCB7_ db
 _RAM_DCB8_ db
-.ende
-
-.enum $DCBA export
+_RAM_DCB9_ db ; unused
 _RAM_DCBA_ db
 _RAM_DCBB_ db
 _RAM_DCBC_ db
@@ -1141,13 +1068,9 @@ _RAM_DE59_ db
 _RAM_DE5C_ db
 _RAM_DE5D_ db
 _RAM_DE5E_ db
-.ende
-
-.enum $DE60 export
+_RAM_DE5F_ db
 _RAM_DE60_ db
-.ende
-
-.enum $DE62 export
+_RAM_DE61_ db
 _RAM_DE62_ db
 .ende
 
@@ -1231,7 +1154,7 @@ _RAM_DEAD_ db
 _RAM_DEAE_ db
 _RAM_DEAF_ db
 _RAM_DEB0_ db
-_RAM_DEB1_ db
+_RAM_DEB1_VScrollDelta db
 _RAM_DEB2_ db
 _RAM_DEB3_ db
 _RAM_DEB4_ db
@@ -1242,12 +1165,11 @@ _RAM_DEB8_ db
 _RAM_DEB9_ db
 _RAM_DEBA_ db
 _RAM_DEBB_ db
-_RAM_DEBC_ db
+_RAM_DEBC_TileDataIndex db
 _RAM_DEBD_ db
 _RAM_DEBE_ db
 _RAM_DEBF_ dw
-_RAM_DEC1_VRAMAddressLo db
-_RAM_DEC2_VRAMAddressHi db
+_RAM_DEC1_VRAMAddress instanceof Word
 _RAM_DEC3_ db
 _RAM_DEC4_ db
 _RAM_DEC5_ db
@@ -1367,10 +1289,7 @@ _RAM_DF2A_ db
 _RAM_DF2B_ db
 _RAM_DF2C_ db
 _RAM_DF2D_ db
-_RAM_DF2E_ db
-.ende
-
-.enum $DF37 export
+_RAM_DF2E_ dsb 9 ;Data copied from _DATA_A7F_GG or _DATA_A6D_SMS
 _RAM_DF37_ db
 _RAM_DF38_ db
 .ende
@@ -1380,7 +1299,7 @@ _RAM_DF3C_ db
 _RAM_DF3D_ db
 _RAM_DF3E_ db
 _RAM_DF3F_ db
-_RAM_DF40_ db
+_RAM_DF40_ dsb 9 ; Data copied from _DATA_A88_GG or _DATA_A76_SMS
 .ende
 
 .enum $DF4F export
@@ -1454,16 +1373,12 @@ _RAM_DF96_ db
 _RAM_DF97_ db
 _RAM_DF98_CarTileLoaderCounter db
 _RAM_DF99_ db
-.ende
-
-.enum $EF00 export
-_RAM_EF00_ dw
+_RAM_DF9A_EndOfRAM .db
 .ende
 
 .BANK 0 SLOT 0
 .ORG $0000
 
-_LABEL_0_:
   di
   ld hl, STACK_TOP
   ld sp, hl
@@ -1474,7 +1389,7 @@ _LABEL_0_:
   ld (PAGING_REGISTER), a
   jp _LABEL_8000_Main
 
-_LABEL_14_EnterMenus: 
+_LABEL_14_EnterMenus:
   ; Code jumps here when transitioning from game to menus
   di
   ld a, :_LABEL_8021_MenuScreenEntryPoint
@@ -1502,7 +1417,7 @@ _LABEL_38_:
 
 +:
   pop af
-  jp $D931  ; Code is loaded from _LABEL_3BAF1_MenusVBlank
+  JumpToRamCode _LABEL_3BAF1_MenusVBlank
 
 ++:
   pop af
@@ -1521,7 +1436,7 @@ _LABEL_66_NMI:
     jp _LABEL_517F_NMI_SMS
 
 ; Data from 71 to 74 (4 bytes)
-.db "9),A" ; Source code left in RAM 
+.db "9),A" ; Source code left in RAM
 
 ; Executed in RAM at dbc0
 _LABEL_75_EnterGameTrampolineImpl:
@@ -1533,10 +1448,12 @@ _LABEL_75_EnterGameTrampolineImpl:
 
 ; Data from 82 to 95 (20 bytes)
 ; Copied to $dbcd onwards
-; This initialises a bunch of stuff... TODO (some seems wrong, is it initialised later?)
-.db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+; This initialises a bunch of stuff...
+; _RAM_DBCD_MenuIndex onwards
+.db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00
+; _RAM_DBD9_DisplayCaseData
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+; _RAM_DBF1_RaceNumberText
 .asc "RACE 01-" ;.db $11 $00 $02 $04 $0E $1A $1B $B5
 ; End stuff copied to RAM
 
@@ -1550,18 +1467,22 @@ _LABEL_AE_EnterMenuTrampolineImpl:
   ld hl, STACK_TOP
   ld sp, hl
   jp _LABEL_8000_Main
+_LABEL_AE_EnterMenuTrampolineImplEnd:
 
 ; Data from C0 to FF (64 bytes)
 _DATA_C0_FloorTilesRawTileData:
-.db $00 $00 $FF $00 $00 $00 $FF $00 $00 $00 $FF $00 $00 $00 $FF $00
-.db $00 $00 $FF $00 $00 $00 $FF $00 $00 $00 $FF $00 $00 $00 $FF $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+.repeat 8
+.db $00 $00 $FF $00
+.endr
+.repeat 8
+.db $00 $00 $00 $00
+.endr
+_DATA_C0_FloorTilesRawTileDataEnd:
 
 _LABEL_100_Startup:
   ; Blank RAM
   ld hl, _RAM_C000_StartOfRam
-  ld bc, $1F9A ; Not all of it (!)
+  ld bc, _RAM_DF9A_EndOfRAM - _RAM_C000_StartOfRam ; $1F9A ; Not all of it - but exactly what we use
 -:xor a
   ld (hl), a
   inc hl
@@ -1569,10 +1490,10 @@ _LABEL_100_Startup:
   ld a, b
   or c
   jr nz, -
-  
+
   ; Load trampolines to RAM
   ld hl, _RAM_DBC0_EnterGameTrampoline
-  ld de, _LABEL_75_EnterGameTrampolineImpl  ; Loading Code into RAM
+  ld de, _LABEL_75_EnterGameTrampolineImpl  ; Loading Code and data into RAM
   ld bc, $0039
 -:ld a, (de)
   ld (hl), a
@@ -1582,12 +1503,12 @@ _LABEL_100_Startup:
   ld a, b
   or c
   jr nz, -
-  
+
   call _LABEL_173_LoadEnterMenuTrampolineToRAM
-  
+
   ld hl, _RAM_DC59_FloorTiles ; Fill floor tiles buffer with data
   ld de, _DATA_C0_FloorTilesRawTileData
-  ld bc, $0040
+  ld bc, _DATA_C0_FloorTilesRawTileDataEnd - _DATA_C0_FloorTilesRawTileData
 -:ld a, (de)
   ld (hl), a
   inc hl
@@ -1596,7 +1517,7 @@ _LABEL_100_Startup:
   ld a, b
   or c
   jr nz, -
-  
+
   call _LABEL_186_InitialiseSoundData
   ; More RAM initialisation
   ld a, $01
@@ -1604,9 +1525,9 @@ _LABEL_100_Startup:
   ld a, $20
   ld (_RAM_DB9C_), a
   ld (_RAM_DB9E_), a
-  ld hl, $DB22
+  ld hl, _RAM_DB22_
   ld (_RAM_DB62_), hl
-  ld hl, $DB42
+  ld hl, _RAM_DB42_
   ld (_RAM_DB64_), hl
   ld a, $1A
   ld (_RAM_DC39_), a
@@ -1626,12 +1547,12 @@ _LABEL_156_:
 ++:ret
 
 _LABEL_173_LoadEnterMenuTrampolineToRAM:
-  ; Copy some data to RAM
+  ; Copy some code to RAM
   ld hl, _RAM_DC99_EnterMenuTrampoline
   ld de, _LABEL_AE_EnterMenuTrampolineImpl
-  ld bc, $0012
--:
-  ld a, (de)
+  ld bc, _LABEL_AE_EnterMenuTrampolineImplEnd - _LABEL_AE_EnterMenuTrampolineImpl
+  ; Could ldir
+-:ld a, (de)
   ld (hl), a
   inc hl
   inc de
@@ -1642,7 +1563,7 @@ _LABEL_173_LoadEnterMenuTrampolineToRAM:
   ret
 
 _LABEL_186_InitialiseSoundData:
-  ld hl, _RAM_D94C_Sound1Channel0Volume
+  ld hl, _RAM_D94C_SoundData
   ld de, _DATA_650C_SoundInitialisationData
   ld bc, _DATA_650C_SoundInitialisationData_End - _DATA_650C_SoundInitialisationData
 -:ld a, (de)
@@ -1659,29 +1580,29 @@ _LABEL_199_GameVBlank:
   push af
     ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
     or a
-    jr nz, _LABEL_1E0_
+    jr nz, _LABEL_1E0_SkipVBlank
     push hl
     push bc
     push de
     push ix
     push iy
-      ld a, (_DATA_BFFF_Value02)
+      ld a, (_DATA_BFFF_Page2PageNumber)
       push af
-        ld a, (_RAM_D5B5_)
+        ld a, (_RAM_D5B5_EnableGameVBlank)
         or a
         jr z, +
         xor a
-        ld (_RAM_D580_), a
-        call _LABEL_33A_
+        ld (_RAM_D580_WaitingForGameVBlank), a
+        call _LABEL_33A_GameVBlankVDPWork
         ld a, (_RAM_DC41_GearToGearActive)
         or a
         jr nz, +
         ld a, (_RAM_D599_IsPaused)
         or a
         jr nz, +
-        call _LABEL_5169_
-        call _LABEL_5174_
-        CallPagedFunction _LABEL_2B5D2_
+        call _LABEL_5169_GameVBlankEngineUpdateTrampoline
+        call _LABEL_5174_GameVBlankPart3Trampoline
+        CallPagedFunction _LABEL_2B5D2_GameVBlankUpdateSoundTrampoline
 +:
       pop af
       ld (PAGING_REGISTER), a
@@ -1690,7 +1611,7 @@ _LABEL_199_GameVBlank:
     pop de
     pop bc
     pop hl
-_LABEL_1E0_:
+_LABEL_1E0_SkipVBlank:
     in a, (PORT_VDP_STATUS) ; Ack INT
   pop af
   ret
@@ -1775,7 +1696,7 @@ _LABEL_29D_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, +
-  in a, (PORT_PSG)
+  in a, (PORT_VDP_LINECOUNTER)
   cp $B8
   jr nc, _LABEL_315_
 +:
@@ -1788,10 +1709,10 @@ _LABEL_29D_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr z, +
-  call _LABEL_5169_
-  call _LABEL_5174_
+  call _LABEL_5169_GameVBlankEngineUpdateTrampoline
+  call _LABEL_5174_GameVBlankPart3Trampoline
   call _LABEL_318_
-  CallPagedFunction _LABEL_2B5D2_
+  CallPagedFunction _LABEL_2B5D2_GameVBlankUpdateSoundTrampoline
   call _LABEL_318_
 +:
   call _LABEL_BF0_UpdateFloorTiles
@@ -1821,12 +1742,12 @@ _LABEL_318_:
   ld a, (_RAM_D5D7_)
   or a
   ret nz
-  in a, (PORT_PSG)
+  in a, (PORT_VDP_LINECOUNTER)
   cp $B8
   jr c, + ; ret
   cp $F0
   jr nc, + ; ret
-  call _LABEL_33A_
+  call _LABEL_33A_GameVBlankVDPWork
   ld a, $01
   ld (_RAM_D5D7_), a
 +:
@@ -1837,14 +1758,14 @@ _LABEL_318_:
   ld (_RAM_DBA8_), a
   ret
 
-_LABEL_33A_:
+_LABEL_33A_GameVBlankVDPWork:
   ld a, (_RAM_DBA8_)
   cp $01
   jr z, -
   call _LABEL_7795_ScreenOff
   call _LABEL_78CE_
   call _LABEL_7916_
-  
+
   ; Update scroll registers
   ld a, (_RAM_DED4_VScrollValue)
   out (PORT_VDP_REGISTER), a
@@ -1854,7 +1775,7 @@ _LABEL_33A_:
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
-  
+
   call _LABEL_31F1_UpdateSpriteTable
   call _LABEL_324C_UpdatePerFrameTiles
   ld a, (_RAM_D5CC_)
@@ -1876,28 +1797,27 @@ _LABEL_383_:
   jr nz, +
   call _LABEL_AFD_ReadControls
 -:
-  ld a, (_RAM_D580_)
+  ld a, (_RAM_D580_WaitingForGameVBlank)
   or a
   jr nz, -
   xor a
-  ld (_RAM_D5B5_), a
+  ld (_RAM_D5B5_EnableGameVBlank), a
   call _LABEL_1E4_
   ld a, (_RAM_D5D6_)
   or a
   jp nz, _LABEL_7476_
   ld a, $01
-  ld (_RAM_D580_), a
-  ld (_RAM_D5B5_), a
+  ld (_RAM_D580_WaitingForGameVBlank), a
+  ld (_RAM_D5B5_EnableGameVBlank), a
   jp --
 
 +:
-  ld hl, $0800
--:
-  dec hl
+  ld hl, $0800 ; Busy wait
+-:dec hl
   ld a, h
   or l
   jr nz, -
-  ld (_RAM_D5D8_), a
+  ld (_RAM_D5D8_), a ; Then set to 0
 --:
   ld a, (_RAM_D5D6_)
   or a
@@ -1906,7 +1826,7 @@ _LABEL_383_:
   or a
   jr z, --
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
-  out ($03), a
+  out (PORT_GG_LinkSend), a
   xor a
   ld (_RAM_D5D7_), a
   ld (_RAM_D5D8_), a
@@ -1916,12 +1836,12 @@ _LABEL_383_:
   or a
   jr nz, --
 -:
-  in a, (PORT_PSG)
+  in a, (PORT_VDP_LINECOUNTER)
   cp $B8
   jr c, -
   cp $F0
   jr nc, -
-  call _LABEL_33A_
+  call _LABEL_33A_GameVBlankVDPWork
   jr --
 
 _LABEL_3ED_:
@@ -1948,14 +1868,14 @@ _LABEL_3ED_:
   ld a, $0A
   ld (_RAM_D96F_), a
   ld a, $01
-  ld (_RAM_D5B5_), a
+  ld (_RAM_D5B5_EnableGameVBlank), a
   xor a
   ld (_RAM_D946_), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
   ld a, $38
-  out ($05), a
+  out (PORT_GG_LinkStatus), a
   call _LABEL_7564_SetControlsToNoButtons
   call _LABEL_AD7_DelayIfPlayer2
 +:
@@ -1976,7 +1896,7 @@ _LABEL_458_PatchForLevelTrampoline:
   JumpToPagedFunction _LABEL_36484_PatchForLevel
 
 ++:
-  JumpToPagedFunction _LABEL_2B5D5_
+  JumpToPagedFunction _LABEL_2B5D5_SilencePSG
 
 ; Data from 46E to 4AD (64 bytes)
 _DATA_46E_:
@@ -2242,19 +2162,18 @@ _LABEL_69C_:
   ld a, (iy+18)
   ld c, a
   ld b, $00
-  ld hl, $DA60
+  ld hl, _RAM_DA60_SpriteTableXNs
   add hl, bc
   add hl, bc
   ex de, hl
-  ld hl, $DAE0
+  ld hl, _RAM_DAE0_SpriteTableYs
   add hl, bc
   ld a, (iy+20)
   add a, $01
   cp $03
   jr nz, +
   xor a
-+:
-  ld (iy+20), a
++:ld (iy+20), a
   or a
   jr z, +
   cp $01
@@ -2688,20 +2607,20 @@ _LABEL_9BF_NMI_GG:
     ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
     or a
     jr nz, +
-    in a, ($05)
-    in a, ($04)
+    in a, (PORT_GG_LinkStatus)
+    in a, (PORT_GG_LinkReceive)
     ld (_RAM_DC48_GearToGear_OtherPlayerControls2), a
   pop af
   retn
 
-+:  in a, ($05)
-    in a, ($04)
++:  in a, (PORT_GG_LinkStatus)
+    in a, (PORT_GG_LinkReceive)
     ld (_RAM_DC47_GearToGear_OtherPlayerControls1), a
     ld a, (_RAM_DC3E_InMenus)
     or a
     jr nz, +
-    in a, ($DC)
-    and $3F
+    in a, (PORT_CONTROL_A)
+    and PORT_CONTROL_A_PLAYER1_MASK
     ld (_RAM_DC48_GearToGear_OtherPlayerControls2), a
     ld a, $01
     ld (_RAM_D5D8_), a
@@ -2712,34 +2631,47 @@ _LABEL_9BF_NMI_GG:
 _DATA_9EB_ValueC000:
 .dw $C000
 
+
+; Data in range $7700 .. $7e00
+
 ; Data from 9ED to A2C (64 bytes)
 _DATA_9ED_:
-.db $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0
-.db $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0
-.db $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0
-.db $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0 $00 $40 $80 $C0
+; Low byte of tilemap address for different row indexes
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
+.db $00 $40 $80 $C0 $00 $40 $80 $C0
 
 ; Data from A2D to A6C (64 bytes)
 _DATA_A2D_:
-.db $77 $77 $77 $77 $78 $78 $78 $78 $79 $79 $79 $79 $7A $7A $7A $7A
-.db $7B $7B $7B $7B $7C $7C $7C $7C $7D $7D $7D $7D $7E $7E $7E $7E
-.db $77 $77 $77 $77 $78 $78 $78 $78 $79 $79 $79 $79 $7A $7A $7A $7A
-.db $7B $7B $7B $7B $7C $7C $7C $7C $7D $7D $7D $7D $7E $7E $7E $7E
+; High byte of tilemap address for different ???
+.db $77 $77 $77 $77 $78 $78 $78 $78
+.db $79 $79 $79 $79 $7A $7A $7A $7A
+.db $7B $7B $7B $7B $7C $7C $7C $7C
+.db $7D $7D $7D $7D $7E $7E $7E $7E
+.db $77 $77 $77 $77 $78 $78 $78 $78
+.db $79 $79 $79 $79 $7A $7A $7A $7A
+.db $7B $7B $7B $7B $7C $7C $7C $7C
+.db $7D $7D $7D $7D $7E $7E $7E $7E
 
 ; Data from A6D to A75 (9 bytes)
-_DATA_A6D_:
+_DATA_A6D_SMS:
 .db $14 $10 $10 $10 $10 $18 $18 $18 $18
 
 ; Data from A76 to A7E (9 bytes)
-_DATA_A76_:
+_DATA_A76_SMS:
 .db $08 $10 $18 $20 $28 $10 $18 $20 $28
 
 ; Data from A7F to A87 (9 bytes)
-_DATA_A7F_:
+_DATA_A7F_GG:
 .db $3C $38 $38 $38 $38 $40 $40 $40 $40
 
 ; Data from A88 to A90 (9 bytes)
-_DATA_A88_:
+_DATA_A88_GG:
 .db $30 $38 $40 $48 $50 $38 $40 $48 $50
 
 ; Data from A91 to A9C (12 bytes)
@@ -2904,8 +2836,6 @@ _LABEL_BC5_UpdateFloorTiles:
   ld b, $40 ; 2 tiles
   ld c, PORT_VDP_DATA
   otir
-; Executed in RAM at daaa (?)
-_LABEL_BDD_:
   ld hl, _RAM_DC59_FloorTiles + $20
   ld b, $20 ; The the same 2 tiles in the opposite order
   ld c, PORT_VDP_DATA
@@ -3085,78 +3015,78 @@ _LABEL_CF8_MoveFloorTilesVertically:
     cp $80
     jp z, _LABEL_D67_MoveFloorTilesUp
     ; Move the data down
-    ld a, (_RAM_DC97_)
+    ld a, (_RAM_DC59_FloorTiles + 62)
     ld (_RAM_DE59_), a
-    ld a, (_RAM_DC93_)
-    ld (_RAM_DC97_), a
-    ld a, (_RAM_DC8F_)
-    ld (_RAM_DC93_), a
-    ld a, (_RAM_DC8B_)
-    ld (_RAM_DC8F_), a
-    ld a, (_RAM_DC87_)
-    ld (_RAM_DC8B_), a
-    ld a, (_RAM_DC83_)
-    ld (_RAM_DC87_), a
-    ld a, (_RAM_DC7F_)
-    ld (_RAM_DC83_), a
-    ld a, (_RAM_DC7B_)
-    ld (_RAM_DC7F_), a
-    ld a, (_RAM_DC77_)
-    ld (_RAM_DC7B_), a
-    ld a, (_RAM_DC73_)
-    ld (_RAM_DC77_), a
-    ld a, (_RAM_DC6F_)
-    ld (_RAM_DC73_), a
-    ld a, (_RAM_DC6B_)
-    ld (_RAM_DC6F_), a
-    ld a, (_RAM_DC67_)
-    ld (_RAM_DC6B_), a
-    ld a, (_RAM_DC63_)
-    ld (_RAM_DC67_), a
-    ld a, (_RAM_DC5F_)
-    ld (_RAM_DC63_), a
-    ld a, (_RAM_DC5B_)
-    ld (_RAM_DC5F_), a
+    ld a, (_RAM_DC59_FloorTiles + 58)
+    ld (_RAM_DC59_FloorTiles + 62), a
+    ld a, (_RAM_DC59_FloorTiles + 54)
+    ld (_RAM_DC59_FloorTiles + 58), a
+    ld a, (_RAM_DC59_FloorTiles + 50)
+    ld (_RAM_DC59_FloorTiles + 54), a
+    ld a, (_RAM_DC59_FloorTiles + 46)
+    ld (_RAM_DC59_FloorTiles + 50), a
+    ld a, (_RAM_DC59_FloorTiles + 42)
+    ld (_RAM_DC59_FloorTiles + 46), a
+    ld a, (_RAM_DC59_FloorTiles + 38)
+    ld (_RAM_DC59_FloorTiles + 42), a
+    ld a, (_RAM_DC59_FloorTiles + 34)
+    ld (_RAM_DC59_FloorTiles + 38), a
+    ld a, (_RAM_DC59_FloorTiles + 30)
+    ld (_RAM_DC59_FloorTiles + 34), a
+    ld a, (_RAM_DC59_FloorTiles + 26)
+    ld (_RAM_DC59_FloorTiles + 30), a
+    ld a, (_RAM_DC59_FloorTiles + 22)
+    ld (_RAM_DC59_FloorTiles + 26), a
+    ld a, (_RAM_DC59_FloorTiles + 18)
+    ld (_RAM_DC59_FloorTiles + 22), a
+    ld a, (_RAM_DC59_FloorTiles + 14)
+    ld (_RAM_DC59_FloorTiles + 18), a
+    ld a, (_RAM_DC59_FloorTiles + 10)
+    ld (_RAM_DC59_FloorTiles + 14), a
+    ld a, (_RAM_DC59_FloorTiles + 6)
+    ld (_RAM_DC59_FloorTiles + 10), a
+    ld a, (_RAM_DC59_FloorTiles + 2)
+    ld (_RAM_DC59_FloorTiles + 6), a
     ld a, (_RAM_DE59_)
-    ld (_RAM_DC5B_), a
+    ld (_RAM_DC59_FloorTiles + 2), a
   pop hl
   ret
 
 _LABEL_D67_MoveFloorTilesUp:
-    ld a, (_RAM_DC5B_)
+    ld a, (_RAM_DC59_FloorTiles + 2)
     ld (_RAM_DE59_), a
-    ld a, (_RAM_DC5F_)
-    ld (_RAM_DC5B_), a
-    ld a, (_RAM_DC63_)
-    ld (_RAM_DC5F_), a
-    ld a, (_RAM_DC67_)
-    ld (_RAM_DC63_), a
-    ld a, (_RAM_DC6B_)
-    ld (_RAM_DC67_), a
-    ld a, (_RAM_DC6F_)
-    ld (_RAM_DC6B_), a
-    ld a, (_RAM_DC73_)
-    ld (_RAM_DC6F_), a
-    ld a, (_RAM_DC77_)
-    ld (_RAM_DC73_), a
-    ld a, (_RAM_DC7B_)
-    ld (_RAM_DC77_), a
-    ld a, (_RAM_DC7F_)
-    ld (_RAM_DC7B_), a
-    ld a, (_RAM_DC83_)
-    ld (_RAM_DC7F_), a
-    ld a, (_RAM_DC87_)
-    ld (_RAM_DC83_), a
-    ld a, (_RAM_DC8B_)
-    ld (_RAM_DC87_), a
-    ld a, (_RAM_DC8F_)
-    ld (_RAM_DC8B_), a
-    ld a, (_RAM_DC93_)
-    ld (_RAM_DC8F_), a
-    ld a, (_RAM_DC97_)
-    ld (_RAM_DC93_), a
+    ld a, (_RAM_DC59_FloorTiles + 6)
+    ld (_RAM_DC59_FloorTiles + 2), a
+    ld a, (_RAM_DC59_FloorTiles + 10)
+    ld (_RAM_DC59_FloorTiles + 6), a
+    ld a, (_RAM_DC59_FloorTiles + 14)
+    ld (_RAM_DC59_FloorTiles + 10), a
+    ld a, (_RAM_DC59_FloorTiles + 18)
+    ld (_RAM_DC59_FloorTiles + 14), a
+    ld a, (_RAM_DC59_FloorTiles + 22)
+    ld (_RAM_DC59_FloorTiles + 18), a
+    ld a, (_RAM_DC59_FloorTiles + 26)
+    ld (_RAM_DC59_FloorTiles + 22), a
+    ld a, (_RAM_DC59_FloorTiles + 30)
+    ld (_RAM_DC59_FloorTiles + 26), a
+    ld a, (_RAM_DC59_FloorTiles + 34)
+    ld (_RAM_DC59_FloorTiles + 30), a
+    ld a, (_RAM_DC59_FloorTiles + 38)
+    ld (_RAM_DC59_FloorTiles + 34), a
+    ld a, (_RAM_DC59_FloorTiles + 42)
+    ld (_RAM_DC59_FloorTiles + 38), a
+    ld a, (_RAM_DC59_FloorTiles + 46)
+    ld (_RAM_DC59_FloorTiles + 42), a
+    ld a, (_RAM_DC59_FloorTiles + 50)
+    ld (_RAM_DC59_FloorTiles + 46), a
+    ld a, (_RAM_DC59_FloorTiles + 54)
+    ld (_RAM_DC59_FloorTiles + 50), a
+    ld a, (_RAM_DC59_FloorTiles + 58)
+    ld (_RAM_DC59_FloorTiles + 54), a
+    ld a, (_RAM_DC59_FloorTiles + 62)
+    ld (_RAM_DC59_FloorTiles + 58), a
     ld a, (_RAM_DE59_)
-    ld (_RAM_DC97_), a
+    ld (_RAM_DC59_FloorTiles + 62), a
   pop hl
   ret
 
@@ -3167,35 +3097,35 @@ _LABEL_DCF_MoveFloorTilesHorizontally:
     jp z, _LABEL_E3C_MoveFloorTilesRight
     ; Move them left
     ld ix, _RAM_DC59_FloorTiles
-    ld a, (_RAM_DC5B_)
+    ld a, (_RAM_DC59_FloorTiles + 2)
     rla
     rl (ix+34)
     rl (ix+2)
-    ld a, (_RAM_DC5F_)
+    ld a, (_RAM_DC59_FloorTiles + 6)
     rla
     rl (ix+38)
     rl (ix+6)
-    ld a, (_RAM_DC63_)
+    ld a, (_RAM_DC59_FloorTiles + 10)
     rla
     rl (ix+42)
     rl (ix+10)
-    ld a, (_RAM_DC67_)
+    ld a, (_RAM_DC59_FloorTiles + 14)
     rla
     rl (ix+46)
     rl (ix+14)
-    ld a, (_RAM_DC6B_)
+    ld a, (_RAM_DC59_FloorTiles + 18)
     rla
     rl (ix+50)
     rl (ix+18)
-    ld a, (_RAM_DC6F_)
+    ld a, (_RAM_DC59_FloorTiles + 22)
     rla
     rl (ix+54)
     rl (ix+22)
-    ld a, (_RAM_DC73_)
+    ld a, (_RAM_DC59_FloorTiles + 26)
     rla
     rl (ix+58)
     rl (ix+26)
-    ld a, (_RAM_DC77_)
+    ld a, (_RAM_DC59_FloorTiles + 30)
     rla
     rl (ix+62)
     rl (ix+30)
@@ -3204,35 +3134,35 @@ _LABEL_DCF_MoveFloorTilesHorizontally:
 
 _LABEL_E3C_MoveFloorTilesRight:
     ld ix, _RAM_DC59_FloorTiles
-    ld a, (_RAM_DC7B_)
+    ld a, (_RAM_DC59_FloorTiles + 34)
     rra
     rr (ix+2)
     rr (ix+34)
-    ld a, (_RAM_DC7F_)
+    ld a, (_RAM_DC59_FloorTiles + 38)
     rra
     rr (ix+6)
     rr (ix+38)
-    ld a, (_RAM_DC83_)
+    ld a, (_RAM_DC59_FloorTiles + 42)
     rra
     rr (ix+10)
     rr (ix+42)
-    ld a, (_RAM_DC87_)
+    ld a, (_RAM_DC59_FloorTiles + 46)
     rra
     rr (ix+14)
     rr (ix+46)
-    ld a, (_RAM_DC8B_)
+    ld a, (_RAM_DC59_FloorTiles + 50)
     rra
     rr (ix+18)
     rr (ix+50)
-    ld a, (_RAM_DC8F_)
+    ld a, (_RAM_DC59_FloorTiles + 54)
     rra
     rr (ix+22)
     rr (ix+54)
-    ld a, (_RAM_DC93_)
+    ld a, (_RAM_DC59_FloorTiles + 58)
     rra
     rr (ix+26)
     rr (ix+58)
-    ld a, (_RAM_DC97_)
+    ld a, (_RAM_DC59_FloorTiles + 62)
     rra
     rr (ix+30)
     rr (ix+62)
@@ -3351,7 +3281,7 @@ _LABEL_F75_:
 _LABEL_F9B_:
   xor a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
   jp nz, _LABEL_109B_
@@ -3603,13 +3533,13 @@ _LABEL_1121_:
   jr z, +
   xor a
   ld (_RAM_DEB0_), a
-  ld hl, $DEAF
+  ld hl, _RAM_DEAF_
   jp ++
 
 +:
   ld a, $01
   ld (_RAM_DEB0_), a
-  ld hl, $DEAF
+  ld hl, _RAM_DEAF_
 ++:
   ld hl, _DATA_3FD3_
   ld a, (_RAM_D5A3_)
@@ -3629,7 +3559,7 @@ _LABEL_1121_:
   adc a, h
   ld h, a
   ld a, (hl)
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld hl, _DATA_40F5_
   ld a, (_RAM_D5A3_)
   add a, l
@@ -3642,13 +3572,13 @@ _LABEL_1121_:
   jr z, +
   xor a
   ld (_RAM_DEB2_), a
-  ld hl, $DEB1
+  ld hl, _RAM_DEB1_VScrollDelta
   ret
 
 +:
   ld a, $01
   ld (_RAM_DEB2_), a
-  ld hl, $DEB1
+  ld hl, _RAM_DEB1_VScrollDelta
   ret
 
 _LABEL_11BA_:
@@ -3801,13 +3731,12 @@ _LABEL_1295_:
   jr nz, +
   ld a, $01
   ld (_RAM_DEAB_), a
-  jp ++
+  jp ++ ; ret
 
-; Data from 12B9 to 12B9 (1 bytes)
-.db $C9 ; ret
+; Unreachable code
+  ret
 
-+:
-  xor a
++:xor a
   ld (_RAM_DEAB_), a
 ++:
   ret
@@ -3822,8 +3751,9 @@ _LABEL_12D5_:
   JumpToPagedFunction _LABEL_1FA3D_
 
 _LABEL_12E0_:
+  ; Look up tile index data pointer into de
   ld hl, _DATA_4000_TileIndexPointerLow
-  ld a, (_RAM_DEBC_)
+  ld a, (_RAM_DEBC_TileDataIndex)
   add a, l
   ld l, a
   ld a, $00
@@ -3831,20 +3761,21 @@ _LABEL_12E0_:
   ld h, a
   ld e, (hl)
   ld hl, _DATA_4041_TileIndexPointerHigh
-  ld a, (_RAM_DEBC_)
+  ld a, (_RAM_DEBC_TileDataIndex)
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
   ld d, (hl)
+
   ld a, (_RAM_DEC5_)
   ld l, a
 --:
   ; Set VRAM address
-  ld a, (_RAM_DEC1_VRAMAddressLo)
+  ld a, (_RAM_DEC1_VRAMAddress.Lo)
   out (PORT_VDP_ADDRESS), a
-  ld a, (_RAM_DEC2_VRAMAddressHi)
+  ld a, (_RAM_DEC1_VRAMAddress.Hi)
   out (PORT_VDP_ADDRESS), a
   ; Load counter
   ld bc, (_RAM_DECF_RectangleWidth)
@@ -3871,14 +3802,14 @@ _LABEL_12E0_:
   cp $00
   jr z, + ; ret
   ; Add a row to the VRAM address
-  ld a, (_RAM_DEC1_VRAMAddressLo)
+  ld a, (_RAM_DEC1_VRAMAddress.Lo)
   add a, $40
-  ld (_RAM_DEC1_VRAMAddressLo), a
-  ld a, (_RAM_DEC2_VRAMAddressHi)
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
+  ld a, (_RAM_DEC1_VRAMAddress.Hi)
   adc a, $00
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-    ; Add ???
+    ; Add _RAM_DECE_ to de
     ld hl, _RAM_DECE_
     ld a, e
     add a, (hl)
@@ -3895,6 +3826,7 @@ _LABEL_1345_:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jp nz, _LABEL_14A8_
+  ; SMS
   ld a, $07
   ld (_RAM_DEE1_), a
   xor a
@@ -3941,36 +3873,38 @@ _LABEL_1345_:
   call _LABEL_1583_
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
+  ; Tile $1b8
   ld a, $00
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $77
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
     call _LABEL_12E0_
   pop hl
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
+  ; Tile $1b8, last bitplane
   ld a, $18
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $77
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   call _LABEL_64E5_
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $30
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $77
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   ld de, (_RAM_DB9C_)
   ld hl, (_RAM_DED1_)
@@ -3978,22 +3912,22 @@ _LABEL_1345_:
   call _LABEL_1583_
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $00
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7A
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $18
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7A
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
   call _LABEL_12E0_
   pop hl
@@ -4001,13 +3935,13 @@ _LABEL_1345_:
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $30
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7A
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   ld de, (_RAM_DB9C_)
   ld hl, (_RAM_DED1_)
@@ -4018,24 +3952,24 @@ _LABEL_1345_:
   ld (_RAM_DEC5_), a
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $00
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7D
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $18
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7D
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   call _LABEL_64E5_
   ld a, $04
@@ -4043,17 +3977,18 @@ _LABEL_1345_:
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $30
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7D
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   ret
 
 _LABEL_14A8_:
+  ; GG version of the above
   ld a, $08
   ld (_RAM_DEE1_), a
   xor a
@@ -4080,8 +4015,7 @@ _LABEL_14A8_:
   jr z, +
   ld bc, (_RAM_DBA2_)
   ld de, (_RAM_DB9C_)
--:
-  ld hl, (_RAM_DED1_)
+-:ld hl, (_RAM_DED1_)
   add hl, de
   ld (_RAM_DED1_), hl
   dec bc
@@ -4090,8 +4024,7 @@ _LABEL_14A8_:
   jr z, +
   jp -
 
-+:
-  ld hl, (_RAM_DED1_)
++:ld hl, (_RAM_DED1_)
   ld de, (_RAM_DBA0_)
   add hl, de
   ld de, (_DATA_9EB_ValueC000)
@@ -4100,25 +4033,25 @@ _LABEL_14A8_:
   call _LABEL_1583_
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $4A
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $78
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   call _LABEL_64E5_
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $62
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $78
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   ld de, (_RAM_DB9C_)
   ld hl, (_RAM_DED1_)
@@ -4128,13 +4061,13 @@ _LABEL_14A8_:
   ld (_RAM_DEC5_), a
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $4A
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7B
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   call _LABEL_64E5_
   ld a, $06
@@ -4142,13 +4075,13 @@ _LABEL_14A8_:
   inc hl
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld a, $62
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, $7B
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call _LABEL_12E0_
+    call _LABEL_12E0_
   pop hl
   ret
 
@@ -4179,15 +4112,12 @@ _LABEL_1593_:
   ld a, (_RAM_DE92_EngineVelocity)
   or a
   jr nz, +
--:
-  ret
-
-+:
-  ld a, (_RAM_DEB2_)
+-:ret
++:ld a, (_RAM_DEB2_)
   cp $01
-  jr nz, -
+  jr nz, - ; ret
   call _LABEL_3E24_
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld (_RAM_DEF6_), a
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
@@ -4196,8 +4126,7 @@ _LABEL_1593_:
   cp $08
   jr z, +
   jr c, ++
-+:
-  ld a, (_RAM_DEB1_)
++:ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
   add a, l
@@ -4258,33 +4187,29 @@ _LABEL_162D_:
   ld a, (_RAM_DE92_EngineVelocity)
   or a
   jr nz, +
--:
-  ret
-
-+:
-  ld a, (_RAM_DEB2_)
+-:ret
++:ld a, (_RAM_DEB2_)
   or a
-  jr nz, -
+  jr nz, - ; ret
   call _LABEL_7C72_
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   or $80
   ld (_RAM_DEF6_), a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
   and $07
   sub l
   jr nc, +
+  ; If the scroll went over an 8px boundary, we need to draw some tiles
   call ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
   sub l
   ld (_RAM_DED4_VScrollValue), a
   ret
-
-+:
-  ld a, (_RAM_DED4_VScrollValue)
++:ld a, (_RAM_DED4_VScrollValue)
   sub l
   ld (_RAM_DED4_VScrollValue), a
   ret
@@ -4482,9 +4407,9 @@ _LABEL_17D0_:
   ld hl, (_RAM_DEBD_)
   add hl, de
   ld a, l
-  ld (_RAM_DEC1_VRAMAddressLo), a
+  ld (_RAM_DEC1_VRAMAddress.Lo), a
   ld a, h
-  ld (_RAM_DEC2_VRAMAddressHi), a
+  ld (_RAM_DEC1_VRAMAddress.Hi), a
   ret
 
 _LABEL_17E6_:
@@ -4764,7 +4689,7 @@ _LABEL_19EE_:
   ld a, b
   or c
   jr nz, -
-  
+
   ; Copy 64 bytes from _DATA_4225_TrackMetatileLookup+_RAM_DB97_TrackType*64 to _RAM_DA20_TrackMetatileLookup
   ld hl, _RAM_DEFD_TrackTypeHighBits
   xor a
@@ -4799,7 +4724,7 @@ _LABEL_19EE_:
   ld a, b
   or c
   jr nz, -
-  
+
   ; Look up _DATA_3EA4_+_RAM_DB97_TrackType*8
   ld d, $00
   ld a, (_RAM_DB97_TrackType)
@@ -4815,7 +4740,7 @@ _LABEL_19EE_:
   rl a
   ld e, a
   add hl, de
-  
+
   ; Variously add/copy it to places...
   ld a, (_RAM_DC54_IsGameGear)
   ld c, a
@@ -5048,26 +4973,26 @@ _LABEL_1B94_:
 
 ; Data from 1C22 to 1C39 (24 bytes)
 _DATA_1C22_TileData_ShadowTopLeft: ; 3bpp -> 24bytes
-.db $03 $03 $00 $0F $0F $00 $1F $1F 
+.db $03 $03 $00 $0F $0F $00 $1F $1F
 .db $00 $3F $3F $00 $3F $3F $00 $7F
 .db $7F $00 $7F $7F $00 $7F $7F $00
 
 ; Data from 1C3A to 1C51 (24 bytes)
 _DATA_1C3A_TileData_ShadowTopRight:
-.db $C0 $C0 $00 $F0 $F0 $00 $F8 $F8 
+.db $C0 $C0 $00 $F0 $F0 $00 $F8 $F8
 .db $00 $FC $FC $00 $FC $FC $00 $FE
 .db $FE $00 $FE $FE $00 $FE $FE $00
 
 ; Data from 1C52 to 1C69 (24 bytes)
 _DATA_1C52_TileData_ShadowBottomLeft:
-.db $7F $7F $00 $7F $7F $00 $7F $7F 
+.db $7F $7F $00 $7F $7F $00 $7F $7F
 .db $00 $3F $3F $00 $3F $3F $00 $1F
 .db $1F $00 $0F $0F $00 $03 $03 $00
 
 ; Data from 1C6A to 1C81 (24 bytes)
 _DATA_1C6A_TileData_ShadowBottomRight:
-.db $FE $FE $00 $FE $FE $00 $FE $FE 
-.db $00 $FC $FC $00 $FC $FC $00 $F8 
+.db $FE $FE $00 $FE $FE $00 $FE $FE
+.db $00 $FC $FC $00 $FC $FC $00 $F8
 .db $F8 $00 $F0 $F0 $00 $C0 $C0 $00
 
 _DATA_1c82_TileVRAMAddresses: ; VRAM addresses
@@ -5142,9 +5067,21 @@ _LABEL_1CFF_:
 
 ; Data from 1D25 to 1D44 (32 bytes)
 _DATA_1D25_HelicoptersAnimatedPalette_GG:
-.db $00 $0E $44 $0E $88 $0E $EE $0E $00 $0E $44 $0E $88 $0E $EE $0E
+.rept 2
+  GGCOLOUR $0000ee
+  GGCOLOUR $4444ee
+  GGCOLOUR $8888ee
+  GGCOLOUR $eeeeee
+.endr
 _DATA_1D35_PowerboatsAnimatedPalette_GG:
-.db $04 $08 $44 $08 $88 $0E $CC $0E $88 $0E $44 $08 $04 $08 $00 $04
+  GGCOLOUR $440088
+  GGCOLOUR $444488
+  GGCOLOUR $8888ee
+  GGCOLOUR $ccccee
+  GGCOLOUR $8888ee
+  GGCOLOUR $444488
+  GGCOLOUR $440088
+  GGCOLOUR $0000844
 
 _LABEL_1D45_:
   ld a, $03
@@ -5307,7 +5244,7 @@ _LABEL_1DF2_:
   ld a, (hl)
   ld d, a
   ld e, c
-  ld hl, $C800
+  ld hl, _RAM_C800_WallData
   add hl, de
   ld b, h
   ld c, l
@@ -5403,12 +5340,12 @@ _LABEL_1DF2_:
   ld a, $03
   ld (_RAM_D963_SFXTrigger2), a
 +:
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   call _LABEL_28AC_
   xor a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DE2F_), a
   ld (_RAM_DF7B_), a
   ld a, (_RAM_DBA4_)
@@ -5453,7 +5390,7 @@ _LABEL_1FDC_:
   ld a, (hl)
   ld d, a
   ld e, c
-  ld hl, $CC80
+  ld hl, _RAM_CC80_BehaviourData
   add hl, de
   ld b, h
   ld c, l
@@ -5493,7 +5430,7 @@ _LABEL_1FDC_:
   rr a
   rr a
   ld b, a ; -> b
-  
+
   ; Look up track type in behaviour lookup
   ld d, $00
   ld a, (_RAM_DB97_TrackType)
@@ -5516,12 +5453,12 @@ _LABEL_1FDC_:
   ld c, a
 +:ld a, b ; mask against the high nibble
   and c
-  
+
   ld e, a ; then look up the behaviour data
   ld d, $00
   add hl, de
   ld a, (hl)
-  
+
   ld b, a
   ld a, (_RAM_DEF9_CurrentBehaviour)
   ld (_RAM_DEFA_PreviousBehaviour), a
@@ -5590,7 +5527,7 @@ _LABEL_20E4_Behaviour2_Dust
 
 ++:
 _LABEL_2128_Behaviour5_Skid
-  ; Behaviour 5 = skid 
+  ; Behaviour 5 = skid
   ld a, $01
   ld (_RAM_D5CD_CarIsSkidding), a
   ld a, (_RAM_DE92_EngineVelocity)
@@ -5757,7 +5694,7 @@ _LABEL_2200_:
   call _LABEL_28AC_
   xor a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DBA4_)
   ld (_RAM_DBA6_), a
   ld a, (_RAM_DBA5_)
@@ -6004,7 +5941,7 @@ _LABEL_23DD_:
   ld a, (_RAM_DE7D_)
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -6185,37 +6122,37 @@ _LABEL_2673_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF0E_)
   ld (_RAM_DEB2_), a
   ret
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 _LABEL_26F5_:
@@ -6366,14 +6303,14 @@ _LABEL_27B1_:
   ld a, (_RAM_DEB2_)
   cp $01
   jr z, +
-  ld hl, _RAM_DEB1_
+  ld hl, _RAM_DEB1_VScrollDelta
   ld a, (_RAM_DBA7_)
   sub (hl)
   ld (_RAM_DBA7_), a
   jp _LABEL_27FB_
 
 +:
-  ld hl, _RAM_DEB1_
+  ld hl, _RAM_DEB1_VScrollDelta
   ld a, (_RAM_DBA7_)
   add a, (hl)
   ld (_RAM_DBA7_), a
@@ -6413,7 +6350,7 @@ _LABEL_27FB_:
 ++:
   ld a, (_RAM_DB81_)
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   add a, l
   ld l, a
   and $01
@@ -6423,7 +6360,7 @@ _LABEL_27FB_:
 -:
   ld a, l
   srl a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
 _LABEL_284F_:
   ret
 
@@ -6674,7 +6611,7 @@ _LABEL_29BC_Behaviour1_FallToFloor:
   jp ++
 +:ld a, $03
 ++:ld (_RAM_DF59_CarState), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
@@ -6706,7 +6643,7 @@ _LABEL_2A36_ret:
   ld (_RAM_DB80_), a
   ld (_RAM_DB81_), a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, $01
   ld (_RAM_D945_), a
   ret
@@ -6722,7 +6659,7 @@ _LABEL_2A55_:
   ld (_RAM_DCF7_), a
   ld (_RAM_DE92_EngineVelocity), a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, $02
   ld (_RAM_DF80_TwoPlayerWinPhase), a
   ld a, $01
@@ -6994,7 +6931,7 @@ _LABEL_2C69_Behaviour12:
   jr nz, _LABEL_2CD0_
   ld a, $08
   ld (_RAM_D963_SFXTrigger2), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
@@ -7096,11 +7033,11 @@ _LABEL_2D07_UpdatePalette_RuffTruxSubmerged:
 
 ; Data from 2D36 to 2D3F (10 bytes)
 _DATA_2D36_RuffTruxSubmergedPaletteSequence_GG:
-.dw $0000 
-.dw $0800 
-.dw $0840 
-.dw $0E80 
-.dw $0000
+  GGCOLOUR $000000
+  GGCOLOUR $000088
+  GGCOLOUR $004488
+  GGCOLOUR $0088ee
+  GGCOLOUR $000000
 
 ++: ; SMS
   ld a, (_RAM_DB97_TrackType)
@@ -7417,22 +7354,21 @@ _DATA_2FAF_:
 
 ; Data from 2FB7 to 2FBB (5 bytes)
 _DATA_2FB7_RuffTruxSubmergedPaletteSequence_SMS:
-.db $00 $20 $24 $38 $00 ; Colours lookup
-; #000000 ; black
-; #0000ff ; dark blue
-; #0055aa ; middle blue
-; #00aaff ; light blue
-; #000000 ; black
+  SMSCOLOUR $000000 ; black
+  SMSCOLOUR $0000aa ; dark blue
+  SMSCOLOUR $0055aa ; middle blue
+  SMSCOLOUR $00aaff ; light blue
+  SMSCOLOUR $000000 ; black
 
 ; Data from 2FBC to 2FDB (32 bytes)
 _DATA_2FBC_:
 .db $52 $A6 $B6 $9E ; 4 bytes per track tyoe
-.db $62 $24 $85 $00 
-.db $1C $51 $5E $4E 
+.db $62 $24 $85 $00 ; Copied to _RAM_DF68
+.db $1C $51 $5E $4E
 .db $57 $50 $70 $00
-.db $85 $8F $9B $00 
-.db $42 $72 $6A $00 
-.db $2C $40 $53 $00 
+.db $85 $8F $9B $00
+.db $42 $72 $6A $00
+.db $2C $40 $53 $00
 .db $38 $3E $4B $00
 
 _LABEL_2FDC_:
@@ -7640,12 +7576,12 @@ _LABEL_3199_:
 _DATA_31A4_FloorTilesVRAMAddress:
 ; VRAM address of the four floor tiles per track type. $ffff if no floor.
 .dw $4000 | ($20 * $58) ; $4B00
-.dw $4000 | ($20 * $a1) ; $5420 
-.dw $FFFF 
-.dw $FFFF 
-.dw $4000 | ($20 * $13) ; $4260 
-.dw $FFFF 
-.dw $FFFF 
+.dw $4000 | ($20 * $a1) ; $5420
+.dw $FFFF
+.dw $FFFF
+.dw $4000 | ($20 * $13) ; $4260
+.dw $FFFF
+.dw $FFFF
 .dw $FFFF
 .dw $FFFF
 
@@ -7753,7 +7689,7 @@ _LABEL_324C_UpdatePerFrameTiles:
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
   jp z, _LABEL_746B_RuffTrux_UpdatePerFrameTiles
-  
+
   ; Update tiles for car "decorators"
   ; Always do the red car
   ld a, (_RAM_DE91_CarDirectionPrevious) ; 0-$f
@@ -8051,7 +7987,7 @@ _LABEL_3450_:
   ret
 
 +++:
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld d, $00
   ld c, $00
   ld a, (_RAM_DE44_)
@@ -8059,35 +7995,35 @@ _LABEL_3450_:
   ld c, a
   add hl, de
   inc (hl)
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld a, (_RAM_DE45_)
   ld e, a
   add a, c
   ld c, a
   add hl, de
   inc (hl)
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld a, (_RAM_DE46_)
   ld e, a
   add a, c
   ld c, a
   add hl, de
   inc (hl)
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld a, (_RAM_DE47_)
   ld e, a
   add a, c
   ld c, a
   add hl, de
   inc (hl)
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld a, (_RAM_DE48_)
   ld e, a
   add a, c
   ld c, a
   add hl, de
   inc (hl)
-  ld hl, $DE4B
+  ld hl, _RAM_DE4B_
   ld a, (_RAM_DE49_)
   ld e, a
   add a, c
@@ -8742,7 +8678,7 @@ _LABEL_39AE_:
   ld (ix+17), a
   ld a, (_RAM_DF1E_)
   ld (ix-1), a
-  ld hl, $DA00
+  ld hl, _RAM_DA00_
   ld a, (_RAM_DE86_)
   add a, l
   ld l, a
@@ -8754,7 +8690,7 @@ _LABEL_39AE_:
   ld a, (_RAM_DE84_)
   add a, l
   ld (ix-2), a
-  ld hl, $DA10
+  ld hl, _RAM_DA00_ + 16
   ld a, (_RAM_DE86_)
   add a, l
   ld l, a
@@ -9066,42 +9002,39 @@ _LABEL_3C54_:
 ++:
   xor a
   ld (_RAM_DF25_), a
+  ; Copy data to RAM
   ld c, $09
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld hl, _DATA_A7F_
+  ld hl, _DATA_A7F_GG
   jp ++
-
-+:
-  ld hl, _DATA_A6D_
++:ld hl, _DATA_A6D_SMS
 ++:
   ld de, _RAM_DF2E_
--:
-  ld a, (hl)
+-:ld a, (hl)
   ld (de), a
   inc hl
   inc de
   dec c
   jr nz, -
+  ; Copy data to RAM
   ld c, $09
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld hl, _DATA_A88_
+  ld hl, _DATA_A88_GG
   jp ++
-
-+:
-  ld hl, _DATA_A76_
++:ld hl, _DATA_A76_SMS
 ++:
   ld de, _RAM_DF40_
--:
-  ld a, (hl)
+-:ld a, (hl)
   ld (de), a
   inc hl
   inc de
   dec c
   jr nz, -
+
   ld a, (_RAM_DB97_TrackType)
   sla a ; x4
   sla a
@@ -9383,7 +9316,7 @@ _LABEL_3F3F_:
 _LABEL_3F54_:
   ld bc, $02EF
 -:
-  ld hl, $DCAB
+  ld hl, _RAM_DCAB_
   add hl, bc
   xor a
   ld (hl), a
@@ -9684,15 +9617,15 @@ _LABEL_44C3_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF83_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 4562 to 4562 (1 bytes)
@@ -9700,7 +9633,7 @@ _LABEL_44C3_:
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF85_)
   ld (_RAM_DEB2_), a
   jp +++
@@ -9709,13 +9642,13 @@ _LABEL_44C3_:
 .db $C9 ; ret
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF83_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 4583 to 4583 (1 bytes)
@@ -9723,7 +9656,7 @@ _LABEL_44C3_:
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 458C to 458C (1 bytes)
@@ -9926,37 +9859,37 @@ _LABEL_46C8_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF83_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF85_)
   ld (_RAM_DEB2_), a
   ret
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF83_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 _LABEL_470C_:
@@ -10533,7 +10466,7 @@ _LABEL_4DD4_:
   ld a, $03
 ++:
   ld (_RAM_DF5B_), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D96C_), hl
   xor a
   ld (_RAM_D96F_), a
@@ -10584,7 +10517,7 @@ _LABEL_4EA0_:
 _LABEL_4EAB_:
   xor a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DE92_EngineVelocity), a
   ld (_RAM_DCF7_), a
   ld (_RAM_D5A4_IsReversing), a
@@ -10643,7 +10576,7 @@ _LABEL_4F1B_:
   ld hl, (_RAM_DED1_)
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld b, a
   add a, $00
   ld l, a
@@ -10999,11 +10932,11 @@ _LABEL_5147_:
   jr nc, _LABEL_5147_
   jp _LABEL_5132_
 
-_LABEL_5169_:
-  JumpToPagedFunction _LABEL_37292_
+_LABEL_5169_GameVBlankEngineUpdateTrampoline:
+  JumpToPagedFunction _LABEL_37292_GameVBlankEngineUpdate
 
-_LABEL_5174_:
-  JumpToPagedFunction _LABEL_3730C_
+_LABEL_5174_GameVBlankPart3Trampoline:
+  JumpToPagedFunction _LABEL_3730C_GameVBlankPart3
 
 _LABEL_517F_NMI_SMS:
     ld a, (_RAM_D599_IsPaused)
@@ -11147,7 +11080,7 @@ _LABEL_5298_:
   ld (_RAM_DEB0_), a
 +:
   ld (_RAM_DEB8_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DEB2_), a
   ret
 
@@ -11441,7 +11374,7 @@ _LABEL_5451_:
   add hl, de
   ld d, (hl)
   ld e, c
-  ld hl, $C800
+  ld hl, _RAM_C800_WallData
   add hl, de
   ld b, h
   ld c, l
@@ -11536,7 +11469,7 @@ _LABEL_5451_:
   ld a, $03
   ld (_RAM_D974_SFXTrigger), a
 +:
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D96C_), hl
   call _LABEL_51CF_
   ld hl, (_RAM_D59F_)
@@ -11581,7 +11514,7 @@ _LABEL_5608_:
   ld a, (hl)
   ld d, a
   ld e, c
-  ld hl, $CC80
+  ld hl, _RAM_CC80_BehaviourData
   add hl, de
   ld b, h
   ld c, l
@@ -11641,7 +11574,7 @@ _LABEL_5608_:
   ld a, (ix+10)
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -12157,7 +12090,7 @@ _LABEL_59FC_:
   jr z, +
   ld a, $03
   ld (_RAM_D974_SFXTrigger), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D96C_), hl
   call _LABEL_51CF_
   ld hl, (_RAM_D59F_)
@@ -13542,6 +13475,7 @@ _LABEL_64E5_:
 
 ; Data from 650C to 653F (52 bytes)
 _DATA_650C_SoundInitialisationData:
+; TODO: could label with the meanings/RAM labels
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $E8
 .db $03 $03 $0A $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $E8 $03 $03 $00 $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00
@@ -13645,7 +13579,7 @@ _LABEL_65D0_BehaviourE:
   ld a, (_RAM_DF58_)
   or a
   jr nz, +
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
@@ -14000,13 +13934,13 @@ _LABEL_67AB_:
 +:
   ld a, $04
 ++:
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp ++++++
 
 +++++:
   xor a
   ld (_RAM_DEBA_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
 ++++++:
   ld a, (_RAM_DEBA_)
   or a
@@ -14048,7 +13982,7 @@ _LABEL_6895_:
   ld a, $00
   ld (_RAM_D95E_), a
   ld (_RAM_D96F_), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   ld (_RAM_D96C_), hl
   ld (_RAM_D58A_), hl
@@ -14138,7 +14072,7 @@ _LABEL_6947_:
   ld (_RAM_DB82_), a
   ld (_RAM_DB83_), a
   ld (_RAM_DEAF_), a
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DB7E_), a
   ld (_RAM_DB7F_), a
   ld (_RAM_DCFB_), a
@@ -14603,7 +14537,7 @@ _LABEL_6D08_:
   ld a, $01
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
-  ld hl, $03E8
+  ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
@@ -14700,7 +14634,7 @@ _LABEL_6DDB_:
   call _LABEL_1CBD_
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -14777,7 +14711,7 @@ _LABEL_6E79_:
   ld a, (_RAM_DCB5_)
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -14955,7 +14889,7 @@ _LABEL_6FCD_:
   ld a, (_RAM_DCF6_)
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -15036,7 +14970,7 @@ _LABEL_7070_:
   ld a, (_RAM_DD37_)
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -15119,7 +15053,7 @@ _LABEL_709C_:
 
 ++++++++:
   call _LABEL_1D45_
-  ld hl, $DF38
+  ld hl, _RAM_DF38_
   ld d, $00
   ld a, (_RAM_DF2A_)
   ld e, a
@@ -15134,7 +15068,7 @@ _LABEL_709C_:
   ld a, $94
 ++:
   ld (hl), a
-  ld hl, $DF38
+  ld hl, _RAM_DF38_
   ld d, $00
   ld a, (_RAM_DF2B_)
   ld e, a
@@ -15149,7 +15083,7 @@ _LABEL_709C_:
   ld a, $95
 ++:
   ld (hl), a
-  ld hl, $DF38
+  ld hl, _RAM_DF38_
   ld d, $00
   ld a, (_RAM_DF2C_)
   ld e, a
@@ -15164,7 +15098,7 @@ _LABEL_709C_:
   ld a, $96
 ++:
   ld (hl), a
-  ld hl, $DF38
+  ld hl, _RAM_DF38_
   ld d, $00
   ld a, (_RAM_DF2D_)
   ld e, a
@@ -15415,7 +15349,7 @@ _LABEL_7367_:
   push hl
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -15444,7 +15378,7 @@ _LABEL_7393_:
   push hl
   and $3F
   ld c, a
-  ld hl, $D900
+  ld hl, _RAM_D900_
   ld b, $00
   add hl, bc
   ld a, (hl)
@@ -15499,7 +15433,7 @@ _LABEL_73D4_:
   xor a
   ld (hl), a
 +:
-  ld hl, $DF2E
+  ld hl, _RAM_DF2E_
   ld d, $00
   ld e, a
   add hl, de
@@ -15547,8 +15481,6 @@ _LABEL_745B_:
   ld (ix+3), a
   ld a, $9B
   ld (ix+5), a
-; Executed in RAM at da67
-_LABEL_7465_:
   ld a, $E8
   ld (ix+7), a
   ret
@@ -15558,7 +15490,7 @@ _LABEL_746B_RuffTrux_UpdatePerFrameTiles:
 
 _LABEL_7476_:
   di
-  CallPagedFunction2 _LABEL_2B5D5_
+  CallPagedFunction2 _LABEL_2B5D5_SilencePSG
   call _LABEL_7564_SetControlsToNoButtons
   ld a, (_RAM_DC3B_)
   cp $01
@@ -15692,12 +15624,9 @@ _LABEL_7573_EnterGame:
   jr z, +
   ; Game Gear
   xor a
-  out ($05), a
+  out (PORT_GG_LinkStatus), a
 +:
-  ld a, $20 ; Palette entry $10
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateGG $10
   xor a ; Set to black
   out (PORT_VDP_DATA), a
   out (PORT_VDP_DATA), a
@@ -15800,7 +15729,7 @@ _LABEL_7573_EnterGame:
   ld e, a
   ld d, $00
   add hl, de ; -> hl
-  
+
   ld de, _RAM_DB86_HandlingData
   ld bc, $0008
 -:ld a, (hl) ; Read byte
@@ -16031,6 +15960,7 @@ _LABEL_784D_:
 ++:
   ld c, a
   ld a, (_RAM_DED4_VScrollValue)
+  ; Divide by 8
   and $F8
   rr a
   rr a
@@ -16092,7 +16022,7 @@ _LABEL_78CE_:
     srl a
     or $E0
     ld d, a
-    ld c, $BF
+    ld c, PORT_VDP_ADDRESS
     out (c), l
     out (c), h
   exx
@@ -16130,7 +16060,7 @@ _LABEL_7916_:
   ld de, _RAM_DB42_
   ld h, $D8
   exx
-    ld hl, (_RAM_DEC1_VRAMAddressLo)
+    ld hl, (_RAM_DEC1_VRAMAddress)
     ld c, PORT_VDP_ADDRESS
     ld b, $40
     ld d, $7F ; If the high byte of the VRAM address gets here...
@@ -16163,7 +16093,7 @@ _LABEL_7916_:
   djnz -
   exx
     ; Update stored VRAM address
-    ld (_RAM_DEC1_VRAMAddressLo), hl
+    ld (_RAM_DEC1_VRAMAddress), hl
   exx
   ret
 
@@ -16171,9 +16101,9 @@ _LABEL_795E_:
   ld hl, (_RAM_DED1_)
   ld a, (hl)
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
-  ld (_RAM_DEBC_), a
+  ld (_RAM_DEBC_TileDataIndex), a
   ld hl, _DATA_4000_TileIndexPointerLow
-  ld a, (_RAM_DEBC_)
+  ld a, (_RAM_DEBC_TileDataIndex)
   add a, l
   ld l, a
   xor a
@@ -16181,7 +16111,7 @@ _LABEL_795E_:
   ld h, a
   ld e, (hl)
   ld hl, _DATA_4041_TileIndexPointerHigh
-  ld a, (_RAM_DEBC_)
+  ld a, (_RAM_DEBC_TileDataIndex)
   add a, l
   ld l, a
   xor a
@@ -16423,7 +16353,7 @@ _LABEL_7B21_Decompress:
 ; de = dest
 ; Returns hc = number of bytes decompressed (i.e. output size)
 ; Uses afbcde
-; Relocatable (no absolute addresses used), but in the end there's another copy 
+; Relocatable (no absolute addresses used), but in the end there's another copy
 ; which gets relocated to RAM - this one executes in place.
   push de
     jr _get_next_mask_set_carry
@@ -16485,11 +16415,11 @@ _2x3x4x_real: ; LZ: copy x+3 bytes from offset -(*p++ + (high-2)*256 - 2)
       cpl         ; Invert (-1..-3)
       ld b, a     ; -> B
       ld a, (hl)  ; Get next byte
-      push hl       
+      push hl
         cpl         ; Subtract from de
-        add a, e      
-        ld l, a       
-        ld a, d       
+        add a, e
+        ld l, a
+        ld a, d
         adc a, b    ; Also subtract b*256
         ld h, a
         dec hl
@@ -16505,7 +16435,7 @@ _copybcbytes:
     ex af, af'
     jr _get_next_mask_7bits
 
-_5x: ; LZ: data bytes are offset, count. 
+_5x: ; LZ: data bytes are offset, count.
 ; If x is $f, there is an extra offset-high byte first.
 ; Else, x is the high byte.
 ; Copy count+4 bytes from -(offset + 1).
@@ -16538,11 +16468,11 @@ _highbitsetcompresseddata: ; %1 nn ooooo Copy n+2 bytes from offset -(n+o+2)
       rlca
       inc a         ; Add 1
       ld c, a
-      
+
       ld a, (hl)    ; Get byte again
       push hl
         and $1F     ; Mask to $00011111 = o
-        add a, c    ; Add c  
+        add a, c    ; Add c
         cpl         ; Two's complement the hard way..?
         add a, e    ; Overall: hl = de - a - 1
         ld l, a
@@ -16558,7 +16488,7 @@ _get_next_mask_set_carry:
 _get_next_mask:
     ld a, (hl)    ; Get byte
     inc hl        ; Point at next
-    
+
     adc a, a      ; High bit 1 = compressed, 0 = raw byte follows. Unrolled loop here, plus carry in
     jr c, _compressed
     ldi
@@ -16750,8 +16680,8 @@ _0fff:
       jr _b
 
 ; end of decompress code
-      
-      
+
+
 _LABEL_7C67_:
   JumpToPagedFunction _LABEL_36E6B_
 
@@ -16760,7 +16690,7 @@ _LABEL_7C72_:
 
 _LABEL_7C7D_:
   call _LABEL_3214_BlankSpriteTable
-  
+
   ; Load tile high bytes
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
@@ -16841,10 +16771,10 @@ _LABEL_7C7D_:
   call _LABEL_7B21_Decompress
   ; Then to VRAM
   call _LABEL_7F02_Copy3bppTileDataToVRAM
-  
+
   ; Then extra tiles
   call _LABEL_663D_InitialisePlugholeTiles
-  
+
   ; Car tiles
   ; Page...
   ld hl, _DATA_3EF4_CarTilesDataLookup_PageNumber
@@ -16924,7 +16854,7 @@ _LABEL_7C7D_:
   ld hl, _RAM_C800_WallData - 4
   ex de, hl
   call _LABEL_7B21_Decompress
-  
+
   ; If it's the bathtub, write some stuff into the wall metadata
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
@@ -16956,7 +16886,7 @@ _LABEL_7C7D_:
   ld hl, _RAM_C000_LevelLayout
   ex de, hl
   call _LABEL_7B21_Decompress
-  
+
   ; Load palette
   ld a, (_RAM_DC54_IsGameGear)
   cp $00
@@ -16968,10 +16898,7 @@ _LABEL_7C7D_:
   inc de
   ld a, (de)
   ld h, a
-  ld a, $00 ; Palette index 0
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateGG 0
   ld b, $40 ; 64 bytes = full palette
   ld c, PORT_VDP_DATA
   otir
@@ -16992,10 +16919,7 @@ _LABEL_7C7D_:
   ld d, (hl)
   ex de, hl
   ; Emit to VDP
-  ld a, $00 ; Palette
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateSMS 0
   ld b, $20 ; 32 entries
   ld c, PORT_VDP_DATA
   otir
@@ -17005,7 +16929,7 @@ _LABEL_7C7D_:
 
 ++:
   CallPagedFunction _LABEL_1BEB1_ChangePoolTableColour
-  
+
   ; Load "decorator" 1bpp tile data to RAM buffer
   ld hl, $800E ; Pointer here in each car's bank
   ld a, (hl)
@@ -17024,7 +16948,7 @@ _LABEL_7C7D_:
   ld a, b
   or c
   jr nz, -
-  
+
   ; Next pointer -> 64 bytes to _RAM_D900_
   ld hl, $8010
   ld a, (hl)
@@ -17042,7 +16966,7 @@ _LABEL_7C7D_:
   ld a, b
   or c
   jr nz, -
-  
+
   ; Next pointer
   ld hl, $8012
   ld a, (hl)
@@ -17149,7 +17073,7 @@ de -> 68 20 00 ... = %0110100000100000...
 bc -> 00 01 00 03 02 01 07 01 07 04 03 0F 0C 03 0F 0C 03 0F ...
 result -> 00 (00 00) 01 (01) 00 03 02 01 07 (07) 01 07 04 03 0F
 
-*/  
+*/
   xor a               ; Set bit index to 0
   ld (_RAM_DF13_RunCompressed_BitIndex), a
 --:
@@ -17255,7 +17179,7 @@ _LABEL_7F4E_CarAndShadowSpriteTilesToVRAM:
   ld bc, 8*4 ; four tiles
   ld hl, _DATA_1C22_TileData_ShadowTopLeft
   call _LABEL_7FC9_EmitTileData3bpp
-  
+
   ; VRAM address - tile $1ac = empty (not for RuffTrux)
   ; Tile is used in-game but in a weird way, and it's glitchy
   ld a, $80
@@ -17360,72 +17284,61 @@ _LABEL_8000_Main:
   ld a, :_DATA_3ED49_SplashScreenCompressed ; $0F
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld hl, _DATA_3ED49_SplashScreenCompressed ; $AD49 ; Location of compressed data - splash screen implementation, goes up to 3F752, decompresses to 3680 bytes
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000, loads splash screen code to RAM
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000 ; loads splash screen code to RAM
   call _RAM_C000_DecompressionTemporaryBuffer ; Splash screen code is here
-  
+
   call _LABEL_AFAE_RamCodeLoader ; Maybe the splash screen broke it?
   call _LABEL_B01D_SquinkyTennisHook
-  
+
 _LABEL_8021_MenuScreenEntryPoint:
   ; Menu screen changes start here
   call _LABEL_AFAE_RamCodeLoader
   ld a, $01
   ld (_RAM_DC3E_InMenus), a
   xor a
-  ld (_RAM_D6D5_), a
+  ld (_RAM_D6D5_InGame), a
   call _LABEL_BD00_InitialiseVDPRegisters
   call _LABEL_BB6C_ScreenOff
-  call _LABEL_BB49_
-  call _LABEL_B44E_
+  call _LABEL_BB49_SetMenuHScroll
+  call _LABEL_B44E_BlankMenuRAM
   call _LABEL_BB5B_SetBackdropToColour0
-  call _LABEL_BF2E_LoadPalette ; Loads palette
+  call _LABEL_BF2E_LoadMenuPalette_SMS
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
   ld a, $38
-  out ($05), a
-+:
-  ld a, (_RAM_DBCD_MenuIndex)
+  out (PORT_GG_LinkStatus), a
+  ; Call the relevant menu initialiser
++:ld a, (_RAM_DBCD_MenuIndex)
   or a
   jr nz, +
   call _LABEL_8114_Menu0
   jp ++
-
-+:
-  dec a
++:dec a
   jr nz, +
   call _LABEL_82DF_Menu1
   jp ++
-
-+:
-  dec a
++:dec a
   jr nz, +
-  call _LABEL_8507_
+  call _LABEL_8507_Menu2
   jp ++
-
-+:
-  dec a
++:dec a
   jr nz, +
-  call _LABEL_866C_
+  call _LABEL_866C_Menu3
   jp ++
-
-+:
-  dec a
++:dec a
   jr nz, +
-  call _LABEL_8A38_
+  call _LABEL_8A38_Menu4
   jp ++
-
-+:
-  dec a
++:dec a
   jr nz, ++
+  ; Menu 5 only if course select > 0
   ld a, (_RAM_DBD8_CourseSelectIndex)
   or a
   jr nz, +
   call _LABEL_82DF_Menu1
   jp ++
-
-+:
-  call _LABEL_84AA_
++:call _LABEL_84AA_Menu5
 ++:
   im 1
   ei
@@ -17438,20 +17351,21 @@ _LABEL_8021_MenuScreenEntryPoint:
   ld a, $00
   ld (_RAM_D6D3_VBlankDone), a
   call _LABEL_90FF_ReadControllers
-  call _LABEL_80E6_
-  ld a, (_RAM_D6D5_)
+  call _LABEL_80E6_CallMenuScreenHandler
+  ld a, (_RAM_D6D5_InGame)
   dec a
   jr z, +
+  ; Staying in menus
   ld a, (_RAM_D6D4_)
   or a
-  call z, $D966 ; Code is loaded from _LABEL_3BB26_
+  CallRamCodeIfZFlag _LABEL_3BB26_Trampoline_MenuMusicFrameHandler
   nop ; Hook point?
   nop
   nop
   call _LABEL_B45D_
   jp -
 
-+:
++:; Menu -> game
   di
   ld a, $00
   ld (_RAM_DC3E_InMenus), a
@@ -17459,12 +17373,28 @@ _LABEL_8021_MenuScreenEntryPoint:
 
 ; Jump Table from 80BE to 80E5 (20 entries, indexed by _RAM_D699_MenuScreenIndex)
 _DATA_80BE_MenuScreenHandlers:
-.dw _LABEL_80FC_MenuScreenHandler_Null 
-.dw _LABEL_8BAB_ _LABEL_8C35_ _LABEL_8CE7_ _LABEL_8D2B_ _LABEL_80FC_MenuScreenHandler_Null _LABEL_8D79_ _LABEL_8DCC_
-.dw _LABEL_8E15_ _LABEL_8E97_ _LABEL_8EF0_ _LABEL_8F93_ _LABEL_8FC4_ _LABEL_9074_ _LABEL_B09F_ _LABEL_8C35_
-.dw _LABEL_B56D_ _LABEL_B6B1_ _LABEL_B84D_ _LABEL_B06C_
+.dw _LABEL_80FC_Handler_MenuScreen_None
+.dw _LABEL_8BAB_Handler_MenuScreen_Title 
+.dw _LABEL_8C35_Handler_MenuScreen_SelectPlayerCount 
+.dw _LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter
+.dw _LABEL_8D2B_Handler_MenuScreen_RaceName
+.dw _LABEL_80FC_Handler_MenuScreen_None ; Unused5
+.dw _LABEL_8D79_Handler_MenuScreen_Qualify
+.dw _LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace
+.dw _LABEL_8E15_Handler_MenuScreen_StorageBox
+.dw _LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro
+.dw _LABEL_8EF0_Handler_MenuScreen_OnePlayerTournamentResults
+.dw _LABEL_8F93_Handler_MenuScreen_UnknownB
+.dw _LABEL_8FC4_Handler_MenuScreen_LifeList
+.dw _LABEL_9074_Handler_MenuScreen_UnknownD
+.dw _LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter
+.dw _LABEL_8C35_Handler_MenuScreen_SelectPlayerCount ; shared
+.dw _LABEL_B56D_MenuScreen_TrackSelect
+.dw _LABEL_B6B1_MenuScreen_TwoPlayerResult
+.dw _LABEL_B84D_MenuScreen_TournamentChampion
+.dw _LABEL_B06C_MenuScreen_OnePlayerMode
 
-_LABEL_80E6_:
+_LABEL_80E6_CallMenuScreenHandler:
   call _LABEL_9167_ScreenOff
   ld a, (_RAM_D699_MenuScreenIndex)
   sla a
@@ -17479,32 +17409,32 @@ _LABEL_80E6_:
   call + ; Invoke looked-up function
 
 ; 1st entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_80FC_MenuScreenHandler_Null:
-  call _LABEL_915E_ScreenOn ; turn it back on
+_LABEL_80FC_Handler_MenuScreen_None:
+_LABEL_80FC_EndMenuScreenHandler:
+  call _LABEL_915E_ScreenOn ; turn screen back on
   ret
 
-+:
-  jp (hl)
++:jp (hl)
 
-; Data from 8101 to 8113 (19 bytes) - dead code
+; Data from 8101 to 8113 (19 bytes) - dead code?
 .db $3A $80 $D6 $E6 $30 $20 $0B $CD $F4 $B1 $3E $8E $32 $41 $D7 $C3
 .db $2F $DB $C9
 
-_LABEL_8114_Menu0:
-  call _LABEL_BB85_
-  call _LABEL_B44E_
-  ld a, $01
+_LABEL_8114_Menu0: ; init functions, need renaming
+  call _LABEL_BB85_ScreenOn
+  call _LABEL_B44E_BlankMenuRAM
+  ld a, MenuScreen_Title
   ld (_RAM_D699_MenuScreenIndex), a
   ld (_RAM_D7B3_), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_B337_
-  call _LABEL_9400_
-  call _LABEL_BAFF_
-  call _LABEL_BAD5_
-  call _LABEL_BDED_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_B337_BlankTiles
+  call _LABEL_9400_BlankSprites
+  call _LABEL_BAFF_LoadFontTiles
+  call _LABEL_BAD5_LoadMenuLogoTiles
+  call _LABEL_BDED_LoadMenuLogoTilemap
   call _LABEL_BB13_
-  call _LABEL_B323_
+  call _LABEL_B323_Populate_RAM_DBFE_
   call _LABEL_8CDB_
   ld a, $59
   ld (_RAM_DBD4_), a
@@ -17523,7 +17453,7 @@ _LABEL_8114_Menu0:
   ld (_RAM_DBD8_CourseSelectIndex), a
   ld (_RAM_DC3B_), a
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a
-  ld (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode), a
+  ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
   ld (_RAM_D6C8_), a
   ld (_RAM_D6C6_), a
   ld (_RAM_D6C0_), a
@@ -17551,35 +17481,35 @@ _LABEL_8114_Menu0:
   ld (_RAM_DC35_), a
   ld a, $1A
   ld (_RAM_DC39_), a
-  call _LABEL_BF2E_LoadPalette
+  call _LABEL_BF2E_LoadMenuPalette_SMS
   ld a, (_RAM_DC3C_IsGameGear)
   ld (_RAM_DC40_), a
   ld c, $01
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
 
 _LABEL_81C1_:
-  call _LABEL_BB85_
-  ld a, $02
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_SelectPlayerCount
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
-  call _LABEL_BAFF_
-  call _LABEL_BAD5_
-  call _LABEL_BDED_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
+  call _LABEL_BAFF_LoadFontTiles
+  call _LABEL_BAD5_LoadMenuLogoTiles
+  call _LABEL_BDED_LoadMenuLogoTilemap
   ld c, $07
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $00
   ld (_RAM_D6C7_), a
   call _LABEL_BB95_
   call _LABEL_BC0C_
   call _LABEL_A4B7_
-  call _LABEL_9317_
+  call _LABEL_9317_InitialiseHandSprites
   call _LABEL_BDB8_
   ld a, $00
-  ld (_RAM_D6A0_), a
+  ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_
@@ -17587,14 +17517,14 @@ _LABEL_81C1_:
   ret
 
 _LABEL_8205_:
-  call _LABEL_BB85_
-  ld a, $03
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_OnePlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $00
   ld (_RAM_D6C8_), a
   call _LABEL_B2DC_
-  call _LABEL_B2F3_
-  call _LABEL_987B_
+  call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
+  call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
   call _LABEL_988D_
   xor a
@@ -17602,7 +17532,7 @@ _LABEL_8205_:
   ld (_RAM_D6B8_), a
   ld (_RAM_D6B7_), a
   ld (_RAM_D6B9_), a
-  ld hl, $4480 ; Tile 24
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   call _LABEL_9F40_
@@ -17611,9 +17541,9 @@ _LABEL_8205_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $791A ; Tilemap 13, 4 for GG
+  TilemapWriteAddressToHL 13, 8 ; for GG
   jr ++
-+:ld hl, $7952 ; Tilemap 9, 5 for SMS
++:TilemapWriteAddressToHL 9, 9 ; for SMS
 ++:call _LABEL_BCCF_EmitTilemapRectangleSequence
 
   ld a, $60
@@ -17624,33 +17554,33 @@ _LABEL_8205_:
   ld (_RAM_D6B0_), a
   call _LABEL_BDA6_
   ld c, $02
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A67C_
-  call _LABEL_97EA_
+  call _LABEL_97EA_DrawDriverPortraitColumn
   call _LABEL_B3AE_
   call _LABEL_BB75_
   ret
 
 _LABEL_8272_:
-  call _LABEL_BB85_
-  ld a, $04
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_RaceName
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2DC_
-  ld hl, $7840
+  call _LABEL_B2DC_ ; blank screen
+  TilemapWriteAddressToHL 0, 5
   call _LABEL_B35A_VRAMAddressToHL
-  call _LABEL_95AF_
-  ld a, $02
-  call _LABEL_B478_SelectPageNumber
-  ld hl, $B3E4
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4480
-  ld de, $0280
+  call _LABEL_95AF_DrawHorizontalLineIfSMS
+  ld a, TT_Powerboats
+  call _LABEL_B478_SelectPortraitPage
+  ld hl, _DATA_1F3E4_Tiles_Portrait_Powerboat
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $24
+  ld de, 80 * 8 ; 80 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  
+
   ; Draw 10x8 tilemap rect at 11, 10 starting at tile $24
   ld a, $24
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld hl, $7A96 ; Tilemap 11, 10
+  TilemapWriteAddressToHL 11, 14
   ld a, $08
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   ld a, $0A
@@ -17658,16 +17588,16 @@ _LABEL_8272_:
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
-  
+
   ld c, $05
-  call _LABEL_B1EC_
-  ld a, $0F
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
+  ld a, :_TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $7C90
+  TilemapWriteAddressToHL 8, 22
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0010
-  ld hl, $ACC9
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
+  ld bc, 16
+  ld hl, _TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
+  CallRamCode _LABEL_3BC6A_EmitText
   ld a, $60
   ld (_RAM_D6AF_), a
   ld hl, $0170
@@ -17678,7 +17608,7 @@ _LABEL_8272_:
   ret
 
 _LABEL_82DF_Menu1:
-  ld a, $06
+  ld a, MenuScreen_Qualify
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $FF
   ld (_RAM_D6C4_), a
@@ -17688,9 +17618,9 @@ _LABEL_82DF_Menu1:
   jp _LABEL_8360_
 
 +:
-  call _LABEL_BB85_
+  call _LABEL_BB85_ScreenOn
   call _LABEL_B2DC_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
   ld a, $0B
@@ -17699,7 +17629,7 @@ _LABEL_82DF_Menu1:
   ld (_RAM_D6B4_), a
   ld a, $07
   ld (_RAM_D6B1_), a
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   ld (_RAM_DBD3_), a
@@ -17707,13 +17637,13 @@ _LABEL_82DF_Menu1:
   call _LABEL_9F40_
   ld hl, $7A1A
   call _LABEL_B8C9_EmitTilemapRectangle_5x6_24
-  ld hl, $7C0E
+  TilemapWriteAddressToHL 7, 20
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0012
   ld hl, _TEXT_834E_FailedToQualify
   call _LABEL_A5B0_EmitToVDP_Text
   ld c, $08
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -17732,9 +17662,9 @@ _TEXT_834E_FailedToQualify:
 .asc "FAILED TO QUALIFY!" ; $05 $00 $08 $0B $04 $03 $0E $13 $1A $0E $10 $14 $00 $0B $08 $05 $18 $B4
 
 _LABEL_8360_:
-  call _LABEL_BB85_
+  call _LABEL_BB85_ScreenOn
   call _LABEL_B2DC_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
   ld a, $03
@@ -17745,19 +17675,18 @@ _LABEL_8360_:
   ld a, (_RAM_DBD8_CourseSelectIndex)
   add a, $01
   ld (_RAM_DBD8_CourseSelectIndex), a
-+:
-  ld hl, $4480 ; Tile $24
++:TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   call _LABEL_9F40_
   ld hl, $7A9A
   call _LABEL_B8C9_EmitTilemapRectangle_5x6_24
-  ld hl, $7996
+  TilemapWriteAddressToHL 11, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0009
   ld hl, _TEXT_83ED_Qualified
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $79D2
+  TilemapWriteAddressToHL 9, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000E
   ld hl, _TEXT_83F6_ForChallenge
@@ -17765,13 +17694,13 @@ _LABEL_8360_:
   ld a, (_RAM_D7B4_)
   or a
   jr z, +
-  ld hl, $79CE
+  TilemapWriteAddressToHL 7, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0012
   ld hl, _TEXT_8404_ForHeadToHead
   call _LABEL_A5B0_EmitToVDP_Text
 +:
-  ld hl, $7C98
+  TilemapWriteAddressToHL 12, 22
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
   ld hl, _TEXT_8416_Lives
@@ -17782,7 +17711,7 @@ _LABEL_8360_:
   xor a
   out (PORT_VDP_DATA), a
   ld c, $06
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld hl, $0190
   ld (_RAM_D6AB_), hl
   call _LABEL_BB75_
@@ -17805,14 +17734,14 @@ _TEXT_8416_Lives:
 .asc "LIVES " ; $0B $08 $15 $04 $12 $0E
 
 _LABEL_841C_:
-  call _LABEL_BB85_
-  ld a, $07
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_WhoDoYouWantToRace
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B337_
+  call _LABEL_B337_BlankTiles
   call _LABEL_B2DC_
   call _LABEL_A673_
-  call _LABEL_B2F3_
-  call _LABEL_987B_
+  call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
+  call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
   call _LABEL_988D_
   xor a
@@ -17837,22 +17766,22 @@ _LABEL_841C_:
   ld (_RAM_D6AE_), a
   call _LABEL_B3AE_
   ld c, $02
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBFB_)
   ld (_RAM_D6A2_), a
   ld c, a
   ld b, $00
-  call _LABEL_97EA_
+  call _LABEL_97EA_DrawDriverPortraitColumn
   call _LABEL_BB75_
   ret
 
 _LABEL_8486_:
-  call _LABEL_BB85_
-  ld a, $08
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_StorageBox
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2BB_
   ld c, $07
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A787_
   call _LABEL_AD42_DrawDisplayCase
   call _LABEL_B230_DisplayCase_BlankRuffTrux
@@ -17862,8 +17791,8 @@ _LABEL_8486_:
   call _LABEL_BB75_
   ret
 
-_LABEL_84AA_:
-  call _LABEL_BB85_
+_LABEL_84AA_Menu5:
+  call _LABEL_BB85_ScreenOn
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, _LABEL_84C7_
@@ -17874,10 +17803,10 @@ _LABEL_84AA_:
   cp $1A
   jr nz, _LABEL_84C7_
   call _LABEL_B877_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_84C7_:
-  ld a, $09
+  ld a, MenuScreen_OnePlayerTrackIntro
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2BB_
   ld a, (_RAM_DC3F_GameMode)
@@ -17889,8 +17818,8 @@ _LABEL_84C7_:
   ld (_RAM_D6C3_), a
   call _LABEL_AC1E_
   call _LABEL_ACEE_
-  call _LABEL_AB5B_
-  call _LABEL_AB86_
+  call _LABEL_AB5B_GetPortraitSource_CourseSelect
+  call _LABEL_AB86_Decompress3bppTiles_Index100
   call _LABEL_ABB0_
   call _LABEL_BA3C_
   ld a, $40
@@ -17900,19 +17829,19 @@ _LABEL_84C7_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   ld c, $05
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
 
-_LABEL_8507_:
-  call _LABEL_BB85_
-  ld a, $0A
+_LABEL_8507_Menu2:
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_OnePlayerTournamentResults
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   call _LABEL_9448_
   ld a, (_RAM_DC3C_IsGameGear)
@@ -17924,8 +17853,8 @@ _LABEL_8507_:
 +:
   call _LABEL_94F0_
 ++:
-  call _LABEL_B305_
-  ld hl, $4480
+  call _LABEL_B305_DrawHorizontalLine_Top
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
   ld c, a
@@ -17941,7 +17870,7 @@ _LABEL_8507_:
   ld a, (_RAM_DBD4_)
   add a, c
   call _LABEL_9F40_
-  ld hl, $4840
+  TileWriteAddressToHL $42
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
   ld c, a
@@ -17957,7 +17886,7 @@ _LABEL_8507_:
   ld a, (_RAM_DBD5_)
   add a, c
   call _LABEL_9F40_
-  ld hl, $4C00
+  TileWriteAddressToHL $60
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
   ld c, a
@@ -17973,7 +17902,7 @@ _LABEL_8507_:
   ld a, (_RAM_DBD6_)
   add a, c
   call _LABEL_9F40_
-  ld hl, $4FC0
+  TileWriteAddressToHL $7e
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
   ld c, a
@@ -17990,7 +17919,7 @@ _LABEL_8507_:
   add a, c
   call _LABEL_9F40_
   call _LABEL_A877_
-  ld hl, $78D8
+  TilemapWriteAddressToHL 12, 7
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_85EC_Results
@@ -18000,7 +17929,7 @@ _LABEL_8507_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6C1_), a
   ld c, $06
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr nz, +
@@ -18024,12 +17953,12 @@ _TEXT_85EC_Results:
 .asc "RESULTS-" ; $11 $04 $12 $14 $0B $13 $12 $B5
 
 _LABEL_85F4_:
-  call _LABEL_BB85_
-  ld a, $0B
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_UnknownB
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, $0E
   call _LABEL_B2DC_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
   ld a, $0B
@@ -18038,12 +17967,12 @@ _LABEL_85F4_:
   ld (_RAM_D6B4_), a
   ld a, $07
   ld (_RAM_D6B1_), a
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_D6C4_)
   ld c, a
   ld b, $00
-  ld hl, $DBD5
+  ld hl, _RAM_DBD5_
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_), a
@@ -18060,7 +17989,7 @@ _LABEL_85F4_:
   srl a
   ld c, a
   ld b, $00
-  ld hl, $DBFE
+  ld hl, _RAM_DBFE_
   add hl, bc
   ld a, $5A
   ld (hl), a
@@ -18073,19 +18002,19 @@ _LABEL_85F4_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   ld c, $09
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
 
-_LABEL_866C_:
-  call _LABEL_BB85_
-  ld a, $0C
+_LABEL_866C_Menu3:
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_LifeList
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2DC_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC38_)
   cp $02
@@ -18108,7 +18037,7 @@ _LABEL_866C_:
   jp z, _LABEL_876B_
   dec a
   jp z, _LABEL_87E9_
-  ld hl, $7992
+  TilemapWriteAddressToHL 9, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000E
   ld hl, _TEXT_882E_OneLifeLost
@@ -18116,11 +18045,9 @@ _LABEL_866C_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7C98
+  TilemapWriteAddressToHL 12, 22 ; SMS
   jr ++
-
-+:
-  ld hl, $7C58
++:TilemapWriteAddressToHL 12, 21 ; GG
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
@@ -18150,15 +18077,15 @@ _LABEL_866C_:
   ld a, $A8
   ld (_RAM_D721_SpriteY), a
 ++:
-  call _LABEL_93CE_
+  call _LABEL_93CE_UpdateSpriteTable
   ld c, $0A
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $80
   ld (_RAM_D6AB_), a
   jp _LABEL_8826_
 
 _LABEL_8717_:
-  ld hl, $7992
+  TilemapWriteAddressToHL 9, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000E
   ld hl, _TEXT_883C_GameOver
@@ -18166,29 +18093,27 @@ _LABEL_8717_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7C98
+  TilemapWriteAddressToHL 12, 22
   jr ++
-
-+:
-  ld hl, $7C58
++:TilemapWriteAddressToHL 12, 21
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
   ld hl, _TEXT_8850_Level
   call _LABEL_A5B0_EmitToVDP_Text
-  ld a, (_RAM_DBF6_)
-  cp $0E
+  ld a, (_RAM_DBF1_RaceNumberText + 5)
+  cp $0E ; '0'?
   jr z, +
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
 +:
-  ld a, (_RAM_DBF7_)
+  ld a, (_RAM_DBF1_RaceNumberText + 6)
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
   ld c, $08
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -18202,12 +18127,12 @@ _LABEL_8717_:
   jp _LABEL_8826_
 
 _LABEL_876B_:
-  ld hl, $7994
+  TilemapWriteAddressToHL 10, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000C
   ld hl, _TEXT_8856_YouMadeIt
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A14
+  TilemapWriteAddressToHL 10, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000C
   ld hl, _TEXT_8862_ExtraLife
@@ -18215,11 +18140,9 @@ _LABEL_876B_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7C98
+  TilemapWriteAddressToHL 12, 22
   jr ++
-
-+:
-  ld hl, $7C58
++:TilemapWriteAddressToHL 12, 21
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
@@ -18252,15 +18175,15 @@ _LABEL_876B_:
   ld (_RAM_D6E1_SpriteX), a
   ld a, $E0
   ld (_RAM_D721_SpriteY), a
-  call _LABEL_93CE_
+  call _LABEL_93CE_UpdateSpriteTable
   ld c, $06
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $C8
   ld (_RAM_D6AB_), a
   jp _LABEL_8826_
 
 _LABEL_87E9_:
-  ld hl, $79D6
+  TilemapWriteAddressToHL 11, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0009
   ld hl, _TEXT_886E_NoBonus
@@ -18268,11 +18191,9 @@ _LABEL_87E9_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7C98
+  TilemapWriteAddressToHL 12, 22
   jr ++
-
-+:
-  ld hl, $7C58
++:TilemapWriteAddressToHL 12, 21
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
@@ -18284,7 +18205,7 @@ _LABEL_87E9_:
   xor a
   out (PORT_VDP_DATA), a
   ld c, $0A
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $80
   ld (_RAM_D6AB_), a
 _LABEL_8826_:
@@ -18322,26 +18243,26 @@ _TEXT_886E_NoBonus:
 .asc "NO  BONUS" ; $0D $1A $0E $0E $01 $1A $0D $14 $12
 
 _LABEL_8877_:
-  call _LABEL_BB85_
-  ld a, $0D
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_UnknownD
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2DC_
-  call _LABEL_B305_
-  ld a, $09
-  call _LABEL_B478_SelectPageNumber
-  ld hl, _DATA_AB4D_
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6000
-  ld de, $0280
+  call _LABEL_B305_DrawHorizontalLine_Top
+  ld a, TT_Unknown9
+  call _LABEL_B478_SelectPortraitPage
+  ld hl, _DATA_2AB4D_Tiles_RuffTruxPortrait
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $100
+  ld de, 80 * 8 ; 80 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
   ; Draw 10x8 tilemap rect at 11, (something) starting at tile 256
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B96 ; 11, 14 (SMS)
+  TilemapWriteAddressToHL 11, 18 ; for SMS
   jr ++
-+:ld hl, $7A96 ; 11, 10 (GG)
++:TilemapWriteAddressToHL 11, 14 ; for GG
 ++:xor a
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $08
@@ -18355,36 +18276,36 @@ _LABEL_8877_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7D90 ; 8, 22
+  TilemapWriteAddressToHL 8, 26 ; SMS
   jr ++
-+:ld hl, $7C90 ; 8, 18
++:TilemapWriteAddressToHL 8, 22 ; GG
 ++:call _LABEL_B35A_VRAMAddressToHL
 
-  ld a, $0F
+  ld a, :_TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld bc, $0010
-  ld hl, $AD39
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
+  ld bc, 16
+  ld hl, _TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
+  CallRamCode _LABEL_3BC6A_EmitText
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7952
+  TilemapWriteAddressToDE 9, 9
   ld hl, _TEXT_8929_TripleWin
   call _LABEL_B3A4_EmitToVDPAtDE_Text
-  ld de, $79D2
+  TilemapWriteAddressToDE 9, 11
   ld hl, _TEXT_8937_BonusRace
   call _LABEL_B3A4_EmitToVDPAtDE_Text
   jr ++
 
 +:
-  ld de, $7992
+  TilemapWriteAddressToDE 9, 10
   ld hl, _TEXT_8929_TripleWin
   call _LABEL_B3A4_EmitToVDPAtDE_Text
-  ld de, $7A12
+  TilemapWriteAddressToDE 9, 12
   ld hl, _TEXT_8937_BonusRace
   call _LABEL_B3A4_EmitToVDPAtDE_Text
 ++:
-  ld de, $7A52
+  TilemapWriteAddressToDE 9, 13
   ld hl, _TEXT_8945_BeatTheClock
   call _LABEL_B3A4_EmitToVDPAtDE_Text
   ld a, $40
@@ -18394,7 +18315,7 @@ _LABEL_8877_:
   ld (_RAM_D6AC_), a
   ld (_RAM_D6C1_), a
   ld c, $05
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
 
@@ -18411,35 +18332,35 @@ _TEXT_8945_BeatTheClock:
 .asc "BEAT THE CLOCK" ; $01 $04 $00 $13 $0E $13 $07 $04 $0E $02 $0B $1A $02 $0A
 
 _LABEL_8953_:
-  call _LABEL_BB85_
-  ld a, $0E
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TwoPlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $01
   ld (_RAM_D7B4_), a
   xor a
   ld (_RAM_D6C8_), a
   call _LABEL_B2DC_
-  call _LABEL_B2F3_
-  call _LABEL_987B_
+  call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
+  call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
   call _LABEL_988D_
   call _LABEL_A673_
 
-  ld hl, $4480 ; Tile $24
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   call _LABEL_9F40_
   ld a, (_RAM_DBD5_)
   call _LABEL_9F40_
-  
-  ld hl, $7954 ; Tilemap 10, 5
+
+  TilemapWriteAddressToHL 10, 9
   call _LABEL_B8C9_EmitTilemapRectangle_5x6_24
-  
+
   ld a, $42
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $06
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
-  ld hl, $7962
+  TilemapWriteAddressToHL 17, 9
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, $30
   ld (_RAM_D6AF_), a
@@ -18460,28 +18381,28 @@ _LABEL_8953_:
   ld a, $02
   ld (_RAM_D688_), a
   call _LABEL_A67C_
-  call _LABEL_97EA_
+  call _LABEL_97EA_DrawDriverPortraitColumn
   call _LABEL_B3AE_
   ld c, $02
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
 
 _LABEL_89E2_:
-  call _LABEL_BB85_
-  ld a, $0F
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TwoPlayerGameType
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   ld a, $B2
   ld (_RAM_D6C8_), a
   call _LABEL_9448_
   call _LABEL_94AD_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   ld a, $01
   ld (_RAM_D6C7_), a
   ld (_RAM_D7B3_), a
@@ -18489,51 +18410,51 @@ _LABEL_89E2_:
   call _LABEL_BC0C_
   call _LABEL_A530_
   ld c, $07
-  call _LABEL_B1EC_
-  call _LABEL_9317_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
+  call _LABEL_9317_InitialiseHandSprites
   xor a
-  ld (_RAM_D6A0_), a
+  ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_
   call _LABEL_BB75_
   ret
 
 _LABEL_8A30_:
-  call _LABEL_BB85_
-  ld a, $10
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TrackSelect
   jp +
 
-_LABEL_8A38_:
-  call _LABEL_BB85_
-  ld a, $11
+_LABEL_8A38_Menu4:
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TwoPlayerResult
 +:
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   call _LABEL_A296_
   call _LABEL_BA3C_
-  call _LABEL_BA4F_
+  call _LABEL_BA4F_LoadMediumNumberTiles
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $10
+  cp MenuScreen_TrackSelect
   jr z, ++
 +:
   ld a, $B2
   ld (_RAM_D6C8_), a
   call _LABEL_9448_
   call _LABEL_94AD_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
 ++:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr nz, +
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBCF_LastRacePosition)
   ld c, a
@@ -18548,7 +18469,7 @@ _LABEL_8A38_:
   jp ++
 
 +:
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   call _LABEL_9F40_
@@ -18557,17 +18478,17 @@ _LABEL_8A38_:
 ++:
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $7852
+  TilemapWriteAddressToHL 9, 5
   jp ++
 
-+:
-  ld hl, $7AD2
++:TilemapWriteAddressToHL 9, 15
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
   jr z, +
+  ; Add two rows for SMS -> 9, 13
   ld bc, $0080
   add hl, bc
 +:
@@ -18577,18 +18498,16 @@ _LABEL_8A38_:
   ld a, $06
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $7864
+  TilemapWriteAddressToHL 18, 5
   jp ++
-
-+:
-  ld hl, $7AE4
++:TilemapWriteAddressToHL 18, 15
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld bc, $0080
+  ld bc, $0080 ; Add 2 rows for SMS -> 18, 13
   add hl, bc
 +:
   call _LABEL_BCCF_EmitTilemapRectangleSequence
@@ -18604,17 +18523,17 @@ _LABEL_8A38_:
   ld (_RAM_D6CC_), a
   ld (_RAM_D6CE_), a
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jp z, _LABEL_8B89_
   ld a, (_RAM_DC34_)
   cp $01
   jr z, +
   call _LABEL_A673_
   ld c, $05
-  call _LABEL_B1EC_
-  call _LABEL_9317_
-  ld hl, $B356
-  call $D9F5  ; Code is loaded from _LABEL_3BBB5_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
+  call _LABEL_9317_InitialiseHandSprites
+  ld hl, _DATA_2B356_SpriteNs_HandLeft
+  CallRamCode _LABEL_3BBB5_PopulateSpriteNs
   jp _LABEL_8B9D_
 
 +:
@@ -18627,7 +18546,7 @@ _LABEL_8A38_:
   jr z, _LABEL_8B55_
 -:
   ld a, $CC
-  out ($03), a
+  out (PORT_GG_LinkSend), a
   ld a, (_RAM_DC47_GearToGear_OtherPlayerControls1)
   cp $3F
   jr z, -
@@ -18639,13 +18558,13 @@ _LABEL_8B55_:
   cp $CC
   jr nz, _LABEL_8B55_
   ld a, (_RAM_D6CF_)
-  out ($03), a
+  out (PORT_GG_LinkSend), a
 +:
-  call _LABEL_AF5D_
+  call _LABEL_AF5D_BlankControlsRAM
   ld a, (_RAM_D6CF_)
   ld c, a
   ld b, $00
-  ld hl, $DC2C
+  ld hl, _RAM_DC2C_
   add hl, bc
   ld a, $01
   ld (hl), a
@@ -18653,16 +18572,16 @@ _LABEL_8B55_:
   call _LABEL_B213_
   ld a, c
   add a, $01
-  call _LABEL_AB68_
-  call _LABEL_AB9B_
+  call _LABEL_AB68_GetPortraitSource_TrackType
+  call _LABEL_AB9B_Decompress3bppTiles_Index160
   call _LABEL_ABB0_
   ld c, $05
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jp _LABEL_8B9D_
 
 _LABEL_8B89_:
   ld c, $0B
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A0B4_
   call _LABEL_B7FF_
   ld a, (_RAM_DC34_)
@@ -18673,12 +18592,12 @@ _LABEL_8B9D_:
   call _LABEL_A14F_
   xor a
   ld (_RAM_D6CB_), a
-  call _LABEL_BF2E_LoadPalette
+  call _LABEL_BF2E_LoadMenuPalette_SMS
   call _LABEL_BB75_
   ret
 
 ; 2nd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8BAB_:
+_LABEL_8BAB_Handler_MenuScreen_Title:
   call _LABEL_AF10_
   ld a, (_RAM_D7BB_)
   or a
@@ -18687,12 +18606,12 @@ _LABEL_8BAB_:
   call _LABEL_918B_
   call _LABEL_92CB_
   call _LABEL_B9C4_
-  call _LABEL_B484_
-  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode)
+  call _LABEL_B484_CheckTitleScreenCheatCodes
+  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect)
   cp $09 ; full length
-  jr z, _LABEL_8C23_CheatCode1 ; cheat 1 entered
+  jr z, _LABEL_8C23_StartCourseSelect ; cheat 1 entered
 
-  ld a, (_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect)
+  ld a, (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode)
   cp $07 ; middle length
   jr nz, +
   ld a, $01
@@ -18703,21 +18622,24 @@ _LABEL_8BAB_:
   ld a, $02
   ld (_RAM_DC46_Cheat_HardMode), a
 ++:
-  call _LABEL_B505_
+  call _LABEL_B505_UpdateHardModeText
+
   ld a, (_RAM_D6AB_)
   or a
   jr z, +
   sub $01
   ld (_RAM_D6AB_), a
+
   jp +++
 
-+:
++:; No hard mode, or _RAM_D6AB_ = 0
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK
   jr z, ++
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +++
+  ; GG: check for Gear to Gear
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr z, +
@@ -18726,34 +18648,35 @@ _LABEL_8BAB_:
   jr z, ++
   jr +++
 
-+:
-  in a, ($00) ; GG start button
-  and $80
++:; Check for Start button
+  in a, (PORT_GG_START)
+  and PORT_GG_START_MASK
   jr nz, +++
 ++:
+  ; Either player pressed Start
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, _LABEL_8C2C_
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_81C1_
 +++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
-_LABEL_8C23_CheatCode1:
-  call _LABEL_B1F4_
+_LABEL_8C23_StartCourseSelect:
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_B70B_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_8C2C_:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8953_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 3rd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8C35_:
+_LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   call _LABEL_B9C4_
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0F
+  cp MenuScreen_TwoPlayerGameType
   jr z, +
   call _LABEL_B433_
   ld hl, (_RAM_D6AB_)
@@ -18762,9 +18685,9 @@ _LABEL_8C35_:
   ld a, h
   cp $03
   jr nz, +
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8114_Menu0
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_8CA2_
@@ -18774,39 +18697,39 @@ _LABEL_8C35_:
 .db $CD $B1 $8C
 
 +:
-  ld a, (_RAM_D6A0_)
+  ld a, (_RAM_D6A0_MenuSelection)
   or a
-  jp z, _LABEL_80FC_MenuScreenHandler_Null
+  jp z, _LABEL_80FC_EndMenuScreenHandler
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_1_MASK ; $10
-  jp nz, _LABEL_80FC_MenuScreenHandler_Null
+  jp nz, _LABEL_80FC_EndMenuScreenHandler
   ; Select
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0F
+  cp MenuScreen_TwoPlayerGameType
   jr z, ++
-  ld a, (_RAM_D6A0_)
+  ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
   call _LABEL_AFCD_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_8953_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++:
-  ld a, (_RAM_D6A0_)
+  ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
   ld a, $01
   ld (_RAM_DC34_), a
   call _LABEL_8A30_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_8A30_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_8CA2_:
   ld a, (_RAM_D680_Player1Controls_Menus) ; Check if any buttons we care about are pressed
@@ -18829,17 +18752,17 @@ _LABEL_8CA2_:
   ret
 
 +:
-  ld hl, $B356
-  call $D9F5  ; Code is loaded from _LABEL_3BBB5_
+  ld hl, _DATA_2B356_SpriteNs_HandLeft
+  CallRamCode _LABEL_3BBB5_PopulateSpriteNs
   ld a, $01
-  ld (_RAM_D6A0_), a
+  ld (_RAM_D6A0_MenuSelection), a
   ret
 
 ++:
-  ld hl, $B36E
-  call $D9F5  ; Code is loaded from _LABEL_3BBB5_
+  ld hl, _DATA_2B36E_SpriteNs_HandRight
+  CallRamCode _LABEL_3BBB5_PopulateSpriteNs
   ld a, $02
-  ld (_RAM_D6A0_), a
+  ld (_RAM_D6A0_MenuSelection), a
   ret
 
 _LABEL_8CDB_:
@@ -18854,24 +18777,24 @@ _LABEL_8CDB_:
   ret
 
 ; 4th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8CE7_:
+_LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter:
   call _LABEL_996E_
   call _LABEL_95C3_
   call _LABEL_9B87_
   call _LABEL_9D4E_
   ld a, (_RAM_D6B8_)
   or a
-  jr z, _LABEL_8D28_
+  jr z, _LABEL_8D28_MenuScreenHandlerDone
   ld a, (_RAM_D6B8_)
   sub $01
   ld (_RAM_D6B8_), a
   cp $10
   jr z, +
   cp $D0
-  jr nc, _LABEL_8D28_
+  jr nc, _LABEL_8D28_MenuScreenHandlerDone
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
-  jr nz, _LABEL_8D28_
+  jr nz, _LABEL_8D28_MenuScreenHandlerDone
 +:
   ld a, (_RAM_D6A2_)
   ld (_RAM_DBFB_), a
@@ -18879,13 +18802,13 @@ _LABEL_8CE7_:
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
   ld (_RAM_DBFD_), a
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8272_
-_LABEL_8D28_:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+_LABEL_8D28_MenuScreenHandlerDone:
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 5th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8D2B_:
+_LABEL_8D2B_Handler_MenuScreen_RaceName:
   ld a, (_RAM_D6C1_)
   dec a
   jr z, ++
@@ -18914,21 +18837,21 @@ _LABEL_8D2B_:
   jr nz, +++
   xor a
   ld (_RAM_D6AB_), a
-  ld a, (_RAM_D6C5_)
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
-  call _LABEL_BD2F_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_BD2F_PaletteFade
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, $01
-  ld (_RAM_D6D5_), a
+  ld (_RAM_D6D5_InGame), a
 +++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 7th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8D79_:
+_LABEL_8D79_Handler_MenuScreen_Qualify:
   ld a, (_RAM_DBCE_)
   or a
   jr z, ++++
@@ -18950,17 +18873,17 @@ _LABEL_8D79_:
 +:
   ld a, $01
   ld (_RAM_D6B9_), a
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
   call _LABEL_841C_
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +++:
-  call _LABEL_84AA_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_84AA_Menu5
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++++:
   call _LABEL_9D4E_
@@ -18971,13 +18894,13 @@ _LABEL_8D79_:
   or h
   or a
   jr nz, +
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8114_Menu0
 +:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 8th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8DCC_:
+_LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace:
   call _LABEL_996E_
   call _LABEL_95C3_
   call _LABEL_9B87_
@@ -18989,8 +18912,8 @@ _LABEL_8DCC_:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
-  in a, ($00)
-  and $80
+  in a, (PORT_GG_START)
+  and PORT_GG_START_MASK
   jr nz, +
   ld a, $01
   ld (_RAM_D6C1_), a
@@ -19004,13 +18927,13 @@ _LABEL_8DCC_:
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
   ld (_RAM_DBFD_), a
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8486_
 +:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 9th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8E15_:
+_LABEL_8E15_Handler_MenuScreen_StorageBox:
   ld b, $00
   ld a, (_RAM_D6C2_DisplayCase_FlashingCarIndex)
   ld c, a
@@ -19040,7 +18963,7 @@ _LABEL_8E15_:
   cp $03
   jp z, _LABEL_B254_DisplayCase_RestoreRuffTrux
   call _LABEL_AE94_DisplayCase_RestoreRectangle
-  
+
 _LABEL_8E54_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -19059,24 +18982,24 @@ _LABEL_8E54_:
   ld a, $01
   ld (_RAM_D697_), a
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC0A_)
   cp $03
   jr nz, +
   xor a
-  ld (_RAM_DBE8_), a
-  ld (_RAM_DBEC_), a
-  ld (_RAM_DBF0_), a
+  ld (_RAM_DBD9_DisplayCaseData + 15), a
+  ld (_RAM_DBD9_DisplayCaseData + 19), a
+  ld (_RAM_DBD9_DisplayCaseData + 23), a
   call _LABEL_8877_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_84AA_
+  call _LABEL_84AA_Menu5
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 10th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8E97_:
+_LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro:
   ld a, (_RAM_D6C1_)
   dec a
   jr z, ++
@@ -19108,21 +19031,21 @@ _LABEL_8E97_:
   jr nz, +++
   xor a
   ld (_RAM_D6AB_), a
-  ld a, (_RAM_D6C5_)
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
-  call _LABEL_BD2F_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_BD2F_PaletteFade
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, $01
-  ld (_RAM_D6D5_), a
+  ld (_RAM_D6D5_InGame), a
 +++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 11th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8EF0_:
+_LABEL_8EF0_Handler_MenuScreen_OnePlayerTournamentResults:
   ld a, (_RAM_D6AB_)
   cp $A0
   jr z, +
@@ -19138,7 +19061,7 @@ _LABEL_8EF0_:
   jp z, _LABEL_A8FC_
 _LABEL_8F10_:
   call _LABEL_A7ED_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, (_RAM_D6C1_)
@@ -19150,7 +19073,7 @@ _LABEL_8F10_:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   cp $02
   jr nc, _LABEL_8F73_
@@ -19163,18 +19086,18 @@ _LABEL_8F10_:
   cp $FF
   jr z, +
   call _LABEL_85F4_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_8486_
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +++:
   ld a, $01
   ld (_RAM_DC3A_), a
-  call _LABEL_84AA_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_84AA_Menu5
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++++:
   ld a, (_RAM_DBCF_LastRacePosition)
@@ -19187,7 +19110,7 @@ _LABEL_8F10_:
 
 +:
   call _LABEL_B877_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_8F73_:
   ld a, (_RAM_DC09_Lives)
@@ -19197,17 +19120,17 @@ _LABEL_8F73_:
   jr z, +
   xor a
   ld (_RAM_DC38_), a
-  call _LABEL_866C_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_866C_Menu3
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, $01
   ld (_RAM_DC38_), a
-  call _LABEL_866C_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_866C_Menu3
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 12th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8F93_:
+_LABEL_8F93_Handler_MenuScreen_UnknownB:
   call _LABEL_A692_
   ld a, (_RAM_D6AC_)
   xor $01
@@ -19227,13 +19150,13 @@ _LABEL_8F93_:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_841C_
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 13th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_8FC4_:
+_LABEL_8FC4_Handler_MenuScreen_LifeList:
   ld a, (_RAM_DC38_)
   or a
   jr nz, +
@@ -19242,7 +19165,7 @@ _LABEL_8FC4_:
   jr z, _LABEL_902E_
   add a, $01
   ld (_RAM_D721_SpriteY), a
-  call _LABEL_93CE_
+  call _LABEL_93CE_UpdateSpriteTable
   jp _LABEL_902E_
 
 +:
@@ -19267,18 +19190,16 @@ _LABEL_8FC4_:
 ++:
   sub $01
   ld (_RAM_D721_SpriteY), a
-  call _LABEL_93CE_
+  call _LABEL_93CE_UpdateSpriteTable
   jp _LABEL_902E_
 
 +++:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7CA4
+  TilemapWriteAddressToHL 18, 22
   jr ++
-
-+:
-  ld hl, $7C64
++:TilemapWriteAddressToHL 18, 21
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC09_Lives)
@@ -19288,7 +19209,7 @@ _LABEL_8FC4_:
   out (PORT_VDP_DATA), a
   ld a, $E1
   ld (_RAM_D721_SpriteY), a
-  call _LABEL_93CE_
+  call _LABEL_93CE_UpdateSpriteTable
 _LABEL_902E_:
   ld a, (_RAM_D6AC_)
   xor $01
@@ -19308,7 +19229,7 @@ _LABEL_902E_:
   and BUTTON_1_MASK ; $10
   jr nz, +++
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC38_)
   dec a
   jr z, ++
@@ -19316,19 +19237,19 @@ _LABEL_902E_:
   dec a
   jr z, +
   call _LABEL_8486_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_84C7_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++:
   call _LABEL_8114_Menu0
 +++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 14th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_9074_:
+_LABEL_9074_Handler_MenuScreen_UnknownD:
   ld a, (_RAM_D6C1_)
   dec a
   jr z, ++
@@ -19359,21 +19280,21 @@ _LABEL_9074_:
   jr nz, +++
   xor a
   ld (_RAM_D6AB_), a
-  ld a, (_RAM_D6C5_)
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
-  call _LABEL_BD2F_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_BD2F_PaletteFade
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, $01
-  ld (_RAM_D6D5_), a
+  ld (_RAM_D6D5_InGame), a
 +++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_90CA_:
-  ld hl, $4000
+  TileWriteAddressToHL $00
   call _LABEL_B35A_VRAMAddressToHL
   ld de, $3700
 -:
@@ -19391,7 +19312,7 @@ _LABEL_90CA_:
 
 _LABEL_90E7_:
   xor a
-  ld (_RAM_D691_), a
+  ld (_RAM_D691_TrackType), a
   ld (_RAM_D692_), a
   ld (_RAM_D693_), a
   ld a, $01
@@ -19405,24 +19326,24 @@ _LABEL_90FF_ReadControllers:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr nz, ++
-  
+
   ; Master System mode
--:in a, ($DC) ; Read controller 1
+-:in a, (PORT_CONTROL_A) ; Read controller 1
   ld b, a
-  and $3F     ; Mask to relevant bits
+  and PORT_CONTROL_A_PLAYER1_MASK
   ld (_RAM_D680_Player1Controls_Menus), a ; Store
-  
+
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr nz, + ; ret
-  
-  in a, ($DD) ; Read controller 2
+
+  in a, (PORT_CONTROL_B) ; Read controller 2
   sla a
   sla a
-  and $3C     ; Shift and mask to relevant bits
+  and %00111100  ; Shift and mask to relevant bits
   ld c, a
   ld a, b
-  and $C0     ; Mask in bits from the other port
+  and %11000000  ; Mask in bits from the other port
   rl a
   rl a
   rl a
@@ -19435,16 +19356,16 @@ _LABEL_90FF_ReadControllers:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr z, - ; Normal operation
-  
+
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
   jr nz, +
-  
+
   ; Read controller, as player 1, emit to GG port and use GG port data for player 2 controls
-  in a, ($DC) ; Read controller 1
-  and $3F
+  in a, (PORT_CONTROL_A) ; Read controller 1
+  and PORT_CONTROL_A_PLAYER1_MASK
   ld (_RAM_D680_Player1Controls_Menus), a
-  out ($03), a ; Emit to GG link port?
+  out (PORT_GG_LinkSend), a ; Emit to GG link port?
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2) ; Read in from other Game Gear?
   ld (_RAM_D681_Player2Controls_Menus), a
   ret
@@ -19453,10 +19374,10 @@ _LABEL_90FF_ReadControllers:
   ; Read controller, as player 2, emit to GG port and use GG port data for player 1 controls. We use the data from the previous frame, presumably for timing reasons?
   ld a, (_RAM_D687_Player1Controls_PreviousFrame)
   ld b, a
-  in a, ($DC) ; Read controller 1
-  and $3F
+  in a, (PORT_CONTROL_A) ; Read controller 1
+  and PORT_CONTROL_A_PLAYER1_MASK
   ld (_RAM_D687_Player1Controls_PreviousFrame), a ; Store
-  out ($03), a ; Emit to GG link port
+  out (PORT_GG_LinkSend), a ; Emit to GG link port
   ld a, b
   ld (_RAM_D681_Player2Controls_Menus), a ; My buttons go to player 2
   ld a, (_RAM_DC47_GearToGear_OtherPlayerControls1)
@@ -19477,13 +19398,13 @@ _LABEL_9167_ScreenOff:
   out (PORT_VDP_REGISTER), a
   ret
 
-_LABEL_9170_:
-  ld hl, $7700
+_LABEL_9170_BlankTilemap_BlankControlsRAM:
+; Fills tilemap with e, then chains to _LABEL_AF5D_BlankControlsRAM
+  TilemapWriteAddressToHL 0, 0
   call _LABEL_B35A_VRAMAddressToHL
   ld d, $00
-  ld bc, $0380
--:
-  ld a, e
+  ld bc, 32*28 ; $0380 ; Size of tilemap
+-:ld a, e
   out (PORT_VDP_DATA), a
   ld a, $00
   out (PORT_VDP_DATA), a
@@ -19491,34 +19412,32 @@ _LABEL_9170_:
   ld a, b
   or c
   jr nz, -
-  call _LABEL_AF5D_
+  call _LABEL_AF5D_BlankControlsRAM ; could jp
   ret
 
 _LABEL_918B_:
   ld a, (_RAM_D694_)
   or a
-  jr z, _LABEL_91E7_
+  jr z, _LABEL_91E7_ret
   ld a, (_RAM_D690_)
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld a, (_RAM_D691_)
+  ld a, (_RAM_D691_TrackType)
   cp $00
   jr nz, +
-  ld hl, $7AD6
+  TilemapWriteAddressToHL 11, 15
   jp ++
-
-+:
-  ld hl, $7A96
++:TilemapWriteAddressToHL 11, 14
 ++:
   xor a
-  ld (_RAM_D68B_), a
+  ld (_RAM_D68B_TilemapRectangleSequence_Row), a
 --:
   call _LABEL_B35A_VRAMAddressToHL
-  ld e, $0A
+  ld e, $0A ; Width
 -:
-  ld a, (_RAM_D691_)
+  ld a, (_RAM_D691_TrackType)
   or a
   jr nz, +
-  ld a, $0E
+  ld a, BLANK_TILE_INDEX
   jp ++
 
 +:
@@ -19532,31 +19451,31 @@ _LABEL_918B_:
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   dec e
   jr nz, -
-  ld a, (_RAM_D68B_)
+  ld a, (_RAM_D68B_TilemapRectangleSequence_Row)
   cp $07
   jr z, +
   add a, $01
-  ld (_RAM_D68B_), a
-  ld de, $0040
+  ld (_RAM_D68B_TilemapRectangleSequence_Row), a
+  ld de, $0040 ; Add to VRAM address
   add hl, de
   jp --
 
 +:
   call _LABEL_9276_
   call _LABEL_91E8_
-_LABEL_91E7_:
+_LABEL_91E7_ret:
   ret
 
 _LABEL_91E8_:
-  ld a, (_RAM_D691_)
+  ld a, (_RAM_D691_TrackType)
   add a, $01
-  ld (_RAM_D691_), a
+  ld (_RAM_D691_TrackType), a
   cp $06
   jr z, _LABEL_91E8_
   cp $0A
   jr nz, +
   xor a
-  ld (_RAM_D691_), a
+  ld (_RAM_D691_TrackType), a
 +:
   add a, $07
   ld (_RAM_D6D6_), a
@@ -19566,17 +19485,17 @@ _LABEL_91E8_:
   ld (_RAM_D68D_), a
   ld a, $C0
   ld (_RAM_D68C_), a
-  ld a, (_RAM_D691_)
+  ld a, (_RAM_D691_TrackType)
   sla a
   ld d, $00
   ld e, a
-  ld hl, _DATA_9254_
+  ld hl, _DATA_9254_VehiclePortraitOffsets
   add hl, de
   ld a, (hl)
   ld (_RAM_D7B5_DecompressorSource), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D7B6_), a
+  ld (_RAM_D7B5_DecompressorSource+1), a
   ld a, (_RAM_D692_)
   xor $02
   ld (_RAM_D692_), a
@@ -19601,64 +19520,80 @@ _LABEL_91E8_:
   ret
 
 ; Data from 9254 to 9267 (20 bytes)
-_DATA_9254_:
-.db $4D $AB $A5 $BA $E4 $B3 $2B $AF $5D $B3 $65 $B7 $4D $AB $C8 $AA
-.db $6E $B3 $4D $AB
+_DATA_9254_VehiclePortraitOffsets:
+; Pointers to compressed tile data for each track type
+.dw _DATA_2AB4D_Tiles_RuffTruxPortrait
+.dw _DATA_FAA5_Tiles_Portrait_SportsCars
+.dw _DATA_1F3E4_Tiles_Portrait_Powerboat
+.dw _DATA_16F2B_Tiles_Portrait_FormulaOne
+.dw _DATA_F35D_Tiles_Portrait_FourByFour
+.dw _DATA_F765_Tiles_Portrait_Warriors
+.dw $AB4D ; invalid?
+.dw _DATA_16AC8_Tiles_PortraitTurboWheels
+.dw _DATA_1736E_Tiles_Portrait_Tanks
+.dw _DATA_2AB4D_Tiles_RuffTruxPortrait
 
 ; Data from 9268 to 926B (4 bytes)
 _DATA_9268_:
 .db $80 $44 $80 $4E
 
 ; Data from 926C to 9275 (10 bytes)
-_DATA_926C_PageNumbers:
-.db $0A $03 $07 $05 $03 $03 $04 $05 $05 $0A
+_DATA_926C_VehiclePortraitPageNumbers:
+; Pages containing portrait (?) data for different vehicle types(?)
+.db :_DATA_2AB4D_Tiles_RuffTruxPortrait
+.db :_DATA_FAA5_Tiles_Portrait_SportsCars
+.db :_DATA_1F3E4_Tiles_Portrait_Powerboat
+.db :_DATA_16F2B_Tiles_Portrait_FormulaOne
+.db :_DATA_F35D_Tiles_Portrait_FourByFour
+.db :_DATA_F765_Tiles_Portrait_Warriors
+.db $04 ; invalid?
+.db :_DATA_16AC8_Tiles_PortraitTurboWheels
+.db :_DATA_1736E_Tiles_Portrait_Tanks
+.db :_DATA_2AB4D_Tiles_RuffTruxPortrait
 
 _LABEL_9276_:
-  ld a, $0F
+  ld a, :_TEXT_3ECA9_VEHICLE_NAME_BLANK
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   call _LABEL_BEF5_
-  ld a, (_RAM_D691_)
+  ld a, (_RAM_D691_TrackType)
   or a
+  rl a ; x16
   rl a
   rl a
   rl a
-  rl a
-  ld hl, $ACA9
-  add a, l
+  ld hl, _TEXT_3ECA9_VEHICLE_NAME_BLANK
+  add a, l ; add it on
   ld l, a
   ld a, h
   adc a, $00
   ld h, a
-  ld a, (_RAM_D691_)
-  cp $00
+  ld a, (_RAM_D691_TrackType)
+  cp $00 ; Qualifying race
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $09
+  cp MenuScreen_OnePlayerTrackIntro
   jr nc, ++
 +:
-  ld de, $7C90
+  TilemapWriteAddressToDE 8, 22 (GG, SMS one player)
   jp ++++
-
 ++:
-  ld de, $7DD0
+  TilemapWriteAddressToDE 8, 27 (SMS two player)
   jp ++++
-
 +++:
-  ld de, $7A90
+  TilemapWriteAddressToDE 8, 14 (qualifying race)
 ++++:
   call _LABEL_B361_VRAMAddressToDE
-  ld bc, $0010
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
-  ld a, (_RAM_D691_)
+  ld bc, 16
+  CallRamCode _LABEL_3BC6A_EmitText
+  ld a, (_RAM_D691_TrackType)
   or a
-  jr nz, +
+  jr nz, + ; ret
   ld a, $01
   ld (_RAM_D6CB_), a
-+:
-  ret
++:ret
 
 _LABEL_92CB_:
   ld a, (_RAM_D6D4_)
@@ -19676,7 +19611,7 @@ _LABEL_92CB_:
   ld a, (_RAM_D68F_)
   ld e, a
   call _LABEL_B361_VRAMAddressToDE
-  call $D9D3  ; Code is loaded from _LABEL_3BB93_
+  CallRamCode _LABEL_3BB93_Emit3bppTiles_2Rows
   ld a, h
   ld (_RAM_D68C_), a
   ld a, l
@@ -19700,46 +19635,47 @@ _LABEL_92CB_:
 _LABEL_9316_:
   ret
 
-_LABEL_9317_:
+_LABEL_9317_InitialiseHandSprites:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_936E_
-  ld de, _DATA_9386_
+  ld hl, _DATA_936E_TitleScreenHandXs_GG
+  ld de, _DATA_9386_TitleScreenHandYs_GG
   jr ++
-
-+:
-  ld hl, _DATA_939E_
-  ld de, _DATA_93B6_
++:ld hl, _DATA_939E_TitleScreenHandXs_SMS
+  ld de, _DATA_93B6_TitleScreenHandYs_SMS
 ++:
   ld ix, _RAM_D6E1_SpriteX
   ld iy, _RAM_D721_SpriteY
-  ld bc, $0018
--:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $10
+  ld bc, 24 ; counter
+
+-:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TrackSelect
   jr z, +
   jp ++
 
-+:
++:; Track select
   ld a, (hl)
-  add a, $43
+  add a, $43 ; Shift right
   ld (ix+0), a
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +++
   ld a, (de)
-  add a, $18
+  add a, $18 ; And down (SMS)
   ld (iy+0), a
   jp ++++
 
 ++:
+  ; Not track select: original X
   ld a, (hl)
   ld (ix+0), a
 +++:
+  ; Not trackslect, or GG: original Y
   ld a, (de)
   ld (iy+0), a
 ++++:
+  ; Move pointers on and loop
   inc hl
   inc de
   inc ix
@@ -19748,33 +19684,43 @@ _LABEL_9317_:
   ld a, c
   or a
   jr nz, -
-  ld hl, $B33E
-  jp $D9F5  ; Code is loaded from _LABEL_3BBB5_
+  ld hl, _DATA_2B33E_SpriteNs_HandFist
+  JumpToRamCode _LABEL_3BBB5_PopulateSpriteNs
 
 ; Data from 936E to 9385 (24 bytes)
-_DATA_936E_:
-.db $6E $76 $7E $86 $8E $96 $6E $76 $7E $86 $8E $96 $6E $76 $7E $86
-.db $8E $96 $6E $76 $7E $86 $8E $96
+_DATA_936E_TitleScreenHandXs_GG:
+.db $6E $76 $7E $86 $8E $96 
+.db $6E $76 $7E $86 $8E $96 
+.db $6E $76 $7E $86 $8E $96 
+.db $6E $76 $7E $86 $8E $96 
 
 ; Data from 9386 to 939D (24 bytes)
-_DATA_9386_:
-.db $90 $90 $90 $90 $90 $90 $98 $98 $98 $98 $98 $98 $A0 $A0 $A0 $A0
-.db $A0 $A0 $A8 $A8 $A8 $A8 $A8 $A8
+_DATA_9386_TitleScreenHandYs_GG:
+.db $90 $90 $90 $90 $90 $90 
+.db $98 $98 $98 $98 $98 $98 
+.db $A0 $A0 $A0 $A0 $A0 $A0 
+.db $A8 $A8 $A8 $A8 $A8 $A8
 
 ; Data from 939E to 93B5 (24 bytes)
-_DATA_939E_:
-.db $65 $6D $75 $7D $85 $8D $65 $6D $75 $7D $85 $8D $65 $6D $75 $7D
-.db $85 $8D $65 $6D $75 $7D $85 $8D
+_DATA_939E_TitleScreenHandXs_SMS:
+; X coordinates of sprites on title screen
+.db $65 $6D $75 $7D $85 $8D 
+.db $65 $6D $75 $7D $85 $8D 
+.db $65 $6D $75 $7D $85 $8D 
+.db $65 $6D $75 $7D $85 $8D
 
 ; Data from 93B6 to 93CD (24 bytes)
-_DATA_93B6_:
-.db $78 $78 $78 $78 $78 $78 $80 $80 $80 $80 $80 $80 $88 $88 $88 $88
-.db $88 $88 $90 $90 $90 $90 $90 $90
+_DATA_93B6_TitleScreenHandYs_SMS:
+; Y coordinates of sprites on title screen
+.db $78 $78 $78 $78 $78 $78 
+.db $80 $80 $80 $80 $80 $80 
+.db $88 $88 $88 $88 $88 $88 
+.db $90 $90 $90 $90 $90 $90
 
-_LABEL_93CE_:
-  ld hl, $7F80 ; sprite XN
+_LABEL_93CE_UpdateSpriteTable:
+  ld hl, SPRITE_TABLE_ADDRESS | VDP_WRITE_MASK + $80 ; $7F80 ; sprite XN
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0020
+  ld bc, 32
   ld hl, _RAM_D6E1_SpriteX
   ld de, _RAM_D701_SpriteN
 -:
@@ -19788,9 +19734,9 @@ _LABEL_93CE_:
   ld a, c
   or a
   jr nz, -
-  ld hl, $7F00 ; Sprite Y
+  ld hl, SPRITE_TABLE_ADDRESS | VDP_WRITE_MASK + $00 ; $7F00 ; Sprite Y
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0020
+  ld bc, 32
   ld hl, _RAM_D721_SpriteY
 -:
   ld a, (hl)
@@ -19802,12 +19748,12 @@ _LABEL_93CE_:
   jr nz, -
   ret
 
-_LABEL_9400_:
-  ld hl, $7F80
+_LABEL_9400_BlankSprites:
+  ld hl, SPRITE_TABLE_ADDRESS | VDP_WRITE_MASK + $80 ; $7F80 ; Sprite XNs
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0040
--:
-  xor a
+  ; Blank them out
+  ld bc, 64
+-:xor a
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -19815,20 +19761,20 @@ _LABEL_9400_:
   ld a, c
   or a
   jr nz, -
-  ld hl, $7F00
+  ld hl, SPRITE_TABLE_ADDRESS | VDP_WRITE_MASK + $00 ; $7F00 ; Sprite Ys
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0040
--:
-  xor a
+  ; Blank them out
+  ld bc, 64
+-:xor a
   out (PORT_VDP_DATA), a
   dec bc
   ld a, c
   or a
   jr nz, -
-  ld bc, $0060
-  ld hl, _RAM_D6E1_SpriteX
--:
-  xor a
+  ; Blank out RAM versions
+  ld bc, 32*3
+  ld hl, _RAM_D6E1_SpriteData
+-:xor a
   ld (hl), a
   inc hl
   dec bc
@@ -19838,57 +19784,57 @@ _LABEL_9400_:
   ret
 
 _LABEL_9434_:
-  ld a, $08
+  ld a, :_DATA_22BEC_Tiles_Cursor
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $ABEC
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0040
-  ld hl, $5740
+  ld hl, _DATA_22BEC_Tiles_Cursor
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 8 * 8 ; 8 tiles
+  TileWriteAddressToHL $ba
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_9448_:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0F
+  cp MenuScreen_TwoPlayerGameType
   jr c, +
-  ld hl, $6200
+  TileWriteAddressToHL $110
   jp ++
 
 +:
-  ld hl, $5840
+  TileWriteAddressToHL $c2
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, $0B
+  ld a, :_DATA_2FDE0_Tiles_SmallLogo
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $BDE0
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $00B0
+  ld hl, _DATA_2FDE0_Tiles_SmallLogo
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 22 * 8 ; 22 tiles
   call _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
-  ld a, $04
+  ld a, :_DATA_13D7F_Tiles_MicroMachinesText
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $BD7F
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $00C0
+  ld hl, _DATA_13D7F_Tiles_MicroMachinesText
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 24 * 8 ; 24 tiles
   call _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $13
+  cp MenuScreen_OnePlayerMode
   jr z, +
   ld a, (_RAM_D7B4_)
   or a
   jr nz, _LABEL_949B_
 _LABEL_948A_:
-  ld a, $0A
+  ld a, :_DATA_2B386_Tiles_ChallengeText
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B386
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0080
+  ld hl, _DATA_2B386_Tiles_ChallengeText
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 16 * 8 ; 16 tiles
   jp _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
 
 _LABEL_949B_:
-  ld a, $0A
+  ld a, :_DATA_2B4CA_Tiles_HeadToHeadText
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B4CA
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0070
+  ld hl, _DATA_2B4CA_Tiles_HeadToHeadText
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 14 * 8 ; 14 tiles
   jp _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
 
 +:
@@ -19898,7 +19844,7 @@ _LABEL_94AD_:
   ld a, $04
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0F
+  cp MenuScreen_TwoPlayerGameType
   jr c, +
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
@@ -19911,11 +19857,11 @@ _LABEL_94AD_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7742
+  TilemapWriteAddressToDE 1, 1
   jr ++
 
 +:
-  ld de, $784C
+  TilemapWriteAddressToDE 6, 5
 ++:
   call _LABEL_B361_VRAMAddressToDE
   ld hl, $BF38
@@ -19928,7 +19874,7 @@ _LABEL_94AD_:
   ld a, $C2
   sub c
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
 _LABEL_94F0_:
   ld a, $04
   ld (_RAM_D741_RAMDecompressorPageIndex), a
@@ -19938,19 +19884,19 @@ _LABEL_94F0_:
   ld a, (_RAM_D7B4_)
   or a
   jr nz, +
-  ld de, $7794
+  TilemapWriteAddressToDE 10, 2
   jp +++
 
 +:
-  ld de, $7792
+  TilemapWriteAddressToDE 9, 2
   jp +++
 
 ++:
-  ld de, $785C
+  TilemapWriteAddressToDE 14, 5
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0A
+  cp MenuScreen_OnePlayerTournamentResults
   jr nz, +++
-  ld de, $784C
+  TilemapWriteAddressToDE 6, 5
 +++:
   call _LABEL_B361_VRAMAddressToDE
   ld hl, _DATA_BF50_
@@ -19963,7 +19909,7 @@ _LABEL_94F0_:
   ld a, $D8
   sub c
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
   ld a, $0A
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld a, (_RAM_DC3C_IsGameGear)
@@ -19981,20 +19927,19 @@ _LABEL_94F0_:
 
 ++:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0A
+  cp MenuScreen_OnePlayerTournamentResults
   jr z, +
   ld a, (_RAM_D7B4_)
   or a
   jr nz, ++
-  ld de, $78E2
+  TilemapWriteAddressToDE 17, 7
   jp +++
 
-+:
-  ld de, $7864
++:TilemapWriteAddressToDE 18, 5
   jp +++
 
 ++:
-  ld de, $78DE
+  TilemapWriteAddressToDE 15, 7
 +++:
   call _LABEL_B361_VRAMAddressToDE
   ld a, (_RAM_D7B4_)
@@ -20016,32 +19961,31 @@ _LABEL_94F0_:
   ld a, $F0
   sub c
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
   ret
 
 _LABEL_959C_:
   ld a, $08
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $7680
+  TileWriteAddressToHL $1b4
   call _LABEL_B35A_VRAMAddressToHL
-  ld e, $20
-  ld hl, _DATA_AB2C_
-  jp $D985  ; Code is loaded from _LABEL_3BB45_
+  ld e, 4 * 8 ; 4 tiles
+  ld hl, _DATA_22B2C_Tiles_
+  JumpToRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM
 
-_LABEL_95AF_:
+_LABEL_95AF_DrawHorizontalLineIfSMS:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
-  jr z, +
-  ld e, $20
--:
-  ld a, $B7
+  jr z, + ; ret if GG
+  ; SMS
+  ld e, $20 ; Counter: 32 tiles
+-:ld a, $B7 ; Tile index: horizontal bar
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
   dec e
   jr nz, -
-+:
-  ret
++:ret
 
 _LABEL_95C3_:
   ld a, (_RAM_D6B4_)
@@ -20209,14 +20153,14 @@ _LABEL_96EC_:
   ld b, $00
   ld a, (_RAM_D6A2_)
   ld c, a
-  call _LABEL_97EA_
+  call _LABEL_97EA_DrawDriverPortraitColumn
   ret
 
 _LABEL_96F6_:
   ld a, (_RAM_D6A4_)
   cp $01
   jr z, _LABEL_973C_
-  ld hl, _DATA_9773_
+  ld hl, _DATA_9773_TileWriteAddresses
 _LABEL_9700_:
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
@@ -20229,12 +20173,12 @@ _LABEL_9700_:
 
 +:
   push hl
-  ld a, (_RAM_D6A2_)
-  ld c, a
-  ld b, $00
-  ld hl, _DATA_9849_
-  add hl, bc
-  ld a, (hl)
+    ld a, (_RAM_D6A2_)
+    ld c, a
+    ld b, $00
+    ld hl, _DATA_9849_
+    add hl, bc
+    ld a, (hl)
   pop hl
 ++:
   ld b, $00
@@ -20243,7 +20187,7 @@ _LABEL_9700_:
   ld e, (hl)
   inc hl
   ld d, (hl)
-  ld (_RAM_D6A8_), de
+  ld (_RAM_D6A8_DisplayCaseTileAddress), de
   call _LABEL_B361_VRAMAddressToDE
   ld a, (_RAM_D6AA_)
   call _LABEL_9F81_
@@ -20253,8 +20197,8 @@ _LABEL_9700_:
   ret
 
 _LABEL_973C_:
-  ld hl, (_RAM_D6A8_)
-  ld bc, $01E0
+  ld hl, (_RAM_D6A8_DisplayCaseTileAddress)
+  ld bc, 15 * TILE_DATA_SIZE ; $01E0
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, (_RAM_D6A6_DisplayCase_Source)
@@ -20267,16 +20211,31 @@ _LABEL_973C_:
   ret
 
 ; Data from 975B to 9766 (12 bytes)
-_DATA_975B_:
-.db $80 $67 $40 $6B $00 $6F $C0 $72 $00 $60 $C0 $63
+_DATA_975B_TileWriteAddresses_SMS:
+  TileWriteAddressData $13c
+  TileWriteAddressData $15a
+  TileWriteAddressData $178
+  TileWriteAddressData $196
+  TileWriteAddressData $100
+  TileWriteAddressData $11e
 
 ; Data from 9767 to 9772 (12 bytes)
-_DATA_9767_:
-.db $C0 $63 $80 $67 $40 $6B $00 $6F $C0 $72 $00 $60
+_DATA_9767_TileWriteAddresses_GG:
+  TileWriteAddressData $11e
+  TileWriteAddressData $13c
+  TileWriteAddressData $15a
+  TileWriteAddressData $178
+  TileWriteAddressData $196
+  TileWriteAddressData $100
 
 ; Data from 9773 to 977E (12 bytes)
-_DATA_9773_:
-.db $C0 $72 $00 $60 $C0 $63 $80 $67 $40 $6B $00 $6F
+_DATA_9773_TileWriteAddresses:
+  TileWriteAddressData $196
+  TileWriteAddressData $100
+  TileWriteAddressData $11e
+  TileWriteAddressData $13c
+  TileWriteAddressData $15a
+  TileWriteAddressData $178
 
 _LABEL_977F_:
   ld a, (_RAM_D6AE_)
@@ -20295,11 +20254,11 @@ _LABEL_977F_:
   ld (_RAM_D6AD_), a
   ld c, a
   ld b, $00
-  ld hl, $DBFE
+  ld hl, _RAM_DBFE_
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_
+  ld hl, _DATA_97DF_MultiplesOf8
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
@@ -20326,38 +20285,40 @@ _LABEL_97AF_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_
+  ld hl, _DATA_97DF_MultiplesOf8
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
   ret
 
 ; Data from 97DF to 97E9 (11 bytes)
-_DATA_97DF_:
+_DATA_97DF_MultiplesOf8:
 .db $00 $08 $10 $18 $20 $28 $30 $38 $40 $48 $50
 
-_LABEL_97EA_:
+_LABEL_97EA_DrawDriverPortraitColumn:
+; Seems to be what it does, not clear how yet
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, $06
+  ; SMS
+  ld a, :_DATA_1B7A7_SMS
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $7C00
+  TilemapWriteAddressToHL 0, 20
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $B7A7
-  add hl, bc
-  ld e, $C0
-  jp $DA18  ; Code is loaded from _LABEL_3BBD8_
+  ld hl, _DATA_1B7A7_SMS
+  add hl, bc ; Offset into data
+  ld e, $C0 ; entry count
+  JumpToRamCode _LABEL_3BBD8_EmitTilemapUnknown2
 
 +:
-  ld a, $06
+  ld a, :_DATA_1B987_GG
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B987
+  ld hl, _DATA_1B987_GG
   add hl, bc
   ld b, $42
   ld c, $0B
-  ld de, $7B0C
-  jp $DA38  ; Code is loaded from _LABEL_3BBF8_
+  TilemapWriteAddressToDE 6, 16
+  JumpToRamCode _LABEL_3BBF8_EmitTilemapUnknown
 
 ; Data from 9817 to 9848 (50 bytes)
 _DATA_9817_:
@@ -20373,12 +20334,11 @@ _DATA_9849_:
 .db $0C $0C $0C $0E $0E $0E $0E $0E $10 $10 $10 $10 $10 $12 $12 $12
 .db $12 $12
 
-_LABEL_987B_:
-  ld hl, $7680
+_LABEL_987B_BlankTile1B4:
+  TileWriteAddressToHL $1b4
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $0020
--:
-  xor a
+  ld bc, TILE_DATA_SIZE
+-:xor a
   out (PORT_VDP_DATA), a
   dec bc
   ld a, c
@@ -20407,7 +20367,7 @@ _LABEL_988D_:
   ld a, c
   or a
   jr nz, -
-  jp _LABEL_93CE_
+  jp _LABEL_93CE_UpdateSpriteTable
 
 ; Data from 98AE to 990D (96 bytes)
 _DATA_98AE_:
@@ -20437,7 +20397,7 @@ _LABEL_996E_:
 +:
   ld a, (_RAM_D6AF_)
   cp $00
-  jr z, _LABEL_99D2_
+  jr z, _LABEL_99D2_ret
   sub $01
   ld (_RAM_D6AF_), a
   sra a
@@ -20448,7 +20408,7 @@ _LABEL_996E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jp z, _LABEL_9A6D_
-  ld hl, $7B08
+  TilemapWriteAddressToHL 4, 16
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_D6C0_)
   dec a
@@ -20457,7 +20417,7 @@ _LABEL_996E_:
   dec a
   jr z, ++++
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $07
+  cp MenuScreen_WhoDoYouWantToRace
   jr z, +
   jp ++
 
@@ -20477,11 +20437,11 @@ _LABEL_996E_:
   ld bc, $0018
   ld hl, _TEXT_9A55_PushStartToContinue
   call _LABEL_A5B0_EmitToVDP_Text
-_LABEL_99D2_:
+_LABEL_99D2_ret:
   ret
 
 ++++:
-  ld hl, $7B1A
+  TilemapWriteAddressToHL 13, 16
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD3_)
   ld c, a
@@ -20497,11 +20457,9 @@ _LABEL_99D2_:
   ld a, (_RAM_DBD3_)
   cp $10
   jr z, +
-  ld hl, $7B0E
+  TilemapWriteAddressToHL 7, 16
   jp ++
-
-+:
-  ld hl, $7B0A
++:TilemapWriteAddressToHL 5, 16
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0009
@@ -20513,7 +20471,7 @@ _LABEL_9A0E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jp z, _LABEL_9B18_
-  ld hl, $7B08
+  TilemapWriteAddressToHL 4, 16
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0018
   ld hl, _TEXT_AAAE_Blanks
@@ -20539,28 +20497,28 @@ _LABEL_9A6D_:
   ld a, (_RAM_D6CA_)
   dec a
   jp z, _LABEL_9AE9_
-  ld hl, $7B64
+  TilemapWriteAddressToHL 18, 17
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B46_WhoDo
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7BE4
+  TilemapWriteAddressToHL 18, 19
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B4E_YouWant
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7C64
+  TilemapWriteAddressToHL 18, 21
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $07
+  cp MenuScreen_WhoDoYouWantToRace
   jr z, +
   jp ++
 
 +:
   ld hl, _TEXT_9B5E_ToRace
   call _LABEL_A5B0_EmitToVDP_Text
-  jp _LABEL_99D2_
+  jp _LABEL_99D2_ret
 
 ++:
   ld hl, _TEXT_9B56_ToBe
@@ -20568,17 +20526,17 @@ _LABEL_9A6D_:
   ret
 
 _LABEL_9ABB_:
-  ld hl, $7B64
+  TilemapWriteAddressToHL 18, 17
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B66_Push
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7BE4
+  TilemapWriteAddressToHL 18, 19
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B6E_StartTo
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7C64
+  TilemapWriteAddressToHL 18, 21
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B76_Continue
@@ -20586,12 +20544,12 @@ _LABEL_9ABB_:
   ret
 
 _LABEL_9AE9_:
-  ld hl, $7B64
+  TilemapWriteAddressToHL 18, 17
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_9B7E_Handicap
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7BE6
+  TilemapWriteAddressToHL 19, 19
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD3_)
   ld c, a
@@ -20608,17 +20566,18 @@ _LABEL_9AE9_:
   ret
 
 _LABEL_9B18_:
-  ld hl, $7B64
+  ; Blank text from above
+  TilemapWriteAddressToHL 18, 17
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_AAAE_Blanks
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7BE4
+  TilemapWriteAddressToHL 18, 19
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_AAAE_Blanks
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7C64
+  TilemapWriteAddressToHL 18, 21
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_AAAE_Blanks
@@ -20724,7 +20683,7 @@ _LABEL_9B87_:
 +:
   ld c, a
   ld b, $00
-  ld hl, $DBFE
+  ld hl, _RAM_DBFE_
   add hl, bc
   ld a, (hl)
   cp $58
@@ -20734,12 +20693,12 @@ _LABEL_9B87_:
   ld a, $58
   ld (hl), a
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_
+  ld hl, _DATA_97DF_MultiplesOf8
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_), a
   ld (_RAM_D6BB_), a
-  ld hl, $DBD4
+  ld hl, _RAM_DBD4_
   add hl, de
   ld (hl), a
   ld a, $01
@@ -20780,11 +20739,11 @@ _LABEL_9C64_:
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
   jr z, +
-  ld hl, _DATA_975B_
+  ld hl, _DATA_975B_TileWriteAddresses_SMS
   jp _LABEL_9700_
 
 +:
-  ld hl, _DATA_9767_
+  ld hl, _DATA_9767_TileWriteAddresses_GG
   jp _LABEL_9700_
 
 ; Data from 9C7F to 9D36 (184 bytes)
@@ -20914,7 +20873,7 @@ _LABEL_9DBD_:
   ld a, $F0
   ld (_RAM_D6B8_), a
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $03
+  cp MenuScreen_OnePlayerSelectCharacter
   jr z, +
   cp $0E
   jr z, ++
@@ -20985,7 +20944,7 @@ _LABEL_9E70_:
   cp $01
   jp z, _LABEL_9C64_
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0E
+  cp MenuScreen_TwoPlayerSelectCharacter
   jr z, +
   ld a, (_RAM_D6B9_)
   cp $01
@@ -21021,7 +20980,7 @@ _LABEL_9E70_:
   sub $01
   ld e, a
   ld d, $00
-  ld hl, $DBD4
+  ld hl, _RAM_DBD4_
   add hl, de
   ld e, (hl)
   ld a, (_RAM_DC3C_IsGameGear)
@@ -21036,13 +20995,13 @@ _LABEL_9E70_:
 +:
   ld c, a
   ld b, $00
-  ld hl, _DATA_97DF_
+  ld hl, _DATA_97DF_MultiplesOf8
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
   cp e
   jr nz, _LABEL_9F3F_ret
-  ld hl, $DBFE
+  ld hl, _RAM_DBFE_
   add hl, bc
   add a, $01
   ld (hl), a
@@ -21076,7 +21035,7 @@ _LABEL_9F3F_ret:
 _LABEL_9F40_:
 ; a = ???
   ld (_RAM_D6A1_), a ; Save
-  
+
   ld hl, _DATA_9D37_ ; Look up in table
   ld a, (_RAM_D6A1_)
   sra a ; Divide by 4
@@ -21086,7 +21045,7 @@ _LABEL_9F40_:
   add hl, de
   ld a, (hl) ; Look up
   ld (_RAM_D741_RAMDecompressorPageIndex), a ; Save value found
-  
+
   ld d, $00
   ld hl, _DATA_9C7F_ ; Look up in another table
   ld a, (_RAM_D6A1_)
@@ -21099,15 +21058,15 @@ _LABEL_9F40_:
   ld a, (hl)
   ld h, a
   ld l, c ; -> hl
-  
+
   ld de, $003C
   ld a, (_RAM_D6A1_)
   cp $58
   jr z, _LABEL_9F74_
-  jp $DA67  ; Code is loaded from _LABEL_7465_
+  JumpToRamCode _LABEL_3BC27_EmitThirty3bppTiles
 
 _LABEL_9F74_:
-  ld hl, _DATA_BD6C_
+  ld hl, _DATA_BD6C_Palette3_SMS
   ld b, $10
   ld c, PORT_VDP_DATA
   otir
@@ -21144,14 +21103,14 @@ _LABEL_9FAB_:
   ld a, (_RAM_D6A1_)
   cp $58
   jr z, _LABEL_9F74_
-  jp $DA7C  ; Code is loaded from _LABEL_3BC3C_
+  JumpToRamCode _LABEL_3BC3C_EmitFifteen3bppTiles
 
 _LABEL_9FB8_:
   ld de, $0014
   ld a, (_RAM_D6A1_)
   cp $58
   jr z, _LABEL_9F74_
-  jp $DA93  ; Possibly invalid
+  JumpToRamCode _LABEL_3BC53_EmitTen3bppTiles
 
 _LABEL_9FC5_:
   ld a, (_RAM_DC3B_)
@@ -21177,11 +21136,9 @@ _LABEL_9FC5_:
   ld a, (_RAM_D6CE_)
   cp $80
   jr z, +
-  ld hl, $7C8C
+  TilemapWriteAddressToHL 6, 22
   jp ++
-
-+:
-  ld hl, $7C8E
++:TilemapWriteAddressToHL 7, 22
 ++:
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
@@ -21190,7 +21147,7 @@ _LABEL_9FC5_:
   jp _LABEL_A5B0_EmitToVDP_Text
 
 +++:
-  ld hl, $7C8C
+  TilemapWriteAddressToHL 6, 22
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0004
@@ -21235,7 +21192,7 @@ _LABEL_A039_:
   sra a
   and $01
   jp nz, +++
-  ld hl, $7A90
+  TilemapWriteAddressToHL 8, 14
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
@@ -21249,7 +21206,7 @@ _LABEL_A039_:
   ld hl, _TEXT_A0A4_Winner
 ++:
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7AA2
+  TilemapWriteAddressToHL 17, 14
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
@@ -21265,7 +21222,7 @@ _LABEL_A039_:
   jp _LABEL_A5B0_EmitToVDP_Text
 
 +++:
-  ld hl, $7A90
+  TilemapWriteAddressToHL 8, 14
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0019
@@ -21284,12 +21241,12 @@ _TEXT_A0AC_Loser:
 .asc " LOSER! " ; $0E $0B $1A $12 $04 $11 $B4 $0E
 
 _LABEL_A0B4_:
-  ld hl, $7998
+  TilemapWriteAddressToHL 12, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0007
   ld hl, _TEXT_A0DB_Results
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $79CE
+  TilemapWriteAddressToHL 7, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC34_)
   dec a
@@ -21309,21 +21266,20 @@ _TEXT_A0DB_Results:
 _TEXT_A0E2_SingleRace:
 .asc "   SINGLE RACE" ; $0E $0E $0E $12 $08 $0D $06 $0B $04 $0E $11 $00 $02 $04
 
-_LABEL_A0F0_:
+_LABEL_A0F0_BlankTilemapRectangle:
   ld bc, $0000
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld bc, $0140
+  ld bc, 5 * TILEMAP_ROW_SIZE ; $0140 - offset to 10, 19 for SMS
 +:
-  ld hl, $7A94
+  TilemapWriteAddressToHL 10, 14
   add hl, bc
-  ld bc, $000C
-  ld de, $0009
+  ld bc, $000C ; Width in tiles
+  ld de, $0009 ; Height in tiles
 --:
   call _LABEL_B35A_VRAMAddressToHL
--:
-  ld a, $0E
+-:ld a, BLANK_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -21331,38 +21287,37 @@ _LABEL_A0F0_:
   ld a, c
   or a
   jr nz, -
-  ld bc, $000C
+  ld bc, $000C ; Width in tiles
   dec de
   ld a, e
   or a
   jr z, +
   ld a, l
-  add a, $40
+  add a, TILEMAP_ROW_SIZE ; $40 ; Add a row
   ld l, a
   ld a, h
   adc a, $00
   ld h, a
   jp --
 
-+:
-  ret
++:ret
 
 _LABEL_A129_:
-  ld de, (_RAM_D6A8_)
+  ld de, (_RAM_D6A8_DisplayCaseTileAddress)
   call _LABEL_B361_VRAMAddressToDE
   exx
     ld hl, (_RAM_D6A6_DisplayCase_Source)
-    ld e, $50
-    call $D985  ; Code is loaded from _LABEL_3BB45_
+    ld e, 10 * 8 ; 10 tiles
+    CallRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM
     ld (_RAM_D6A6_DisplayCase_Source), hl
   exx
-  ld hl, $0140
+  ld hl, 32*10 ; 10 tiles
   add hl, de
-  ld (_RAM_D6A8_), hl
+  ld (_RAM_D6A8_DisplayCaseTileAddress), hl
   ld a, (_RAM_D693_)
   sub $01
   ld (_RAM_D693_), a
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_A14F_:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -21378,27 +21333,25 @@ _LABEL_A14F_:
   ld b, $00
   call _LABEL_A1EC_
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $79CE
+  TilemapWriteAddressToHL 7, 11
   add hl, de
   jp ++
 
 +:
-  ld hl, $7C8E
+  TilemapWriteAddressToHL 7, 22
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC21
+  ld hl, _RAM_DC21_
   add hl, bc
   ld a, (hl)
   or a
   jr z, +
   call _LABEL_A1CA_PrintHandicap
   jp ++
-
-+:
-  call _LABEL_A1D3_PrintOrdinary
++:call _LABEL_A1D3_PrintOrdinary
 ++:
   ld a, (_RAM_DBD5_)
   srl a
@@ -21413,18 +21366,16 @@ _LABEL_A14F_:
   ld e, a
   ld d, $00
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $79E2
+  TilemapWriteAddressToHL 17, 11
   add hl, de
   jp ++
-
-+:
-  ld hl, $7CA2
++:TilemapWriteAddressToHL 17, 22
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC21
+  ld hl, _RAM_DC21_
   add hl, bc
   ld a, (hl)
   or a
@@ -21432,8 +21383,7 @@ _LABEL_A14F_:
   call _LABEL_A1CA_PrintHandicap
   ret
 
-+:
-  call _LABEL_A1D3_PrintOrdinary
++:call _LABEL_A1D3_PrintOrdinary
   ret
 
 _LABEL_A1CA_PrintHandicap:
@@ -21456,33 +21406,29 @@ _TEXT_A1E4_Ordinary:
 
 _LABEL_A1EC_:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $788E
+  TilemapWriteAddressToHL 7, 6
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B0E
++:TilemapWriteAddressToHL 7, 16
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC0B
+  ld hl, _RAM_DC0B_
   add hl, bc
   call _LABEL_A272_
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $790E
+  TilemapWriteAddressToHL 7, 8
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B8E
++:TilemapWriteAddressToHL 7, 18
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC16
+  ld hl, _RAM_DC16_
   add hl, bc
   call _LABEL_A272_
   ret
@@ -21496,18 +21442,16 @@ _LABEL_A225_:
   ld e, a
 +:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $78B0
+  TilemapWriteAddressToHL 24, 6
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B30
++:TilemapWriteAddressToHL 24, 16
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC0B
+  ld hl, _RAM_DC0B_
   add hl, bc
   call _LABEL_A272_
   ld a, (_RAM_DC3C_IsGameGear)
@@ -21516,20 +21460,17 @@ _LABEL_A225_:
   ld a, e
   add a, $02
   ld e, a
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
++:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $7930
+  TilemapWriteAddressToHL 24, 8
   add hl, de
   jp ++
-
-+:
-  ld hl, $7BB0
++:TilemapWriteAddressToHL 24, 18
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $DC16
+  ld hl, _RAM_DC16_
   add hl, bc
   call _LABEL_A272_
   ret
@@ -21559,12 +21500,12 @@ _LABEL_A272_:
   ret
 
 _LABEL_A296_:
-  ld a, $0A
+  ld a, :_DATA_2B151_Tiles_Hand
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B151
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0138
-  ld hl, $5760
+  ld hl, _DATA_2B151_Tiles_Hand
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 39 * 8 ; 39 tiles
+  TileWriteAddressToHL $bb
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_A2AA_:
@@ -21574,11 +21515,9 @@ _LABEL_A2AA_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B0E
+  TilemapWriteAddressToHL 7, 16
   jr ++
-
-+:
-  ld hl, $7A4E
++:TilemapWriteAddressToHL 7, 13
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   jp ++++
@@ -21587,11 +21526,9 @@ _LABEL_A2AA_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $79CE
+  TilemapWriteAddressToHL 7, 11
   jr ++
-
-+:
-  ld hl, $798E
++:TilemapWriteAddressToHL 7, 10
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   jp ++++
@@ -21657,16 +21594,13 @@ _LABEL_A355_:
   dec a
   jr z, +
   ld e, $7C
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
++:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $788C
+  TilemapWriteAddressToHL 6, 6
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B0C
++:TilemapWriteAddressToHL 6, 16
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
@@ -21676,16 +21610,13 @@ _LABEL_A355_:
   dec a
   jr z, +
   ld e, $7A
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
++:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $790C
+  TilemapWriteAddressToHL 6, 8
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B8C
++:TilemapWriteAddressToHL 6, 18
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
@@ -21695,16 +21626,13 @@ _LABEL_A355_:
   dec a
   jr z, +
   ld e, $80
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
++:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $78AE
+  TilemapWriteAddressToHL 23, 6
   add hl, de
   jp ++
-
-+:
-  ld hl, $7B2E
++:TilemapWriteAddressToHL 23, 16
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
@@ -21714,16 +21642,13 @@ _LABEL_A355_:
   dec a
   jr z, +
   ld e, $80
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
++:ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $792E
+  TilemapWriteAddressToHL 23, 8
   add hl, de
   jp ++
-
-+:
-  ld hl, $7BAE
++:TilemapWriteAddressToHL 23, 18
   add hl, de
 ++:
   call _LABEL_B35A_VRAMAddressToHL
@@ -21767,7 +21692,7 @@ _TEXT_A41E_Won:
 
 ; Data from A423 to A4B6 (148 bytes)
 _TEXT_A423_Lost:
-.asc "LOST-" ; $0B $1A $12 $13 $B5 
+.asc "LOST-" ; $0B $1A $12 $13 $B5
 
 _DATA_A427_:
 .db $3A $3C $DC $3D $28 $05 $11 $08 $7D $18 $03
@@ -21782,21 +21707,20 @@ _DATA_A427_:
 .db $04 $11 $15 $12
 
 _LABEL_A4B7_:
-  ld hl, $7A54
+  TilemapWriteAddressToHL 10, 13
   call _LABEL_A500_
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $13
+  cp MenuScreen_OnePlayerMode
   jr z, +
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B06
+  TilemapWriteAddressToHL 3, 16
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $001A
   ld hl, _TEXT_A4E6_OnePlayerTwoPlayer
   call _LABEL_A5B0_EmitToVDP_Text
-+:
-  ret
++:ret
 
 ; Data from A4DA to A4E5 (12 bytes)
 _TEXT_A4DA_SelectGame:
@@ -21813,12 +21737,12 @@ _LABEL_A500_:
   jp _LABEL_A5B0_EmitToVDP_Text
 
 _LABEL_A50C_:
-  ld hl, $7990
+  TilemapWriteAddressToHL 8, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000F
   ld hl, _TEXT_A521_OnePlayerGame
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A14
+  TilemapWriteAddressToHL 10, 12
   jp _LABEL_A500_
 
 ; Data from A521 to A52F (15 bytes)
@@ -21826,7 +21750,7 @@ _TEXT_A521_OnePlayerGame:
 .asc "ONE PLAYER GAME" ; $1A $0D $04 $0E $0F $0B $00 $18 $04 $11 $0E $06 $00 $0C $04
 
 _LABEL_A530_:
-  ld hl, $79D4
+  TilemapWriteAddressToHL 10, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000C
   ld hl, _TEXT_A574_ChooseGame
@@ -21834,7 +21758,7 @@ _LABEL_A530_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7D86
+  TilemapWriteAddressToHL 3, 26
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $001A
   ld hl, _TEXT_A580_TournamentSingleRace
@@ -21842,12 +21766,12 @@ _LABEL_A530_:
   ret
 
 +:
-  ld hl, $7C4C
+  TilemapWriteAddressToHL 6, 21
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0012
   ld hl, _TEXT_A59A_TournamentSingle
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7CAC
+  TilemapWriteAddressToHL 22, 22
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0004
   ld hl, _TEXT_A5AC_Race
@@ -21893,19 +21817,20 @@ _LABEL_A5C9_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7986
+  TilemapWriteAddressToDE 3, 10
   ld bc, $0006
   ld hl, _TEXT_A664_Player
   jr ++
 
 +:
-  ld de, $798C
+  TilemapWriteAddressToDE 6, 10
   ld bc, $0003
   ld hl, _TEXT_A66A_Plr
 ++:
   call _LABEL_B361_VRAMAddressToDE
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A0C
+  
+  TilemapWriteAddressToHL 6, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, _TEXT_A66D_One
@@ -21913,12 +21838,12 @@ _LABEL_A5C9_:
   ret
 
 _LABEL_A5F9_:
-  ld hl, $7986
+  TilemapWriteAddressToHL 3, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
   ld hl, _TEXT_AAAE_Blanks
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A0C
+  TilemapWriteAddressToHL 6, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, _TEXT_AAAE_Blanks
@@ -21940,7 +21865,7 @@ _LABEL_A618_:
 ++:
   call _LABEL_B361_VRAMAddressToDE
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A2E
+  TilemapWriteAddressToHL 23, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, _TEXT_A670_Two
@@ -21948,12 +21873,12 @@ _LABEL_A618_:
   ret
 
 _LABEL_A645_:
-  ld hl, $79AE
+  TilemapWriteAddressToHL 23, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
   ld hl, _TEXT_AAAE_Blanks
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A2E
+  TilemapWriteAddressToHL 23, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, _TEXT_AAAE_Blanks
@@ -22005,7 +21930,7 @@ _LABEL_A692_:
   sra a
   and $01
   jp nz, +++
-  ld hl, $7C10
+  TilemapWriteAddressToHL 8, 20
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD3_)
   and $F8
@@ -22017,7 +21942,7 @@ _LABEL_A692_:
   inc hl
   or a
   jr z, +
-  ld de, $7C12
+  TilemapWriteAddressToDE 9, 20
   call _LABEL_B361_VRAMAddressToDE
 +:
   ld bc, $0007
@@ -22029,7 +21954,7 @@ _LABEL_A692_:
   ret
 
 +++:
-  ld hl, $7C0E
+  TilemapWriteAddressToHL 7, 20
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, _TEXT_AAAE_Blanks
@@ -22088,9 +22013,9 @@ _LABEL_A787_:
   cp $03
   jr nz, +
   ld a, $02
-  ld (_RAM_DBE8_), a
-  ld (_RAM_DBEC_), a
-  ld (_RAM_DBF0_), a
+  ld (_RAM_DBD9_DisplayCaseData + 15), a
+  ld (_RAM_DBD9_DisplayCaseData + 19), a
+  ld (_RAM_DBD9_DisplayCaseData + 23), a
   ret
 
 +:
@@ -22133,7 +22058,7 @@ _LABEL_A7ED_:
   sra a
   and $01
   jr nz, ++++
-  call _LABEL_A859_
+  call _LABEL_A859_SetTilemapLocationForLastRacePosition
   ld a, (_RAM_DC3A_)
   dec a
   jr nz, +
@@ -22159,25 +22084,32 @@ _LABEL_A7ED_:
   ret
 
 ++++:
-  call _LABEL_A859_
+  call _LABEL_A859_SetTilemapLocationForLastRacePosition
   ld hl, _TEXT_AAAE_Blanks
   ld bc, $0007
   jp _LABEL_A5B0_EmitToVDP_Text
 
 ; Data from A83A to A841 (8 bytes)
-_DATA_A83A_:
-.db $90 $7A $A2 $7A $90 $7C $A4 $7C
+_DATA_A83A_TilemapLocations_GG:
+  TilemapWriteAddressData  8, 14
+  TilemapWriteAddressData 17, 14
+  TilemapWriteAddressData  8, 22
+  TilemapWriteAddressData 18, 22
 
 ; Data from A842 to A849 (8 bytes)
-_DATA_A842_:
-.db $82 $7A $B0 $7A $04 $7D $30 $7D
+_DATA_A842_TilemapLocations_SMS:
+  TilemapWriteAddressData  1, 14
+  TilemapWriteAddressData 24, 14
+  TilemapWriteAddressData  2, 24
+  TilemapWriteAddressData 24, 24
 
 ; Data from A84A to A858 (15 bytes)
 _TEXT_A84A_QualifyFailed:
-.asc "QUALIFY", $FF 
+.asc "QUALIFY", $FF
 .asc "FAILED "
 
-_LABEL_A859_:
+_LABEL_A859_SetTilemapLocationForLastRacePosition:
+  ; Index into table for system
   ld a, (_RAM_DBCF_LastRacePosition)
   sla a
   ld c, a
@@ -22185,11 +22117,9 @@ _LABEL_A859_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_A842_
+  ld hl, _DATA_A842_TilemapLocations_SMS
   jr ++
-
-+:
-  ld hl, _DATA_A83A_
++:ld hl, _DATA_A83A_TilemapLocations_GG
 ++:
   add hl, bc
   ld e, (hl)
@@ -22199,12 +22129,12 @@ _LABEL_A859_:
   ret
 
 _LABEL_A877_:
-  ld a, $04
+  ld a, :_DATA_13C42_Tiles_BigNumbers
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $BC42
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $00C0
-  ld hl, $6000
+  ld hl, _DATA_13C42_Tiles_BigNumbers
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 24 * 8 ; 24 tiles
+  TileWriteAddressToHL $100
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   call _LABEL_BA42_
   ld a, (_RAM_DC3C_IsGameGear)
@@ -22214,8 +22144,8 @@ _LABEL_A877_:
   ld b, $00
   xor a
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld hl, $790C
-  add hl, bc
+  TilemapWriteAddressToHL 6, 8
+  add hl, bc ; Add 2 rows for SMS -> 6, 10
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   ld a, $02
@@ -22225,8 +22155,8 @@ _LABEL_A877_:
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, $06
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld hl, $7930
-  add hl, bc
+  TilemapWriteAddressToHL 24, 8
+  add hl, bc ; Add 2 rows for SMS -> 24, 10
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
@@ -22236,15 +22166,15 @@ _LABEL_A877_:
   ld c, $00
   ld a, $0C
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld hl, $7B0C
-  add hl, bc
+  TilemapWriteAddressToHL 6, 16
+  add hl, bc ; Add 2 rows for SMS -> 6, 20
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, $12
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld hl, $7B30
-  add hl, bc
+  TilemapWriteAddressToHL 24, 16
+  add hl, bc ; Add 22 ros for SMS -> 24, 18
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
@@ -22266,8 +22196,7 @@ _LABEL_A8FC_:
   ld c, $03
   jp +
 
-+:
-  ld a, (_RAM_DBCF_LastRacePosition)
++:ld a, (_RAM_DBCF_LastRacePosition)
   cp c
   jp z, +
   ld a, (_RAM_DBD0_HeadToHeadLost2)
@@ -22294,7 +22223,7 @@ _LABEL_A8FC_:
   jr ++
 
 +:
-  ld hl, _DATA_A9A6_
+  ld hl, _DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBCF_LastRacePosition)
   jp _LABEL_A996_
@@ -22307,11 +22236,11 @@ _LABEL_A8FC_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_A9AE_
+  ld hl, _DATA_A9AE_TilemapAddresses_SMS
   jr ++
 
 +:
-  ld hl, _DATA_A9A6_
+  ld hl, _DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD0_HeadToHeadLost2)
   jp _LABEL_A996_
@@ -22324,11 +22253,11 @@ _LABEL_A95D_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_A9AE_
+  ld hl, _DATA_A9AE_TilemapAddresses_SMS
   jr ++
 
 +:
-  ld hl, _DATA_A9A6_
+  ld hl, _DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD1_)
   jp _LABEL_A996_
@@ -22341,11 +22270,9 @@ _LABEL_A97B_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_A9AE_
+  ld hl, _DATA_A9AE_TilemapAddresses_SMS
   jr ++
-
-+:
-  ld hl, _DATA_A9A6_
++:ld hl, _DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD2_)
 _LABEL_A996_:
@@ -22361,22 +22288,36 @@ _LABEL_A996_:
   jp _LABEL_8F10_
 
 ; Data from A9A6 to A9AD (8 bytes)
-_DATA_A9A6_:
-.db $12 $79 $24 $79 $12 $7B $24 $7B
+_DATA_A9A6_TilemapAddresses_GG:
+  TilemapWriteAddressData  9,  8
+  TilemapWriteAddressData 18,  8
+  TilemapWriteAddressData  9, 16
+  TilemapWriteAddressData 18, 16
 
 ; Data from A9AE to A9B5 (8 bytes)
-_DATA_A9AE_:
-.db $92 $79 $A4 $79 $12 $7C $24 $7C
+_DATA_A9AE_TilemapAddresses_SMS:
+  TilemapWriteAddressData  9, 10
+  TilemapWriteAddressData 18, 10
+  TilemapWriteAddressData  9, 20
+  TilemapWriteAddressData 18, 20
 
 ; Data from A9B6 to A9BD (8 bytes)
-_DATA_A9B6_:
-.db $0E $7A $30 $7A $0E $7C $30 $7C
+_DATA_A9B6_TilemapAddresses_GG:
+  TilemapWriteAddressData  7, 12
+  TilemapWriteAddressData 24, 12
+  TilemapWriteAddressData  7, 20
+  TilemapWriteAddressData 24, 20
 
 ; Data from A9BE to A9C5 (8 bytes)
-_DATA_A9BE_:
-.db $16 $7B $28 $7B $96 $7D $A8 $7D
+_DATA_A9BE_TilemapAddresses_SMS:
+  TilemapWriteAddressData 11, 16
+  TilemapWriteAddressData 20, 16
+  TilemapWriteAddressData 11, 26
+  TilemapWriteAddressData 20, 26
 
 _LABEL_A9C6_:
+; c = position index?
+; b = tile index
   ld a, c
   sla a
   ld e, a
@@ -22384,11 +22325,9 @@ _LABEL_A9C6_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, _DATA_A9BE_
+  ld hl, _DATA_A9BE_TilemapAddresses_SMS
   jr ++
-
-+:
-  ld hl, _DATA_A9B6_
++:ld hl, _DATA_A9B6_TilemapAddresses_GG
 ++:
   add hl, de
   ld e, (hl)
@@ -22405,7 +22344,7 @@ _LABEL_A9C6_:
 _LABEL_A9EB_:
   ld a, (_RAM_D6AF_)
   cp $00
-  jr z, _LABEL_AA5D_
+  jr z, _LABEL_AA5D_ ; ret
   sub $01
   ld (_RAM_D6AF_), a
   sra a
@@ -22422,10 +22361,10 @@ _LABEL_AA02_:
   ld hl, _DATA_AB06_
   add hl, bc
   ld a, (hl)
-  ld (_RAM_DBF6_), a
+  ld (_RAM_DBF1_RaceNumberText + 5), a
   inc hl
   ld a, (hl)
-  ld (_RAM_DBF7_), a
+  ld (_RAM_DBF1_RaceNumberText + 6), a
   ld hl, _DATA_AACE_
   add hl, bc
   ld c, (hl)
@@ -22441,23 +22380,22 @@ _LABEL_AA02_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7B16
+  TilemapWriteAddressToDE 11, 16
   call _LABEL_B361_VRAMAddressToDE
-  ld bc, $0014
-  ld de, $7B04
+  ld bc, 20
+  TilemapWriteAddressToDE 2, 16
   jr ++
 
-+:
-  ld de, $7A4C
++:TilemapWriteAddressToDE 6, 13
   call _LABEL_B361_VRAMAddressToDE
-  ld bc, $0014
-  ld de, $7A18
+  ld bc, 20
+  TilemapWriteAddressToDE 12, 12
 ++:
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
+  CallRamCode _LABEL_3BC6A_EmitText
   call _LABEL_B361_VRAMAddressToDE
-  ld bc, $0008
-  ld hl, $DBF1
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
+  ld bc, 8
+  ld hl, _RAM_DBF1_RaceNumberText
+  CallRamCode _LABEL_3BC6A_EmitText
 _LABEL_AA5D_:
   ret
 
@@ -22465,33 +22403,32 @@ _LABEL_AA5D_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B00
-  ld bc, $001E
+  ; SMS: emit 30 tiles here
+  TilemapWriteAddressToHL 0, 16
+  ld bc, 30
   jr ++
 
-+:
-  ld hl, $7A52
++:; GG: emit "string" split across lines
+  TilemapWriteAddressToHL 9, 13
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $000F
-  ld hl, $BFB0
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
-  ld hl, $7A12
-  ld bc, $000F
+  ld bc, 15
+  ld hl, _DATA_BFB0_
+  CallRamCode _LABEL_3BC6A_EmitText
+  TilemapWriteAddressToHL 9, 12
+  ld bc, 15
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $BFA1
-  call $DAAA  ; Code is loaded from _LABEL_BDD_
+  ld hl, _DATA_BFA1_
+  CallRamCode _LABEL_3BC6A_EmitText
   ret
 
 _LABEL_AA8B_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7AC0
+  TilemapWriteAddressToHL 0, 15
   jr ++
-
-+:
-  ld hl, $7A00
++:TilemapWriteAddressToHL 0, 12
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $0020
@@ -22503,8 +22440,7 @@ _LABEL_AA8B_:
 
 ; Data from AAAE to AACD (32 bytes)
 _TEXT_AAAE_Blanks:
-.db $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E
-.db $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E
+.asc "                                "
 
 ; Data from AACE to AB05 (56 bytes)
 _DATA_AACE_:
@@ -22525,25 +22461,28 @@ _DATA_AB2C_:
 .db $1C $1F
 
 ; Data from AB3E to AB4C (15 bytes)
-_DATA_AB3E_:
-.db $04 $01 $05 $07 $04 $03 $05 $02 $07 $06 $04 $02 $08 $03 $01
+_DATA_AB3E_CourseSelect_TrackTypes:
+; Maps the course select index to a track type
+; (???)
+.db TT_FormulaOne TT_FourByFour TT_Warriors TT_RuffTrux TT_FormulaOne
+.db TT_TurboWheels TT_Warriors TT_Powerboats TT_RuffTrux TT_Tanks
+.db TT_FormulaOne TT_Powerboats TT_Helicopters TT_TurboWheels TT_FourByFour
+.db TT_RuffTrux TT_Tanks TT_Warriors TT_Helicopters TT_FourByFour TT_Powerboats
+.db TT_Tanks TT_TurboWheels TT_Helicopters TT_FourByFour TT_Unknown9 TT_Unknown9
+.db TT_Unknown9 TT_Powerboats
 
-; Data from AB4D to AB5A (14 bytes)
-_DATA_AB4D_:
-.db $07 $06 $05 $08 $01 $02 $06 $03 $08 $01 $09 $09 $09 $02
-
-_LABEL_AB5B_:
+_LABEL_AB5B_GetPortraitSource_CourseSelect:
   ld a, (_RAM_DBD8_CourseSelectIndex)
   sub $01
   ld c, a
   ld b, $00
-  ld hl, _DATA_AB3E_
+  ld hl, _DATA_AB3E_CourseSelect_TrackTypes
   add hl, bc
   ld a, (hl)
-_LABEL_AB68_:
-  ld (_RAM_D691_), a
+_LABEL_AB68_GetPortraitSource_TrackType:
+  ld (_RAM_D691_TrackType), a
   sla a
-  ld de, _DATA_9254_
+  ld de, _DATA_9254_VehiclePortraitOffsets
   add a, e
   ld e, a
   ld a, d
@@ -22553,28 +22492,29 @@ _LABEL_AB68_:
   ld (_RAM_D7B5_DecompressorSource), a
   inc de
   ld a, (de)
-  ld (_RAM_D7B6_), a
-  ld hl, $C000
+  ld (_RAM_D7B5_DecompressorSource+1), a
+  ld hl, _RAM_C000_DecompressionTemporaryBuffer
   ld (_RAM_D6A6_DisplayCase_Source), hl
   ret
 
-_LABEL_AB86_:
-  ; Decompresses data from 
-  ld a, (_RAM_D691_)
-  call _LABEL_B478_SelectPageNumber
+_LABEL_AB86_Decompress3bppTiles_Index100:
+  ; Decompresses 80 tiles of 3bpp tile data from the given source address and page to tile $100
+  ld a, (_RAM_D691_TrackType)
+  call _LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6000 ; Tile $100
-  ld de, $0280 ; 80 * 8 rows
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $100
+  ld de, 80 * 8 ; 80 tiles
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
-_LABEL_AB9B_:
-  ld a, (_RAM_D691_)
-  call _LABEL_B478_SelectPageNumber
+_LABEL_AB9B_Decompress3bppTiles_Index160:
+  ; Decompresses 80 tiles of 3bpp tile data from the given source address and page to tile $160
+  ld a, (_RAM_D691_TrackType)
+  call _LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6C00 ; Tile $160
-  ld de, $0280 ; 80 * 8 rows
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $160
+  ld de, 80 * 8 ; 80 tiles
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_ABB0_:
@@ -22589,7 +22529,7 @@ _LABEL_ABB3_:
   xor a
   ld (_RAM_D690_), a
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $10
+  cp MenuScreen_TrackSelect
   jr nz, +
   ld a, $60
   ld (_RAM_D690_), a
@@ -22603,14 +22543,14 @@ _LABEL_ABB3_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7BD6
+  TilemapWriteAddressToHL 11, 19
   jr ++
 
 +:
-  ld hl, $7A96
+  TilemapWriteAddressToHL 11, 14
 ++:
   xor a
-  ld (_RAM_D68B_), a
+  ld (_RAM_D68B_TilemapRectangleSequence_Row), a
 --:
   call _LABEL_B35A_VRAMAddressToHL
   ld de, $000A
@@ -22626,11 +22566,11 @@ _LABEL_ABB3_:
   ld a, d
   or e
   jr nz, -
-  ld a, (_RAM_D68B_)
+  ld a, (_RAM_D68B_TilemapRectangleSequence_Row)
   cp $07
   jr z, +
   add a, $01
-  ld (_RAM_D68B_), a
+  ld (_RAM_D68B_TilemapRectangleSequence_Row), a
   ld de, $0040
   add hl, de
   jp --
@@ -22643,7 +22583,7 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
   ld (_RAM_D6BB_), a
@@ -22652,16 +22592,16 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7902
+  TilemapWriteAddressToHL 1, 8
   jr ++
 
 +:
-  ld hl, $794C
+  TilemapWriteAddressToHL 6, 9
   call _LABEL_B2B3_
 ++:
   call _LABEL_BCCF_EmitTilemapRectangleSequence
 +++:
-  ld hl, $4840
+  TileWriteAddressToHL $42
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3F_GameMode)
   or a
@@ -22681,17 +22621,17 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7912
+  TilemapWriteAddressToHL 9, 8
   jr ++
 
 +:
-  ld hl, $7956
+  TilemapWriteAddressToHL 11, 9
   call _LABEL_B2B3_
 ++:
   or a
   sbc hl, de
   call _LABEL_BCCF_EmitTilemapRectangleSequence
-  ld hl, $4C00
+  TileWriteAddressToHL $60
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3F_GameMode)
   or a
@@ -22711,11 +22651,11 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7922
+  TilemapWriteAddressToHL 17, 8
   jr ++
 
 +:
-  ld hl, $7960
+  TilemapWriteAddressToHL 16, 9
   call _LABEL_B2B3_
 ++:
   add hl, de
@@ -22723,7 +22663,7 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +++
-  ld hl, $4FC0
+  TileWriteAddressToHL $7e
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD7_)
   call _LABEL_9F40_
@@ -22732,11 +22672,11 @@ _LABEL_AC1E_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7932
+  TilemapWriteAddressToHL 25, 8
   jr ++
 
 +:
-  ld hl, $796A
+  TilemapWriteAddressToHL 21, 9
   call _LABEL_B2B3_
 ++:
   call _LABEL_BCCF_EmitTilemapRectangleSequence
@@ -22747,17 +22687,16 @@ _LABEL_ACEE_:
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
-  ld hl, $7A86
+  TilemapWriteAddressToHL 3, 14
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, $7A96
-  ld bc, $7AA6
-  ld de, $7AB6
+  TilemapWriteAddressToHL 11, 14
+  TilemapWriteAddressToBC 19, 14
+  TilemapWriteAddressToDE 27, 14
   jr ++
 
-+:
-  ld hl, $7A92
++:TilemapWriteAddressToHL 9, 14
   call _LABEL_B35A_VRAMAddressToHL
-  ld de, $7AAA
+  TilemapWriteAddressToDE 21, 14
   jr ++
 
 ++:
@@ -22789,18 +22728,18 @@ _LABEL_ACEE_:
   ret
 
 _LABEL_AD42_DrawDisplayCase:
-  ld a, :_DATA_3B37F_DisplayCaseTilesCompressed ; $0E
+  ld a, :_DATA_3B37F_Tiles_DisplayCase ; $0E
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, _DATA_3B37F_DisplayCaseTilesCompressed ; $B37F - compressed 3bpp tile data, 2952 bytes = 123 tiles up to $3b970
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6000 ; Tile $100
-  ld de, $03D8 ; 123 * 8 rows
+  ld hl, _DATA_3B37F_Tiles_DisplayCase ; $B37F - compressed 3bpp tile data, 2952 bytes = 123 tiles up to $3b970
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $100
+  ld de, 123 * 8 ; 123 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   ld a, :_DATA_3B32F_DisplayCaseTilemapCompressed ; $0E
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld hl, _DATA_3B32F_DisplayCaseTilemapCompressed ; $B32F - compressed data, 440 bytes up to $3b37e
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -22818,7 +22757,7 @@ _LABEL_AD42_DrawDisplayCase:
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   xor a
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
 
   ; The displayed tilemap includes all the cars, then we blank it out here
   ld bc, $0000
@@ -22855,21 +22794,21 @@ _DATA_ADDA_DisplayCaseTilemapAddresses: ; Tilemap addresses per car index (0-24)
 .dw $7B4C $7B56 $7B60 $7B6A $7C0C $7C16 $7C20 $7C2A
 
 _DATA_AE0A_DisplayCase_BlankRectangle_RuffTruxTop:
-.db $04 $05 $05 $05 $06 
-.db $4C $4D $4D $4D $19 
-.db $4C $4D $4D $4D $19 
+.db $04 $05 $05 $05 $06
+.db $4C $4D $4D $4D $19
+.db $4C $4D $4D $4D $19
 _DATA_AE19_DisplayCase_BlankRectangle_RuffTruxMiddle:
-.db $4C $4D $4D $4D $19 
-.db $4C $4D $4D $4D $19 
-.db $4C $4D $4D $4D $19 
+.db $4C $4D $4D $4D $19
+.db $4C $4D $4D $4D $19
+.db $4C $4D $4D $4D $19
 _DATA_AE28_DisplayCase_BlankRectangle_RuffTruxBottom:
-.db $4C $4D $4D $4D $19 
-.db $4C $4D $4D $4D $19 
-.db $76 $77 $77 $77 $57 
+.db $4C $4D $4D $4D $19
+.db $4C $4D $4D $4D $19
+.db $76 $77 $77 $77 $57
 
 _DATA_AE37_DisplayCase_BlankRectangle:
-.db $04 $05 $05 $05 $06 
-.db $4C $4D $4D $4D $19 
+.db $04 $05 $05 $05 $06
+.db $4C $4D $4D $4D $19
 .db $76 $77 $77 $77 $57
 
 _LABEL_AE46_DisplayCase_BlankCar:
@@ -22895,14 +22834,14 @@ _LABEL_AE50_DisplayCase_BlankRect:
   ld d, (hl)
   ld h, d
   ld l, e ; -> hl
-  
+
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01 ; 1 for SMS, 0 for GG
   ld d, a
   ld e, $00
   add hl, de ; Add 256 for SMS -> shift down by 4 rows
   call _LABEL_B35A_VRAMAddressToHL
-  
+
   ld d, h
   ld e, l
   ld hl, (_RAM_D6A6_DisplayCase_Source)
@@ -22914,7 +22853,7 @@ _LABEL_AE50_DisplayCase_BlankRect:
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   xor a
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
   ld bc, (_RAM_D6BC_DisplayCase_IndexBackup) ; Restore bc (?)
   ret
 
@@ -22954,15 +22893,15 @@ _LABEL_AE94_DisplayCase_RestoreRectangle:
   ld h, a
   ld a, c
   ld l, a
-  
+
   ; Emit rectangle (5x3)
   ld a, $03
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  jp $DABD  ; Code is loaded from _LABEL_3BC7D_DisplayCase_RestoreRectangle
+  JumpToRamCode _LABEL_3BC7D_DisplayCase_RestoreRectangle
 
 _LABEL_AECD_:
-  ld hl, (_RAM_D6A8_)
-  ld bc, $0320
+  ld hl, (_RAM_D6A8_DisplayCaseTileAddress)
+  ld bc, 25 * TILE_DATA_SIZE ; $0320
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _DATA_9D37_
@@ -22989,8 +22928,8 @@ _LABEL_AECD_:
   ld l, c
   ld bc, $0258
   add hl, bc
-  ld e, $28
-  call $DAEF  ; Code is loaded from _LABEL_03BCAF_
+  ld e, $28 ; 5 tiles
+  CallRamCode _LABEL_03BCAF_Emit3bppTiles
   ld a, $00
   ld (_RAM_D6A4_), a
   ld (_RAM_D6B0_), a
@@ -23000,7 +22939,7 @@ _LABEL_AF10_:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   ret z
-  in a, ($05)
+  in a, (PORT_GG_LinkStatus)
   and $04
   jr nz, +++
   ld a, (_RAM_DC41_GearToGearActive)
@@ -23012,7 +22951,7 @@ _LABEL_AF10_:
   cp $55
   jr z, ++
   ld a, $CA
-  out ($03), a
+  out (PORT_GG_LinkSend), a
   ret
 
 +:
@@ -23020,8 +22959,8 @@ _LABEL_AF10_:
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
   ld (_RAM_DC41_GearToGearActive), a
   ld a, $55
-  out ($03), a
-  jr _LABEL_AF5D_
+  out (PORT_GG_LinkSend), a
+  jr _LABEL_AF5D_BlankControlsRAM
 
 ++:
   xor a
@@ -23029,8 +22968,8 @@ _LABEL_AF10_:
   ld a, $01
   ld (_RAM_DC41_GearToGearActive), a
   ld c, $01
-  call _LABEL_B1EC_
-  jr _LABEL_AF5D_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
+  jr _LABEL_AF5D_BlankControlsRAM
 
 ; Data from AF4F to AF4F (1 bytes)
 .db $C9 ; ret
@@ -23043,7 +22982,7 @@ _LABEL_AF10_:
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
   ret
 
-_LABEL_AF5D_:
+_LABEL_AF5D_BlankControlsRAM:
   ld a, NO_BUTTONS_PRESSED
   ld (_RAM_DC47_GearToGear_OtherPlayerControls1), a
   ld (_RAM_DC48_GearToGear_OtherPlayerControls2), a
@@ -23053,13 +22992,13 @@ _LABEL_AF5D_:
   ret
 
 _LABEL_AF6F_:
-  ld a, (_RAM_D7BA_)
+  ld a, (_RAM_D7BA_HardModeTextFlashCounter)
   inc a
   and $0F
-  ld (_RAM_D7BA_), a
+  ld (_RAM_D7BA_HardModeTextFlashCounter), a
   and $08
   jr z, _LABEL_AF92_
-  ld hl, $7A5A
+  TilemapWriteAddressToHL 13, 13
   call _LABEL_B35A_VRAMAddressToHL
   ld c, $05
   ld hl, _TEXT_AFA0_Link
@@ -23070,7 +23009,7 @@ _LABEL_AF6F_:
   ret
 
 _LABEL_AF92_:
-  ld hl, $7A5A
+  TilemapWriteAddressToHL 13, 13
   call _LABEL_B35A_VRAMAddressToHL
   ld c, $06
   ld hl, _TEXT_AAAE_Blanks
@@ -23084,7 +23023,7 @@ _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL:
   call _LABEL_B35A_VRAMAddressToHL
 _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM:
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
-  jp $D971  ; Code is loaded from _LABEL_3BB31_Emit3bppTileDataToVRAM
+  JumpToRamCode _LABEL_3BB31_Emit3bppTileDataToVRAM
 
 _LABEL_AFAE_RamCodeLoader:
   ; Trampoline for calling paging code
@@ -23095,8 +23034,7 @@ _LABEL_AFAE_RamCodeLoader:
   jp _RAM_D640_RamCodeLoader  ; Code is loaded from +
 
 ; Executed in RAM at d640
-+:
-  ld a, :_LABEL_3B971_RamCodeLoaderStage2
++:ld a, :_LABEL_3B971_RamCodeLoaderStage2
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld (PAGING_REGISTER), a ; page in and call
   call _LABEL_3B971_RamCodeLoaderStage2
@@ -23105,31 +23043,31 @@ _LABEL_AFAE_RamCodeLoader:
   ret
 
 _LABEL_AFCD_:
-  call _LABEL_BB85_
-  ld a, $13
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_OnePlayerMode
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_B337_
-  call _LABEL_9400_
-  call _LABEL_BAFF_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_B337_BlankTiles
+  call _LABEL_9400_BlankSprites
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   ld a, $B2
   ld (_RAM_D6C8_), a
   call _LABEL_9448_
   call _LABEL_94AD_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   ld c, $07
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
   ld (_RAM_D6C7_), a
   call _LABEL_BB95_
   call _LABEL_BC0C_
   call +
   call _LABEL_A50C_
-  call _LABEL_9317_
+  call _LABEL_9317_InitialiseHandSprites
   xor a
-  ld (_RAM_D6A0_), a
+  ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_
@@ -23142,29 +23080,29 @@ _LABEL_B01D_SquinkyTennisHook:
   ret z
   ; If a GG...
   ; ...and Start is held...
-  in a, ($00)
-  add a, a
+  in a, (PORT_GG_START)
+  add a, a ; start is bit 7, 1 = not pressed
   ret c
   ld a, :_DATA_3F753_JonsSquinkyTennisCompressed ;$0F
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ld hl, _DATA_3F753_JonsSquinkyTennisCompressed ;$B753 Up to $3ff78, compressed code (Jon's Squinky Tennis, 5923 bytes)
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   jp _RAM_C000_DecompressionTemporaryBuffer ; $C000 ; Possibly invalid
 
 +:
-  ld a, :_DATA_23656_ ; $08
+  ld a, :_DATA_23656_Tiles_VsCPUPatch ; $08
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, _DATA_23656_ ; $B656 Up to $237e1, 864 bytes compressed
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $7000 ; Tile $180
-  ld de, $0120 ; 36 * 8 rows
+  ld hl, _DATA_23656_Tiles_VsCPUPatch ; $B656 Up to $237e1, 864 bytes compressed
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $180
+  ld de, 36 * 8 ; 36 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B6C ; 22, 13 (GG)
+  TilemapWriteAddressToHL 22, 17 ; GG
   jr ++
-+:ld hl, $7AA8 ; 20, 10 (SMS)
++:TilemapWriteAddressToHL 20, 14 ; SMS
 ++:
   ; Draw it as 6x6 tiles
   ld a, $80
@@ -23178,38 +23116,38 @@ _LABEL_B01D_SquinkyTennisHook:
   ret
 
 ; 20th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_B06C_:
+_LABEL_B06C_MenuScreen_OnePlayerMode:
   call _LABEL_B9C4_
   call _LABEL_8CA2_
-  ld a, (_RAM_D6A0_)
+  ld a, (_RAM_D6A0_MenuSelection)
   or a
-  jp z, _LABEL_80FC_MenuScreenHandler_Null
+  jp z, _LABEL_80FC_EndMenuScreenHandler
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_1_MASK ; $10
-  jp nz, _LABEL_80FC_MenuScreenHandler_Null
-  call _LABEL_B1F4_
-  ld a, (_RAM_D6A0_)
+  jp nz, _LABEL_80FC_EndMenuScreenHandler
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
+  ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
   xor a
   ld (_RAM_DC3F_GameMode), a
   call _LABEL_8205_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, $01
   ld (_RAM_DC3F_GameMode), a
   call _LABEL_8953_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 15th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_B09F_:
+_LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   ld a, (_RAM_D688_)
   or a
   jr z, +
   dec a
   ld (_RAM_D688_), a
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, (_RAM_D6B9_)
@@ -23227,7 +23165,7 @@ _LABEL_B09F_:
   jr z, _LABEL_B110_
   dec a
   jr z, _LABEL_B132_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, (_RAM_D6AC_)
@@ -23237,70 +23175,70 @@ _LABEL_B09F_:
   jr z, +
   dec a
   call z, _LABEL_A645_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call _LABEL_89E2_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, (_RAM_DBD8_CourseSelectIndex)
   or a
   jr nz, +
   ld (_RAM_D6AB_), a
-  ld a, $09
+  ld a, MenuScreen_OnePlayerTrackIntro
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $01
   ld (_RAM_D6C1_), a
-  call _LABEL_9400_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_9400_BlankSprites
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  jp _LABEL_84AA_
+  jp _LABEL_84AA_Menu5
 
 _LABEL_B110_:
   ld a, (_RAM_D6CD_)
   cp $02
-  jp z, _LABEL_80FC_MenuScreenHandler_Null
+  jp z, _LABEL_80FC_EndMenuScreenHandler
   add a, $01
   ld (_RAM_D6CD_), a
   dec a
   jr z, +
   dec a
   jr z, ++
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_A645_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++:
   call _LABEL_A5C9_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B132_:
   ld a, (_RAM_D6CD_)
   cp $02
-  jp z, _LABEL_80FC_MenuScreenHandler_Null
+  jp z, _LABEL_80FC_EndMenuScreenHandler
   add a, $01
   ld (_RAM_D6CD_), a
   dec a
   jr z, +
   dec a
   jr z, ++
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_A5F9_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ++:
   call _LABEL_A618_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B154_:
   ld a, (_RAM_DC3F_GameMode)
@@ -23351,13 +23289,13 @@ _LABEL_B154_:
   srl a
   ld c, a
   ld b, $00
-  ld hl, $DC21
+  ld hl, _RAM_DC21_
   add hl, bc
   ld a, (_RAM_D6CB_)
   ld (hl), a
   call _LABEL_9E52_
 _LABEL_B1B6_Select:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B1B9_Left:
   xor a
@@ -23365,7 +23303,7 @@ _LABEL_B1B9_Left:
   call _LABEL_B389_
   ld bc, $0005
   call _LABEL_A5B0_EmitToVDP_Text
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _Right:
   ld a, $01
@@ -23374,11 +23312,11 @@ _Right:
   ld hl, _TEXT_B1E7_Yes
   ld bc, $0005
   call _LABEL_A5B0_EmitToVDP_Text
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; Data from B1DD to B1E6 (10 bytes)
 _TEXT_B1DD_No:
-.asc "-NO- " ; $B5 $0D $1A $B5 $0E 
+.asc "-NO- " ; $B5 $0D $1A $B5 $0E
 
 _TEXT_B1E2_No:
 .asc " -NO-" ; $0E $B5 $0D $1A $B5
@@ -23387,15 +23325,15 @@ _TEXT_B1E2_No:
 _TEXT_B1E7_Yes:
 .asc "-YES-" ; $B5 $18 $04 $12 $B5
 
-_LABEL_B1EC_:
-  ld a, $0C
+_LABEL_B1EC_Trampoline_PlayMenuMusic:
+  ld a, :_LABEL_30CE8_PlayMenuMusic
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  jp $DB1C  ; Code is loaded from _LABEL_3BCDC_
+  JumpToRamCode _LABEL_3BCDC_Trampoline2_PlayMenuMusic
 
-_LABEL_B1F4_:
-  ld a, $0C
+_LABEL_B1F4_Trampoline_StopMenuMusic:
+  ld a, :_LABEL_30D28_StopMenuMusic
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  jp $DB26  ; Code is loaded from _LABEL_3BCE6_
+  JumpToRamCode _LABEL_3BCE6_Trampoline_StopMenuMusic
 
 _LABEL_B1FC_:
   ld a, (_RAM_DC34_)
@@ -23505,42 +23443,44 @@ _LABEL_B2B3_:
   ret
 
 _LABEL_B2BB_:
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   call _LABEL_9448_
   call _LABEL_94AD_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
 +:
   ret
 
 _LABEL_B2DC_:
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   call _LABEL_9448_
   jp _LABEL_94AD_
 
-_LABEL_B2F3_:
-  ld hl, $7BC0
+_LABEL_B2F3_DrawHorizontalLines_CharacterSelect:
+  TilemapWriteAddressToHL 0, 19
   call _LABEL_B35A_VRAMAddressToHL
-  call _LABEL_95AF_
-  ld hl, $7D80
+  call _LABEL_95AF_DrawHorizontalLineIfSMS
+  TilemapWriteAddressToHL 0, 26
   call _LABEL_B35A_VRAMAddressToHL
-  call _LABEL_95AF_
-_LABEL_B305_:
-  ld hl, $7840
+  call _LABEL_95AF_DrawHorizontalLineIfSMS
+  ; fall through
+  
+_LABEL_B305_DrawHorizontalLine_Top:
+  TilemapWriteAddressToHL 0, 5
   call _LABEL_B35A_VRAMAddressToHL
-  jp _LABEL_95AF_
+  jp _LABEL_95AF_DrawHorizontalLineIfSMS
 
 _LABEL_B30E_:
   ld a, $01
@@ -23556,37 +23496,35 @@ _LABEL_B31C_:
   ld (_RAM_D6C0_), a
   jp -
 
-_LABEL_B323_:
-  ld hl, _DATA_97DF_
+_LABEL_B323_Populate_RAM_DBFE_:
+  ; Copies data from _DATA_97DF_MultiplesOf8 to _RAM_DBFE_
+  ld hl, _DATA_97DF_MultiplesOf8
   ld de, _RAM_DBFE_
   ld bc, $0000
--:
-  ld a, (hl)
+-:ld a, (hl)
   ld (de), a
   inc hl
   inc de
   inc bc
   ld a, c
-  cp $0B
+  cp 11
   jr nz, -
   ret
 
-_LABEL_B337_:
-  ld hl, $4000
+_LABEL_B337_BlankTiles:
+  TileWriteAddressToHL $00
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $2000
--:
-  xor a
+  ld bc, 256 * TILE_DATA_SIZE ; lower tiles
+-:xor a
   out (PORT_VDP_DATA), a
   dec bc
   ld a, b
   or c
   jr nz, -
-  ld hl, $6000
+  TileWriteAddressToHL $100
   call _LABEL_B35A_VRAMAddressToHL
-  ld bc, $1700
--:
-  xor a
+  ld bc, 184 * TILE_DATA_SIZE ; Upper tiles
+-:xor a
   out (PORT_VDP_DATA), a
   dec bc
   ld a, b
@@ -23613,7 +23551,7 @@ _LABEL_B368_:
   ld (_RAM_D6C1_), a
   xor a
   ld (_RAM_D6AB_), a
-  ld (_RAM_D6C5_), a
+  ld (_RAM_D6C5_PaletteFadeIndex), a
   ret
 
 _LABEL_B375_ConfigureTilemapRect_5x6_24:
@@ -23632,13 +23570,11 @@ _LABEL_B389_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B2C
+  TilemapWriteAddressToHL 22, 16 ; SMS
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_B1DD_No
   jr ++
-
-+:
-  ld hl, $7C6A
++:TilemapWriteAddressToHL 21, 21 ; GG
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_B1E2_No
 ++:
@@ -23663,19 +23599,19 @@ _LABEL_B3AE_:
   ld b, $00
   call _LABEL_B412_
 _LABEL_B3C4_:
-  ld hl, _DATA_9773_
+  ld hl, _DATA_9773_TileWriteAddresses
   add hl, de
   ld (_RAM_D6BE_), de
   ld e, (hl)
   inc hl
   ld d, (hl)
   call _LABEL_B361_VRAMAddressToDE
-  ld (_RAM_D6A8_), de
-  ld hl, _DATA_97DF_
+  ld (_RAM_D6A8_DisplayCaseTileAddress), de
+  ld hl, _DATA_97DF_MultiplesOf8
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
-  ld hl, $DBFE
+  ld hl, _RAM_DBFE_
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BC_DisplayCase_IndexBackup), bc
@@ -23743,11 +23679,10 @@ _LABEL_B433_:
   ld (_RAM_D6AC_), a
   ret
 
-_LABEL_B44E_:
-  ld bc, $013C
-  ld hl, _RAM_D680_Player1Controls_Menus
--:
-  xor a
+_LABEL_B44E_BlankMenuRAM:
+  ld bc, _RAM_D7BB_MenuRamEnd - _RAM_D680_MenuRamStart ; Size of menu RAM
+  ld hl, _RAM_D680_MenuRamStart ; Start of menu RAM
+-:xor a
   ld (hl), a
   dec bc
   inc hl
@@ -23760,27 +23695,27 @@ _LABEL_B45D_:
   ld a, (_RAM_D6D4_) ; Only if 1
   or a
   jp z, +
-  ld a, (_RAM_D691_)
-  call _LABEL_B478_SelectPageNumber
+  ld a, (_RAM_D691_TrackType)
+  call _LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   xor a
   ld (_RAM_D6D4_), a
   ld (_RAM_D6D3_VBlankDone), a
 +:
   ret
 
-_LABEL_B478_SelectPageNumber:
+_LABEL_B478_SelectPortraitPage:
   ; Indexes into a table with a to select the page number for a subsequent call to RAM code
   ld e, a
   ld d, $00
-  ld hl, _DATA_926C_PageNumbers
+  ld hl, _DATA_926C_VehiclePortraitPageNumbers
   add hl, de
   ld a, (hl)
   ld (_RAM_D741_RAMDecompressorPageIndex), a
   ret
 
-_LABEL_B484_:
+_LABEL_B484_CheckTitleScreenCheatCodes:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, ++ ; ret
@@ -23858,7 +23793,7 @@ _DATA_B4BA_: ; erroneous label?
 ; 0               = end
 
 _CheckForCheatCode_HardMode:
-  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode) ; Get index of next button press
+  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect) ; Get index of next button press
   ld c, a
   ld b, $00
   ld hl, _DATA_B4AB_CheatKeys_HardMode  ; Look up the button press
@@ -23866,20 +23801,20 @@ _CheckForCheatCode_HardMode:
   ld a, (hl)
   cp e  ; Compare to what we have
   jr nz, +
-  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode) ; If it matches, increase the index
+  ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect) ; If it matches, increase the index
   add a, $01
-  ld (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode), a
+  ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
   ld a, $01
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a
   ret
 
 +:; If no match, reset the counter
   xor a
-  ld (_RAM_D6D0_TitleScreenCheatCodeCounterHardMode), a
+  ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
   ret
 
 _CheckForCheatCode_CourseSelect:
-  ld a, (_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect) ; Get index of next button press
+  ld a, (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode) ; Get index of next button press
   ld c, a
   ld b, $00
   ld hl, _DATA_B4B5_CheatKeys_CourseSelect ; Look up the button press
@@ -23889,30 +23824,34 @@ _CheckForCheatCode_CourseSelect:
   jr z, +
   cp e
   jr nz, +
-  ld a, (_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect) ; If it matches, increase the index
+  ld a, (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode) ; If it matches, increase the index
   add a, $01
-  ld (_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect), a
+  ld (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode), a
   ld a, $01
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a
   ret
 
 +:
   xor a
-  ld (_RAM_DC45_TitleScreenCheatCodeCounterCourseSelect), a
+  ld (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode), a
   ret
 
-_LABEL_B505_:
+_LABEL_B505_UpdateHardModeText:
   ld a, (_RAM_DC46_Cheat_HardMode)
   or a
   ret z
-  ld hl, $7A52
+  ; Get ready
+  TilemapWriteAddressToHL 9, 13
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_D7BA_)
+  ; Increment counter
+  ld a, (_RAM_D7BA_HardModeTextFlashCounter)
   inc a
   and $0F
-  ld (_RAM_D7BA_), a
+  ld (_RAM_D7BA_HardModeTextFlashCounter), a
+  ; Draw or blank every 8 frames
   and $08
   jr z, +++
+  ; Draw
   ld a, (_RAM_DC46_Cheat_HardMode)
   cp $01
   jr z, +
@@ -23923,17 +23862,17 @@ _LABEL_B505_:
 +:
   ld c, $0C
   ld hl, _TEXT_B541_HardMode
-  jp _LABEL_A5B0_EmitToVDP_Text
+  jp _LABEL_A5B0_EmitToVDP_Text ; and ret
 
 ++:
   ld c, $0E
   ld hl, _TEXT_B54D_RockHardMode
-  jp _LABEL_A5B0_EmitToVDP_Text
+  jp _LABEL_A5B0_EmitToVDP_Text ; and ret
 
 +++:
   ld c, $0E
   ld hl, _TEXT_AAAE_Blanks
-  jp _LABEL_A5B0_EmitToVDP_Text
+  jp _LABEL_A5B0_EmitToVDP_Text ; and ret
 
 ; Data from B541 to B54C (12 bytes)
 _TEXT_B541_HardMode:
@@ -23941,14 +23880,14 @@ _TEXT_B541_HardMode:
 
 ; Data from B54D to B56C (32 bytes)
 _TEXT_B54D_RockHardMode:
-.asc "ROCK HARD MODE" ; .db $11 $1A $02 $0A $0E $07 $00 $11 $03 $0E $0C $1A $03 $04 
+.asc "ROCK HARD MODE" ; .db $11 $1A $02 $0A $0E $07 $00 $11 $03 $0E $0C $1A $03 $04
 
 ; Unknown data
 .db $AF $32
 .db $46 $DC $32 $D0 $D6 $32 $45 $DC $21 $52 $7A $CD $5A $B3 $18 $CC
 
 ; 17th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_B56D_:
+_LABEL_B56D_MenuScreen_TrackSelect:
   call _LABEL_B9C4_
   call _LABEL_A2AA_
   call _LABEL_9FC5_
@@ -24000,7 +23939,7 @@ _LABEL_B56D_:
   jr nz, _LABEL_B618_
 ++++:
   call _LABEL_B368_
-  call _LABEL_9400_
+  call _LABEL_9400_BlankSprites
   jp _LABEL_B618_
 
 _LABEL_B5E7_:
@@ -24011,28 +23950,28 @@ _LABEL_B5E7_:
   jr nz, _LABEL_B618_
   xor a
   ld (_RAM_D6AB_), a
-  ld a, (_RAM_D6C5_)
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
-  call _LABEL_BD2F_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  call _LABEL_BD2F_PaletteFade
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC3B_)
   dec a
   jr z, +
   call _LABEL_B1FC_
   ld a, $01
   ld (_RAM_DC3D_IsHeadToHead), a
-  ld (_RAM_D6D5_), a
+  ld (_RAM_D6D5_InGame), a
 _LABEL_B618_:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, $01
-  ld (_RAM_D6D5_), a
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  ld (_RAM_D6D5_InGame), a
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B623_:
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
@@ -24069,7 +24008,7 @@ _LABEL_B640_:
 
 +++:
   call _LABEL_B27E_
-  call _LABEL_AB5B_
+  call _LABEL_AB5B_GetPortraitSource_CourseSelect
   call _LABEL_AA8B_
   jp +++++
 
@@ -24088,31 +24027,31 @@ _LABEL_B666_:
 
 ++:
   call _LABEL_B298_
-  call _LABEL_AB5B_
+  call _LABEL_AB5B_GetPortraitSource_CourseSelect
   call _LABEL_AA8B_
   jp +++++
 
 ++++:
   call _LABEL_A01C_
-  call _LABEL_AB68_
+  call _LABEL_AB68_GetPortraitSource_TrackType
 +++++:
-  call _LABEL_A0F0_
+  call _LABEL_A0F0_BlankTilemapRectangle
   ld a, $01
   ld (_RAM_D6D4_), a
   ld a, $09
   ld (_RAM_D693_), a
   ld de, $6C00
-  ld (_RAM_D6A8_), de
+  ld (_RAM_D6A8_DisplayCaseTileAddress), de
   ld a, $01
   ld (_RAM_D697_), a
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B6AB_:
   call _LABEL_ABB3_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 ; 18th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_B6B1_:
+_LABEL_B6B1_MenuScreen_TwoPlayerResult:
   call _LABEL_B9C4_
   call _LABEL_A039_
   ld hl, (_RAM_D6AB_)
@@ -24131,13 +24070,13 @@ _LABEL_B6B1_:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DC34_)
   dec a
   jr z, +++
   call _LABEL_8114_Menu0
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +++:
   ld a, (_RAM_DC36_)
@@ -24152,21 +24091,21 @@ _LABEL_B6B1_:
   add a, $01
   ld (_RAM_DC35_), a
   call _LABEL_8A30_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 +:
   call _LABEL_B877_
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B70B_:
-  call _LABEL_BB85_
-  ld a, $10
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TrackSelect
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, $0E
-  call _LABEL_9170_
-  call _LABEL_9400_
+  ld e, BLANK_TILE_INDEX
+  call _LABEL_9170_BlankTilemap_BlankControlsRAM
+  call _LABEL_9400_BlankSprites
   call _LABEL_90CA_
-  call _LABEL_BAFF_
+  call _LABEL_BAFF_LoadFontTiles
   call _LABEL_959C_
   call _LABEL_A296_
   ld a, $01
@@ -24177,9 +24116,9 @@ _LABEL_B70B_:
   ld (_RAM_D6C8_), a
   call _LABEL_9448_
   call _LABEL_94AD_
-  ld hl, $7840
+  TilemapWriteAddressToHL 0, 5
   call _LABEL_B35A_VRAMAddressToHL
-  call _LABEL_95AF_
+  call _LABEL_95AF_DrawHorizontalLineIfSMS
   ld a, $60
   ld (_RAM_D6AF_), a
   xor a
@@ -24188,16 +24127,16 @@ _LABEL_B70B_:
   ld (_RAM_D6C1_), a
   ld (_RAM_D693_), a
   ld (_RAM_D6CE_), a
-  call _LABEL_AB5B_
-  call _LABEL_AB9B_
+  call _LABEL_AB5B_GetPortraitSource_CourseSelect
+  call _LABEL_AB9B_Decompress3bppTiles_Index160
   call _LABEL_ABB0_
   ld c, $07
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A673_
-  call _LABEL_9317_
-  ld hl, $B356
-  call $D9F5  ; Code is loaded from _LABEL_3BBB5_
-  call _LABEL_BF2E_LoadPalette
+  call _LABEL_9317_InitialiseHandSprites
+  ld hl, _DATA_2B356_SpriteNs_HandLeft
+  CallRamCode _LABEL_3BBB5_PopulateSpriteNs
+  call _LABEL_BF2E_LoadMenuPalette_SMS
   call _LABEL_BB75_
   ret
 
@@ -24216,43 +24155,43 @@ _LABEL_B785_:
   ld e, a
   ld d, $00
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $78DC
+  TilemapWriteAddressToHL 14, 7
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC36_)
   call _LABEL_B7F1_
-  ld hl, $791C
+  TilemapWriteAddressToHL 14, 8
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   call _LABEL_B7F9_
-  ld hl, $78E2
+  TilemapWriteAddressToHL 17, 7
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC37_)
   call _LABEL_B7F1_
-  ld hl, $7922
+  TilemapWriteAddressToHL 17, 8
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   jp _LABEL_B7F9_
 
 +:
-  ld hl, $7B5C
+  TilemapWriteAddressToHL 14, 17
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC36_)
   call _LABEL_B7F1_
-  ld hl, $7B9C
+  TilemapWriteAddressToHL 14, 18
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   call _LABEL_B7F9_
-  ld hl, $7B62
+  TilemapWriteAddressToHL 17, 17
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC37_)
   call _LABEL_B7F1_
-  ld hl, $7BA2
+  TilemapWriteAddressToHL 17, 18
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
   jp _LABEL_B7F9_
@@ -24285,12 +24224,12 @@ _LABEL_B7FF_:
 +:
   or a
   jr z, +
-  ld hl, $DC16
+  ld hl, _RAM_DC16_
   jp ++
 
 +:
   call _LABEL_B77C_
-  ld hl, $DC0B
+  ld hl, _RAM_DC0B_
 ++:
   ld a, c
   srl a
@@ -24323,7 +24262,7 @@ _LABEL_B7FF_:
   ret
 
 ; 19th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-_LABEL_B84D_:
+_LABEL_B84D_MenuScreen_TournamentChampion:
   call _LABEL_B911_
   ld a, (_RAM_D6AB_)
   cp $FF
@@ -24340,33 +24279,33 @@ _LABEL_B84D_:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call _LABEL_B1F4_
+  call _LABEL_B1F4_Trampoline_StopMenuMusic
   call _LABEL_8114_Menu0
 ++:
-  jp _LABEL_80FC_MenuScreenHandler_Null
+  jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B877_:
-  call _LABEL_BB85_
-  ld a, $12
+  call _LABEL_BB85_ScreenOn
+  ld a, MenuScreen_TournamentChampion
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $B2
   ld (_RAM_D6C8_), a
   call _LABEL_B2DC_
-  call _LABEL_B305_
+  call _LABEL_B305_DrawHorizontalLine_Top
   call _LABEL_B8CF_
   call _LABEL_B8E3_
-  ld hl, $4480
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC34_)
   or a
   jr nz, +
   ld c, $03
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jp ++
 
 +:
   ld c, $0C
-  call _LABEL_B1EC_
+  call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr z, ++
@@ -24389,22 +24328,22 @@ _LABEL_B8C9_EmitTilemapRectangle_5x6_24:
   jp _LABEL_BCCF_EmitTilemapRectangleSequence
 
 _LABEL_B8CF_:
-  ld a, $06
+  ld a, :_DATA_1B2C3_Tiles_Trophy
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B2C3
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6C00
-  ld de, $0290
+  ld hl, _DATA_1B2C3_Tiles_Trophy
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $160
+  ld de, 82 * 8 ; 82 tiles
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_B8E3_:
-  ld a, $09
+  ld a, :_DATA_279F0_Tilemap_
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B9F0
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $7A8E
+  ld hl, _DATA_279F0_Tilemap_
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TilemapWriteAddressToHL 7, 14
   call _LABEL_B35A_VRAMAddressToHL
-  ld de, $7A8E
+  TilemapWriteAddressToDE 7, 14
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
   ld a, $0C
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
@@ -24414,7 +24353,7 @@ _LABEL_B8E3_:
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
-  jp $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  JumpToRamCode _LABEL_3BB57_EmitTilemapRectangle
 
 _LABEL_B911_:
   ld a, (_RAM_D6AF_)
@@ -24428,7 +24367,7 @@ _LABEL_B911_:
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, ++
-  ld hl, $79CC
+  TilemapWriteAddressToHL 6, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC34_)
   or a
@@ -24443,14 +24382,14 @@ _LABEL_B911_:
   jp _LABEL_A5B0_EmitToVDP_Text
 
 ++:
-  ld hl, $79D6
+  TilemapWriteAddressToHL 11, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_B984_Champion
   ld bc, $000A
   jp _LABEL_A5B0_EmitToVDP_Text
 
 +++:
-  ld hl, $79CC
+  TilemapWriteAddressToHL 6, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_AAAE_Blanks
   ld bc, $0014
@@ -24512,7 +24451,7 @@ _LABEL_B9C4_:
   ld (_RAM_D6CF_), a
   ld c, a
   ld b, $00
-  ld hl, $DC2C
+  ld hl, _RAM_DC2C_
   add hl, bc
   ld a, (hl)
   or a
@@ -24537,58 +24476,58 @@ _LABEL_B9ED_:
   ld e, a
   ld d, $00
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $11
+  cp MenuScreen_TwoPlayerResult
   jr z, +
-  ld hl, $7990
+  TilemapWriteAddressToHL 8, 10
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, $50
+  ld a, $50 ; Tile $150
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
-  ld hl, $79AE
+  TilemapWriteAddressToHL 23, 10
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, $53
+  ld a, $53 ; Tile $153
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
   ret
 
 +:
-  ld hl, $7C10
+  TilemapWriteAddressToHL 8, 20
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, $50
+  ld a, $50 ; Tile $150
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
-  ld hl, $7C2E
+  TilemapWriteAddressToHL 23, 20
   add hl, de
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, $53
+  ld a, $53 ; Tile $153
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
   ret
 
 _LABEL_BA3C_:
-  ld hl, $6A00
+  TileWriteAddressToHL $150
   call _LABEL_B35A_VRAMAddressToHL
 _LABEL_BA42_:
-  ld a, $08
+  ld a, :_DATA_22B8C_Tiles_
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld e, $20
-  ld hl, $AB8C
-  jp $D985  ; Code is loaded from _LABEL_3BB45_
+  ld e, 4 * 8 ; 4 tiles
+  ld hl, _DATA_22B8C_Tiles_
+  JumpToRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM
 
-_LABEL_BA4F_:
-  ld a, $09
+_LABEL_BA4F_LoadMediumNumberTiles:
+  ld a, :_DATA_2794C_Tiles_MediumNumbers
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B94C
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0050
-  ld hl, $4C00
+  ld hl, _DATA_2794C_Tiles_MediumNumbers
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 10 * 8 ; 10 tiles
+  TileWriteAddressToHL $60
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_BA63_:
@@ -24640,70 +24579,74 @@ _TEXT_BAC1_Race:
 _TEXT_BACB_Blanks:
 .asc "          " ; $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E
 
-_LABEL_BAD5_:
+_LABEL_BAD5_LoadMenuLogoTiles:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, $08
+  ; SMS: big logo
+  ld a, :_DATA_22C4E_Tiles_BigLogo
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $AC4E
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0588
+  ld hl, _DATA_22C4E_Tiles_BigLogo
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 177 * 8 ; 177 tiles
   jr ++
 
-+:
-  ld a, $0F
++:; GG: medium logo
+  ld a, :_DATA_3E5D7_Tiles_MediumLogo
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $A5D7
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld de, $0380
+  ld hl, _DATA_3E5D7_Tiles_MediumLogo
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ld de, 112 * 8 ; 122 tiles
 ++:
-  ld hl, $6000
-  jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
+  TileWriteAddressToHL $100
+  jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL ; and ret
 
-_LABEL_BAFF_:
-  ld a, $0A
+_LABEL_BAFF_LoadFontTiles:
+  ld a, :_DATA_2B02D_Tiles_Font
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B02D
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4000
-  ld de, $0120
+  ld hl, _DATA_2B02D_Tiles_Font
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL 0
+  ld de, 36 * 8 ; 36 tiles
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_BB13_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, $03
+
+  ; SMS: draw sports cars portrait
+  ld a, :_DATA_FAA5_Tiles_Portrait_SportsCars
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $BAA5
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4480
-  ld de, $0280
+  ld hl, _DATA_FAA5_Tiles_Portrait_SportsCars
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $24
+  ld de, 80 * 8 ; 80 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   jr ++
 
-+:
-  ld bc, $0A00
-  ld hl, $4480
++:; GG: blank tiles
+  ld bc, 80 * 32 ; 80 tiles
+  TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
--:
-  xor a
+-:xor a
   out (PORT_VDP_DATA), a
   dec bc
   ld a, b
   or c
   jr nz, -
+
 ++:
   ld a, $01
   ld (_RAM_D6CB_), a
   call _LABEL_90E7_
   ret
 
-_LABEL_BB49_:
+_LABEL_BB49_SetMenuHScroll:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
+  ; SMS scroll 6, GG scroll 0
   ld a, $06
   jr ++
 +:xor a
@@ -24742,7 +24685,7 @@ _LABEL_BB75_:
   ei
   ret
 
-_LABEL_BB85_:
+_LABEL_BB85_ScreenOn:
 -:di
   ; Wait for line $ff
   in a, (PORT_VDP_LINECOUNTER)
@@ -24759,47 +24702,47 @@ _LABEL_BB95_:
   ld a, (_RAM_D6C7_)
   dec a
   jr z, _LABEL_BBE0_
-  ld a, $09
+  ld a, :_DATA_26C52_Tiles_Portrait_Chopper
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $AC52
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4480
-  ld de, $01E0
+  ld hl, _DATA_26C52_Tiles_Portrait_Chopper
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $24
+  ld de, 60 * 8 ; 60 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $02
+  cp MenuScreen_SelectPlayerCount
   jr z, ++
 +:
-  ld hl, $AFC6
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4E80
-  ld de, $01E0
+  ld hl, _DATA_26FC6_Tiles_HeadToHead
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $74
+  ld de, 60 * 8 ; 60 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   jp +++
 
 ++:
-  ld hl, $BA12
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4E80
-  ld de, $01E0
-  call _LABEL_BD94_
+  ld hl, _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $74
+  ld de, 60 * 8 ; 60 tiles
+  call _LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
   jp +++
 
 _LABEL_BBE0_:
-  ld a, $09
+  ld a, :_DATA_27391_Tiles_Tournament
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $B391
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4480
-  ld de, $01B0
+  ld hl, _DATA_27391_Tiles_Tournament
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $24
+  ld de, 54 * 8 ; 54 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  ld hl, $B674
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $4E80
-  ld de, $01B0
+  ld hl, _DATA_27674_Tiles_Portrait_TurboWheels
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $74
+  ld de, 54 * 8 ; 54 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 +++:
   call _LABEL_A296_
@@ -24828,7 +24771,7 @@ _LABEL_BC0C_:
   ld hl, $7ACC
 ++:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $13
+  cp MenuScreen_OnePlayerMode
   jr nz, +
   ld de, $0040
   or a
@@ -24857,7 +24800,7 @@ _LABEL_BC0C_:
   inc hl
 +:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $13
+  cp MenuScreen_OnePlayerMode
   jr nz, +
   ld de, $0040
   or a
@@ -24869,8 +24812,8 @@ _LABEL_BC0C_:
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $0F
-  jr z, _LABEL_BCCE_
+  cp MenuScreen_TwoPlayerGameType
+  jr z, _LABEL_BCCE_ret
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -24888,7 +24831,7 @@ _LABEL_BC0C_:
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
   ld a, $F0
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -24906,8 +24849,8 @@ _LABEL_BC0C_:
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
   ld a, $E2
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  call $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
-_LABEL_BCCE_:
+  CallRamCode _LABEL_3BB57_EmitTilemapRectangle
+_LABEL_BCCE_ret:
   ret
 
 _LABEL_BCCF_EmitTilemapRectangleSequence:
@@ -24971,51 +24914,76 @@ _LABEL_BD00_InitialiseVDPRegisters:
   out (PORT_VDP_REGISTER), a
   ret
 
-_LABEL_BD2F_:
-  ld a, (_RAM_D6C5_)
+_LABEL_BD2F_PaletteFade:
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $06
   jr z, _LABEL_BD7C_
   cp $03
   jr nc, +
-  ld hl, _DATA_BD58_
-  call _LABEL_BD82_
-  ld b, $07
+  ld hl, _DATA_BD58_Palettes_SMS
+  call _LABEL_BD82_GetPalettePointerAndSelectIndex0
+  ld b, 7 ; count
   ld c, PORT_VDP_DATA
   otir
-  ld hl, $C010
-  call $DB07  ; Code is loaded from _LABEL_3BCC7_VRAMAddressToHL
-  ld a, (de)
+  ld hl, $C010 ; Palette index $10
+  CallRamCode _LABEL_3BCC7_VRAMAddressToHL
+  ld a, (de) ; 0th palette value
   out (PORT_VDP_DATA), a
 +:
-  ld a, (_RAM_D6C5_)
+  ld a, (_RAM_D6C5_PaletteFadeIndex)
   add a, $01
-  ld (_RAM_D6C5_), a
+  ld (_RAM_D6C5_PaletteFadeIndex), a
   ret
 
 ; Pointer Table from BD58 to BD5B (2 entries, indexed by unknown)
-_DATA_BD58_:
-.dw _DATA_BD5E_ _DATA_BD65_ _DATA_BD6C_
+_DATA_BD58_Palettes_SMS:
+.dw _DATA_BD5E_Palette1_SMS _DATA_BD65_Palette2_SMS _DATA_BD6C_Palette3_SMS
 
 ; 1st entry of Pointer Table from BD58 (indexed by unknown)
 ; Data from BD5E to BD64 (7 bytes)
-_DATA_BD5E_:
-.db $10 $2A $04 $01 $02 $06 $20
+_DATA_BD5E_Palette1_SMS:
+  ; Full intensity?
+  SMSCOLOUR $000055
+  SMSCOLOUR $aaaaaa
+  SMSCOLOUR $005500
+  SMSCOLOUR $550000
+  SMSCOLOUR $aa0000
+  SMSCOLOUR $aa5500
+  SMSCOLOUR $0000aa
 
 ; 2nd entry of Pointer Table from BD58 (indexed by unknown)
 ; Data from BD65 to BD6B (7 bytes)
-_DATA_BD65_:
-.db $00 $15 $00 $00 $01 $01 $10
+_DATA_BD65_Palette2_SMS:
+  ; Darker
+  SMSCOLOUR $000000
+  SMSCOLOUR $555555
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $550000
+  SMSCOLOUR $550000
+  SMSCOLOUR $000055
 
 ; Data from BD6C to BD7B (16 bytes)
-_DATA_BD6C_:
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+_DATA_BD6C_Palette3_SMS:
+  ; Black
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+
+; Unused? $bd73+
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00
 
 _LABEL_BD7C_:
   ld a, $FF
-  ld (_RAM_D6C5_), a
+  ld (_RAM_D6C5_PaletteFadeIndex), a
   ret
 
-_LABEL_BD82_:
+_LABEL_BD82_GetPalettePointerAndSelectIndex0:
+  ; Gets a'th pointer to de and hl, also sets palette index to 0
   sla a
   ld c, a
   ld b, $00
@@ -25023,17 +24991,17 @@ _LABEL_BD82_:
   ld e, (hl)
   inc hl
   ld d, (hl)
-  ld hl, $C000
-  call $DB07  ; Code is loaded from _LABEL_3BCC7_VRAMAddressToHL
+  ld hl, $C000 ; Palette index 0
+  CallRamCode _LABEL_3BCC7_VRAMAddressToHL
   ld h, d
   ld l, e
   ret
 
-_LABEL_BD94_:
+_LABEL_BD94_Emit4bppTileDataToVRAMAddressHL:
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
 -:
-  ld b, $04
+  ld b, $04 ; bytes per row
   ld c, PORT_VDP_DATA
   otir
   dec de
@@ -25055,14 +25023,14 @@ _LABEL_BDB8_:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
-  ld a, $05
+  ld a, :_DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, $BC0C
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $6E00
-  ld de, $00A0
-  call _LABEL_BD94_
-  ld hl, $7C60
+  ld hl, _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  TileWriteAddressToHL $170
+  ld de, 20 * 8 ; 20 tiles
+  call _LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
+  TilemapWriteAddressToHL 16, 21
   ld a, $70
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $02
@@ -25075,24 +25043,26 @@ _LABEL_BDB8_:
 +:
   ret
 
-_LABEL_BDED_:
-  ld a, $0B
+_LABEL_BDED_LoadMenuLogoTilemap: ; TODO: how does it work for GG?
+  ; Decompress to RAM
+  ld a, :_DATA_2FF6F_Tilemap
   ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, _DATA_BF6F_
-  call $D7BD  ; Code is loaded from _LABEL_3B97D_DecompressFromHLToC000
-  ld hl, $7700
+  ld hl, _DATA_2FF6F_Tilemap
+  CallRamCode _LABEL_3B97D_DecompressFromHLToC000
+  ; Draw to name table
+  TilemapWriteAddressToHL 0, 0
   call _LABEL_B35A_VRAMAddressToHL
-  ld de, $7700
+  TilemapWriteAddressToDE 0, 0
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
-  ld a, $20
+  ld a, 32
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
-  ld a, $0B
+  ld a, 11
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   xor a
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
-  jp $D997  ; Code is loaded from _LABEL_3BB57_EmitTilemapRectangle
+  JumpToRamCode _LABEL_3BB57_EmitTilemapRectangle ; and ret
 
 _LABEL_BE1A_DrawCopyrightText:
   ld a, (_RAM_D6CB_)
@@ -25157,7 +25127,7 @@ _TEXT_BEE4_DavidSaunders:
 
 _LABEL_BEF5_:
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp $01
+  cp MenuScreen_Title
   ret nz
   ld hl, $7B08
   call +
@@ -25184,27 +25154,58 @@ _LABEL_BEF5_:
   jr nz, -
   ret
 
-_LABEL_BF2E_LoadPalette:
-  ld hl, $C000 ; Palette address
+_LABEL_BF2E_LoadMenuPalette_SMS:
+  ld hl, $C000 ; Palette index 0
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, _DATA_BF3E_
+  ld hl, _DATA_BF3E_MenuPalette_SMS
   ld b, $20
   ld c, PORT_VDP_DATA
   otir
   ret
 
 ; Data from BF3E to BF4F (18 bytes)
-_DATA_BF3E_:
-.db $21 $3F $08 $02 $17 $0B $35 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $21 $3F
+_DATA_BF3E_MenuPalette_SMS:
+  SMSCOLOUR $5500aa
+  SMSCOLOUR $ffffff
+  SMSCOLOUR $00aa00
+  SMSCOLOUR $aa0000
+  SMSCOLOUR $ff5555
+  SMSCOLOUR $ffaa00
+  SMSCOLOUR $5555ff
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $5500aa ; $10
+  SMSCOLOUR $ffffff
+_DATA_BF50_: ; false label?
+  SMSCOLOUR $00aa00
+  SMSCOLOUR $aa0000
+  SMSCOLOUR $ff5555
+  SMSCOLOUR $ffaa00
+  SMSCOLOUR $aaaaff
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
+  SMSCOLOUR $000000
 
-; Data from BF50 to BF6E (31 bytes)
-_DATA_BF50_: ; false location?
-.db $08 $02 $17 $0B $3A $00 $00 $00 $00 $00 $00 $00 $00 $00 $18 $00
+/*
+; Data from BF5E to BF6E (16 bytes)
+; Code?
+.db $18 $00
 .db $CD $58 $B3 $0E $05 $3E $0E $D3 $BE $AF $D3 $BE $0D $20 $F6
 
 ; Data from BF6F to BFFE (144 bytes)
-_DATA_BF6F_:
 .db $C9 $21 $00 $C0 $CD $58 $B3 $21 $80 $BF $06 $40 $0E $BE $ED $B3
 .db $C9 $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $44 $0E $00
 .db $00 $22 $02 $44 $04 $88 $08 $40 $00 $C0 $00 $E0 $00 $AE $0A $00
@@ -25214,9 +25215,47 @@ _DATA_BF6F_:
 .db $7F $EA $EF $EE $FF $FA $FF $EB $FF $FF $FE $7F $EF $BA $FE $EF
 .db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
 .db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
+*/
+
+_LABEL_BF5E_: ; unused code? Left over memory?
+  jr +
++:call $B358 ; not a function
+  ld c, $05
+-:ld a, $0e
+  out (PORT_VDP_DATA), a
+  xor a
+  out (PORT_VDP_DATA), a
+  dec c
+  jr nz, -
+  ret
+
+_LABEL_BF70_: ; unused code? Left over memory?
+  ld hl, $c000
+  call $b358
+  ld hl, _DATA_BF80_
+  ld b, $40
+  ld c, PORT_VDP_DATA
+  otir
+  ret
+
+_DATA_BF80_: ; unused?
+.db $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $44 $0E $00 $00
+.db $22 $02 $44 $04 $88 $08 $40 $00 $C0 $00 $E0 $00 $AE $0A $00 $00
+.db $04
+
+_DATA_BFA1_: ; Treated as text but not text..? Unused?
+.db     $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $88 $0E $00 $00
+_DATA_BFB0_: ; Same as above
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+
+; blank space?
+.db $00 $FE $FF $EE $FF $FE $EF $EF $EE $FF $FF $EF $EF $FA $EF $FF
+.db $7F $EA $EF $EE $FF $FA $FF $EB $FF $FF $FE $7F $EF $BA $FE $EF
+.db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
+.db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
 
 ; Data from BFFF to BFFF (1 bytes)
-_DATA_BFFF_Value02:
+_DATA_BFFF_Page2PageNumber:
 .db :CADDR
 
 .BANK 3
@@ -25267,16 +25306,37 @@ _LABEL_F215_Desk_Data:
 _LABEL_F255_Desk_ExtraTiles:
 .incbin "Assets/raw/Micro Machines_c000.inc" skip $3255 read $0108 ; raw
 
-; Unknown data
-_LABEL_F35D_:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $335d read $0ca3 ; Length unknown
+_DATA_F35D_Tiles_Portrait_FourByFour:
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $f35d-$c000 read $f765-$f35d
+
+_DATA_F765_Tiles_Portrait_Warriors:
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $f765-$c000 read $faa5-$f765
+
+_DATA_FAA5_Tiles_Portrait_SportsCars:
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $faa5-$c000 read $fdc0-$faa5
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $fdc0-$c000 read $ffff-$fdc0
+
+.db :CADDR
 
 .BANK 4
 .ORG $0000
 
 ; Data from 10000 to 13FFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_10000.inc"
+.incbin "Assets/raw/Micro Machines_10000.inc" skip 0 read $13C42-$10000
+
 ; 1296a = ruff trux car tiles run encoded
+
+$12B4D
+
+_DATA_13C42_Tiles_BigNumbers:
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13C42-$10000 read $13D7F-$13C42
+
+_DATA_13D7F_Tiles_MicroMachinesText:
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13D7F-$10000 read $13f38-$13D7F
+
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f38-$10000 read $13fff-$13f38
+
+.db :CADDR
 
 .BANK 5
 .ORG $0000
@@ -25298,7 +25358,21 @@ _DATA_169A8_:
 
 ; Data from 16A38 to 17DD4 (5021 bytes)
 _DATA_16A38_:
-.incbin "Assets/raw/Micro Machines_16a38.inc"
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16a38-$16a38 read $16ac8-$16a38
+
+_DATA_16AC8_Tiles_PortraitTurboWheels:
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16ac8-$16a38 read $16f2b-$16ac8
+
+_DATA_16F2B_Tiles_Portrait_FormulaOne:
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16f2b-$16a38 read $1736e-$16f2b
+
+_DATA_1736E_Tiles_Portrait_Tanks:
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $1736e-$16a38 read $1766c-$1736e
+
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $1766c-$16a38 read $17c0c-$1766c
+
+_DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
+.incbin "Assets/raw/Micro Machines_16a38.inc" skip $17c0c-$16a38 read $17dd5-$17c0c
 
 ; Data from 17DD5 to 17E54 (128 bytes)
 _DATA_17DD5_:
@@ -25346,13 +25420,13 @@ _LABEL_17EB4_:
 
 ; Pointer Table from 17EC2 to 17ED1 (8 entries, indexed by _RAM_DB97_TrackType)
 _DATA_17EC2_SMSPalettes:
-.dw _DATA_17ED2_SMSPalette_Desk 
-.dw _DATA_17EF2_SMSPalette_Breakfast 
-.dw _DATA_17F12_SMSPalette_Sandpit 
-.dw _DATA_17F32_SMSPalette_F1 
-.dw _DATA_17F52_SMSPalette_Garage 
-.dw _DATA_17F72_SMSPalette_Tanks 
-.dw _DATA_17F92_SMSPalette_RuffTrux 
+.dw _DATA_17ED2_SMSPalette_Desk
+.dw _DATA_17EF2_SMSPalette_Breakfast
+.dw _DATA_17F12_SMSPalette_Sandpit
+.dw _DATA_17F32_SMSPalette_F1
+.dw _DATA_17F52_SMSPalette_Garage
+.dw _DATA_17F72_SMSPalette_Tanks
+.dw _DATA_17F92_SMSPalette_RuffTrux
 .dw _DATA_17FB2_Helicopter
 
 ; 1st entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
@@ -25406,7 +25480,7 @@ _DATA_17FB2_Helicopter: ; Unused
 ; Uninitialised data?
 .db $FF $FF $FF $FF $FF $FF $FF $DF $FF $FF $FF $DF $FF $FF $FF $7F
 .db $FF $7F $FF $FF $FF $7F $FF $FF $FF $7F $FE $FF $FF $FF $FF $FF
-.db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF 
+.db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 
 ; Bank index marker
 .db :CADDR
@@ -25431,7 +25505,16 @@ _DATA_1B1A2_:
 
 ; Data from 1B232 to 1BAB2 (2177 bytes)
 _DATA_1B232_:
-.incbin "Assets/raw/Micro Machines_1b232.inc"
+.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1B232-$1B232 read $1b2c3-$1B232
+
+_DATA_1B2C3_Tiles_Trophy:
+.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b2c3-$1B232 read $1b7a7-$1b2c3
+
+_DATA_1B7A7_SMS:
+.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b7a7-$1B232 read $1b987-$1b7a7
+
+_DATA_1B987_GG:
+.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b987-$1B232 read $1bab3-$1b987
 
 _LABEL_1BAB3_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -25443,7 +25526,7 @@ _LABEL_1BAB3_:
   srl a
   ld e, a
   ld d, $00
-  ld hl, $DC21
+  ld hl, _RAM_DC21_
   add hl, de
   ld a, (hl)
   or a
@@ -25459,7 +25542,7 @@ _LABEL_1BAB3_:
   srl a
   ld e, a
   ld d, $00
-  ld hl, $DC21
+  ld hl, _RAM_DC21_
   add hl, de
   ld a, (hl)
   or a
@@ -25724,37 +25807,37 @@ _LABEL_1BC3F_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF0E_)
   ld (_RAM_DEB2_), a
   ret
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 _LABEL_1BCCB_DelayIfPlayer2:
@@ -25982,15 +26065,15 @@ _LABEL_1BDF3_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 1BE56 to 1BE56 (1 bytes)
@@ -25998,7 +26081,7 @@ _LABEL_1BDF3_:
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF0E_)
   ld (_RAM_DEB2_), a
   jp +++
@@ -26007,13 +26090,13 @@ _LABEL_1BDF3_:
 .db $C9
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 1BE77 to 1BE77 (1 bytes)
@@ -26021,7 +26104,7 @@ _LABEL_1BDF3_:
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
 ; Data from 1BE80 to 1BE80 (1 bytes)
@@ -26067,34 +26150,19 @@ _LABEL_1BEB1_ChangePoolTableColour:
   or a
   jr z, ++
   ; Game Gear
-  ld a, $02 ; Palette index 1
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateGG 1
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
   jr z, _LABEL_1BEF2_ret
   cp $01
   jr z, +
   ; Track 2
-  ld a, $08 ; $0804
-  out (PORT_VDP_DATA), a
-  ld a, $04
-  out (PORT_VDP_DATA), a
-  ld a, $04 ; $0004
-  out (PORT_VDP_DATA), a
-  ld a, $00
-  out (PORT_VDP_DATA), a
+  EmitGGColourImmediate $880044 ; pink
+  EmitGGColourImmediate $440000 ; dark red
   ret
 +:; Track 1
-  ld a, $40 ; $0840
-  out (PORT_VDP_DATA), a
-  ld a, $08
-  out (PORT_VDP_DATA), a
-  ld a, $00 ; $0004
-  out (PORT_VDP_DATA), a
-  ld a, $04
-  out (PORT_VDP_DATA), a
+  EmitGGColourImmediate $004488 ; turquoise
+  EmitGGColourImmediate $000044 ; dark blue
   ret
 
 _LABEL_1BEF2_ret:
@@ -26102,26 +26170,19 @@ _LABEL_1BEF2_ret:
 
 ++:
   ; Master System
-  ld a, $01 ; Palette index 1
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateSMS 1
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
   jr z, _LABEL_1BEF2_ret
   cp $01
   jr z, +
   ; Track 2
-  ld a, $12 ; %00010010 = #aa0055 = pink
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitSMSColourImmediate $aa0055 ; pink
+  EmitSMSColourImmediate $550000 ; dark red
   ret
 +:; Track 1
-  ld a, $24 ; %00100100 = #005555 = 
-  out (PORT_VDP_DATA), a
-  ld a, $10
-  out (PORT_VDP_DATA), a
+  EmitSMSColourImmediate $0055aa ; turquoise
+  EmitSMSColourImmediate $000055 ; dark blue
   ret
 
 _LABEL_1BF17_:
@@ -26158,13 +26219,16 @@ _LABEL_1BF17_:
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF
-.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $06
+.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF :CADDR
 
 .BANK 7
 .ORG $0000
 
 ; Data from 1C000 to 1F8D7 (14552 bytes)
-.incbin "Assets/raw/Micro Machines_1c000.inc"
+.incbin "Assets/raw/Micro Machines_1c000.inc" skip 0 read $1f3e4-$1c000
+
+_DATA_1F3E4_Tiles_Portrait_Powerboat:
+.incbin "Assets/raw/Micro Machines_1c000.inc" skip $1f3e4-$1c000 read $1f8d8-$1f3e4
 
 _LABEL_1F8D8_: ; Cheats!
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -26182,7 +26246,7 @@ _LABEL_1F8D8_: ; Cheats!
   ld a, (_RAM_DE7B_)
   add a, l
   ld (_RAM_D5C9_MetatileY), a
-  
+
   ld a, (_RAM_DB97_TrackType)
   or a ; TT_SportsCars
   jp z, _LABEL_1F9D4_Cheats_SportsCars
@@ -26569,8 +26633,16 @@ _LABEL_1FB35_:
 .ORG $0000
 
 ; Data from 20000 to 237E1 (14306 bytes)
-.incbin "Assets/raw/Micro Machines_20000.inc" skip 0 read $23656-$20000
-_DATA_23656_:
+.incbin "Assets/raw/Micro Machines_20000.inc" skip 0 read $22B2C-$20000
+_DATA_22B2C_Tiles_:
+.incbin "Assets/raw/Micro Machines_20000.inc" skip $22B2C-$20000 read $22B8C-$22B2C
+_DATA_22B8C_Tiles_:
+.incbin "Assets/raw/Micro Machines_20000.inc" skip $22B8C-$20000 read $22BEC-$22B8C
+_DATA_22BEC_Tiles_Cursor:
+.incbin "Assets/raw/Micro Machines_20000.inc" skip $22BEC-$20000 read $22C4E-$22BEC
+_DATA_22C4E_Tiles_BigLogo:
+.incbin "Assets/raw/Micro Machines_20000.inc" skip $22C4E-$20000 read $23656-$22C4E
+_DATA_23656_Tiles_VsCPUPatch:
 .incbin "Assets/raw/Micro Machines_20000.inc" skip $23656-$20000 read $237e2-$23656
 
 _LABEL_237E2_:
@@ -26580,11 +26652,11 @@ _LABEL_237E2_:
   ld (_RAM_DD19_), a
   ld a, $02
   ld (_RAM_DD5A_), a
-  ld hl, $DD9E
+  ld hl, _RAM_DD9E_
   ld (_RAM_DCCD_), hl
-  ld hl, $DDCE
+  ld hl, _RAM_DDCE_
   ld (_RAM_DD0E_), hl
-  ld hl, $DDFE
+  ld hl, _RAM_DDFE_
   ld (_RAM_DD4F_), hl
   ld a, $38
   ld (_RAM_DD80_), a
@@ -26594,17 +26666,17 @@ _LABEL_237E2_:
   ld (_RAM_DDE0_), a
   ld a, $3E
   ld (_RAM_DE10_), a
-  ld hl, $DE5F
+  ld hl, _RAM_DE5F_
   ld (_RAM_DCD2_), hl
-  ld hl, $DE60
+  ld hl, _RAM_DE60_
   ld (_RAM_DD13_), hl
-  ld hl, $DE61
+  ld hl, _RAM_DE61_
   ld (_RAM_DD54_), hl
-  ld hl, $DE32
+  ld hl, _RAM_DE32_
   ld (_RAM_DCDA_), hl
-  ld hl, $DE35
+  ld hl, _RAM_DE35_
   ld (_RAM_DD1B_), hl
-  ld hl, $DE38
+  ld hl, _RAM_DE38_
   ld (_RAM_DD5C_), hl
   ld a, (_RAM_DC55_CourseIndex)
   sla a
@@ -27005,7 +27077,7 @@ _LABEL_23A91_:
 
 _LABEL_23B98_:
   ld bc, $0062
-  ld hl, _RAM_D580_
+  ld hl, _RAM_D580_WaitingForGameVBlank
 -:
   ld a, $00
   ld (hl), a
@@ -27142,13 +27214,13 @@ _LABEL_23C68_:
   jp ++
 
 +:
-  in a, ($00)
+  in a, (PORT_GG_START)
 ++:
-  ld (_RAM_D59C_), a
+  ld (_RAM_D59C_GGStartButtonValue), a
   ld a, (_RAM_D599_IsPaused)
   or a
   jr nz, ++
-  ld a, (_RAM_D59C_)
+  ld a, (_RAM_D59C_GGStartButtonValue)
   and $80
   jr z, +
   ret
@@ -27172,7 +27244,7 @@ _LABEL_23C68_:
   ld a, (_RAM_D59A_)
   or a
   jr z, ++
-  ld a, (_RAM_D59C_)
+  ld a, (_RAM_D59C_GGStartButtonValue)
   and $80
   jr z, +
   xor a
@@ -27181,7 +27253,7 @@ _LABEL_23C68_:
   ret
 
 ++:
-  ld a, (_RAM_D59C_)
+  ld a, (_RAM_D59C_GGStartButtonValue)
   and $80
   jr z, ++
   ld a, (_RAM_D59B_)
@@ -27203,7 +27275,7 @@ _LABEL_23CE6_UpdateAnimatedPalette:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, _LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS
-  
+
   ; GG
   ld a, (_RAM_DB97_TrackType)
   cp TT_Helicopters
@@ -27269,12 +27341,12 @@ _LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS:
   ret
 
 +:
-  ld hl, _DATA_2BDA6_HelicoptersAnimatedPalette_SMS
+  ld hl, _DATA_23DA6_HelicoptersAnimatedPalette_SMS
   ld (_RAM_DF77_PaletteAnimationData), hl
   jp +++
 
 ++:
-  ld hl, _DATA_2BDAE_PowerboatsAnimatedPalette_SMS
+  ld hl, _DATA_23DAE_PowerboatsAnimatedPalette_SMS
   ld (_RAM_DF77_PaletteAnimationData), hl
 +++:
   ld a, (_RAM_DF76_PaletteAnimationCounter)
@@ -27314,9 +27386,9 @@ _LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS:
   ret
 
 ; Data from 23DA6 to 23DB5 (16 bytes)
-_DATA_2BDA6_HelicoptersAnimatedPalette_SMS
-.db $30 $35 $3A $3F $30 $35 $3A $3F 
-_DATA_2BDAE_PowerboatsAnimatedPalette_SMS
+_DATA_23DA6_HelicoptersAnimatedPalette_SMS
+.db $30 $35 $3A $3F $30 $35 $3A $3F
+_DATA_23DAE_PowerboatsAnimatedPalette_SMS
 .db $21 $25 $3A $3F $3A $25 $21 $10
 
 _LABEL_23DB6_:
@@ -27420,15 +27492,9 @@ _DATA_23ECF_HandlingData_SMS:
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
 
 ; Fill to end of bank
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $FF $00 $00
+.repeat 18
+.db $FF $FF $00 $00
+.endr
 
 ; Bank number
 .db :CADDR
@@ -27437,18 +27503,76 @@ _DATA_23ECF_HandlingData_SMS:
 .ORG $0000
 
 ; Data from 24000 to 27FFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_24000.inc"
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $24000-$24000 read $26C52-$24000
+
+_DATA_26C52_Tiles_Portrait_Chopper:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $26C52-$24000 read $26FC6-$26C52
+
+_DATA_26FC6_Tiles_HeadToHead:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $26FC6-$24000 read $27391-$26FC6
+
+_DATA_27391_Tiles_Tournament:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $27391-$24000 read $27674-$27391
+
+_DATA_27674_Tiles_Portrait_TurboWheels:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $27674-$24000 read $2794c-$27674
+
+_DATA_2794C_Tiles_MediumNumbers:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $2794c-$24000 read $279f0-$2794c
+
+_DATA_279F0_Tilemap_:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $279f0-$24000 read $27a12-$279f0
+
+_DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $27a12-$24000 read $27efb-$27a12
+
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $27efb-$24000 read $27fff-$27efb
+
+.db :CADDR
 
 .BANK 10
 .ORG $0000
 
 ; Data from 28000 to 2B5D1 (13778 bytes)
-.incbin "Assets/raw/Micro Machines_28000.inc"
+.incbin "Assets/raw/Micro Machines_28000.inc" skip 0 read $2AB4D-$28000
 
-_LABEL_2B5D2_:
+_DATA_2AB4D_Tiles_RuffTruxPortrait:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2AB4D-$28000 read $2b02d-$2AB4D
+
+_DATA_2B02D_Tiles_Font:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b02d-$28000 read $2b151-$2b02d
+
+_DATA_2B151_Tiles_Hand:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b151-$28000 read $2b33e-$2b151
+
+_DATA_2B33E_SpriteNs_Hand:
+
+_DATA_2B33E_SpriteNs_HandFist:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b33e-$28000 read $2b356-$2b33e
+
+_DATA_2B356_SpriteNs_HandLeft:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b356-$28000 read $2b36e-$2b356
+
+_DATA_2B36E_SpriteNs_HandRight:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b36e-$28000 read $2b386-$2b36e
+
+_DATA_2B386_Tiles_ChallengeText:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b386-$28000 read $2B4BA-$2b386
+
+; Tilemap?
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4BA-$28000 read $2B4CA-$2B4BA
+
+_DATA_2B4CA_Tiles_HeadToHeadText:
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4CA-$28000 read $2B5BE-$2B4CA
+
+; Tilemap?
+.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B5BE-$28000 read $2B5D2-$2B5BE
+
+
+_LABEL_2B5D2_GameVBlankUpdateSoundTrampoline:
   jp _LABEL_2B616_Sound
 
-_LABEL_2B5D5_:
+_LABEL_2B5D5_SilencePSG:
   ld a, $FF
   out (PORT_PSG), a
   ld a, $9F
@@ -27848,7 +27972,16 @@ _DATA_2B911_:
 .ORG $0000
 
 ; Data from 2C000 to 2FFFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_2c000.inc"
+.incbin "Assets/raw/Micro Machines_2c000.inc" skip $2c000-$2c000 read $2fde0-$2c000
+
+_DATA_2FDE0_Tiles_SmallLogo:
+.incbin "Assets/raw/Micro Machines_2c000.inc" skip $2fde0-$2c000 read $2ff6f-$2fde0
+
+_DATA_2FF6F_Tilemap:
+.incbin "Assets/raw/Micro Machines_2c000.inc" skip $2ff6f-$2c000 read $2fffa-$2ff6f
+
+; End of bank
+.db $00 $FF $FF $00 $00 :CADDR
 
 .BANK 12
 .ORG $0000
@@ -27915,36 +28048,39 @@ _DATA_30C68_LapRemainingIndicators: ; Number tiles
 .db $00 $00 $00 $00 $7F $7F $00 $00 $7F $7F $36 $00 $7F $7F $36 $00 ; 3
 .db $7F $5F $3E $00 $3F $3F $06 $00 $0F $0F $06 $00 $0F $0F $00 $00
 
-_LABEL_30CE8_:
+_LABEL_30CE8_PlayMenuMusic:
   or a
   jr nz, +
-  ld a, $04
+  ld a, $04 ; 0 -> 4
 +:
-  dec a
+  dec a ; Subtract 1
   ld c, a
   ex af, af'
-  ld b, $00
-  ld hl, _DATA_31410_
-  add hl, bc
-  ld a, (hl)
-  ld (_RAM_D916_), a
-  add a, $0C
-  ld (_RAM_D917_), a
-  xor a
-  ld (_RAM_D918_), a
+    ; Look up first value and put in RAM
+    ld b, $00
+    ld hl, _DATA_31410_
+    add hl, bc
+    ld a, (hl)  ; -ve number
+    ld (_RAM_D916_MenuSound_), a
+    add a, $0C  ; +ve number
+    ld (_RAM_D917_MenuSound_), a
+    ; Init other stuff
+    xor a
+    ld (_RAM_D918_MenuSound_), a
   ex af, af'
   add a, a
   ld c, a
-  ld hl, _DATA_314F7_
+  ld hl, _DATA_314F7_ ; Look up second value
   add hl, bc
   ld a, (hl)
   inc hl
   ld h, (hl)
   ld l, a
-  ld (_RAM_D929_), hl
+  ld (_RAM_D929_MenuSound_), hl
+  ; Init other stuff
   ld a, $06
-  ld (_RAM_D92B_), a
-  ld (_RAM_D92C_), a
+  ld (_RAM_D92B_MenuSound_), a
+  ld (_RAM_D92C_MenuSound_), a
   ld a, $01
   ld (_RAM_D92F_), a
   ld (_RAM_D74D_), a
@@ -27952,14 +28088,14 @@ _LABEL_30CE8_:
   ld (_RAM_D797_), a
   ret
 
-_LABEL_30D28_:
-  ld hl, _DATA_314AF_
-  ld de, _RAM_D91A_
-  ld bc, $000F
+_LABEL_30D28_StopMenuMusic:
+  ld hl, _DATA_314AF_MenuMusicStopData
+  ld de, _RAM_D91A_MenuSoundData
+  ld bc, _DATA_314AF_MenuMusicStopData_End - _DATA_314AF_MenuMusicStopData
   ldir
   jp _LABEL_30F7D_
 
-_LABEL_30D36_MainVBlankImpl:
+_LABEL_30D36_MenuMusicFrameHandler:
   ld a, (_RAM_D912_)
   ld c, a
   and $01
@@ -27973,25 +28109,25 @@ _LABEL_30D36_MainVBlankImpl:
   ld a, c
   and $0F
   ld (_RAM_D912_), a
-  ld a, (_RAM_D92B_)
+  ld a, (_RAM_D92B_MenuSound_)
   dec a
-  ld (_RAM_D92B_), a
+  ld (_RAM_D92B_MenuSound_), a
   jp nz, _LABEL_30DC7_
   ld a, (_RAM_D915_)
   or a
   jr nz, +
-  ld a, (_RAM_D92C_)
+  ld a, (_RAM_D92C_MenuSound_)
 +:
-  ld (_RAM_D92B_), a
+  ld (_RAM_D92B_MenuSound_), a
   ld a, (_RAM_D92F_)
   dec a
   and $3F
   ld (_RAM_D92F_), a
   jp nz, +
-  ld hl, (_RAM_D929_)
+  ld hl, (_RAM_D929_MenuSound_)
   ld a, (hl)
   inc hl
-  ld (_RAM_D929_), hl
+  ld (_RAM_D929_MenuSound_), hl
   add a, a
   ld c, a
   ld b, $00
@@ -28008,30 +28144,30 @@ _LABEL_30D36_MainVBlankImpl:
   ld ix, _RAM_D744_
   ld iy, _RAM_D922_
   ld hl, (_RAM_D92D_)
-  ld a, (_RAM_D916_)
+  ld a, (_RAM_D916_MenuSound_)
   call _LABEL_31093_
   call _LABEL_31068_
   ld ix, _RAM_D769_
   ld iy, $D923
-  ld a, (_RAM_D917_)
+  ld a, (_RAM_D917_MenuSound_)
   call _LABEL_31093_
   call _LABEL_31068_
   ld ix, _RAM_D78E_
   ld iy, $D924
-  ld a, (_RAM_D918_)
+  ld a, (_RAM_D918_MenuSound_)
   call _LABEL_31093_
   call _LABEL_31068_
   ld (_RAM_D92D_), hl
 _LABEL_30DC7_:
-  ld iy, _RAM_D91A_
+  ld iy, _RAM_D91A_MenuSoundData
   ld ix, _RAM_D744_
   ld de, _RAM_D922_
   call +
-  ld iy, _RAM_D91C_
+  ld iy, _RAM_D91A_MenuSoundData+2
   ld ix, _RAM_D769_
   ld de, _RAM_D923_
   call +
-  ld iy, _RAM_D91E_
+  ld iy, _RAM_D91A_MenuSoundData+4
   ld ix, _RAM_D78E_
   ld de, _RAM_D924_
   call +
@@ -28278,7 +28414,7 @@ _LABEL_30F73_:
   jp _LABEL_30EBB_
 
 _LABEL_30F7D_:
-  ld ix, _RAM_D91A_
+  ld ix, _RAM_D91A_MenuSoundData
   ld c, $80
   call _LABEL_30FCA_
   ld c, $90
@@ -28487,8 +28623,8 @@ _LABEL_310CE_:
   inc c
 +:
   ld a, c
-  ld (_RAM_D92B_), a
-  ld (_RAM_D92C_), a
+  ld (_RAM_D92B_MenuSound_), a
+  ld (_RAM_D92C_MenuSound_), a
   jp _LABEL_310A0_
 
 _LABEL_310EF_:
@@ -28599,7 +28735,7 @@ _LABEL_311BC_:
   push hl
   ld hl, $94BE
   add hl, bc
-  ld (_RAM_D929_), hl
+  ld (_RAM_D929_MenuSound_), hl
   ld a, $01
   ld (_RAM_D92F_), a
   pop hl
@@ -28696,10 +28832,10 @@ _DATA_3137A_:
 .db $43 $00 $40 $00 $3C $00 $39 $00 $35 $00 $32 $00 $30 $00 $2D $00
 .db $2A $00 $28 $00 $26 $00 $24 $00 $22 $00 $20 $00 $1E $00 $1C $00
 .db $1B $00 $19 $00 $18 $00 $16 $00 $15 $00 $14 $00 $13 $00 $12 $00
-.db $11 $00 $10 $00 $0F $00 
+.db $11 $00 $10 $00 $0F $00
+
 _DATA_31410_:
-.db $F6 $FB $FE $FA $FA $FC $FC $FB $FD $FD
-.db $FC $FE
+.db $F6 $FB $FE $FA $FA $FC $FC $FB $FD $FD $FC $FE
 
 ; Data from 3141C to 3150E (243 bytes)
 _DATA_3141C_:
@@ -28711,17 +28847,18 @@ _DATA_3141C_:
 .db $83 $94 $89 $94 $7C $94 $83 $94 $89 $94 $7C $94 $83 $94 $89 $94
 .db $0A $09 $08 $07 $06 $05 $FF $08 $08 $08 $08 $08 $08 $00 $00 $00
 .db $00 $00 $0F $16 $14 $12 $10 $0E $0C $FF $06 $05 $04 $07 $07 $07
-.db $00 $00 $00 $00 $00 $0F $00 $00 $00 $00 $FF $04 $03 $07 $07 $00 $02 $04 $0F 
-_DATA_314AF_:
-.db $00 $00 $00 $00 $00 $00 $07 $0F $0F $0F $0F $00 $00
-.db $00 $00 $00 $05 $02 $03 $02 $04 $06 $07 $02 $03 $02 $04 $09 $08
+.db $00 $00 $00 $00 $00 $0F $00 $00 $00 $00 $FF $04 $03 $07 $07 $00 $02 $04 $0F
+
+_DATA_314AF_MenuMusicStopData: ; 15 bytes, menu sound engine init?
+.db $00 $00 $00 $00 $00 $00 $07 $0F $0F $0F $0F $00 $00 $00 $00 
+_DATA_314AF_MenuMusicStopData_End:
+
+.db $00 $05 $02 $03 $02 $04 $06 $07 $02 $03 $02 $04 $09 $08
 .db $0B $0B $0A $0A $0C $0D $0C $0E $00 $00 $0F $10 $11 $11 $12 $13
 .db $11 $11 $14 $15 $16 $18 $17 $19 $1A $1B $1B $1C $1D $1F $20 $21
-.db $10 $22 $22 $23 $24 $25 $26 $27 $28 $29 $2A 
+.db $10 $22 $22 $23 $24 $25 $26 $27 $28 $29 $2A
 _DATA_314F7_:
-.db $BE $94 $D6 $94 $E3
-.db $94 $E9 $94 $EA $94 $EB $94 $EC $94 $F1 $94 $F2 $94 $F3 $94 $F4
-.db $94 $F5 $94
+.dw $94BE $94D6 $94E3 $94E9 $94EA $94EB $94EC $94F1 $94F2 $94F3 $94F4 $94F5
 
 ; Data from 3150F to 33FFF (10993 bytes)
 _DATA_3150F_:
@@ -28864,7 +29001,7 @@ _hflip:
   inc hl
   ld a, (hl)
   ld b, a
-  
+
   ld a, (_RAM_DB76_CarTileLoaderPositionIndex) ; Index into table of 6 byte entries, read first two into hl
   sla a
   ld l, a
@@ -28881,7 +29018,7 @@ _hflip:
   ld a, (hl)
   ld h, a
   ld l, e
-  
+
   ld de, $05DC  ; Subtract this? $600 - 36? Adjusts the address to suit
   or a
   sbc hl, de
@@ -28910,7 +29047,7 @@ _LABEL_358D9_vflip:
   inc hl
   ld a, (hl)
   ld b, a
-  
+
   ld a, (_RAM_DB76_CarTileLoaderPositionIndex) ; Index into table of 6 byte entries, read first two into hl
   sla a
   ld l, a
@@ -28927,7 +29064,7 @@ _LABEL_358D9_vflip:
   ld a, (hl)
   ld h, a
   ld l, e
-  
+
   ; Use the tile address as-is
   push hl
     call _LABEL_3598D_emitThreeTilesVFlipped
@@ -28956,7 +29093,7 @@ _LABEL_3591C_noflip:
   inc hl
   ld a, (hl)
   ld b, a
-  
+
   ld a, (_RAM_DB76_CarTileLoaderPositionIndex) ; Index into table of 6 byte entries, read first two into hl
   sla a
   ld l, a
@@ -28973,11 +29110,11 @@ _LABEL_3591C_noflip:
   ld a, (hl)
   ld h, a
   ld l, e
-  
+
   ld de, $061C ; Adjust the tile address
   or a
   sbc hl, de
-  
+
   ld a, l       ; Set VRAM address
   out (PORT_VDP_ADDRESS), a
   ld a, h
@@ -29031,7 +29168,7 @@ _LABEL_3598D_emitThreeTilesVFlipped:
   out (PORT_VDP_ADDRESS), a
   ld a, h
   out (PORT_VDP_ADDRESS), a
-  
+
   ld a, (bc)    ; Emit data as-is, in order
   out (PORT_VDP_DATA), a
   inc bc
@@ -29073,7 +29210,7 @@ _LABEL_359C0_emitThreeTilesHFlipped:
   out (PORT_VDP_ADDRESS), a
   ld a, h
   out (PORT_VDP_ADDRESS), a
-  
+
 -:push hl
     ld a, (bc)    ; Read byte from here
     call _hflipByte_usingHL
@@ -29191,7 +29328,7 @@ _LABEL_35A3E_CarTileLoader_HFlipSwapData:
   ld a, b
   or c
   jr nz, -
-  
+
   ld a, (_RAM_DB77_CarTileLoaderCounter) ; Increment counter
   add a, $01
   ld (_RAM_DB77_CarTileLoaderCounter), a
@@ -29238,13 +29375,13 @@ _LABEL_35A3E_CarTileLoader_HFlipSwapData:
 ; Data from 35ABF to 35AC0 (2 bytes)
 _DATA_35ABF_:
 .dw $C0F0 $C120 ; Address pairs for data munging
-.dw $C138 $C168 
-.dw $C180 $C1B0 
-.dw $C1E0 $C210 
-.dw $C228 $C258 
-.dw $C270 $C2A0 
-.dw $C2D0 $C300 
-.dw $C318 $C348 
+.dw $C138 $C168
+.dw $C180 $C1B0
+.dw $C1E0 $C210
+.dw $C228 $C258
+.dw $C270 $C2A0
+.dw $C2D0 $C300
+.dw $C318 $C348
 .dw $C360 $C390
 
 ; Data from 35AE3 to 35B4C (106 bytes)
@@ -29252,20 +29389,20 @@ _DATA_35AE3_CarTileRAMLocations:
 .dw $C000 $C0F0 $C1E0 $C2D0 $C3C0 ; VRAM offsets of the five car positions - N, NNW, NW, WNW, W
 _DATA_35AED_CarTileAddresses:
 .dw $661C $631C $601C ; Tile addresses to write at for various flipping modes, only first is used?
-.dw $667C $637C $607C 
-.dw $66DC $63DC $60DC 
-.dw $673C $643C $613C 
-.dw $679C $649C $619C 
-.dw $67FC $64FC $61FC 
-.dw $685C $655C $625C 
-.dw $68BC $65BC $62BC 
-.dw $6F1C $6C1C $691C 
-.dw $6F7C $6C7C $697C 
-.dw $6FDC $6CDC $69DC 
-.dw $703C $6D3C $6A3C 
-.dw $709C $6D9C $6A9C 
-.dw $70FC $6DFC $6AFC 
-.dw $715C $6E5C $6B5C 
+.dw $667C $637C $607C
+.dw $66DC $63DC $60DC
+.dw $673C $643C $613C
+.dw $679C $649C $619C
+.dw $67FC $64FC $61FC
+.dw $685C $655C $625C
+.dw $68BC $65BC $62BC
+.dw $6F1C $6C1C $691C
+.dw $6F7C $6C7C $697C
+.dw $6FDC $6CDC $69DC
+.dw $703C $6D3C $6A3C
+.dw $709C $6D9C $6A9C
+.dw $70FC $6DFC $6AFC
+.dw $715C $6E5C $6B5C
 .dw $71BC $6EBC $6BBC
 
 ; Data from 35B4D to 35B8C (64 bytes)
@@ -29275,21 +29412,21 @@ _DATA_35B4D_CarDrawingData:
 ;    ||  ,,- index of rotation
 ;    ||  ||  ,,- horizontal flip
 ;    ||  ||  ||  ,,- vertical flip
-.db $00 $00 $00 $00 
-.db $01 $01 $00 $00 
-.db $02 $02 $00 $00 
+.db $00 $00 $00 $00
+.db $01 $01 $00 $00
+.db $02 $02 $00 $00
 .db $03 $03 $00 $00
-.db $04 $04 $00 $00 
-.db $03 $05 $00 $01 
-.db $02 $06 $00 $01 
-.db $01 $07 $00 $01 
-.db $00 $08 $00 $01 
-.db $01 $09 $01 $01 
-.db $02 $0A $01 $01 
+.db $04 $04 $00 $00
+.db $03 $05 $00 $01
+.db $02 $06 $00 $01
+.db $01 $07 $00 $01
+.db $00 $08 $00 $01
+.db $01 $09 $01 $01
+.db $02 $0A $01 $01
 .db $03 $0B $01 $01
-.db $04 $0C $01 $00 
-.db $03 $0D $01 $00 
-.db $02 $0E $01 $00 
+.db $04 $0C $01 $00
+.db $03 $0D $01 $00
+.db $02 $0E $01 $00
 .db $01 $0F $01 $00
 
 ; Data from 35B8D to 35BEC (96 bytes)
@@ -29475,8 +29612,8 @@ _LABEL_35F8A_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, +
-  in a, ($00)
-  and $80
+  in a, (PORT_GG_START)
+  and PORT_GG_START_MASK
   jp z, _LABEL_3603C_
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK ; $10
@@ -29687,37 +29824,37 @@ _LABEL_360B9_:
   ld a, (_RAM_DEB2_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   sub l
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF0E_)
   ld (_RAM_DEB2_), a
   ret
 
 ++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DF0C_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
   ld a, $07
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 _LABEL_36152_:
@@ -30209,19 +30346,19 @@ _LABEL_36484_PatchForLevel:
 .macro PatchLayout args x, y, index
   ld a, index
   ld (_RAM_C000_LevelLayout + x + y*32), a
-.endm  
+.endm
 
 .macro PatchWallData args index, offset, value
   ld a, value
   ld (_RAM_C800_WallData + index * _sizeof_WallDataMetaTile + offset), a
-.endm  
+.endm
 
 .macro PatchBehaviourData args index, x, y, value
 .if NARGS == 4
   ld a, value
-.endif  
+.endif
   ld (_RAM_CC80_BehaviourData + index * _sizeof_BehaviourDataMetaTile + y * 6 + x), a
-.endm  
+.endm
 
   ; Also patches other stuff - code?
   ld a, (_RAM_DB97_TrackType)
@@ -30267,7 +30404,7 @@ _LABEL_36484_PatchForLevel:
   PatchWallData 37 10 %01001111
   PatchWallData 36 13 %00000010 ; Hole (top right, more)
   PatchWallData 36 15 %11100000
-  
+
   PatchBehaviourData 37, 5, 2, $85
   PatchBehaviourData 36, 1, 4, $81
   PatchBehaviourData 36, 1, 0, $0F
@@ -30374,7 +30511,7 @@ _LABEL_3666D_Powerboats:
   ; to   --S-++-BB---
   PatchLayout 3, 23, $B5 ; Move soap left at start
   PatchLayout 4, 23, $9E ; Fill space next to it
-  PatchLayout 6, 23, $9F ; 
+  PatchLayout 6, 23, $9F ;
   PatchLayout 7, 23, $B6
   PatchLayout 8, 23, $B7
   ret
@@ -31213,7 +31350,7 @@ _LABEL_36CA5_:
   ld (_RAM_D943_), a
   ld a, $04
 -:
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   jp ++
 
 +:
@@ -31224,7 +31361,7 @@ _LABEL_36CA5_:
   ld a, (_RAM_DEAF_)
   cp $00
   jr nz, _LABEL_36D06_
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   cp $00
   jr nz, _LABEL_36D06_
   ld a, $00
@@ -31349,13 +31486,13 @@ _DATA_36DAF_TimerDigitTilesData: ; 1bpp data. This is written into the right bit
 .db %00011100
 .db %00000000
 .db $00 $00 $0C $1C $0C $0C $1E $00 ; 1 ...
-.db $00 $00 $1C $36 $0C $18 $3E $00 
+.db $00 $00 $1C $36 $0C $18 $3E $00
 .db $00 $00 $3C $06 $1C $06 $3C $00
-.db $00 $00 $36 $36 $1E $06 $06 $00 
+.db $00 $00 $36 $36 $1E $06 $06 $00
 .db $00 $00 $3E $30 $3C $06 $3C $00
-.db $00 $00 $1C $30 $3C $36 $1C $00 
+.db $00 $00 $1C $30 $3C $36 $1C $00
 .db $00 $00 $3E $06 $0C $18 $18 $00
-.db $00 $00 $1C $36 $1C $36 $1C $00 
+.db $00 $00 $1C $36 $1C $36 $1C $00
 .db $00 $00 $1C $36 $1E $06 $3C $00
 
 _LABEL_36DFF_RuffTrux_DecrementTimer:
@@ -31375,7 +31512,7 @@ _LABEL_36DFF_RuffTrux_DecrementTimer:
   ld (_RAM_DF72_RuffTruxTimer_Frames), a
   cp $0A ; BUG: should be 5 or 6 for 50 or 60Hz!
   jr nz, _LABEL_36E6A_ret
-  
+
   ; Reached target, decrement tenths
   ld a, $00
   ld (_RAM_DF72_RuffTruxTimer_Frames), a
@@ -31384,7 +31521,7 @@ _LABEL_36DFF_RuffTrux_DecrementTimer:
   ld (_RAM_DF71_RuffTruxTimer_Tenths), a
   cp $FF
   jr nz, _LABEL_36E6A_ret
-  
+
   ; Decrement seconds
   ld a, $09
   ld (_RAM_DF71_RuffTruxTimer_Tenths), a
@@ -31393,7 +31530,7 @@ _LABEL_36DFF_RuffTrux_DecrementTimer:
   ld (_RAM_DF70_RuffTruxTimer_Seconds), a
   cp $FF
   jr nz, _LABEL_36E6A_ret
-  
+
   ; Decrement tens of seconds
   ld a, $09
   ld (_RAM_DF70_RuffTruxTimer_Seconds), a
@@ -31402,7 +31539,7 @@ _LABEL_36DFF_RuffTrux_DecrementTimer:
   ld (_RAM_DF6F_RuffTruxTimer_TensOfSeconds), a
   cp $FF
   jr nz, _LABEL_36E6A_ret
-  
+
   ; Ran out of time!
   ld a, $01
   ld (_RAM_DF65_), a
@@ -31561,7 +31698,7 @@ _LABEL_36F4B_:
   jp _LABEL_36F3E_
 
 _LABEL_36F9E_:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DBA5_)
   add a, l
@@ -31731,7 +31868,7 @@ _DATA_37161_:
 _LABEL_371F1_:
   ld a, (_RAM_DEAF_)
   ld l, a
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld c, a
   ld a, (_RAM_D589_)
   add a, l
@@ -31775,7 +31912,7 @@ _DATA_37272_:
 .db $E8 $03 $C0 $03 $98 $03 $70 $03 $48 $03 $20 $03 $F8 $02 $D0 $02
 .db $A8 $02 $80 $02 $58 $02 $30 $02 $08 $02 $E0 $01 $B8 $01 $90 $01
 
-_LABEL_37292_:
+_LABEL_37292_GameVBlankEngineUpdate:
   ld a, (_RAM_DE92_EngineVelocity)
   sla a
   ld e, a
@@ -31848,7 +31985,7 @@ _LABEL_372D3_:
   jr c, -
   jp --
 
-_LABEL_3730C_:
+_LABEL_3730C_GameVBlankPart3:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -32204,11 +32341,11 @@ _LABEL_375A0_:
   cp b
   jr z, +
   jr c, +++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   cp $00
   jr z, ++
   sub $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
@@ -32220,16 +32357,16 @@ _LABEL_375A0_:
 
 ++:
   ld a, $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DEB8_), a
   ld a, $01
   ld (_RAM_DEB2_), a
   ret
 
 +++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   add a, $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   cp $01
   jr nz, +
   ld (_RAM_DEB8_), a
@@ -32243,11 +32380,11 @@ _LABEL_3762B_:
   cp b
   jr z, +
   jr nc, +++
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   cp $00
   jr z, ++
   sub $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ret
 
 +:
@@ -32259,16 +32396,16 @@ _LABEL_3762B_:
 
 ++:
   ld a, $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DEB8_), a
   ld a, $00
   ld (_RAM_DEB2_), a
   ret
 
 +++:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   add a, $01
-  ld (_RAM_DEB1_), a
+  ld (_RAM_DEB1_VScrollDelta), a
   cp $01
   jr nz, +
   ld (_RAM_DEB8_), a
@@ -32401,15 +32538,15 @@ _LABEL_3773B_ReadControls:
   or a
   jr nz, ++
 -:; Read player 1 controls
-  in a, ($DC)
+  in a, (PORT_CONTROL_A)
   ld b, a
-  and $3F
+  and PORT_CONTROL_A_PLAYER1_MASK
   ld (_RAM_DB20_Player1Controls), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr nz, + ; ret
   ; Read player 2 controls
-  in a, ($DD)
+  in a, (PORT_CONTROL_B)
   sla a
   sla a
   and $3C
@@ -32431,14 +32568,14 @@ _LABEL_3773B_ReadControls:
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
   jr nz, +
-  
-  ; I am player 1  
+
+  ; I am player 1
   xor a
   ld (_RAM_DC48_GearToGear_OtherPlayerControls2), a
-  in a, ($DC)
+  in a, (PORT_CONTROL_A)
   and $3F
   ld (_RAM_DB20_Player1Controls), a
-  out ($03), a
+  out (PORT_GG_LinkSend), a
 -:
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
   or a
@@ -32530,7 +32667,7 @@ _LABEL_3779F_:
   ret
 
 _LABEL_37817_:
-  ld a, (_RAM_DEB1_)
+  ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DBA5_)
   sub l
@@ -33558,7 +33695,7 @@ _LABEL_37FF7_ret:
   ret
 
 ; Data from 37FF8 to 37FFF (8 bytes)
-.db $FF $00 $00 $FF 
+.db $FF $00 $00 $FF
 .db $FF $00 $00
 
 ; Bank marker
@@ -33624,33 +33761,36 @@ _LABEL_37FF7_ret:
   ld c, $31
   ld c, a
   jp p, $FA7F ; Possibly invalid
-; Data from 3941A to 3B970 (9559 bytes)
+
+  ; Data from 3941A to 3B970 (9559 bytes)
 .incbin "Assets/raw/Micro Machines_3941a.inc" skip 0 read $3B32F-$3941A
 
 _DATA_3B32F_DisplayCaseTilemapCompressed:
 .incbin "Assets/raw/Micro Machines_3941a.inc" skip $3B32F-$3941A read $3B37F-$3B32F
 
-_DATA_3B37F_DisplayCaseTilesCompressed:
+_DATA_3B37F_Tiles_DisplayCase:
 .incbin "Assets/raw/Micro Machines_3941a.inc" skip $3B37F-$3941A read $3B971-$3B37F
 
 _LABEL_3B971_RamCodeLoaderStage2:
   ; Copy more code into RAM...
-  ld hl, _LABEL_3B97D_DecompressFromHLToC000  ; Loading Code into RAM
+  ld hl, _LABEL_3B97D_RamCodeStart  ; Loading Code into RAM
   ld de, _RAM_D7BD_RamCode
-  ld bc, $0392 ; A lot! 914 bytes
+  ld bc, _LABEL_3BD0F_RamCodeEnd - _LABEL_3B97D_RamCodeStart ; A lot! 914 bytes
   ldir
   ret
 
+_LABEL_3B97D_RamCodeStart:
+
 ; Executed in RAM at d7bd
 _LABEL_3B97D_DecompressFromHLToC000:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741 ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
   ld de, _RAM_C000_DecompressionTemporaryBuffer
-  call $D7C9  ; Code is loaded from RAM_decompress
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  CallRamCode _LABEL_3B989_Decompress
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d7c9
-; This is a copy (?) of the code at _LABEL_7B21_Decompress
-RAM_decompress:
+; This is a copy (!) of the code at _LABEL_7B21_Decompress
+_LABEL_3B989_Decompress:
   push de
     jr _LABEL_3B9F5_get_next_mask_set_carry
 
@@ -33664,8 +33804,7 @@ _LABEL_3B98C_exit:
   ld h, a
   ret
 
----:
-      ld b, a
+---:  ld b, a
 ; Executed in RAM at d7d5
 _LABEL_3B995_5x_use_b:
       ld a, e
@@ -33687,18 +33826,7 @@ _LABEL_3B995_5x_use_b:
         inc bc
         jr +
 
-; Executed in RAM at d7ec
---:
-
-
-
-
-
-
-
-
-
-      ld b, a
+--:   ld b, a
       and $0F
       add a, $02
       ld c, a
@@ -33719,14 +33847,10 @@ _LABEL_3B995_5x_use_b:
         adc a, b
         ld h, a
         dec hl
-; Executed in RAM at d804
--:
-        ld b, $00
+-:      ld b, $00
         inc c
         ldi
-; Executed in RAM at d809
-+:
-        ldir
++:      ldir
       pop hl
       inc hl
     ex af, af'
@@ -33734,14 +33858,6 @@ _LABEL_3B995_5x_use_b:
 
 ; Executed in RAM at d810
 _LABEL_3B9D0_5x:
-
-
-
-
-
-
-
-
       cp $0F
       jr nz, ---
       ld b, (hl)
@@ -33753,8 +33869,6 @@ _LABEL_3B9D8_2x3x4x:
 
 ; Executed in RAM at d81a
 _LABEL_3B9DA_highbitsetcompresseddata:
-
-
       cp $FF
       jr z, _LABEL_3B98C_exit
 
@@ -33777,8 +33891,7 @@ _LABEL_3B9DA_highbitsetcompresseddata:
         ld h, a
         jr -
 
---:
-    ldi
+--: ldi
 _LABEL_3B9F5_get_next_mask_set_carry:
     scf
 ; Executed in RAM at d836
@@ -33815,16 +33928,12 @@ _LABEL_3B9FD_get_next_mask_7bits:
 
     add a, a
     jr nc, --
-; Executed in RAM at d85e
-+:  
-    jr z, -
++:  jr z, -
     ex af, af'
 _LABEL_3BA21_compressed_real:
       ld a, (hl)
       cp $80
       jr nc, _LABEL_3B9DA_highbitsetcompresseddata
-
-
       inc hl
       sub $70
       jr nc, ++
@@ -33836,14 +33945,11 @@ _LABEL_3BA21_compressed_real:
       jr c, _LABEL_3B9D8_2x3x4x
       add a, $10
       jr nc, _LABEL_3BA85_0x
-
-
       ld b, $00
       sub $0F
       jr z, +
       add a, $11
--:
-      ld c, a
+-:    ld c, a
       push hl
         ld l, e
         ld h, d
@@ -33862,12 +33968,7 @@ _LABEL_3BA21_compressed_real:
       jr -
 
 ; Executed in RAM at d899
-++:
-
-
-
-
-      sub $0F
+++:   sub $0F
       jr nz, +
       ld a, (hl)
       inc hl
@@ -33885,12 +33986,6 @@ _LABEL_3BA21_compressed_real:
 
 ; Executed in RAM at d8ad
 _LABEL_3BA6D_6x:
-
-
-
-
-
-
       add a, $03
       ld b, a
       ld a, (hl)
@@ -33914,18 +34009,6 @@ _LABEL_3BA6D_6x:
 
 ; Executed in RAM at d8c5
 _LABEL_3BA85_0x:
-
-
-
-
-
-
-
-
-
-
-
-
       ld b, $00
       inc a
       jr z, +
@@ -33941,8 +34024,7 @@ _LABEL_3BA85_0x:
       ldir
 -:    jr _LABEL_3BA21_compressed_real
 
-+:
-      ld a, (hl)
++:    ld a, (hl)
       inc hl
       inc a
       jr z, +
@@ -33967,15 +34049,13 @@ __:   ldi
       ldir
       jr -
 
-+:
-  ld c, (hl)
-  inc hl
-  ld b, (hl)
-  inc hl
-  ld a, $08
-  jr _b
-  
-  ; End of decompress code
++:    ld c, (hl)
+      inc hl
+      ld b, (hl)
+      inc hl
+      ld a, $08
+      jr _b
+; End of decompress code
 
 ; Data from 3BACF to 3BAF0 (34 bytes)
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
@@ -33995,9 +34075,9 @@ _LABEL_3BAF1_MenusVBlank:
     jr z, + ; almost always the case
     ld a, ($BFFF) ; Last byte of currently mapped page is (usually) the bank number
     ld (_RAM_D742_VBlankSavedPageIndex), a ; save
-    ld a, :_LABEL_30D36_MainVBlankImpl
+    ld a, :_LABEL_30D36_MenuMusicFrameHandler
     ld (PAGING_REGISTER), a
-    call _LABEL_30D36_MainVBlankImpl
+    call _LABEL_30D36_MenuMusicFrameHandler
     ld a, (_RAM_D742_VBlankSavedPageIndex)
     ld (PAGING_REGISTER), a
 +:  ld a, 1
@@ -34013,21 +34093,20 @@ _LABEL_3BAF1_MenusVBlank:
   reti
 
 ; Executed in RAM at d966
-_LABEL_3BB26_:
-  ld a, :_LABEL_30D36_MainVBlankImpl
+_LABEL_3BB26_Trampoline_MenuMusicFrameHandler:
+  ld a, :_LABEL_30D36_MenuMusicFrameHandler
   ld (PAGING_REGISTER), a
-  call _LABEL_30D36_MainVBlankImpl
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  call _LABEL_30D36_MenuMusicFrameHandler
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d971
 _LABEL_3BB31_Emit3bppTileDataToVRAM:
 ; hl = source
-; de = count of rows to emit
+; de = count of rows (3 bytes = 1 row of pixels in a tile) to emit
 ; Write address must be set
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d974
--:
-  ld b, $03
+-:ld b, $03
   ld c, PORT_VDP_DATA
   otir          ; Emit 3 bytes
   xor a
@@ -34036,21 +34115,23 @@ _LABEL_3BB31_Emit3bppTileDataToVRAM:
   ld a, d
   or e
   jr nz, -
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d985
-_LABEL_3BB45_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_3BB45_Emit3bppTileDataToVRAM:
+; hl = source
+; e = count of rows (3 bytes = 1 row of pixels in a tile) to emit
+; Write address must be set
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d988
--:
-  ld b, $03
+-:ld b, $03
   ld c, PORT_VDP_DATA
   otir
   xor a
   out (PORT_VDP_DATA), a
   dec e
   jr nz, -
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d997
 _LABEL_3BB57_EmitTilemapRectangle:
@@ -34059,7 +34140,7 @@ _LABEL_3BB57_EmitTilemapRectangle:
 ; Parameters in RAM
 ; Tile index $ff is converted to the blank tile from the font at index $0e
 ; - but if the high bit is set, it needs to be blank at $10e too...
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d99a
 --:
   ld a, (_RAM_D69D_EmitTilemapRectangle_Width)
@@ -34072,7 +34153,7 @@ _LABEL_3BB57_EmitTilemapRectangle:
   cp $FF
   jr nz, +
   ld a, $0E           ; $ff -> $0e (blank tile)
-  jp $D9AD            ; Code is loaded from ++
+  JumpToRamCode ++
 +:add a, b            ; Else add offset
 ; Executed in RAM at d9ad
 ++:
@@ -34080,7 +34161,7 @@ _LABEL_3BB57_EmitTilemapRectangle:
   ld a, (_RAM_D69C_TilemapRectangleSequence_Flags)
   out (PORT_VDP_DATA), a        ; And flags/high bit
   inc hl
-  dec c               ; repeat for width  
+  dec c               ; repeat for width
   jr nz, -
   ld a, (_RAM_D69E_EmitTilemapRectangle_Height)  ; Decrement row counter
   sub $01
@@ -34092,20 +34173,17 @@ _LABEL_3BB57_EmitTilemapRectangle:
   ld a, d
   adc a, $00
   ld d, a
-  call $DB00  ; Code is loaded from _LABEL_3BCC0_VRAMAddressToDE
-  jp $D99A  ; Code is loaded from --
+  CallRamCode _LABEL_3BCC0_VRAMAddressToDE
+  JumpToRamCode --
 
-; Executed in RAM at d9d0
-+:
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
++: ; Done
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d9d3
-_LABEL_3BB93_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_3BB93_Emit3bppTiles_2Rows:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
   ld c, $03
-; Executed in RAM at d9d8
--:
-  ld a, (hl)
+-:ld a, (hl)
   out (PORT_VDP_DATA), a
   inc hl
   inc de
@@ -34115,9 +34193,7 @@ _LABEL_3BB93_:
   out (PORT_VDP_DATA), a
   inc de
   ld c, $03
-; Executed in RAM at d9e6
--:
-  ld a, (hl)
+-:ld a, (hl)
   out (PORT_VDP_DATA), a
   inc hl
   inc de
@@ -34126,68 +34202,63 @@ _LABEL_3BB93_:
   xor a
   out (PORT_VDP_DATA), a
   inc de
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d9f5
-_LABEL_3BBB5_:
-  ld a, $0A
-  ld ($D741), a
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_3BBB5_PopulateSpriteNs:
+  ld a, :_DATA_2B33E_SpriteNs_Hand
+  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
   ld de, _RAM_D701_SpriteN
-  ld bc, $0018
-; Executed in RAM at da03
--:
-  ld a, (hl)
+  ld bc, 24
+-:ld a, (hl)
   cp $FF
   jr nz, +
   ld a, $53
-; Executed in RAM at da0a
-+:
-  add a, $BB
++:add a, $BB ; 0+ map to $bb+, -1 maps to $53
   ld (de), a
   inc hl
   inc de
   dec c
   jr nz, -
-  call $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
-  jp _LABEL_93CE_
+  CallRamCode _LABEL_3BD08_BackToSlot2
+  jp _LABEL_93CE_UpdateSpriteTable
 
 ; Executed in RAM at da18
-_LABEL_3BBD8_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_3BBD8_EmitTilemapUnknown2:
+; hl = source
+; e = entry count
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
   ld b, $00
-; Executed in RAM at da1d
 --:
   ld c, PORT_VDP_DATA
-; Executed in RAM at da1f
--:
-  ld a, (hl)
-  out (c), a
+-:ld a, (hl) ; Get byte
+  out (c), a ; Emit, high byte 1
   ld a, $01
   out (c), a
   inc hl
-  dec e
+  dec e       ; Counter
   jr z, +
   ld a, e
-  and $1F
+  and $1F     ; When we reach a multiple of 32, add $30 to the source pointer
   jr nz, -
   ld c, $30
   add hl, bc
-  jp $DA1D  ; Code is loaded from --
+  JumpToRamCode --
 
-; Executed in RAM at da35
-+:
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
++: ; done
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at da38
-_LABEL_3BBF8_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
-; Executed in RAM at da3b
+_LABEL_3BBF8_EmitTilemapUnknown:
+; hl = source
+; de = dest VRAM address
+; b = entry count
+; c = width?
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
 --:
-  call $DB00  ; Code is loaded from _LABEL_3BCC0_VRAMAddressToDE
-; Executed in RAM at da3e
--:
-  ld a, (hl)
+  CallRamCode _LABEL_3BCC0_VRAMAddressToDE
+-:ld a, (hl)
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
@@ -34195,57 +34266,74 @@ _LABEL_3BBF8_:
   inc de
   inc de
   dec b
-  jr z, 24
+  jr z, + ; done
   dec c
   jr nz, -
+  ; Add $2a to de -> 21 entries on
   ld a, e
   add a, $2A
   ld e, a
   ld a, d
   adc a, $00
   ld d, a
+  ; Set c to 11???
   ld c, $0B
+  ; Add $27 to hl -> ???
   ld a, l
   add a, $27
   ld l, a
   ld a, h
   adc a, $00
   ld h, a
-  jp $DA3B  ; Code is loaded from --
+  JumpToRamCode --
 
-; Data from 3BC23 to 3BC28 (6 bytes)
-.db $CD $48 $DB $C9 $CD $35
++:CallRamCode _LABEL_3BD08_BackToSlot2
+  ret
 
-  in a, ($1E)
-  ret p
-; Executed in RAM at da6c
--:
-  ld b, $03
+_LABEL_3BC27_EmitThirty3bppTiles:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+  ld e, $f0 ; Row count - 30 tiles
+-:ld b, $03 ;
   ld c, PORT_VDP_DATA
   otir
   xor a
   out (PORT_VDP_DATA), a
   dec e
   jr nz, -
-  call $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  CallRamCode _LABEL_3BD08_BackToSlot2
   ret
 
 ; Executed in RAM at da7c
-_LABEL_3BC3C_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
-  ld e, $78
-  ld b, $03
+_LABEL_3BC3C_EmitFifteen3bppTiles:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+  ld e, $78 ; 15 tiles
+-:ld b, $03
   ld c, PORT_VDP_DATA
   otir
-; Data from 3BC47 to 3BC69 (35 bytes)
-.db $AF $D3 $BE $1D $20 $F4 $22 $A6 $D6 $C3 $48 $DB $CD $35 $DB $1E
-.db $50 $06 $03 $0E $BE $ED $B3 $AF $D3 $BE $1D $20 $F4 $22 $A6 $D6
-.db $C3 $48 $DB
+  xor a
+  out (PORT_VDP_DATA),a
+  dec e
+  jr nz, -
+  ld (_RAM_D6A6_DisplayCase_Source), hl
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
-_LABEL_3BC6A_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
--:
-  ld a, (hl)
+_LABEL_3BC53_EmitTen3bppTiles:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+  ld e, $50 ; 10 tiles
+-:ld b, $03
+  ld c, PORT_VDP_DATA
+  otir
+  xor a
+  out (PORT_VDP_DATA),a
+  dec e
+  jr nz, -
+  ld (_RAM_D6A6_DisplayCase_Source), hl
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
+
+
+_LABEL_3BC6A_EmitText: ; Executed in RAM at $daaa
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+-:ld a, (hl)
   out (PORT_VDP_DATA), a
   rlc a
   and $01
@@ -34253,19 +34341,16 @@ _LABEL_3BC6A_:
   inc hl
   dec c
   jr nz, -
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at dabd
 _LABEL_3BC7D_DisplayCase_RestoreRectangle:
 ; Restores tilemap data from hl to de (must be already set)
 ; 5 tiles wide rectangles from 22 tiles wide source data
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
-; Executed in RAM at dac0
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
 --:
   ld c, $05   ; Width
-; Executed in RAM at dac2
--:
-  ld a, (hl) ; Emit a byte from (hl), high tileset
+-:ld a, (hl) ; Emit a byte from (hl), high tileset
   out (PORT_VDP_DATA), a
   ld a, $01
   out (PORT_VDP_DATA), a
@@ -34276,7 +34361,7 @@ _LABEL_3BC7D_DisplayCase_RestoreRectangle:
   sub $01
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
   jr z, + ;$bcad         ; When done
-  
+
   ; Add $0011 to hl -> skip to next row in 22 tile wide data
   ld a, l
   add a, $11
@@ -34291,15 +34376,15 @@ _LABEL_3BC7D_DisplayCase_RestoreRectangle:
   ld a, d
   adc a, $00
   ld d, a
-  call $DB00 ; Code is loaded from _LABEL_3BCC0_VRAMAddressToDE
-  jp $dac0 ; actually --
-  
+  CallRamCode _LABEL_3BCC0_VRAMAddressToDE
+  JumpToRamCode --
+
   ; When done...
 +:jr _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at $daef
-_LABEL_03BCAF_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_03BCAF_Emit3bppTiles:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
   ; Emit 3bpp tile data for e bytes
 -:ld b, $03
   ld c, PORT_VDP_DATA
@@ -34326,24 +34411,32 @@ _LABEL_3BCC7_VRAMAddressToHL:
   out (PORT_VDP_ADDRESS), a
   ret
 
-; Data from 3BCCE to 3BCDB (14 bytes)
-.db $CD $35 $DB $1A $C3 $3C $DB $CD $35 $DB $0A $C3 $3C $DB
+_LABEL_3BCCE_ReadPagedByte_de: ; unused?
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+  ld a, (de)          ; 03BCD1 1A
+  JumpToRamCode _LABEL_3BCFC_RestorePagingPreserveA
+
+_LABEL_3BCD5_ReadPagedByte_bc: ; unused?
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741
+  ld a, (bc)          ; 03BCD8 0A
+  JumpToRamCode _LABEL_3BCFC_RestorePagingPreserveA
 
 ; Executed in RAM at db1c
-_LABEL_3BCDC_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+_LABEL_3BCDC_Trampoline2_PlayMenuMusic:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
   ld a, c
-  call $8CE8  ; Possibly invalid
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+  call _LABEL_30CE8_PlayMenuMusic
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at db26
-_LABEL_3BCE6_:
-  call $DB35  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
-  call _LABEL_8D28_
-  jp $DB48  ; Code is loaded from _LABEL_3BD08_BackToSlot2
+_LABEL_3BCE6_Trampoline_StopMenuMusic:
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+  call _LABEL_30D28_StopMenuMusic
+  JumpToRamCode _LABEL_3BD08_BackToSlot2
 
-; Data from 3BCEF to 3BCF4 (6 bytes)
-.db $CD $35 $DB $C3 $03 $A0
+_LABEL_3BCEF_: ; unused?
+  CallRamCode _LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from _LABEL_3BCF5_RestorePagingFromD741
+  jp $a003 ; Don't know which page
 
 ; Executed in RAM at db35
 _LABEL_3BCF5_RestorePagingFromD741:
@@ -34351,8 +34444,14 @@ _LABEL_3BCF5_RestorePagingFromD741:
   ld (PAGING_REGISTER), a
   ret
 
-; Data from 3BCFC to 3BD07 (12 bytes)
-.db $32 $43 $D7 $3E $02 $32 $00 $80 $3A $43 $D7 $C9
+_LABEL_3BCFC_RestorePagingPreserveA:
+; Restores paging to slot 2 without losing the value in a
+  ld (_RAM_D743_ReadPagedByteTemp),a
+  ld a, $02
+  ld (PAGING_REGISTER),a
+  ld a, (_RAM_D743_ReadPagedByteTemp)
+  ret
+
 
 ; Executed in RAM at db48
 _LABEL_3BD08_BackToSlot2:
@@ -34360,55 +34459,14 @@ _LABEL_3BD08_BackToSlot2:
   ld (PAGING_REGISTER), a
   ret
 
-; Data from 3BD0E to 3BFFF (754 bytes)
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00
-.db $00 
+; Extra byte picked up by RAM code copier...
+.db $00
+
+_LABEL_3BD0F_RamCodeEnd:
+
+.repeat 188
+.db $FF $FF $00 $00
+.endr
 
 ; Bank marker
 .db :CADDR
@@ -34417,7 +34475,33 @@ _LABEL_3BD08_BackToSlot2:
 .ORG $0000
 
 ; Data from 3C000 to 3FFFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_3c000.inc" skip 0 read $3ED49-$3C000 
+.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3C000-$3C000 read $3e5d7-$3C000
+
+_DATA_3E5D7_Tiles_MediumLogo:
+.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3e5d7-$3C000 read $3ec67-$3e5d7
+
+.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3ec67-$3C000 read $3ECA9-$3ec67
+
+_TEXT_3ECA9_VEHICLE_NAME_BLANK:
+.asc "                "
+_TEXT_3ECB9_VEHICLE_NAME_SPORTSCARS:
+.asc "   SPORTSCARS   "
+_TEXT_3ECC9_VEHICLE_NAME_POWERBOATS:
+.asc "   POWERBOATS   "
+_TEXT_3ECD9_VEHICLE_NAME_FORMULA_ONE:
+.asc "  FORMULA  ONE  "
+_TEXT_3ECE9_VEHICLE_NAME_FOUR_BY_FOUR:
+.asc "  FOUR BY FOUR  "
+_TEXT_3ECF9_VEHICLE_NAME_WARRIORS:
+.asc "    WARRIORS    "
+_TEXT_3ED09_VEHICLE_NAME_CHOPPERS:
+.asc "    CHOPPERS    "
+_TEXT_3ED19_VEHICLE_NAME_TURBO_WHEELS:
+.asc "  TURBO WHEELS  "
+_TEXT_3ED29_VEHICLE_NAME_TANKS:
+.asc "      TANKS     "
+_TEXT_3ED39_VEHICLE_NAME_RUFFTRUX:
+.asc "    RUFFTRUX    "
 
 _DATA_3ED49_SplashScreenCompressed:
 .incbin "Assets/SplashScreen/SplashScreen.compressed"
