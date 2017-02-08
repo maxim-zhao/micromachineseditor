@@ -393,7 +393,7 @@
 00:d6ac _RAM_D6AC_
 00:d6ad _RAM_D6AD_
 00:d6ae _RAM_D6AE_
-00:d6af _RAM_D6AF_
+00:d6af _RAM_D6AF_FlashingCounter
 00:d6b0 _RAM_D6B0_
 00:d6b1 _RAM_D6B1_
 00:d6b2 _RAM_D6B2_

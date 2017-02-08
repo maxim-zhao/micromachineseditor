@@ -333,7 +333,7 @@ _RAM_D6AB_ db
 _RAM_D6AC_ db
 _RAM_D6AD_ db
 _RAM_D6AE_ db
-_RAM_D6AF_ db
+_RAM_D6AF_FlashingCounter db
 _RAM_D6B0_ db
 _RAM_D6B1_ db
 _RAM_D6B2_ dsb 2 ; unused?
@@ -17547,7 +17547,7 @@ _LABEL_8205_:
 ++:call _LABEL_BCCF_EmitTilemapRectangleSequence
 
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6A4_), a
   ld (_RAM_D6B4_), a
@@ -17599,7 +17599,7 @@ _LABEL_8272_:
   ld hl, _TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
   CallRamCode _LABEL_3BC6A_EmitText
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   ld hl, $0170
   ld (_RAM_D6AB_), hl
   xor a
@@ -17754,7 +17754,7 @@ _LABEL_841C_:
   ld (_RAM_D6C3_), a
   call _LABEL_AC1E_
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D697_), a
   ld (_RAM_D6B4_), a
@@ -17823,7 +17823,7 @@ _LABEL_84C7_:
   call _LABEL_ABB0_
   call _LABEL_BA3C_
   ld a, $40
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6C1_), a
   ld (_RAM_D6AB_), a
@@ -17997,7 +17997,7 @@ _LABEL_85F4_:
   add a, $01
   ld (_RAM_D6B9_), a
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
@@ -18309,7 +18309,7 @@ _LABEL_8877_:
   ld hl, _TEXT_8945_BeatTheClock
   call _LABEL_B3A4_EmitToVDPAtDE_Text
   ld a, $40
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
@@ -18363,7 +18363,7 @@ _LABEL_8953_:
   TilemapWriteAddressToHL 17, 9
   call _LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, $30
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6CD_), a
   ld (_RAM_D6AC_), a
@@ -18514,7 +18514,7 @@ _LABEL_8A38_Menu4:
   call _LABEL_A355_
   call _LABEL_B9ED_
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
@@ -20395,11 +20395,12 @@ _LABEL_996E_:
   dec a
   jp z, _LABEL_9A0E_
 +:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, _LABEL_99D2_ret
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
+  ; Flash every 8 frames
   sra a
   sra a
   sra a
@@ -20927,7 +20928,7 @@ _LABEL_9E52_:
   ld a, $01
   ld (_RAM_D6CA_), a
   ld a, $40
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   ret
 
 _LABEL_9E70_:
@@ -21128,7 +21129,7 @@ _LABEL_9FC5_:
   ld a, (_RAM_D6CE_)
   or a
   jr z, +++
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   sra a
   sra a
   and $01
@@ -21182,11 +21183,11 @@ _LABEL_A039_:
   jr z, +
   ld e, $40
 +:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, _LABEL_A0A3_
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -21534,9 +21535,9 @@ _LABEL_A2AA_:
   jp ++++
 
 ++++:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -21808,7 +21809,7 @@ _LABEL_A5B0_EmitToVDP_Text:
 
 _LABEL_A5BE_:
   ld a, $30
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   ld a, $01
   ld (_RAM_D6C6_), a
   ret
@@ -21920,11 +21921,11 @@ _LABEL_A67C_:
   ret
 
 _LABEL_A692_:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, ++
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -22048,11 +22049,11 @@ _DATA_A7BB_:
 .db $E1 $DB
 
 _LABEL_A7ED_:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, +++
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -22212,7 +22213,7 @@ _LABEL_A8FC_:
 
 +:
   ld a, $80
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   ld b, $00
   call _LABEL_A9C6_
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
@@ -22342,11 +22343,11 @@ _LABEL_A9C6_:
   ret
 
 _LABEL_A9EB_:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, _LABEL_AA5D_ ; ret
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -23249,7 +23250,7 @@ _LABEL_B154_:
   jp +++
 
 +:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $08
   jr z, _LABEL_B1B9_Left
   or a
@@ -23487,7 +23488,7 @@ _LABEL_B30E_:
   ld (_RAM_D6C0_), a
 -:
   ld a, $40
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   ld a, (_RAM_D6B9_)
   ret
 
@@ -24120,7 +24121,7 @@ _LABEL_B70B_:
   call _LABEL_B35A_VRAMAddressToHL
   call _LABEL_95AF_DrawHorizontalLineIfSMS
   ld a, $60
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
@@ -24316,7 +24317,7 @@ _LABEL_B877_:
   ld a, (_RAM_DBD4_)
 +++:
   call _LABEL_9F40_
-  ld hl, $7B26 ; Tilemap 19, 12
+  TilemapWriteAddressToHL 19, 16
   call _LABEL_B8C9_EmitTilemapRectangle_5x6_24
   xor a
   ld (_RAM_D6AB_), a
@@ -24356,9 +24357,9 @@ _LABEL_B8E3_:
   JumpToRamCode _LABEL_3BB57_EmitTilemapRectangle
 
 _LABEL_B911_:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
@@ -24531,22 +24532,23 @@ _LABEL_BA4F_LoadMediumNumberTiles:
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 _LABEL_BA63_:
-  ld a, (_RAM_D6AF_)
+  ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
   jr z, +
   sub $01
-  ld (_RAM_D6AF_), a
+  ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
   and $01
   jr nz, ++
-  ld hl, $79D6
+  ; Text
+  TilemapWriteAddressToHL 11, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000A
   ld hl, _TEXT_BAB7_Qualifying
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A16
+  TilemapWriteAddressToHL 11, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000A
   ld hl, _TEXT_BAC1_Race
@@ -24555,12 +24557,13 @@ _LABEL_BA63_:
   ret
 
 ++:
-  ld hl, $79D6
+  ; Blanks (for flashing)
+  TilemapWriteAddressToHL 11, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000A
   ld hl, _TEXT_BACB_Blanks
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7A16
+  TilemapWriteAddressToHL 11, 12
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000A
   ld hl, _TEXT_BACB_Blanks
@@ -25070,32 +25073,32 @@ _LABEL_BE1A_DrawCopyrightText:
   ret z
   xor a
   ld (_RAM_D6CB_), a
-  ld hl, $7D80
+  TilemapWriteAddressToHL 0, 26
   call _LABEL_B35A_VRAMAddressToHL
   ld c, $1A
   ld hl, _TEXT_BE77_CopyrightCodemasters
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7DC0
+  TilemapWriteAddressToHL 0, 27
   call _LABEL_B35A_VRAMAddressToHL
   ld c, $1C
   ld hl, _TEXT_BE91_SoftwareCompanyLtd1993
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7B08
+  TilemapWriteAddressToHL 4, 16
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_BEAD_MasterSystemVersionBy
   ld c, $18
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7B8C
+  TilemapWriteAddressToHL 6, 18
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_BEC5_AshleyRoutledge
   ld c, $14
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7BCC
+  TilemapWriteAddressToHL 6, 19
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_BED9_And
   ld c, $0D
   call _LABEL_A5B0_EmitToVDP_Text
-  ld hl, $7C0C
+  TilemapWriteAddressToHL 6, 20
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _TEXT_BEE4_DavidSaunders
   ld c, $11
@@ -25129,17 +25132,17 @@ _LABEL_BEF5_:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_Title
   ret nz
-  ld hl, $7B08
+  TilemapWriteAddressToHL 4, 16
   call +
-  ld hl, $7B88
+  TilemapWriteAddressToHL 4, 18
   call +
-  ld hl, $7C08
+  TilemapWriteAddressToHL 4, 20
   call +
-  ld hl, $7B2A
+  TilemapWriteAddressToHL 21, 16
   call +
-  ld hl, $7BAA
+  TilemapWriteAddressToHL 21, 18
   call +
-  ld hl, $7C2A
+  TilemapWriteAddressToHL 21, 20
   jr +
 
 +:
