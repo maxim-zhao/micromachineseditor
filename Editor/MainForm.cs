@@ -70,38 +70,6 @@ namespace MicroMachinesEditor
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
 
             RenderTiles(decoded.ToArray(), 0);
-            /*
-            // Try as graphics
-            if (_palette == null)
-            {
-                // Load the menu palette
-                _palette = SMSGraphics.ReadPalette(file, 0xbf3e, 32);
-            }
-            var bpp = Convert.ToInt32(numericUpDown1.Value);
-            var tiles = SMSGraphics.ReadTiles(decoded.ToArray(), 0, decoded.Count, _palette, bpp);
-            var bm = new Bitmap(128, 256);
-            Graphics g = Graphics.FromImage(bm);
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-            // Set to transparent
-            g.Clear(Color.Transparent);
-
-            int x = 0;
-            int y = 0;
-            foreach (var tile in tiles)
-            {
-                g.DrawImage(tile.Bitmap, x, y, 8, 8);
-                x += 8;
-                if (x >= bm.Width)
-                {
-                    x = 0;
-                    y += 8;
-                }
-            }
-
-            pbRaw.Image = bm;
-            */
         }
 
         private void btnSearch_Click(object sender, EventArgs e)

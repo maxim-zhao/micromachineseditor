@@ -44,6 +44,7 @@
             this.editTrackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pgTrack = new System.Windows.Forms.PropertyGrid();
             this.tabTrack = new System.Windows.Forms.TabPage();
+            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.tabMetaTiles = new System.Windows.Forms.TabPage();
             this.panelMetaTiles = new System.Windows.Forms.Panel();
             this.pbMetaTiles = new System.Windows.Forms.PictureBox();
@@ -63,7 +64,6 @@
             this.tbLog = new System.Windows.Forms.TextBox();
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
             this.cbLevelType = new System.Windows.Forms.ComboBox();
-            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -111,7 +111,8 @@
             // 
             // tbOutput
             // 
-            this.tbOutput.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.tbOutput.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tbOutput.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.tbOutput.Location = new System.Drawing.Point(12, 64);
@@ -234,12 +235,12 @@
             this.trackListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.editTrackToolStripMenuItem});
             this.trackListMenu.Name = "trackListMenu";
-            this.trackListMenu.Size = new System.Drawing.Size(214, 42);
+            this.trackListMenu.Size = new System.Drawing.Size(189, 40);
             // 
             // editTrackToolStripMenuItem
             // 
             this.editTrackToolStripMenuItem.Name = "editTrackToolStripMenuItem";
-            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(213, 38);
+            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(188, 36);
             this.editTrackToolStripMenuItem.Text = "Edit track";
             this.editTrackToolStripMenuItem.Click += new System.EventHandler(this.editTrackToolStripMenuItem_Click);
             // 
@@ -265,6 +266,16 @@
             this.tabTrack.TabIndex = 4;
             this.tabTrack.Text = "Track";
             this.tabTrack.UseVisualStyleBackColor = true;
+            // 
+            // trackEditor
+            // 
+            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.trackEditor.Location = new System.Drawing.Point(6, 6);
+            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
+            this.trackEditor.Name = "trackEditor";
+            this.trackEditor.Size = new System.Drawing.Size(1500, 491);
+            this.trackEditor.TabIndex = 0;
+            this.trackEditor.Track = null;
             // 
             // tabMetaTiles
             // 
@@ -439,12 +450,12 @@
             // 
             // pbRaw
             // 
-            this.pbRaw.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.pbRaw.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.pbRaw.Location = new System.Drawing.Point(988, 56);
             this.pbRaw.Margin = new System.Windows.Forms.Padding(6);
             this.pbRaw.Name = "pbRaw";
-            this.pbRaw.Size = new System.Drawing.Size(512, 512);
-            this.pbRaw.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pbRaw.Size = new System.Drawing.Size(512, 435);
             this.pbRaw.TabIndex = 7;
             this.pbRaw.TabStop = false;
             // 
@@ -527,16 +538,6 @@
             this.cbLevelType.Size = new System.Drawing.Size(238, 33);
             this.cbLevelType.TabIndex = 1;
             this.cbLevelType.SelectedIndexChanged += new System.EventHandler(this.TrackParametersChanged);
-            // 
-            // trackEditor
-            // 
-            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.trackEditor.Location = new System.Drawing.Point(6, 6);
-            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
-            this.trackEditor.Name = "trackEditor";
-            this.trackEditor.Size = new System.Drawing.Size(1500, 491);
-            this.trackEditor.TabIndex = 0;
-            this.trackEditor.Track = null;
             // 
             // MainForm
             // 
