@@ -53,8 +53,10 @@
             this.tabPalette = new System.Windows.Forms.TabPage();
             this.pbPalette = new System.Windows.Forms.PictureBox();
             this.tabRaw = new System.Windows.Forms.TabPage();
+            this.udImageWidth = new System.Windows.Forms.NumericUpDown();
+            this.btnDecodeRaw = new System.Windows.Forms.Button();
+            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
             this.pbRaw = new System.Windows.Forms.PictureBox();
-            this.tbDelta = new System.Windows.Forms.TextBox();
             this.btnDecodeRun = new System.Windows.Forms.Button();
             this.btnText = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
@@ -62,7 +64,6 @@
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
             this.cbLevelType = new System.Windows.Forms.ComboBox();
             this.trackEditor = new MicroMachinesEditor.TrackEditor();
-            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -81,10 +82,11 @@
             this.tabPalette.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).BeginInit();
             this.tabRaw.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).BeginInit();
             this.tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.SuspendLayout();
             // 
             // tbFilename
@@ -103,7 +105,7 @@
             this.tbOffset.Location = new System.Drawing.Point(12, 12);
             this.tbOffset.Margin = new System.Windows.Forms.Padding(6);
             this.tbOffset.Name = "tbOffset";
-            this.tbOffset.Size = new System.Drawing.Size(196, 31);
+            this.tbOffset.Size = new System.Drawing.Size(96, 31);
             this.tbOffset.TabIndex = 0;
             this.tbOffset.Text = "2fde0";
             // 
@@ -112,23 +114,23 @@
             this.tbOutput.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tbOutput.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tbOutput.Location = new System.Drawing.Point(12, 63);
+            this.tbOutput.Location = new System.Drawing.Point(12, 64);
             this.tbOutput.Margin = new System.Windows.Forms.Padding(6);
             this.tbOutput.Multiline = true;
             this.tbOutput.Name = "tbOutput";
             this.tbOutput.ReadOnly = true;
             this.tbOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbOutput.Size = new System.Drawing.Size(922, 437);
+            this.tbOutput.Size = new System.Drawing.Size(964, 436);
             this.tbOutput.TabIndex = 4;
             // 
             // btnDecode
             // 
-            this.btnDecode.Location = new System.Drawing.Point(224, 8);
+            this.btnDecode.Location = new System.Drawing.Point(120, 8);
             this.btnDecode.Margin = new System.Windows.Forms.Padding(6);
             this.btnDecode.Name = "btnDecode";
             this.btnDecode.Size = new System.Drawing.Size(150, 44);
             this.btnDecode.TabIndex = 1;
-            this.btnDecode.Text = "Decode";
+            this.btnDecode.Text = "Decompress";
             this.btnDecode.UseVisualStyleBackColor = true;
             this.btnDecode.Click += new System.EventHandler(this.btnDecode_Click);
             // 
@@ -152,7 +154,7 @@
             // 
             // btnSearch
             // 
-            this.btnSearch.Location = new System.Drawing.Point(386, 8);
+            this.btnSearch.Location = new System.Drawing.Point(282, 7);
             this.btnSearch.Margin = new System.Windows.Forms.Padding(6);
             this.btnSearch.Name = "btnSearch";
             this.btnSearch.Size = new System.Drawing.Size(150, 44);
@@ -356,9 +358,10 @@
             // 
             // tabRaw
             // 
+            this.tabRaw.Controls.Add(this.udImageWidth);
+            this.tabRaw.Controls.Add(this.btnDecodeRaw);
             this.tabRaw.Controls.Add(this.numericUpDown1);
             this.tabRaw.Controls.Add(this.pbRaw);
-            this.tabRaw.Controls.Add(this.tbDelta);
             this.tabRaw.Controls.Add(this.btnDecodeRun);
             this.tabRaw.Controls.Add(this.btnText);
             this.tabRaw.Controls.Add(this.tbOffset);
@@ -374,31 +377,83 @@
             this.tabRaw.Text = "Raw";
             this.tabRaw.UseVisualStyleBackColor = true;
             // 
+            // udImageWidth
+            // 
+            this.udImageWidth.Increment = new decimal(new int[] {
+            8,
+            0,
+            0,
+            0});
+            this.udImageWidth.Location = new System.Drawing.Point(1161, 13);
+            this.udImageWidth.Maximum = new decimal(new int[] {
+            256,
+            0,
+            0,
+            0});
+            this.udImageWidth.Minimum = new decimal(new int[] {
+            8,
+            0,
+            0,
+            0});
+            this.udImageWidth.Name = "udImageWidth";
+            this.udImageWidth.Size = new System.Drawing.Size(82, 31);
+            this.udImageWidth.TabIndex = 10;
+            this.udImageWidth.Value = new decimal(new int[] {
+            32,
+            0,
+            0,
+            0});
+            // 
+            // btnDecodeRaw
+            // 
+            this.btnDecodeRaw.Location = new System.Drawing.Point(777, 7);
+            this.btnDecodeRaw.Margin = new System.Windows.Forms.Padding(6);
+            this.btnDecodeRaw.Name = "btnDecodeRaw";
+            this.btnDecodeRaw.Size = new System.Drawing.Size(159, 44);
+            this.btnDecodeRaw.TabIndex = 9;
+            this.btnDecodeRaw.Text = "Raw";
+            this.btnDecodeRaw.UseVisualStyleBackColor = true;
+            this.btnDecodeRaw.Click += new System.EventHandler(this.btnDecodeRaw_Click);
+            // 
+            // numericUpDown1
+            // 
+            this.numericUpDown1.Location = new System.Drawing.Point(1086, 16);
+            this.numericUpDown1.Maximum = new decimal(new int[] {
+            4,
+            0,
+            0,
+            0});
+            this.numericUpDown1.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+            this.numericUpDown1.Name = "numericUpDown1";
+            this.numericUpDown1.Size = new System.Drawing.Size(69, 31);
+            this.numericUpDown1.TabIndex = 8;
+            this.numericUpDown1.Value = new decimal(new int[] {
+            3,
+            0,
+            0,
+            0});
+            // 
             // pbRaw
             // 
-            this.pbRaw.Location = new System.Drawing.Point(946, 63);
+            this.pbRaw.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.pbRaw.Location = new System.Drawing.Point(988, 56);
             this.pbRaw.Margin = new System.Windows.Forms.Padding(6);
             this.pbRaw.Name = "pbRaw";
-            this.pbRaw.Size = new System.Drawing.Size(768, 768);
+            this.pbRaw.Size = new System.Drawing.Size(512, 512);
             this.pbRaw.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
             this.pbRaw.TabIndex = 7;
             this.pbRaw.TabStop = false;
             // 
-            // tbDelta
-            // 
-            this.tbDelta.Location = new System.Drawing.Point(710, 12);
-            this.tbDelta.Margin = new System.Windows.Forms.Padding(6);
-            this.tbDelta.Name = "tbDelta";
-            this.tbDelta.Size = new System.Drawing.Size(196, 31);
-            this.tbDelta.TabIndex = 6;
-            this.tbDelta.Text = "tbDelta";
-            // 
             // btnDecodeRun
             // 
-            this.btnDecodeRun.Location = new System.Drawing.Point(918, 7);
+            this.btnDecodeRun.Location = new System.Drawing.Point(606, 7);
             this.btnDecodeRun.Margin = new System.Windows.Forms.Padding(6);
             this.btnDecodeRun.Name = "btnDecodeRun";
-            this.btnDecodeRun.Size = new System.Drawing.Size(150, 44);
+            this.btnDecodeRun.Size = new System.Drawing.Size(159, 44);
             this.btnDecodeRun.TabIndex = 5;
             this.btnDecodeRun.Text = "Decode RLE";
             this.btnDecodeRun.UseVisualStyleBackColor = true;
@@ -406,7 +461,7 @@
             // 
             // btnText
             // 
-            this.btnText.Location = new System.Drawing.Point(548, 8);
+            this.btnText.Location = new System.Drawing.Point(444, 8);
             this.btnText.Margin = new System.Windows.Forms.Padding(6);
             this.btnText.Name = "btnText";
             this.btnText.Size = new System.Drawing.Size(150, 44);
@@ -483,28 +538,6 @@
             this.trackEditor.TabIndex = 0;
             this.trackEditor.Track = null;
             // 
-            // numericUpDown1
-            // 
-            this.numericUpDown1.Location = new System.Drawing.Point(1097, 19);
-            this.numericUpDown1.Maximum = new decimal(new int[] {
-            4,
-            0,
-            0,
-            0});
-            this.numericUpDown1.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            this.numericUpDown1.Name = "numericUpDown1";
-            this.numericUpDown1.Size = new System.Drawing.Size(120, 31);
-            this.numericUpDown1.TabIndex = 8;
-            this.numericUpDown1.Value = new decimal(new int[] {
-            3,
-            0,
-            0,
-            0});
-            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
@@ -541,11 +574,12 @@
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).EndInit();
             this.tabRaw.ResumeLayout(false);
             this.tabRaw.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).EndInit();
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -584,9 +618,10 @@
         private System.Windows.Forms.TextBox tbLog;
         private System.Windows.Forms.PropertyGrid pgTrack;
         private System.Windows.Forms.Button btnDecodeRun;
-        private System.Windows.Forms.TextBox tbDelta;
         private System.Windows.Forms.PictureBox pbRaw;
         private System.Windows.Forms.NumericUpDown numericUpDown1;
+        private System.Windows.Forms.Button btnDecodeRaw;
+        private System.Windows.Forms.NumericUpDown udImageWidth;
     }
 }
 

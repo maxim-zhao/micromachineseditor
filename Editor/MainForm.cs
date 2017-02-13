@@ -69,6 +69,8 @@ namespace MicroMachinesEditor
             tbOutput.Text = HexToString(decoded);
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
 
+            RenderTiles(decoded.ToArray(), 0);
+            /*
             // Try as graphics
             if (_palette == null)
             {
@@ -99,6 +101,7 @@ namespace MicroMachinesEditor
             }
 
             pbRaw.Image = bm;
+            */
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -498,6 +501,50 @@ namespace MicroMachinesEditor
             }
             tbOutput.Text = HexToString(decoded);
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
+        }
+
+        private void btnDecodeRaw_Click(object sender, EventArgs e)
+        {
+            byte[] file = File.ReadAllBytes(tbFilename.Text);
+            int offset = Convert.ToInt32(tbOffset.Text, 16);
+            RenderTiles(file, offset);
+        }
+
+        private void RenderTiles(byte[] data, int offset)
+        {
+            if (_palette == null)
+            {
+                // Load the menu palette
+                _palette = SMSGraphics.ReadPalette(File.ReadAllBytes(tbFilename.Text), 0xbf3e, 32);
+            }
+            var bpp = Convert.ToInt32(numericUpDown1.Value);
+            int numBytes = Math.Min(bpp * 8 * 512, data.Length - offset);
+            int numTiles = numBytes / bpp / 8;
+            var tiles = SMSGraphics.ReadTiles(data, offset, numBytes, _palette, bpp);
+            var width = Convert.ToInt32(udImageWidth.Value);
+            var height = Convert.ToInt32(Math.Ceiling(numTiles * 64.0 / width));
+            var bm = new Bitmap(width, height);
+            Graphics g = Graphics.FromImage(bm);
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            // Set to transparent
+            g.Clear(Color.Transparent);
+
+            int x = 0;
+            int y = 0;
+            foreach (var tile in tiles)
+            {
+                g.DrawImage(tile.Bitmap, x, y, 8, 8);
+                x += 8;
+                if (x >= bm.Width)
+                {
+                    x = 0;
+                    y += 8;
+                }
+            }
+
+            pbRaw.Image = bm;
         }
     }
 }
