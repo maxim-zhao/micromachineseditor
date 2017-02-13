@@ -323,7 +323,7 @@ _RAM_D69D_EmitTilemapRectangle_Width db
 _RAM_D69E_EmitTilemapRectangle_Height db
 _RAM_D69F_EmitTilemapRectangle_IndexOffset db
 _RAM_D6A0_MenuSelection db
-_RAM_D6A1_ db
+_RAM_D6A1_PortraitIndex db
 _RAM_D6A2_ db
 _RAM_D6A3_ db
 _RAM_D6A4_ db
@@ -5270,9 +5270,9 @@ _LABEL_1DF2_:
   ld (_RAM_DE6B_), a
   ld a, h
   ld (_RAM_DE6C_), a
-  ld de, _DATA_16A38_
+  ld de, _DATA_16A38_DivideBy8
   add hl, de
-  ld a, :_DATA_16A38_
+  ld a, :_DATA_16A38_DivideBy8
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld l, a
@@ -5287,9 +5287,9 @@ _LABEL_1DF2_:
   ld l, a
   ld a, (_RAM_DE6C_)
   ld h, a
-  ld de, _DATA_169A8_
+  ld de, _DATA_169A8_IndexToBitmask
   add hl, de
-  ld a, :_DATA_169A8_
+  ld a, :_DATA_169A8_IndexToBitmask
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld b, a
@@ -11400,9 +11400,9 @@ _LABEL_5451_:
   ld (_RAM_DE6D_), a
   ld a, h
   ld (_RAM_DE6E_), a
-  ld de, _DATA_16A38_
+  ld de, _DATA_16A38_DivideBy8
   add hl, de
-  ld a, :_DATA_16A38_
+  ld a, :_DATA_16A38_DivideBy8
   ld (PAGING_REGISTER), a
   ld l, (hl)
   ld a, (_RAM_DE8E_PageNumber)
@@ -11415,9 +11415,9 @@ _LABEL_5451_:
   ld l, a
   ld a, (_RAM_DE6E_)
   ld h, a
-  ld de, _DATA_169A8_
+  ld de, _DATA_169A8_IndexToBitmask
   add hl, de
-  ld a, :_DATA_169A8_
+  ld a, :_DATA_169A8_IndexToBitmask
   ld (PAGING_REGISTER), a
   ld b, (hl)
   ld a, (_RAM_DE8E_PageNumber)
@@ -20162,7 +20162,7 @@ _LABEL_96EC_:
 _LABEL_96F6_:
   ld a, (_RAM_D6A4_)
   cp $01
-  jr z, _LABEL_973C_
+  jr z, _LABEL_973C_DrawPortrait_RightTwoColumns
   ld hl, _DATA_9773_TileWriteAddresses
 _LABEL_9700_:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -20193,20 +20193,20 @@ _LABEL_9700_:
   ld (_RAM_D6A8_DisplayCaseTileAddress), de
   call _LABEL_B361_VRAMAddressToDE
   ld a, (_RAM_D6AA_)
-  call _LABEL_9F81_
+  call _LABEL_9F81_DrawPortrait_ThreeColumns
   ld a, (_RAM_D6A4_)
   sub $01
   ld (_RAM_D6A4_), a
   ret
 
-_LABEL_973C_:
+_LABEL_973C_DrawPortrait_RightTwoColumns:
   ld hl, (_RAM_D6A8_DisplayCaseTileAddress)
   ld bc, 15 * TILE_DATA_SIZE ; $01E0
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, (_RAM_D6A6_DisplayCase_Source)
   ld a, (_RAM_D6AA_)
-  call _LABEL_9FB8_
+  call _LABEL_9FB8_DrawOrBlank10PortraitTiles
   ld a, (_RAM_D6A4_)
   sub $01
   ld (_RAM_D6A4_), a
@@ -20739,7 +20739,7 @@ _LABEL_9C5E_:
 _LABEL_9C64_:
   ld a, (_RAM_D6A4_)
   cp $01
-  jp z, _LABEL_973C_
+  jp z, _LABEL_973C_DrawPortrait_RightTwoColumns
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
   jr z, +
@@ -20836,7 +20836,7 @@ _LABEL_9D4E_:
   ld a, (hl)
   out (PORT_VDP_ADDRESS), a
   ld a, (_RAM_D6B6_)
-  jp _LABEL_9F81_
+  jp _LABEL_9F81_DrawPortrait_ThreeColumns
 
 ++++:
   ld a, (_RAM_D6B9_)
@@ -20852,7 +20852,7 @@ _LABEL_9D4E_:
   out (PORT_VDP_ADDRESS), a
   ld hl, (_RAM_D6A6_DisplayCase_Source)
   ld a, (_RAM_D6B6_)
-  call _LABEL_9FAB_
+  call _LABEL_9FAB_DrawOrBlank15PortraitTiles
   ld a, (_RAM_D6BA_)
   cp $00
   jr z, +
@@ -21060,12 +21060,12 @@ _LABEL_9F3F_ret:
   ret
 
 _LABEL_9F40_:
-; a = ???
-  ld (_RAM_D6A1_), a ; Save
+; a = portrait index
+  ld (_RAM_D6A1_PortraitIndex), a ; Save
 
   ld hl, _DATA_9D37_RacerPortraitsPages ; Look up in page number
-  ld a, (_RAM_D6A1_)
-  sra a ; Divide by 4 to look up the page number because that tale has a 1:4 ratio to the portrait pointers
+  ld a, (_RAM_D6A1_PortraitIndex)
+  sra a ; Divide by 4 to look up the page number because that table has a 1:4 ratio to the portrait pointers
   sra a
   ld e, a
   ld d, $00
@@ -21075,7 +21075,7 @@ _LABEL_9F40_:
 
   ld d, $00
   ld hl, _DATA_9C7F_RacerPortraitsLocations ; Look up pointer to data
-  ld a, (_RAM_D6A1_)
+  ld a, (_RAM_D6A1_PortraitIndex)
   sla a ; *2 because words
   ld e, a
   add hl, de
@@ -21086,25 +21086,28 @@ _LABEL_9F40_:
   ld h, a
   ld l, c ; -> hl
 
-  ld de, $003C
-  ld a, (_RAM_D6A1_)
+  ld de, 30 * 2 ; for blanking
+  ld a, (_RAM_D6A1_PortraitIndex)
   cp $58
-  jr z, _LABEL_9F74_
+  jr z, _LABEL_9F74_BlankVRAMRegion
   JumpToRamCode _LABEL_3BC27_EmitThirty3bppTiles
 
-_LABEL_9F74_:
-  ld hl, _DATA_BD6C_Palette3_SMS
-  ld b, $10
+_LABEL_9F74_BlankVRAMRegion:
+; de = amount to write / 16
+-:ld hl, _DATA_BD6C_ZeroData
+  ld b, 16
   ld c, PORT_VDP_DATA
   otir
   dec e
-  jr nz, _LABEL_9F74_
+  jr nz, -
   ret
 
-_LABEL_9F81_:
-  ld (_RAM_D6A1_), a
+_LABEL_9F81_DrawPortrait_ThreeColumns:
+  ; save index
+  ld (_RAM_D6A1_PortraitIndex), a
+  ; Look up page
   ld hl, _DATA_9D37_RacerPortraitsPages
-  ld a, (_RAM_D6A1_)
+  ld a, (_RAM_D6A1_PortraitIndex)
   sra a
   sra a
   ld e, a
@@ -21113,9 +21116,10 @@ _LABEL_9F81_:
   ld a, (hl)
   ld (_RAM_D6A5_), a
   ld (_RAM_D741_RequestedPageIndex), a
+  ; Look up pointer
   ld d, $00
   ld hl, _DATA_9C7F_RacerPortraitsLocations
-  ld a, (_RAM_D6A1_)
+  ld a, (_RAM_D6A1_PortraitIndex)
   sla a
   ld e, a
   add hl, de
@@ -21125,18 +21129,20 @@ _LABEL_9F81_:
   ld a, (hl)
   ld h, a
   ld l, c
-_LABEL_9FAB_:
-  ld de, $001E
-  ld a, (_RAM_D6A1_)
+  ; fall through
+  
+_LABEL_9FAB_DrawOrBlank15PortraitTiles:
+  ld de, 15 * 2 ; to blank 15 tiles
+  ld a, (_RAM_D6A1_PortraitIndex)
   cp $58
-  jr z, _LABEL_9F74_
+  jr z, _LABEL_9F74_BlankVRAMRegion
   JumpToRamCode _LABEL_3BC3C_EmitFifteen3bppTiles
 
-_LABEL_9FB8_:
-  ld de, $0014
-  ld a, (_RAM_D6A1_)
+_LABEL_9FB8_DrawOrBlank10PortraitTiles:
+  ld de, 10 * 2 ; to blank 10 tiles
+  ld a, (_RAM_D6A1_PortraitIndex)
   cp $58
-  jr z, _LABEL_9F74_
+  jr z, _LABEL_9F74_BlankVRAMRegion
   JumpToRamCode _LABEL_3BC53_EmitTen3bppTiles
 
 _LABEL_9FC5_:
@@ -21146,11 +21152,11 @@ _LABEL_9FC5_:
   jp _LABEL_AA02_
 
 +:
-  ld bc, $0000
+  ld bc, $0000 ; Offset 5 rows down for SMS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld bc, $0140
+  ld bc, TILEMAP_ROW_SIZE * 5 ; $0140
 +:
   ld a, (_RAM_D6CE_)
   or a
@@ -25038,17 +25044,9 @@ _DATA_BD65_Palette2_SMS:
 
 ; Data from BD6C to BD7B (16 bytes)
 _DATA_BD6C_Palette3_SMS:
-  ; Black
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-  SMSCOLOUR $000000
-
-; Unused? $bd73+
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00
+_DATA_BD6C_ZeroData:
+  ; Black (16 entries)
+.dsb 16 $00
 
 _LABEL_BD7C_:
   ld a, $FF
@@ -25421,37 +25419,44 @@ _DATA_13F50_Tilemap_MicroMachinesText:
 .incbin "Assets/raw/Micro Machines_14000.inc"
 
 ; Data from 169A8 to 16A37 (144 bytes)
-_DATA_169A8_:
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
-.db $80 $40 $20 $10 $08 $04 $02 $01 $80 $40 $20 $10 $08 $04 $02 $01
+_DATA_169A8_IndexToBitmask:
+.repeat 144/8
+.db %10000000
+.db %01000000
+.db %00100000
+.db %00010000
+.db %00001000
+.db %00000100
+.db %00000010
+.db %00000001
+.endr
 
 ; Data from 16A38 to 17DD4 (5021 bytes)
-_DATA_16A38_:
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16a38-$16a38 read $16ac8-$16a38
+_DATA_16A38_DivideBy8:
+.define n 0
+.repeat 144
+.db n/8
+.redefine n n+1
+.endr
+.undefine n
 
 _DATA_16AC8_Tiles_PortraitTurboWheels:
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16ac8-$16a38 read $16f2b-$16ac8
+.incbin "Assets/TurboWheels/Portrait.3bpp.compressed"
 
 _DATA_16F2B_Tiles_Portrait_FormulaOne:
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $16f2b-$16a38 read $1736e-$16f2b
+.incbin "Assets/F1/Portrait.3bpp.compressed"
 
 _DATA_1736E_Tiles_Portrait_Tanks:
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $1736e-$16a38 read $1766c-$1736e
+.incbin "Assets/Tanks/Portrait.3bpp.compressed"
 
 _DATA_Tiles_MrQuestion:
 .incbin "Assets/racers/MrQuestion.3bpp"
+
 _DATA_Tiles_OutOfGame:
 .incbin "Assets/racers/OutOfGame.3bpp"
 
 _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $17c0c-$16a38 read $17dd5-$17c0c
+.incbin "Assets/Menu/TwoPlayersOnOneGameGear.compressed"
 
 ; Data from 17DD5 to 17E54 (128 bytes)
 _DATA_17DD5_:

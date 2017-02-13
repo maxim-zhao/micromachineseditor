@@ -381,7 +381,7 @@
 00:d69e _RAM_D69E_EmitTilemapRectangle_Height
 00:d69f _RAM_D69F_EmitTilemapRectangle_IndexOffset
 00:d6a0 _RAM_D6A0_MenuSelection
-00:d6a1 _RAM_D6A1_
+00:d6a1 _RAM_D6A1_PortraitIndex
 00:d6a2 _RAM_D6A2_
 00:d6a3 _RAM_D6A3_
 00:d6a4 _RAM_D6A4_
@@ -2184,7 +2184,7 @@
 02:96ec _LABEL_96EC_
 02:96f6 _LABEL_96F6_
 02:9700 _LABEL_9700_
-02:973c _LABEL_973C_
+02:973c _LABEL_973C_DrawPortrait_RightTwoColumns
 02:975b _DATA_975B_TileWriteAddresses_SMS
 02:9767 _DATA_9767_TileWriteAddresses_GG
 02:9773 _DATA_9773_TileWriteAddresses
@@ -2220,7 +2220,7 @@
 02:9c5d _LABEL_9C5D_
 02:9c5e _LABEL_9C5E_
 02:9c64 _LABEL_9C64_
-02:9c7f _DATA_9C7F_
+02:9c7f _DATA_9C7F_RacerPortraitsLocations
 02:9d37 _DATA_9D37_RacerPortraitsPages
 02:9d4e _LABEL_9D4E_
 02:9dad _DATA_9DAD_TileVRAMAddresses
@@ -2232,10 +2232,10 @@
 02:9e70 _LABEL_9E70_
 02:9f3f _LABEL_9F3F_ret
 02:9f40 _LABEL_9F40_
-02:9f74 _LABEL_9F74_
-02:9f81 _LABEL_9F81_
-02:9fab _LABEL_9FAB_
-02:9fb8 _LABEL_9FB8_
+02:9f74 _LABEL_9F74_BlankVRAMRegion
+02:9f81 _LABEL_9F81_DrawPortrait_ThreeColumns
+02:9fab _LABEL_9FAB_DrawOrBlank15PortraitTiles
+02:9fb8 _LABEL_9FB8_DrawOrBlank10PortraitTiles
 02:9fc5 _LABEL_9FC5_
 02:a019 _TEXT_A019_Pro
 02:a01c _LABEL_A01C_
@@ -2472,6 +2472,7 @@
 02:bd5e _DATA_BD5E_Palette1_SMS
 02:bd65 _DATA_BD65_Palette2_SMS
 02:bd6c _DATA_BD6C_Palette3_SMS
+02:bd6c _DATA_BD6C_ZeroData
 02:bd7c _LABEL_BD7C_
 02:bd82 _LABEL_BD82_GetPalettePointerAndSelectIndex0
 02:bd94 _LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
@@ -2511,8 +2512,8 @@
 04:bd7f _DATA_13D7F_Tiles_MicroMachinesText
 04:bf38 _DATA_13F38_Tilemap_SmallLogo
 04:bf50 _DATA_13F50_Tilemap_MicroMachinesText
-05:a9a8 _DATA_169A8_
-05:aa38 _DATA_16A38_
+05:a9a8 _DATA_169A8_IndexToBitmask
+05:aa38 _DATA_16A38_DivideBy8
 05:aac8 _DATA_16AC8_Tiles_PortraitTurboWheels
 05:af2b _DATA_16F2B_Tiles_Portrait_FormulaOne
 05:b36e _DATA_1736E_Tiles_Portrait_Tanks
