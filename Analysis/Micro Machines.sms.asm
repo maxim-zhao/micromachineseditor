@@ -73,14 +73,16 @@ MenuScreen_OnePlayerMode      db ; 13 Challenge or Head to Head
 
 ; ASCII mapping for menu screen text
 .define BLANK_TILE_INDEX = $0e
-.asciitable
+.define ZERO_DIGIT_TILE_INDEX = $1a
+.define HYPHEN_TILE_INDEX = $b5
+.asctable
 map "A" to "N" = $00
 map "O" = $1a
 map "P" to "Z" = $0f
-map "0" to "9" = $1a
+map "0" to "9" = ZERO_DIGIT_TILE_INDEX
 map " " = BLANK_TILE_INDEX
 map "!" = $B4
-map "-" = $B5
+map "-" = HYPHEN_TILE_INDEX
 map "?" = $B6
 .enda
 
@@ -354,8 +356,8 @@ _RAM_D6C3_ db
 _RAM_D6C4_ db ; Per-course value, usually -1, sometimes 0, 1, 2
 _RAM_D6C5_PaletteFadeIndex db
 _RAM_D6C6_ db
-_RAM_D6C7_ db
-_RAM_D6C8_ db
+_RAM_D6C7_ db ; 0 or 1
+_RAM_D6C8_HeaderTilesIndexOffset db
 _RAM_D6C9_ControllingPlayersLR1Buttons db ; Combination of player 1 and 2 when applicable, else player 1
 _RAM_D6CA_ db
 _RAM_D6CB_ db
@@ -375,7 +377,7 @@ _RAM_D6E1_SpriteData .db
 _RAM_D6E1_SpriteX dsb 32
 _RAM_D701_SpriteN dsb 32
 _RAM_D721_SpriteY dsb 32
-_RAM_D741_RAMDecompressorPageIndex db
+_RAM_D741_RequestedPageIndex db
 _RAM_D742_VBlankSavedPageIndex db
 _RAM_D743_ReadPagedByteTemp db
 _RAM_D744_ db
@@ -391,7 +393,7 @@ _RAM_D78F_ dsb 8 ; unused?
 _RAM_D797_ db
 _RAM_D798_ dsb 27 ; unused?
 _RAM_D7B3_ db
-_RAM_D7B4_ db
+_RAM_D7B4_IsHeadToHead db
 _RAM_D7B5_DecompressorSource dw
 _RAM_D7B7_ db
 _RAM_D7B8_ db
@@ -400,7 +402,7 @@ _RAM_D7BA_HardModeTextFlashCounter db
 _RAM_D7BB_ db
 _RAM_D7BB_MenuRamEnd .db
 _RAM_D7BC_ db ; unused?
-_RAM_D7BD_RamCode dsb $392 ; runs over the next bit, needs more labels?
+_RAM_D7BD_RamCode dsb $392 ; runs over the next bit
 .ende
 
 ; These macros allow us to call into RAM code from the above address
@@ -617,10 +619,16 @@ _RAM_DBFE_ dsb 11
 _RAM_DC09_Lives db
 _RAM_DC0A_ db
 _RAM_DC0B_ db
+_RAM_DC0C_Player2_WonCount db
+_RAM_DC0D_Player1_WonCount db
+_RAM_DC0E_ db
+_RAM_DC0F_ db
 .ende
 
 .enum $DC16 export
 _RAM_DC16_ db
+_RAM_DC17_Player2_LostCount db
+_RAM_DC18_Player1_LostCount db
 .ende
 
 .enum $DC21 export
@@ -636,14 +644,14 @@ _RAM_DC31_ db
 .ende
 
 .enum $DC34 export
-_RAM_DC34_ db
-_RAM_DC35_ db
+_RAM_DC34_IsTournament db
+_RAM_DC35_TournamentRaceNumber db
 _RAM_DC36_ db
 _RAM_DC37_ db
 _RAM_DC38_ db
 _RAM_DC39_ db
 _RAM_DC3A_ db
-_RAM_DC3B_ db
+_RAM_DC3B_IsTrackSelect db
 _RAM_DC3C_IsGameGear db ; Most code is common with the GG game
 _RAM_DC3D_IsHeadToHead db
 _RAM_DC3E_InMenus db ; 1 in menus, 0 otherwise
@@ -1394,7 +1402,7 @@ _LABEL_14_EnterMenus:
   di
   ld a, :_LABEL_8021_MenuScreenEntryPoint
   ld (PAGING_REGISTER), a
-  ld a, $01
+  ld a, 1
   ld (_RAM_DC3E_InMenus), a
   ld hl, STACK_TOP
   ld sp, hl
@@ -1410,16 +1418,17 @@ _LABEL_38_:
     jr z, ++
     cp $01
     jr z, +
+    ; Unreachable code
     in a, (PORT_VDP_STATUS) ; Ack INT
   pop af
   ei
   reti
 
-+:
++:; In menus
   pop af
   JumpToRamCode _LABEL_3BAF1_MenusVBlank
 
-++:
+++:; In game
   pop af
   call _LABEL_199_GameVBlank
   ei
@@ -15492,7 +15501,7 @@ _LABEL_7476_:
   di
   CallPagedFunction2 _LABEL_2B5D5_SilencePSG
   call _LABEL_7564_SetControlsToNoButtons
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   cp $01
   jp z, _LABEL_7519_
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -17282,7 +17291,7 @@ _LABEL_8000_Main:
   ld (_RAM_DC3C_IsGameGear), a
   call _LABEL_AFAE_RamCodeLoader
   ld a, :_DATA_3ED49_SplashScreenCompressed ; $0F
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_3ED49_SplashScreenCompressed ; $AD49 ; Location of compressed data - splash screen implementation, goes up to 3F752, decompresses to 3680 bytes
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000 ; loads splash screen code to RAM
   call _RAM_C000_DecompressionTemporaryBuffer ; Splash screen code is here
@@ -17293,7 +17302,7 @@ _LABEL_8000_Main:
 _LABEL_8021_MenuScreenEntryPoint:
   ; Menu screen changes start here
   call _LABEL_AFAE_RamCodeLoader
-  ld a, $01
+  ld a, 1
   ld (_RAM_DC3E_InMenus), a
   xor a
   ld (_RAM_D6D5_InGame), a
@@ -17367,7 +17376,7 @@ _LABEL_8021_MenuScreenEntryPoint:
 
 +:; Menu -> game
   di
-  ld a, $00
+  ld a, 0
   ld (_RAM_DC3E_InMenus), a
   jp _RAM_DBC0_EnterGameTrampoline  ; Code is loaded from _LABEL_75_EnterGameTrampolineImpl
 
@@ -17447,18 +17456,18 @@ _LABEL_8114_Menu0: ; init functions, need renaming
   ld (_RAM_D7B7_), a
   ld (_RAM_D7B8_), a
   ld (_RAM_D7B9_), a
-  ld (_RAM_D7B4_), a
+  ld (_RAM_D7B4_IsHeadToHead), a
   ld (_RAM_DC3F_GameMode), a
   ld (_RAM_DC3D_IsHeadToHead), a
   ld (_RAM_DBD8_CourseSelectIndex), a
-  ld (_RAM_DC3B_), a
+  ld (_RAM_DC3B_IsTrackSelect), a
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a
   ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
-  ld (_RAM_D6C8_), a
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   ld (_RAM_D6C6_), a
   ld (_RAM_D6C0_), a
   ld (_RAM_DC0A_), a
-  ld (_RAM_DC34_), a
+  ld (_RAM_DC34_IsTournament), a
   ld (_RAM_DC36_), a
   ld (_RAM_DC37_), a
   call _LABEL_A778_InitDisplayCaseData
@@ -17478,7 +17487,7 @@ _LABEL_8114_Menu0: ; init functions, need renaming
   ld a, $18
   ld (_RAM_D6AB_), a
   ld a, $01
-  ld (_RAM_DC35_), a
+  ld (_RAM_DC35_TournamentRaceNumber), a
   ld a, $1A
   ld (_RAM_DC39_), a
   call _LABEL_BF2E_LoadMenuPalette_SMS
@@ -17503,7 +17512,7 @@ _LABEL_81C1_:
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $00
   ld (_RAM_D6C7_), a
-  call _LABEL_BB95_
+  call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
   call _LABEL_A4B7_
   call _LABEL_9317_InitialiseHandSprites
@@ -17521,7 +17530,7 @@ _LABEL_8205_:
   ld a, MenuScreen_OnePlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $00
-  ld (_RAM_D6C8_), a
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call _LABEL_B2DC_
   call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
   call _LABEL_987B_BlankTile1B4
@@ -17592,7 +17601,7 @@ _LABEL_8272_:
   ld c, $05
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, :_TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   TilemapWriteAddressToHL 8, 22
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, 16
@@ -17691,7 +17700,7 @@ _LABEL_8360_:
   ld bc, $000E
   ld hl, _TEXT_83F6_ForChallenge
   call _LABEL_A5B0_EmitToVDP_Text
-  ld a, (_RAM_D7B4_)
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr z, +
   TilemapWriteAddressToHL 7, 11
@@ -17821,7 +17830,7 @@ _LABEL_84C7_:
   call _LABEL_AB5B_GetPortraitSource_CourseSelect
   call _LABEL_AB86_Decompress3bppTiles_Index100
   call _LABEL_ABB0_
-  call _LABEL_BA3C_
+  call _LABEL_BA3C_LoadColouredCirclesTilesToIndex150
   ld a, $40
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
@@ -17840,18 +17849,16 @@ _LABEL_8507_Menu2:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
-  call _LABEL_9448_
+  call _LABEL_959C_LoadPunctuationTiles
+  call _LABEL_9448_LoadHeaderTiles
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  call _LABEL_94AD_
+  call _LABEL_94AD_DrawHeaderTilemap
   jr ++
-
-+:
-  call _LABEL_94F0_
++:call _LABEL_94F0_DrawHeaderTextTilemap
 ++:
   call _LABEL_B305_DrawHorizontalLine_Top
   TileWriteAddressToHL $24
@@ -18282,7 +18289,7 @@ _LABEL_8877_:
 ++:call _LABEL_B35A_VRAMAddressToHL
 
   ld a, :_TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld bc, 16
   ld hl, _TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
   CallRamCode _LABEL_3BC6A_EmitText
@@ -18336,9 +18343,9 @@ _LABEL_8953_:
   ld a, MenuScreen_TwoPlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $01
-  ld (_RAM_D7B4_), a
+  ld (_RAM_D7B4_IsHeadToHead), a
   xor a
-  ld (_RAM_D6C8_), a
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call _LABEL_B2DC_
   call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
   call _LABEL_987B_BlankTile1B4
@@ -18395,20 +18402,20 @@ _LABEL_89E2_:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
+  call _LABEL_959C_LoadPunctuationTiles
   ld a, $B2
-  ld (_RAM_D6C8_), a
-  call _LABEL_9448_
-  call _LABEL_94AD_
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
+  call _LABEL_9448_LoadHeaderTiles
+  call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
   ld a, $01
   ld (_RAM_D6C7_), a
   ld (_RAM_D7B3_), a
-  call _LABEL_BB95_
+  call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
-  call _LABEL_A530_
+  call _LABEL_A530_DrawChooseGameText
   ld c, $07
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_9317_InitialiseHandSprites
@@ -18427,16 +18434,15 @@ _LABEL_8A30_:
 _LABEL_8A38_Menu4:
   call _LABEL_BB85_ScreenOn
   ld a, MenuScreen_TwoPlayerResult
-+:
-  ld (_RAM_D699_MenuScreenIndex), a
++:ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
-  call _LABEL_A296_
-  call _LABEL_BA3C_
+  call _LABEL_959C_LoadPunctuationTiles
+  call _LABEL_A296_LoadHandTiles
+  call _LABEL_BA3C_LoadColouredCirclesTilesToIndex150
   call _LABEL_BA4F_LoadMediumNumberTiles
   ld a, (_RAM_DC3C_IsGameGear)
   or a
@@ -18446,9 +18452,9 @@ _LABEL_8A38_Menu4:
   jr z, ++
 +:
   ld a, $B2
-  ld (_RAM_D6C8_), a
-  call _LABEL_9448_
-  call _LABEL_94AD_
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
+  call _LABEL_9448_LoadHeaderTiles
+  call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
 ++:
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -18525,7 +18531,7 @@ _LABEL_8A38_Menu4:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jp z, _LABEL_8B89_
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   cp $01
   jr z, +
   call _LABEL_A673_
@@ -18584,7 +18590,7 @@ _LABEL_8B89_:
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A0B4_
   call _LABEL_B7FF_
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   dec a
   jr nz, _LABEL_8B9D_
   call _LABEL_B785_
@@ -18723,7 +18729,7 @@ _LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   dec a
   jr nz, +
   ld a, $01
-  ld (_RAM_DC34_), a
+  ld (_RAM_DC34_IsTournament), a
   call _LABEL_8A30_
   jp _LABEL_80FC_EndMenuScreenHandler
 
@@ -19293,17 +19299,18 @@ _LABEL_9074_Handler_MenuScreen_UnknownD:
 +++:
   jp _LABEL_80FC_EndMenuScreenHandler
 
-_LABEL_90CA_:
+_LABEL_90CA_BlankTiles_BlankControls:
+  ; Blank tiles
   TileWriteAddressToHL $00
   call _LABEL_B35A_VRAMAddressToHL
   ld de, $3700
--:
-  xor a
+-:xor a
   out (PORT_VDP_DATA), a
   dec de
   ld a, d
   or e
   jr nz, -
+  ; Blank controls data
   ld a, NO_BUTTONS_PRESSED ; $3F
   ld (_RAM_D680_Player1Controls_Menus), a
   ld (_RAM_D681_Player2Controls_Menus), a
@@ -19553,7 +19560,7 @@ _DATA_926C_VehiclePortraitPageNumbers:
 
 _LABEL_9276_:
   ld a, :_TEXT_3ECA9_VEHICLE_NAME_BLANK
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   call _LABEL_BEF5_
   ld a, (_RAM_D691_TrackType)
   or a
@@ -19785,73 +19792,69 @@ _LABEL_9400_BlankSprites:
 
 _LABEL_9434_:
   ld a, :_DATA_22BEC_Tiles_Cursor
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_22BEC_Tiles_Cursor
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 8 * 8 ; 8 tiles
   TileWriteAddressToHL $ba
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
-_LABEL_9448_:
+_LABEL_9448_LoadHeaderTiles:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr c, +
   TileWriteAddressToHL $110
   jp ++
-
-+:
-  TileWriteAddressToHL $c2
++:TileWriteAddressToHL $c2
 ++:
   call _LABEL_B35A_VRAMAddressToHL
   ld a, :_DATA_2FDE0_Tiles_SmallLogo
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2FDE0_Tiles_SmallLogo
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 22 * 8 ; 22 tiles
   call _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
   ld a, :_DATA_13D7F_Tiles_MicroMachinesText
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_13D7F_Tiles_MicroMachinesText
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 24 * 8 ; 24 tiles
   call _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
-  jr z, +
-  ld a, (_RAM_D7B4_)
+  jr z, + ; ret z
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
-  jr nz, _LABEL_949B_
-_LABEL_948A_:
+  jr nz, _LABEL_949B_LoadHeadToHeadTextTiles
+  
+_LABEL_948A_LoadChallengeTextTiles:
   ld a, :_DATA_2B386_Tiles_ChallengeText
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2B386_Tiles_ChallengeText
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 16 * 8 ; 16 tiles
-  jp _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
+  jp _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM ; and ret
 
-_LABEL_949B_:
+_LABEL_949B_LoadHeadToHeadTextTiles:
   ld a, :_DATA_2B4CA_Tiles_HeadToHeadText
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2B4CA_Tiles_HeadToHeadText
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 14 * 8 ; 14 tiles
   jp _LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
 
-+:
-  ret
++:ret
 
-_LABEL_94AD_:
-  ld a, $04
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+_LABEL_94AD_DrawHeaderTilemap:
+  ld a, :_DATA_13F38_Tilemap_SmallLogo
+  ld (_RAM_D741_RequestedPageIndex), a
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr c, +
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   jp ++
-
-+:
-  xor a
++:xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -19859,104 +19862,104 @@ _LABEL_94AD_:
   jr z, +
   TilemapWriteAddressToDE 1, 1
   jr ++
-
-+:
-  TilemapWriteAddressToDE 6, 5
++:TilemapWriteAddressToDE 6, 5
 ++:
   call _LABEL_B361_VRAMAddressToDE
-  ld hl, $BF38
+  ld hl, _DATA_13F38_Tilemap_SmallLogo
   ld a, $08
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
   ld a, $03
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  ld a, (_RAM_D6C8_)
+  ld a, (_RAM_D6C8_HeaderTilesIndexOffset)
   ld c, a
   ld a, $C2
   sub c
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   CallRamCode _LABEL_3BB57_EmitTilemapRectangle
-_LABEL_94F0_:
-  ld a, $04
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ; Fall through
+
+_LABEL_94F0_DrawHeaderTextTilemap:
+  ld a, :_DATA_13F50_Tilemap_MicroMachinesText
+  ld (_RAM_D741_RequestedPageIndex), a
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, ++
-  ld a, (_RAM_D7B4_)
+  ; SMS
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, +
   TilemapWriteAddressToDE 10, 2
   jp +++
-
-+:
-  TilemapWriteAddressToDE 9, 2
++:TilemapWriteAddressToDE 9, 2
   jp +++
 
-++:
+++:; GG
   TilemapWriteAddressToDE 14, 5
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerTournamentResults
   jr nz, +++
   TilemapWriteAddressToDE 6, 5
-+++:
+  
++++:; Both
   call _LABEL_B361_VRAMAddressToDE
-  ld hl, _DATA_BF50_
-  ld a, $0C
+  ld hl, _DATA_13F50_Tilemap_MicroMachinesText
+  ld a, $0C ; 12x2
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
   ld a, $02
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  ld a, (_RAM_D6C8_)
+  ld a, (_RAM_D6C8_HeaderTilesIndexOffset)
   ld c, a
   ld a, $D8
   sub c
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   CallRamCode _LABEL_3BB57_EmitTilemapRectangle
-  ld a, $0A
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+
+  ld a, :_DATA_2B4BA_Tilemap_ChallengeText
+  ld (_RAM_D741_RequestedPageIndex), a
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, ++
-  ld a, (_RAM_D7B4_)
+  ; SMS
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, +
-  ld de, $77AC
+  TilemapWriteAddressToDE 22, 2
+  jp +++
++:TilemapWriteAddressToDE 21, 2
   jp +++
 
-+:
-  ld de, $77AA
-  jp +++
-
-++:
+++:; GG
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerTournamentResults
   jr z, +
-  ld a, (_RAM_D7B4_)
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, ++
   TilemapWriteAddressToDE 17, 7
   jp +++
-
 +:TilemapWriteAddressToDE 18, 5
   jp +++
-
 ++:
   TilemapWriteAddressToDE 15, 7
-+++:
+  
++++:; Both
   call _LABEL_B361_VRAMAddressToDE
-  ld a, (_RAM_D7B4_)
+  ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, +
-  ld hl, _DATA_B4BA_
-  ld a, $08
+  ; Challenge
+  ld hl, _DATA_2B4BA_Tilemap_ChallengeText
+  ld a, $08 ; 8x2
   jp ++
 
-+:
-  ld hl, $B5BE
-  ld a, $0A
++:; Head to head
+  ld hl, _DATA_2B5BE_Tilemap_HeadToHeadText
+  ld a, $0A ; 10x2
 ++:
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
   ld a, $02
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  ld a, (_RAM_D6C8_)
+  ld a, (_RAM_D6C8_HeaderTilesIndexOffset)
   ld c, a
   ld a, $F0
   sub c
@@ -19964,14 +19967,14 @@ _LABEL_94F0_:
   CallRamCode _LABEL_3BB57_EmitTilemapRectangle
   ret
 
-_LABEL_959C_:
-  ld a, $08
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+_LABEL_959C_LoadPunctuationTiles:
+  ld a, :_DATA_22B2C_Tiles_PunctuationAndLine
+  ld (_RAM_D741_RequestedPageIndex), a
   TileWriteAddressToHL $1b4
   call _LABEL_B35A_VRAMAddressToHL
   ld e, 4 * 8 ; 4 tiles
-  ld hl, _DATA_22B2C_Tiles_
-  JumpToRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM
+  ld hl, _DATA_22B2C_Tiles_PunctuationAndLine
+  JumpToRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM ; and ret
 
 _LABEL_95AF_DrawHorizontalLineIfSMS:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -20302,7 +20305,7 @@ _LABEL_97EA_DrawDriverPortraitColumn:
   jr z, +
   ; SMS
   ld a, :_DATA_1B7A7_SMS
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   TilemapWriteAddressToHL 0, 20
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _DATA_1B7A7_SMS
@@ -20312,7 +20315,7 @@ _LABEL_97EA_DrawDriverPortraitColumn:
 
 +:
   ld a, :_DATA_1B987_GG
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_1B987_GG
   add hl, bc
   ld b, $42
@@ -20748,35 +20751,58 @@ _LABEL_9C64_:
   jp _LABEL_9700_
 
 ; Data from 9C7F to 9D36 (184 bytes)
-_DATA_9C7F_:
-.dw $8B40 $8E10 $8B40 $1000
-.dw $8B40 $8E10 $8E10 $1000
-.dw $B2A0 $B570 $B2A0 $1000
-.dw $B2A0 $B570 $B570 $1000
-.dw $B840 $BB10 $B840 $1000
-.dw $B840 $BB10 $BB10 $1000
-.dw $9680 $9950 $9680 $1000
-.dw $9680 $9950 $9950 $1000
-.dw $A760 $AA30 $A760 $1000
-.dw $A760 $AA30 $AA30 $1000
-.dw $85A0 $8870 $85A0 $1000
-.dw $85A0 $8870 $8870 $1000
-.dw $AD00 $AFD0 $AD00 $1000
-.dw $AD00 $AFD0 $AFD0 $1000
-.dw $9C20 $9EF0 $9C20 $1000
-.dw $9C20 $9EF0 $9EF0 $1000
-.dw $A1C0 $A490 $A1C0 $1000
-.dw $A1C0 $A490 $A490 $1000
-.dw $8000 $82D0 $8000 $1000
-.dw $8000 $82D0 $82D0 $1000
-.dw $90E0 $93B0 $90E0 $1000
-.dw $90E0 $93B0 $93B0 $1000
-.dw $B93C $B66C $B93C $1000
+_DATA_9C7F_RacerPortraitsLocations:
+.dw _DATA_Tiles_Chen_Happy   _DATA_Tiles_Chen_Sad   _DATA_Tiles_Chen_Happy    $1000
+.dw _DATA_Tiles_Chen_Happy   _DATA_Tiles_Chen_Sad   _DATA_Tiles_Chen_Sad      $1000
+.dw _DATA_Tiles_Spider_Happy _DATA_Tiles_Spider_Sad _DATA_Tiles_Spider_Happy  $1000
+.dw _DATA_Tiles_Spider_Happy _DATA_Tiles_Spider_Sad _DATA_Tiles_Spider_Sad    $1000
+.dw _DATA_Tiles_Walter_Happy _DATA_Tiles_Walter_Sad _DATA_Tiles_Walter_Happy  $1000
+.dw _DATA_Tiles_Walter_Happy _DATA_Tiles_Walter_Sad _DATA_Tiles_Walter_Sad    $1000
+.dw _DATA_Tiles_Dwayne_Happy _DATA_Tiles_Dwayne_Sad _DATA_Tiles_Dwayne_Happy  $1000
+.dw _DATA_Tiles_Dwayne_Happy _DATA_Tiles_Dwayne_Sad _DATA_Tiles_Dwayne_Sad    $1000
+.dw _DATA_Tiles_Joel_Happy   _DATA_Tiles_Joel_Sad   _DATA_Tiles_Joel_Happy    $1000
+.dw _DATA_Tiles_Joel_Happy   _DATA_Tiles_Joel_Sad   _DATA_Tiles_Joel_Sad      $1000
+.dw _DATA_Tiles_Bonnie_Happy _DATA_Tiles_Bonnie_Sad _DATA_Tiles_Bonnie_Happy  $1000
+.dw _DATA_Tiles_Bonnie_Happy _DATA_Tiles_Bonnie_Sad _DATA_Tiles_Bonnie_Sad    $1000
+.dw _DATA_Tiles_Mike_Happy   _DATA_Tiles_Mike_Sad   _DATA_Tiles_Mike_Happy    $1000
+.dw _DATA_Tiles_Mike_Happy   _DATA_Tiles_Mike_Sad   _DATA_Tiles_Mike_Sad      $1000
+.dw _DATA_Tiles_Emilio_Happy _DATA_Tiles_Emilio_Sad _DATA_Tiles_Emilio_Happy  $1000
+.dw _DATA_Tiles_Emilio_Happy _DATA_Tiles_Emilio_Sad _DATA_Tiles_Emilio_Sad    $1000
+.dw _DATA_Tiles_Jethro_Happy _DATA_Tiles_Jethro_Sad _DATA_Tiles_Jethro_Happy  $1000
+.dw _DATA_Tiles_Jethro_Happy _DATA_Tiles_Jethro_Sad _DATA_Tiles_Jethro_Sad    $1000
+.dw _DATA_Tiles_Anne_Happy   _DATA_Tiles_Anne_Sad   _DATA_Tiles_Anne_Happy    $1000
+.dw _DATA_Tiles_Anne_Happy   _DATA_Tiles_Anne_Sad   _DATA_Tiles_Anne_Sad      $1000
+.dw _DATA_Tiles_Cherry_Happy _DATA_Tiles_Cherry_Sad _DATA_Tiles_Cherry_Happy  $1000
+.dw _DATA_Tiles_Cherry_Happy _DATA_Tiles_Cherry_Sad _DATA_Tiles_Cherry_Sad    $1000
+
+.dw _DATA_Tiles_OutOfGame    _DATA_Tiles_MrQuestion _DATA_Tiles_OutOfGame     $1000
 
 ; Data from 9D37 to 9D4D (23 bytes)
-_DATA_9D37_:
-.db $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B $0B
-.db $0B $0B $0B $0B $0B $0B $05
+; Page numbers for the racer portraits (previous table)
+_DATA_9D37_RacerPortraitsPages:
+.db :_DATA_Tiles_Chen_Happy  
+.db :_DATA_Tiles_Chen_Happy  
+.db :_DATA_Tiles_Spider_Happy
+.db :_DATA_Tiles_Spider_Happy
+.db :_DATA_Tiles_Walter_Happy
+.db :_DATA_Tiles_Walter_Happy
+.db :_DATA_Tiles_Dwayne_Happy
+.db :_DATA_Tiles_Dwayne_Happy
+.db :_DATA_Tiles_Joel_Happy  
+.db :_DATA_Tiles_Joel_Happy  
+.db :_DATA_Tiles_Bonnie_Happy
+.db :_DATA_Tiles_Bonnie_Happy
+.db :_DATA_Tiles_Mike_Happy  
+.db :_DATA_Tiles_Mike_Happy  
+.db :_DATA_Tiles_Emilio_Happy
+.db :_DATA_Tiles_Emilio_Happy
+.db :_DATA_Tiles_Jethro_Happy
+.db :_DATA_Tiles_Jethro_Happy
+.db :_DATA_Tiles_Anne_Happy  
+.db :_DATA_Tiles_Anne_Happy  
+.db :_DATA_Tiles_Cherry_Happy
+.db :_DATA_Tiles_Cherry_Happy
+.db :_DATA_Tiles_OutOfGame   
 
 _LABEL_9D4E_:
   ld a, (_RAM_D6B1_)
@@ -21037,20 +21063,20 @@ _LABEL_9F40_:
 ; a = ???
   ld (_RAM_D6A1_), a ; Save
 
-  ld hl, _DATA_9D37_ ; Look up in table
+  ld hl, _DATA_9D37_RacerPortraitsPages ; Look up in page number
   ld a, (_RAM_D6A1_)
-  sra a ; Divide by 4
+  sra a ; Divide by 4 to look up the page number because that tale has a 1:4 ratio to the portrait pointers
   sra a
   ld e, a
   ld d, $00
   add hl, de
   ld a, (hl) ; Look up
-  ld (_RAM_D741_RAMDecompressorPageIndex), a ; Save value found
+  ld (_RAM_D741_RequestedPageIndex), a ; Save value found
 
   ld d, $00
-  ld hl, _DATA_9C7F_ ; Look up in another table
+  ld hl, _DATA_9C7F_RacerPortraitsLocations ; Look up pointer to data
   ld a, (_RAM_D6A1_)
-  sla a ; *2
+  sla a ; *2 because words
   ld e, a
   add hl, de
   ld a, (hl)
@@ -21077,7 +21103,7 @@ _LABEL_9F74_:
 
 _LABEL_9F81_:
   ld (_RAM_D6A1_), a
-  ld hl, _DATA_9D37_
+  ld hl, _DATA_9D37_RacerPortraitsPages
   ld a, (_RAM_D6A1_)
   sra a
   sra a
@@ -21086,9 +21112,9 @@ _LABEL_9F81_:
   add hl, de
   ld a, (hl)
   ld (_RAM_D6A5_), a
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld d, $00
-  ld hl, _DATA_9C7F_
+  ld hl, _DATA_9C7F_RacerPortraitsLocations
   ld a, (_RAM_D6A1_)
   sla a
   ld e, a
@@ -21114,7 +21140,7 @@ _LABEL_9FB8_:
   JumpToRamCode _LABEL_3BC53_EmitTen3bppTiles
 
 _LABEL_9FC5_:
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   or a
   jr z, +
   jp _LABEL_AA02_
@@ -21249,7 +21275,7 @@ _LABEL_A0B4_:
   call _LABEL_A5B0_EmitToVDP_Text
   TilemapWriteAddressToHL 7, 11
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +
   ld bc, $000E
@@ -21321,16 +21347,18 @@ _LABEL_A129_:
   jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_A14F_:
+  ; de = location offset - 0 for GG, $80 for SMS
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01
   rrca
   ld e, a
   ld d, $00
+  
   ld a, (_RAM_DBD4_)
   srl a
   srl a
   srl a
-  ld c, a
+  ld c, a ; 1 = player 2, 2 = player 1 (!)
   ld b, $00
   call _LABEL_A1EC_
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -21418,7 +21446,7 @@ _LABEL_A1EC_:
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC0B_
   add hl, bc
-  call _LABEL_A272_
+  call _LABEL_A272_PrintBCDNumberWithLeadingHyphen
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jr z, +
@@ -21431,7 +21459,7 @@ _LABEL_A1EC_:
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC16_
   add hl, bc
-  call _LABEL_A272_
+  call _LABEL_A272_PrintBCDNumberWithLeadingHyphen
   ret
 
 _LABEL_A225_:
@@ -21454,7 +21482,7 @@ _LABEL_A225_:
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC0B_
   add hl, bc
-  call _LABEL_A272_
+  call _LABEL_A272_PrintBCDNumberWithLeadingHyphen
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -21473,44 +21501,44 @@ _LABEL_A225_:
   call _LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC16_
   add hl, bc
-  call _LABEL_A272_
+  call _LABEL_A272_PrintBCDNumberWithLeadingHyphen
   ret
 
-_LABEL_A272_:
-  ld a, (hl)
-  and $F0
+_LABEL_A272_PrintBCDNumberWithLeadingHyphen:
+  ld a, (hl) ; Get byte
+  and $F0 ; High nibble
   srl a
   srl a
   srl a
   srl a
-  jr nz, +
-  ld a, $B5
+  jr nz, + ; high 0 -> "-"
+  ld a, HYPHEN_TILE_INDEX
   jp ++
-
-+:
-  add a, $1A
++:add a, ZERO_DIGIT_TILE_INDEX ; else convert to digit
 ++:
   out (PORT_VDP_DATA), a
   rlc a
   and $01
   out (PORT_VDP_DATA), a
-  ld a, (hl)
+  ld a, (hl) ; Low nibble is printed as a 0
   and $0F
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   ret
 
-_LABEL_A296_:
+_LABEL_A296_LoadHandTiles:
   ld a, :_DATA_2B151_Tiles_Hand
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2B151_Tiles_Hand
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 39 * 8 ; 39 tiles
   TileWriteAddressToHL $bb
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
-_LABEL_A2AA_:
-  ld a, (_RAM_DC3B_)
+_LABEL_A2AA_PrintOrFlashMenuScreenText:
+  ; Pick a location based on _RAM_DC3B_IsTrackSelect and SMS/GG
+  ; Pick text based on _RAM_DC34_IsTournament (Tournament race), _RAM_DC3B_IsTrackSelect (Select a track) (else Select vehicle)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
@@ -21524,6 +21552,7 @@ _LABEL_A2AA_:
   jp ++++
 
 +++:
+  ; Track select -> higher up
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -21532,7 +21561,7 @@ _LABEL_A2AA_:
 +:TilemapWriteAddressToHL 7, 10
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  jp ++++
+  jp ++++ ; could fall through
 
 ++++:
   ld a, (_RAM_D6AF_FlashingCounter)
@@ -21544,10 +21573,10 @@ _LABEL_A2AA_:
   sra a
   and $01
   jp nz, ++
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, _LABEL_A302_
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +
   ld hl, _TEXT_A325_SelectVehicle
@@ -21558,8 +21587,9 @@ _LABEL_A302_:
   ld hl, _TEXT_A335_TournamentRace
   ld bc, $0010
   call _LABEL_A5B0_EmitToVDP_Text
-  ld a, (_RAM_DC35_)
-  add a, $1A
+  ; Emit number
+  ld a, (_RAM_DC35_TournamentRaceNumber)
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   ret
 
@@ -21695,21 +21725,71 @@ _TEXT_A41E_Won:
 _TEXT_A423_Lost:
 .asc "LOST-" ; $0B $1A $12 $13 $B5
 
-_DATA_A427_:
-.db $3A $3C $DC $3D $28 $05 $11 $08 $7D $18 $03
-.db $11 $0C $7C $CD $61 $B3 $01 $08 $00 $21 $9D $A4 $CD $B0 $A5 $21
-.db $46 $00 $19 $CD $5A $B3 $01 $02 $00 $21 $B5 $A4 $CD $B0 $A5 $21
-.db $80 $00 $19 $CD $5A $B3 $01 $08 $00 $21 $A5 $A4 $CD $B0 $A5 $3A
-.db $3C $DC $3D $28 $05 $11 $28 $7D $18 $03 $11 $24 $7C $CD $61 $B3
-.db $01 $08 $00 $21 $9D $A4 $CD $B0 $A5 $21 $46 $00 $19 $CD $5A $B3
-.db $01 $02 $00 $21 $B5 $A4 $CD $B0 $A5 $21 $80 $00 $19 $CD $5A $B3
-.db $01 $08 $00 $21 $AD $A4 $CD $B0 $A5 $C9 $0F $0B $00 $18 $04 $11
-.db $0E $1B $0F $0B $00 $18 $04 $11 $0E $1C $02 $1A $0C $0F $14 $13
-.db $04 $11 $15 $12
+; Unused code (?)
+_LABEL_A428_DrawPlayerOpponentTypeSelectText:
+  ld a, (_RAM_DC3C_IsGameGear)
+  dec a
+  jr z, +
+  TilemapWriteAddressToDE 4, 24 ; SMS
+  jr ++
++:TilemapWriteAddressToDE 6, 20 ; GG
+++:call _LABEL_B361_VRAMAddressToDE
+  ld bc, 8
+  ld hl, _TEXT_A49D_Player1
+  call _LABEL_A5B0_EmitToVDP_Text
+
+  ld hl, $0046 ; down and right a bit
+  add hl, de
+  call _LABEL_B35A_VRAMAddressToHL          
+  ld bc, 2
+  ld hl, _TEXT_A4B5_Vs
+  call _LABEL_A5B0_EmitToVDP_Text           
+
+  ld hl, $0080 ; down a bit
+  add hl, de
+  call _LABEL_B35A_VRAMAddressToHL
+  ld bc, 8
+  ld hl, _TEXT_A4A5_Player2
+  call _LABEL_A5B0_EmitToVDP_Text           
+
+  ld a, (_RAM_DC3C_IsGameGear)
+  dec a
+  jr z, +
+  TilemapWriteAddressToDE 20, 24 ; SMS
+  jr ++
++:TilemapWriteAddressToDE 18, 20 ; GG
+++:call _LABEL_B361_VRAMAddressToDE           
+  ld bc, 8
+  ld hl, _TEXT_A49D_Player1
+  call _LABEL_A5B0_EmitToVDP_Text
+
+  ld hl, $0046 ; down and right a bit
+  add hl, de
+  call _LABEL_B35A_VRAMAddressToHL          
+  ld bc, 2
+  ld hl, _TEXT_A4B5_Vs
+  call _LABEL_A5B0_EmitToVDP_Text           
+
+  ld hl, $0080 ; down a bit
+  add hl, de
+  call _LABEL_B35A_VRAMAddressToHL
+  ld bc, 8
+  ld hl, _TEXT_A4AD_Computer
+  call _LABEL_A5B0_EmitToVDP_Text           
+  ret                    
+
+_TEXT_A49D_Player1:
+.asc "PLAYER 1"
+_TEXT_A4A5_Player2:
+.asc "PLAYER 2"
+_TEXT_A4AD_Computer:
+.asc "COMPUTER"
+_TEXT_A4B5_Vs:
+.asc "VS"
 
 _LABEL_A4B7_:
   TilemapWriteAddressToHL 10, 13
-  call _LABEL_A500_
+  call _LABEL_A500_DrawSelectGameText
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
   jr z, +
@@ -21731,26 +21811,26 @@ _TEXT_A4DA_SelectGame:
 _TEXT_A4E6_OnePlayerTwoPlayer:
 .asc "ONE PLAYER      TWO PLAYER" ; $1A $0D $04 $0E $0F $0B $00 $18 $04 $11 $0E $0E $0E $0E $0E $0E $13 $16 $1A $0E $0F $0B $00 $18 $04 $11
 
-_LABEL_A500_:
+_LABEL_A500_DrawSelectGameText:
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000C
   ld hl, _TEXT_A4DA_SelectGame
   jp _LABEL_A5B0_EmitToVDP_Text
 
-_LABEL_A50C_:
+_LABEL_A50C_DrawOnePlayerSelectGameText:
   TilemapWriteAddressToHL 8, 10
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000F
   ld hl, _TEXT_A521_OnePlayerGame
   call _LABEL_A5B0_EmitToVDP_Text
   TilemapWriteAddressToHL 10, 12
-  jp _LABEL_A500_
+  jp _LABEL_A500_DrawSelectGameText
 
 ; Data from A521 to A52F (15 bytes)
 _TEXT_A521_OnePlayerGame:
 .asc "ONE PLAYER GAME" ; $1A $0D $04 $0E $0F $0B $00 $18 $04 $11 $0E $06 $00 $0C $04
 
-_LABEL_A530_:
+_LABEL_A530_DrawChooseGameText:
   TilemapWriteAddressToHL 10, 11
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, $000C
@@ -22131,13 +22211,13 @@ _LABEL_A859_SetTilemapLocationForLastRacePosition:
 
 _LABEL_A877_:
   ld a, :_DATA_13C42_Tiles_BigNumbers
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_13C42_Tiles_BigNumbers
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 24 * 8 ; 24 tiles
   TileWriteAddressToHL $100
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  call _LABEL_BA42_
+  call _LABEL_BA42_LoadColouredCirclesTiles
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01
   rrca
@@ -22374,7 +22454,7 @@ _LABEL_AA02_:
   ld h, b
   ld l, c
   ld a, $03
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld a, (_RAM_DBD8_CourseSelectIndex)
   cp $19
   jr z, +++
@@ -22730,14 +22810,14 @@ _LABEL_ACEE_:
 
 _LABEL_AD42_DrawDisplayCase:
   ld a, :_DATA_3B37F_Tiles_DisplayCase ; $0E
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_3B37F_Tiles_DisplayCase ; $B37F - compressed 3bpp tile data, 2952 bytes = 123 tiles up to $3b970
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $100
   ld de, 123 * 8 ; 123 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   ld a, :_DATA_3B32F_DisplayCaseTilemapCompressed ; $0E
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_3B32F_DisplayCaseTilemapCompressed ; $B32F - compressed data, 440 bytes up to $3b37e
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
 
@@ -22821,7 +22901,7 @@ _LABEL_AE50_DisplayCase_BlankRect:
 ; bc = index
 ; hl = source data
   ld a, $02
-  ld (_RAM_D741_RAMDecompressorPageIndex), a ; Unused?
+  ld (_RAM_D741_RequestedPageIndex), a ; Unused?
 
   ld (_RAM_D6BC_DisplayCase_IndexBackup), bc
   ld a, c ; Look up tilemap address
@@ -22860,7 +22940,7 @@ _LABEL_AE50_DisplayCase_BlankRect:
 
 _LABEL_AE94_DisplayCase_RestoreRectangle:
   ld a, $0D
-  ld (_RAM_D741_RAMDecompressorPageIndex), a ; Unused?
+  ld (_RAM_D741_RequestedPageIndex), a ; Unused?
 
   ld a, c   ; Look up destination address
   sla a
@@ -22905,7 +22985,7 @@ _LABEL_AECD_:
   ld bc, 25 * TILE_DATA_SIZE ; $0320
   add hl, bc
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, _DATA_9D37_
+  ld hl, _DATA_9D37_RacerPortraitsPages
   ld a, (_RAM_D6BB_)
   sra a
   sra a
@@ -22914,9 +22994,9 @@ _LABEL_AECD_:
   add hl, de
   ld a, (hl)
   ld (_RAM_D6A5_), a
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld d, $00
-  ld hl, _DATA_9C7F_
+  ld hl, _DATA_9C7F_RacerPortraitsLocations
   ld a, (_RAM_D6BB_)
   sla a
   ld e, a
@@ -23036,7 +23116,7 @@ _LABEL_AFAE_RamCodeLoader:
 
 ; Executed in RAM at d640
 +:ld a, :_LABEL_3B971_RamCodeLoaderStage2
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld (PAGING_REGISTER), a ; page in and call
   call _LABEL_3B971_RamCodeLoaderStage2
   ld a, $02 ; restore paging
@@ -23052,20 +23132,20 @@ _LABEL_AFCD_:
   call _LABEL_B337_BlankTiles
   call _LABEL_9400_BlankSprites
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
+  call _LABEL_959C_LoadPunctuationTiles
   ld a, $B2
-  ld (_RAM_D6C8_), a
-  call _LABEL_9448_
-  call _LABEL_94AD_
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
+  call _LABEL_9448_LoadHeaderTiles
+  call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
   ld c, $07
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
   ld (_RAM_D6C7_), a
-  call _LABEL_BB95_
+  call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
   call +
-  call _LABEL_A50C_
+  call _LABEL_A50C_DrawOnePlayerSelectGameText
   call _LABEL_9317_InitialiseHandSprites
   xor a
   ld (_RAM_D6A0_MenuSelection), a
@@ -23085,14 +23165,14 @@ _LABEL_B01D_SquinkyTennisHook:
   add a, a ; start is bit 7, 1 = not pressed
   ret c
   ld a, :_DATA_3F753_JonsSquinkyTennisCompressed ;$0F
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_3F753_JonsSquinkyTennisCompressed ;$B753 Up to $3ff78, compressed code (Jon's Squinky Tennis, 5923 bytes)
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   jp _RAM_C000_DecompressionTemporaryBuffer ; $C000 ; Possibly invalid
 
 +:
   ld a, :_DATA_23656_Tiles_VsCPUPatch ; $08
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_23656_Tiles_VsCPUPatch ; $B656 Up to $237e1, 864 bytes compressed
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $180
@@ -23328,16 +23408,16 @@ _TEXT_B1E7_Yes:
 
 _LABEL_B1EC_Trampoline_PlayMenuMusic:
   ld a, :_LABEL_30CE8_PlayMenuMusic
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   JumpToRamCode _LABEL_3BCDC_Trampoline2_PlayMenuMusic
 
 _LABEL_B1F4_Trampoline_StopMenuMusic:
   ld a, :_LABEL_30D28_StopMenuMusic
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   JumpToRamCode _LABEL_3BCE6_Trampoline_StopMenuMusic
 
 _LABEL_B1FC_:
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +
   ld hl, _DATA_B219_
@@ -23447,14 +23527,14 @@ _LABEL_B2BB_:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
+  call _LABEL_959C_LoadPunctuationTiles
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  call _LABEL_9448_
-  call _LABEL_94AD_
+  call _LABEL_9448_LoadHeaderTiles
+  call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
 +:
   ret
@@ -23463,11 +23543,11 @@ _LABEL_B2DC_:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
-  call _LABEL_9448_
-  jp _LABEL_94AD_
+  call _LABEL_959C_LoadPunctuationTiles
+  call _LABEL_9448_LoadHeaderTiles
+  jp _LABEL_94AD_DrawHeaderTilemap
 
 _LABEL_B2F3_DrawHorizontalLines_CharacterSelect:
   TilemapWriteAddressToHL 0, 19
@@ -23713,7 +23793,7 @@ _LABEL_B478_SelectPortraitPage:
   ld hl, _DATA_926C_VehiclePortraitPageNumbers
   add hl, de
   ld a, (hl)
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ret
 
 _LABEL_B484_CheckTitleScreenCheatCodes:
@@ -23772,26 +23852,12 @@ _DATA_B4B5_CheatKeys_CourseSelect:
 .db BUTTON_L_ONLY
 .db BUTTON_R_ONLY
 .db BUTTON_L_ONLY
-; $3e = %00111110 = U
-; $3d = %00111101 = D
-; $3b = %00111011 = L
-; $37 = %00110111 = R
-; $3b = %00111011 = L
-
-; Data from B4BA to B4BF (6 bytes)
-_DATA_B4BA_: ; erroneous label?
 .db BUTTON_2_ONLY
 .db BUTTON_U_ONLY
 .db BUTTON_U_ONLY
 .db BUTTON_2_ONLY
 .db BUTTON_U_ONLY
 .db 0
-; $1f = %00011111 = 2
-; $3e = %00111110 = U
-; $3e = %00111110 = U
-; $1f = %00011111 = 2
-; $3e = %00111110 = U
-; 0               = end
 
 _CheckForCheatCode_HardMode:
   ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect) ; Get index of next button press
@@ -23890,12 +23956,12 @@ _TEXT_B54D_RockHardMode:
 ; 17th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 _LABEL_B56D_MenuScreen_TrackSelect:
   call _LABEL_B9C4_
-  call _LABEL_A2AA_
+  call _LABEL_A2AA_PrintOrFlashMenuScreenText
   call _LABEL_9FC5_
   ld a, (_RAM_D6C1_)
   cp $01
   jr z, _LABEL_B5E7_
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   cp $01
   jr nz, ++
   call _LABEL_B9A3_
@@ -23959,7 +24025,7 @@ _LABEL_B5E7_:
 
 +:
   call _LABEL_B1F4_Trampoline_StopMenuMusic
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +
   call _LABEL_B1FC_
@@ -23992,7 +24058,7 @@ _LABEL_B623_:
   ret
 
 _LABEL_B640_:
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +++
   ld a, (_RAM_D6CC_)
@@ -24014,7 +24080,7 @@ _LABEL_B640_:
   jp +++++
 
 _LABEL_B666_:
-  ld a, (_RAM_DC3B_)
+  ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, ++
   ld a, (_RAM_D6CC_)
@@ -24072,7 +24138,7 @@ _LABEL_B6B1_MenuScreen_TwoPlayerResult:
   jr nz, ++
 +:
   call _LABEL_B1F4_Trampoline_StopMenuMusic
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +++
   call _LABEL_8114_Menu0
@@ -24086,11 +24152,11 @@ _LABEL_B6B1_MenuScreen_TwoPlayerResult:
   ld a, (_RAM_DC37_)
   cp $04
   jr z, +
-  ld a, (_RAM_DC35_)
+  ld a, (_RAM_DC35_TournamentRaceNumber)
   cp $07
   jr z, +
   add a, $01
-  ld (_RAM_DC35_), a
+  ld (_RAM_DC35_TournamentRaceNumber), a
   call _LABEL_8A30_
   jp _LABEL_80FC_EndMenuScreenHandler
 
@@ -24105,18 +24171,18 @@ _LABEL_B70B_:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
-  call _LABEL_90CA_
+  call _LABEL_90CA_BlankTiles_BlankControls
   call _LABEL_BAFF_LoadFontTiles
-  call _LABEL_959C_
-  call _LABEL_A296_
+  call _LABEL_959C_LoadPunctuationTiles
+  call _LABEL_A296_LoadHandTiles
   ld a, $01
-  ld (_RAM_DC3B_), a
+  ld (_RAM_DC3B_IsTrackSelect), a
   ld (_RAM_D6CC_), a
   ld (_RAM_DBD8_CourseSelectIndex), a
   ld a, $B2
-  ld (_RAM_D6C8_), a
-  call _LABEL_9448_
-  call _LABEL_94AD_
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
+  call _LABEL_9448_LoadHeaderTiles
+  call _LABEL_94AD_DrawHeaderTilemap
   TilemapWriteAddressToHL 0, 5
   call _LABEL_B35A_VRAMAddressToHL
   call _LABEL_95AF_DrawHorizontalLineIfSMS
@@ -24290,14 +24356,14 @@ _LABEL_B877_:
   ld a, MenuScreen_TournamentChampion
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $B2
-  ld (_RAM_D6C8_), a
+  ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call _LABEL_B2DC_
   call _LABEL_B305_DrawHorizontalLine_Top
   call _LABEL_B8CF_
   call _LABEL_B8E3_
   TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   or a
   jr nz, +
   ld c, $03
@@ -24330,7 +24396,7 @@ _LABEL_B8C9_EmitTilemapRectangle_5x6_24:
 
 _LABEL_B8CF_:
   ld a, :_DATA_1B2C3_Tiles_Trophy
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_1B2C3_Tiles_Trophy
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $160
@@ -24339,7 +24405,7 @@ _LABEL_B8CF_:
 
 _LABEL_B8E3_:
   ld a, :_DATA_279F0_Tilemap_
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_279F0_Tilemap_
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TilemapWriteAddressToHL 7, 14
@@ -24370,7 +24436,7 @@ _LABEL_B911_:
   jr z, ++
   TilemapWriteAddressToHL 6, 11
   call _LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC34_)
+  ld a, (_RAM_DC34_IsTournament)
   or a
   jr z, +
   ld hl, _TEXT_B966_TournamentChampion
@@ -24512,19 +24578,20 @@ _LABEL_B9ED_:
   out (PORT_VDP_DATA), a
   ret
 
-_LABEL_BA3C_:
+_LABEL_BA3C_LoadColouredCirclesTilesToIndex150:
   TileWriteAddressToHL $150
   call _LABEL_B35A_VRAMAddressToHL
-_LABEL_BA42_:
-  ld a, :_DATA_22B8C_Tiles_
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+
+_LABEL_BA42_LoadColouredCirclesTiles:
+  ld a, :_DATA_22B8C_Tiles_ColouredCircles
+  ld (_RAM_D741_RequestedPageIndex), a
   ld e, 4 * 8 ; 4 tiles
-  ld hl, _DATA_22B8C_Tiles_
+  ld hl, _DATA_22B8C_Tiles_ColouredCircles
   JumpToRamCode _LABEL_3BB45_Emit3bppTileDataToVRAM
 
 _LABEL_BA4F_LoadMediumNumberTiles:
   ld a, :_DATA_2794C_Tiles_MediumNumbers
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2794C_Tiles_MediumNumbers
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 10 * 8 ; 10 tiles
@@ -24588,7 +24655,7 @@ _LABEL_BAD5_LoadMenuLogoTiles:
   jr z, +
   ; SMS: big logo
   ld a, :_DATA_22C4E_Tiles_BigLogo
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_22C4E_Tiles_BigLogo
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 177 * 8 ; 177 tiles
@@ -24596,7 +24663,7 @@ _LABEL_BAD5_LoadMenuLogoTiles:
 
 +:; GG: medium logo
   ld a, :_DATA_3E5D7_Tiles_MediumLogo
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_3E5D7_Tiles_MediumLogo
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ld de, 112 * 8 ; 122 tiles
@@ -24606,7 +24673,7 @@ _LABEL_BAD5_LoadMenuLogoTiles:
 
 _LABEL_BAFF_LoadFontTiles:
   ld a, :_DATA_2B02D_Tiles_Font
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2B02D_Tiles_Font
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL 0
@@ -24620,7 +24687,7 @@ _LABEL_BB13_:
 
   ; SMS: draw sports cars portrait
   ld a, :_DATA_FAA5_Tiles_Portrait_SportsCars
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_FAA5_Tiles_Portrait_SportsCars
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
@@ -24701,25 +24768,31 @@ _LABEL_BB85_ScreenOn:
   out (PORT_VDP_REGISTER), a
   ret
 
-_LABEL_BB95_:
+_LABEL_BB95_LoadIconMenuGraphics:
   ld a, (_RAM_D6C7_)
   dec a
-  jr z, _LABEL_BBE0_
+  jr z, _LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
+  
+  ; _RAM_D6C7_ != 1
+  ; Load chopper portrait - unused
   ld a, :_DATA_26C52_Tiles_Portrait_Chopper
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_26C52_Tiles_Portrait_Chopper
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
   ld de, 60 * 8 ; 60 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
+  
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
+  ; GG
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_SelectPlayerCount
   jr z, ++
-+:
-  ld hl, _DATA_26FC6_Tiles_HeadToHead
++:; Both SMS and (GG if not selecting player count)
+  ; Load "head to head" image tiles
+  ld hl, _DATA_26FC6_Tiles_HeadToHead_Icon
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $74
   ld de, 60 * 8 ; 60 tiles
@@ -24727,6 +24800,7 @@ _LABEL_BB95_:
   jp +++
 
 ++:
+  ; GG selecting player count: replace "head to head" icon with "two players on one game gear"
   ld hl, _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $74
@@ -24734,23 +24808,27 @@ _LABEL_BB95_:
   call _LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
   jp +++
 
-_LABEL_BBE0_:
-  ld a, :_DATA_27391_Tiles_Tournament
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
-  ld hl, _DATA_27391_Tiles_Tournament
+_LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
+  ; _RAM_D6C7_ == 1
+  ; Load tournament icon
+  ld a, :_DATA_27391_Tiles_Tournament_Icon
+  
+  ld (_RAM_D741_RequestedPageIndex), a
+  ld hl, _DATA_27391_Tiles_Tournament_Icon
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
   ld de, 54 * 8 ; 54 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  ld hl, _DATA_27674_Tiles_Portrait_TurboWheels
+  
+  ld hl, _DATA_27674_Tiles_SingleRace_Icon
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $74
   ld de, 54 * 8 ; 54 tiles
   call _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 +++:
-  call _LABEL_A296_
-  call _LABEL_949B_
-  jp _LABEL_948A_
+  call _LABEL_A296_LoadHandTiles
+  call _LABEL_949B_LoadHeadToHeadTextTiles
+  jp _LABEL_948A_LoadChallengeTextTiles ; tail call optimisation
 
 _LABEL_BC0C_:
   ld a, (_RAM_D6C7_)
@@ -24759,24 +24837,21 @@ _LABEL_BC0C_:
   ld a, $09
   ld (_RAM_D69A_TilemapRectangleSequence_Width), a
   jp ++
-
-+:
-  ld a, $0A
++:ld a, $0A
   ld (_RAM_D69A_TilemapRectangleSequence_Width), a
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7B88
+  TilemapWriteAddressToHL 4, 18
   jr ++
-
-+:
-  ld hl, $7ACC
++:TilemapWriteAddressToHL 6, 15
 ++:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
   jr nz, +
-  ld de, $0040
+  ; Subtract a row
+  ld de, TILEMAP_ROW_SIZE
   or a
   sbc hl, de
 +:
@@ -24787,29 +24862,28 @@ _LABEL_BC0C_:
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
+  
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $7BA4
+  TilemapWriteAddressToHL 18, 18
   jr ++
-
-+:
-  ld hl, $7AE0
++:TilemapWriteAddressToHL 16, 15
 ++:
   ld a, (_RAM_D6C7_)
   or a
   jr z, +
+  ; Right by 1
   inc hl
   inc hl
-+:
-  ld a, (_RAM_D699_MenuScreenIndex)
++:ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
   jr nz, +
-  ld de, $0040
+  ; Down a row
+  ld de, TILEMAP_ROW_SIZE
   or a
   sbc hl, de
-+:
-  ld a, $74
++:ld a, $74
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $06
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
@@ -24820,14 +24894,12 @@ _LABEL_BC0C_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7D48
+  TilemapWriteAddressToDE 4, 25
   jr ++
-
-+:
-  ld de, $7C4C
++:TilemapWriteAddressToDE 6, 21
 ++:
   call _LABEL_B361_VRAMAddressToDE
-  ld hl, _DATA_B4BA_
+  ld hl, _DATA_2B4BA_Tilemap_ChallengeText
   ld a, $08
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
   ld a, $02
@@ -24838,14 +24910,12 @@ _LABEL_BC0C_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld de, $7D64
+  TilemapWriteAddressToDE 18, 25
   jr ++
-
-+:
-  ld de, $7C60
++:TilemapWriteAddressToDE 16, 21
 ++:
   call _LABEL_B361_VRAMAddressToDE
-  ld hl, $B5BE
+  ld hl, _DATA_2B5BE_Tilemap_HeadToHeadText
   ld a, $0A
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
   ld a, $02
@@ -25027,7 +25097,7 @@ _LABEL_BDB8_:
   or a
   jr z, +
   ld a, :_DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $170
@@ -25049,7 +25119,7 @@ _LABEL_BDB8_:
 _LABEL_BDED_LoadMenuLogoTilemap: ; TODO: how does it work for GG?
   ; Decompress to RAM
   ld a, :_DATA_2FF6F_Tilemap
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_2FF6F_Tilemap
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   ; Draw to name table
@@ -25149,7 +25219,7 @@ _LABEL_BEF5_:
   call _LABEL_B35A_VRAMAddressToHL
   ld c, $07
 -:
-  ld a, $0E
+  ld a, BLANK_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -25186,7 +25256,6 @@ _DATA_BF3E_MenuPalette_SMS:
   SMSCOLOUR $000000
   SMSCOLOUR $5500aa ; $10
   SMSCOLOUR $ffffff
-_DATA_BF50_: ; false label?
   SMSCOLOUR $00aa00
   SMSCOLOUR $aa0000
   SMSCOLOUR $ff5555
@@ -25329,7 +25398,7 @@ _DATA_FAA5_Tiles_Portrait_SportsCars:
 
 ; 1296a = ruff trux car tiles run encoded
 
-$12B4D
+;$12B4D
 
 _DATA_13C42_Tiles_BigNumbers:
 .incbin "Assets/raw/Micro Machines_10000.inc" skip $13C42-$10000 read $13D7F-$13C42
@@ -25337,7 +25406,11 @@ _DATA_13C42_Tiles_BigNumbers:
 _DATA_13D7F_Tiles_MicroMachinesText:
 .incbin "Assets/raw/Micro Machines_10000.inc" skip $13D7F-$10000 read $13f38-$13D7F
 
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f38-$10000 read $13fff-$13f38
+_DATA_13F38_Tilemap_SmallLogo: ; 8x3
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f38-$10000 read $13f50-$13f38
+
+_DATA_13F50_Tilemap_MicroMachinesText:
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f50-$10000 read $13fff-$13f50
 
 .db :CADDR
 
@@ -25372,7 +25445,10 @@ _DATA_16F2B_Tiles_Portrait_FormulaOne:
 _DATA_1736E_Tiles_Portrait_Tanks:
 .incbin "Assets/raw/Micro Machines_16a38.inc" skip $1736e-$16a38 read $1766c-$1736e
 
-.incbin "Assets/raw/Micro Machines_16a38.inc" skip $1766c-$16a38 read $17c0c-$1766c
+_DATA_Tiles_MrQuestion:
+.incbin "Assets/racers/MrQuestion.3bpp"
+_DATA_Tiles_OutOfGame:
+.incbin "Assets/racers/OutOfGame.3bpp"
 
 _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
 .incbin "Assets/raw/Micro Machines_16a38.inc" skip $17c0c-$16a38 read $17dd5-$17c0c
@@ -26637,9 +26713,9 @@ _LABEL_1FB35_:
 
 ; Data from 20000 to 237E1 (14306 bytes)
 .incbin "Assets/raw/Micro Machines_20000.inc" skip 0 read $22B2C-$20000
-_DATA_22B2C_Tiles_:
+_DATA_22B2C_Tiles_PunctuationAndLine:
 .incbin "Assets/raw/Micro Machines_20000.inc" skip $22B2C-$20000 read $22B8C-$22B2C
-_DATA_22B8C_Tiles_:
+_DATA_22B8C_Tiles_ColouredCircles:
 .incbin "Assets/raw/Micro Machines_20000.inc" skip $22B8C-$20000 read $22BEC-$22B8C
 _DATA_22BEC_Tiles_Cursor:
 .incbin "Assets/raw/Micro Machines_20000.inc" skip $22BEC-$20000 read $22C4E-$22BEC
@@ -27511,13 +27587,13 @@ _DATA_23ECF_HandlingData_SMS:
 _DATA_26C52_Tiles_Portrait_Chopper:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $26C52-$24000 read $26FC6-$26C52
 
-_DATA_26FC6_Tiles_HeadToHead:
+_DATA_26FC6_Tiles_HeadToHead_Icon:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $26FC6-$24000 read $27391-$26FC6
 
-_DATA_27391_Tiles_Tournament:
+_DATA_27391_Tiles_Tournament_Icon:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $27391-$24000 read $27674-$27391
 
-_DATA_27674_Tiles_Portrait_TurboWheels:
+_DATA_27674_Tiles_SingleRace_Icon:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $27674-$24000 read $2794c-$27674
 
 _DATA_2794C_Tiles_MediumNumbers:
@@ -27562,13 +27638,13 @@ _DATA_2B36E_SpriteNs_HandRight:
 _DATA_2B386_Tiles_ChallengeText:
 .incbin "Assets/raw/Micro Machines_28000.inc" skip $2b386-$28000 read $2B4BA-$2b386
 
-; Tilemap?
+_DATA_2B4BA_Tilemap_ChallengeText:
 .incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4BA-$28000 read $2B4CA-$2B4BA
 
 _DATA_2B4CA_Tiles_HeadToHeadText:
 .incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4CA-$28000 read $2B5BE-$2B4CA
 
-; Tilemap?
+_DATA_2B5BE_Tilemap_HeadToHeadText:
 .incbin "Assets/raw/Micro Machines_28000.inc" skip $2B5BE-$28000 read $2B5D2-$2B5BE
 
 
@@ -27975,7 +28051,51 @@ _DATA_2B911_:
 .ORG $0000
 
 ; Data from 2C000 to 2FFFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_2c000.inc" skip $2c000-$2c000 read $2fde0-$2c000
+; Portrait data (3bpp)
+_DATA_Tiles_Anne_Happy:
+.incbin "Assets/Racers/Anne-Happy.3bpp"
+_DATA_Tiles_Anne_Sad:
+.incbin "Assets/Racers/Anne-Sad.3bpp"
+_DATA_Tiles_Bonnie_Happy:
+.incbin "Assets/Racers/Bonnie-Happy.3bpp"
+_DATA_Tiles_Bonnie_Sad:
+.incbin "Assets/Racers/Bonnie-Sad.3bpp"
+_DATA_Tiles_Chen_Happy:
+.incbin "Assets/Racers/Chen-Happy.3bpp"
+_DATA_Tiles_Chen_Sad:
+.incbin "Assets/Racers/Chen-Sad.3bpp"
+_DATA_Tiles_Cherry_Happy:
+.incbin "Assets/Racers/Cherry-Happy.3bpp"
+_DATA_Tiles_Cherry_Sad:
+.incbin "Assets/Racers/Cherry-Sad.3bpp"
+_DATA_Tiles_Dwayne_Happy:
+.incbin "Assets/Racers/Dwayne-Happy.3bpp"
+_DATA_Tiles_Dwayne_Sad:
+.incbin "Assets/Racers/Dwayne-Sad.3bpp"
+_DATA_Tiles_Emilio_Happy:
+.incbin "Assets/Racers/Emilio-Happy.3bpp"
+_DATA_Tiles_Emilio_Sad:
+.incbin "Assets/Racers/Emilio-Sad.3bpp"
+_DATA_Tiles_Jethro_Happy:
+.incbin "Assets/Racers/Jethro-Happy.3bpp"
+_DATA_Tiles_Jethro_Sad:
+.incbin "Assets/Racers/Jethro-Sad.3bpp"
+_DATA_Tiles_Joel_Happy:
+.incbin "Assets/Racers/Joel-Happy.3bpp"
+_DATA_Tiles_Joel_Sad:
+.incbin "Assets/Racers/Joel-Sad.3bpp"
+_DATA_Tiles_Mike_Happy:
+.incbin "Assets/Racers/Mike-Happy.3bpp"
+_DATA_Tiles_Mike_Sad:
+.incbin "Assets/Racers/Mike-Sad.3bpp"
+_DATA_Tiles_Spider_Happy:
+.incbin "Assets/Racers/Spider-Happy.3bpp"
+_DATA_Tiles_Spider_Sad:
+.incbin "Assets/Racers/Spider-Sad.3bpp"
+_DATA_Tiles_Walter_Happy:
+.incbin "Assets/Racers/Walter-Happy.3bpp"
+_DATA_Tiles_Walter_Sad:
+.incbin "Assets/Racers/Walter-Sad.3bpp"
 
 _DATA_2FDE0_Tiles_SmallLogo:
 .incbin "Assets/raw/Micro Machines_2c000.inc" skip $2fde0-$2c000 read $2ff6f-$2fde0
@@ -34155,7 +34275,7 @@ _LABEL_3BB57_EmitTilemapRectangle:
   ld a, (hl)          ; Read data
   cp $FF
   jr nz, +
-  ld a, $0E           ; $ff -> $0e (blank tile)
+  ld a, BLANK_TILE_INDEX ; $ff -> $0e (blank tile)
   JumpToRamCode ++
 +:add a, b            ; Else add offset
 ; Executed in RAM at d9ad
@@ -34210,7 +34330,7 @@ _LABEL_3BB93_Emit3bppTiles_2Rows:
 ; Executed in RAM at d9f5
 _LABEL_3BBB5_PopulateSpriteNs:
   ld a, :_DATA_2B33E_SpriteNs_Hand
-  ld (_RAM_D741_RAMDecompressorPageIndex), a
+  ld (_RAM_D741_RequestedPageIndex), a
   CallRamCode _LABEL_3BCF5_RestorePagingFromD741
   ld de, _RAM_D701_SpriteN
   ld bc, 24
@@ -34295,8 +34415,8 @@ _LABEL_3BBF8_EmitTilemapUnknown:
 
 _LABEL_3BC27_EmitThirty3bppTiles:
   CallRamCode _LABEL_3BCF5_RestorePagingFromD741
-  ld e, $f0 ; Row count - 30 tiles
--:ld b, $03 ;
+  ld e, 30 * 8 ; Row count - 30 tiles
+-:ld b, $03 ; bit depth
   ld c, PORT_VDP_DATA
   otir
   xor a
@@ -34443,7 +34563,7 @@ _LABEL_3BCEF_: ; unused?
 
 ; Executed in RAM at db35
 _LABEL_3BCF5_RestorePagingFromD741:
-  ld a, (_RAM_D741_RAMDecompressorPageIndex)
+  ld a, (_RAM_D741_RequestedPageIndex)
   ld (PAGING_REGISTER), a
   ret
 
