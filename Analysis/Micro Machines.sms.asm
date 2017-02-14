@@ -24781,9 +24781,9 @@ _LABEL_BB95_LoadIconMenuGraphics:
   
   ; _RAM_D6C7_ != 1
   ; Load chopper portrait - unused
-  ld a, :_DATA_26C52_Tiles_Portrait_Chopper
+  ld a, :_DATA_26C52_Tiles_Challenge_Icon
   ld (_RAM_D741_RequestedPageIndex), a
-  ld hl, _DATA_26C52_Tiles_Portrait_Chopper
+  ld hl, _DATA_26C52_Tiles_Challenge_Icon
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
   ld de, 60 * 8 ; 60 tiles
@@ -25021,7 +25021,7 @@ _DATA_BD58_Palettes_SMS:
 ; 1st entry of Pointer Table from BD58 (indexed by unknown)
 ; Data from BD5E to BD64 (7 bytes)
 _DATA_BD5E_Palette1_SMS:
-  ; Full intensity?
+  ; Full intensity
   SMSCOLOUR $000055
   SMSCOLOUR $aaaaaa
   SMSCOLOUR $005500
@@ -25287,8 +25287,8 @@ _DATA_BF3E_MenuPalette_SMS:
 .db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
 */
 
-_LABEL_BF5E_: ; unused code? Left over memory?
-  jr +
+_LABEL_BF5E_: ; GG-only code, misaligned here
+  jr + ; Weird
 +:call $B358 ; not a function
   ld c, $05
 -:ld a, $0e
@@ -25308,7 +25308,7 @@ _LABEL_BF70_: ; unused code? Left over memory?
   otir
   ret
 
-_DATA_BF80_: ; unused?
+_DATA_BF80_: ; GG menu palette(s)?
 .db $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $44 $0E $00 $00
 .db $22 $02 $44 $04 $88 $08 $40 $00 $C0 $00 $E0 $00 $AE $0A $00 $00
 .db $04
@@ -25456,7 +25456,7 @@ _DATA_Tiles_OutOfGame:
 .incbin "Assets/racers/OutOfGame.3bpp"
 
 _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
-.incbin "Assets/Menu/TwoPlayersOnOneGameGear.compressed"
+.incbin "Assets/Menu/Text-TwoPlayersOnOneGameGear.4bpp.compressed"
 
 ; Data from 17DD5 to 17E54 (128 bytes)
 _DATA_17DD5_:
@@ -26711,6 +26711,7 @@ _LABEL_1FB35_:
   ret
 
 ; Data from 1FB81 to 1FFFF (1151 bytes)
+; Unreferenced?
 .incbin "Assets/raw/Micro Machines_1fb81.inc"
 
 .BANK 8
@@ -27589,20 +27590,25 @@ _DATA_23ECF_HandlingData_SMS:
 ; Data from 24000 to 27FFF (16384 bytes)
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $24000-$24000 read $26C52-$24000
 
-_DATA_26C52_Tiles_Portrait_Chopper:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $26C52-$24000 read $26FC6-$26C52
+_DATA_26C52_Tiles_Challenge_Icon:
+.incbin "Assets/Menu/Icon-Challenge.3bpp.compressed"
+;.incbin "Assets/raw/Micro Machines_24000.inc" skip $26C52-$24000 read $26FC6-$26C52
 
 _DATA_26FC6_Tiles_HeadToHead_Icon:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $26FC6-$24000 read $27391-$26FC6
+.incbin "Assets/Menu/Icon-HeadToHead.3bpp.compressed"
+;.incbin "Assets/raw/Micro Machines_24000.inc" skip $26FC6-$24000 read $27391-$26FC6
 
 _DATA_27391_Tiles_Tournament_Icon:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $27391-$24000 read $27674-$27391
+.incbin "Assets/Menu/Icon-Tournament.3bpp.compressed"
+;.incbin "Assets/raw/Micro Machines_24000.inc" skip $27391-$24000 read $27674-$27391
 
 _DATA_27674_Tiles_SingleRace_Icon:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $27674-$24000 read $2794c-$27674
+.incbin "Assets/Menu/Icon-SingleRace.3bpp.compressed"
+;.incbin "Assets/raw/Micro Machines_24000.inc" skip $27674-$24000 read $2794c-$27674
 
 _DATA_2794C_Tiles_MediumNumbers:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $2794c-$24000 read $279f0-$2794c
+.incbin "Assets/Menu/Numbers-Medium.3bpp.compressed"
+;.incbin "Assets/raw/Micro Machines_24000.inc" skip $2794c-$24000 read $279f0-$2794c
 
 _DATA_279F0_Tilemap_:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $279f0-$24000 read $27a12-$279f0
@@ -28050,7 +28056,14 @@ _DATA_2B87B_:
 
 ; Data from 2B911 to 2BFFF (1775 bytes)
 _DATA_2B911_:
-.incbin "Assets/raw/Micro Machines_2b911.inc"
+.incbin "Assets/raw/Micro Machines_2b911.inc" read $57a
+
+; End of bank
+
+.repeat $174/4
+.db $ff $ff $00 $00
+.endr
+.db :CADDR
 
 .BANK 11
 .ORG $0000
