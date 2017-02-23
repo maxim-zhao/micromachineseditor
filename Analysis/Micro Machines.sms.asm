@@ -17580,7 +17580,7 @@ _LABEL_8272_:
   call _LABEL_95AF_DrawHorizontalLineIfSMS
   ld a, TT_Powerboats
   call _LABEL_B478_SelectPortraitPage
-  ld hl, _DATA_1F3E4_Tiles_Portrait_Powerboat
+  ld hl, _DATA_1F3E4_Tiles_Portrait_Powerboats
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
   ld de, 80 * 8 ; 80 tiles
@@ -18257,7 +18257,7 @@ _LABEL_8877_:
   call _LABEL_B305_DrawHorizontalLine_Top
   ld a, TT_Unknown9
   call _LABEL_B478_SelectPortraitPage
-  ld hl, _DATA_2AB4D_Tiles_RuffTruxPortrait
+  ld hl, _DATA_2AB4D_Tiles_Portrait_RuffTrux
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $100
   ld de, 80 * 8 ; 80 tiles
@@ -19529,16 +19529,16 @@ _LABEL_91E8_:
 ; Data from 9254 to 9267 (20 bytes)
 _DATA_9254_VehiclePortraitOffsets:
 ; Pointers to compressed tile data for each track type
-.dw _DATA_2AB4D_Tiles_RuffTruxPortrait
+.dw _DATA_2AB4D_Tiles_Portrait_RuffTrux
 .dw _DATA_FAA5_Tiles_Portrait_SportsCars
-.dw _DATA_1F3E4_Tiles_Portrait_Powerboat
+.dw _DATA_1F3E4_Tiles_Portrait_Powerboats
 .dw _DATA_16F2B_Tiles_Portrait_FormulaOne
 .dw _DATA_F35D_Tiles_Portrait_FourByFour
 .dw _DATA_F765_Tiles_Portrait_Warriors
 .dw $AB4D ; invalid?
-.dw _DATA_16AC8_Tiles_PortraitTurboWheels
+.dw _DATA_16AC8_Tiles_Portrait_TurboWheels
 .dw _DATA_1736E_Tiles_Portrait_Tanks
-.dw _DATA_2AB4D_Tiles_RuffTruxPortrait
+.dw _DATA_2AB4D_Tiles_Portrait_RuffTrux
 
 ; Data from 9268 to 926B (4 bytes)
 _DATA_9268_:
@@ -19547,16 +19547,16 @@ _DATA_9268_:
 ; Data from 926C to 9275 (10 bytes)
 _DATA_926C_VehiclePortraitPageNumbers:
 ; Pages containing portrait (?) data for different vehicle types(?)
-.db :_DATA_2AB4D_Tiles_RuffTruxPortrait
+.db :_DATA_2AB4D_Tiles_Portrait_RuffTrux
 .db :_DATA_FAA5_Tiles_Portrait_SportsCars
-.db :_DATA_1F3E4_Tiles_Portrait_Powerboat
+.db :_DATA_1F3E4_Tiles_Portrait_Powerboats
 .db :_DATA_16F2B_Tiles_Portrait_FormulaOne
 .db :_DATA_F35D_Tiles_Portrait_FourByFour
 .db :_DATA_F765_Tiles_Portrait_Warriors
 .db $04 ; invalid?
-.db :_DATA_16AC8_Tiles_PortraitTurboWheels
+.db :_DATA_16AC8_Tiles_Portrait_TurboWheels
 .db :_DATA_1736E_Tiles_Portrait_Tanks
-.db :_DATA_2AB4D_Tiles_RuffTruxPortrait
+.db :_DATA_2AB4D_Tiles_Portrait_RuffTrux
 
 _LABEL_9276_:
   ld a, :_TEXT_3ECA9_VEHICLE_NAME_BLANK
@@ -19678,7 +19678,7 @@ _LABEL_9317_InitialiseHandSprites:
   ld a, (hl)
   ld (ix+0), a
 +++:
-  ; Not trackslect, or GG: original Y
+  ; Not track select, or GG: original Y
   ld a, (de)
   ld (iy+0), a
 ++++:
@@ -25377,14 +25377,15 @@ _LABEL_F255_Desk_ExtraTiles:
 .incbin "Assets/raw/Micro Machines_c000.inc" skip $3255 read $0108 ; raw
 
 _DATA_F35D_Tiles_Portrait_FourByFour:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $f35d-$c000 read $f765-$f35d
+.incbin "Assets/Four By Four/Portrait.3bpp.compressed"
 
 _DATA_F765_Tiles_Portrait_Warriors:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $f765-$c000 read $faa5-$f765
+.incbin "Assets/Warriors/Portrait.3bpp.compressed"
 
 _DATA_FAA5_Tiles_Portrait_SportsCars:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $faa5-$c000 read $fdc0-$faa5
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $fdc0-$c000 read $ffff-$fdc0
+.incbin "Assets/Sportscars/Portrait.3bpp.compressed"
+
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $fdc1-$c000 read $ffff-$fdc1
 
 .db :CADDR
 
@@ -25396,7 +25397,7 @@ _DATA_FAA5_Tiles_Portrait_SportsCars:
 
 ; 1296a = ruff trux car tiles run encoded
 
-;$12B4D
+; $12B4D = dangling pointer for Helicopters portrait?
 
 _DATA_13C42_Tiles_BigNumbers:
 .incbin "Assets/raw/Micro Machines_10000.inc" skip $13C42-$10000 read $13D7F-$13C42
@@ -25440,11 +25441,11 @@ _DATA_16A38_DivideBy8:
 .endr
 .undefine n
 
-_DATA_16AC8_Tiles_PortraitTurboWheels:
-.incbin "Assets/TurboWheels/Portrait.3bpp.compressed"
+_DATA_16AC8_Tiles_Portrait_TurboWheels:
+.incbin "Assets/Turbo Wheels/Portrait.3bpp.compressed"
 
 _DATA_16F2B_Tiles_Portrait_FormulaOne:
-.incbin "Assets/F1/Portrait.3bpp.compressed"
+.incbin "Assets/Formula One/Portrait.3bpp.compressed"
 
 _DATA_1736E_Tiles_Portrait_Tanks:
 .incbin "Assets/Tanks/Portrait.3bpp.compressed"
@@ -25459,8 +25460,12 @@ _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
 .incbin "Assets/Menu/Text-TwoPlayersOnOneGameGear.4bpp.compressed"
 
 ; Data from 17DD5 to 17E54 (128 bytes)
-_DATA_17DD5_:
-.db $FF $FF $00 $00 $FF $FD $7E $00 $FF $FF $66 $00 $FF $FD $7E $00
+_DATA_17DD5_Tiles_Playoff_Part1:
+; Raw 4bpp tile data: "PLAYO-" (4 tiles)
+.db $FF $FF $00 $00 
+.db $FF $FD $7E $00 
+.db $FF $FF $66 $00 
+.db $FF $FD $7E $00
 .db $FF $FF $60 $00 $F1 $F1 $60 $00 $F1 $F1 $60 $00 $F1 $F1 $00 $00
 .db $E3 $E3 $00 $00 $E7 $E5 $C3 $00 $E7 $E7 $C3 $00 $E7 $E7 $C3 $00
 .db $FF $FF $C3 $00 $FF $FF $FB $00 $FF $FF $FB $00 $FF $FF $00 $00
@@ -25470,7 +25475,8 @@ _DATA_17DD5_:
 .db $EF $EF $86 $00 $CF $CF $87 $00 $CF $CB $87 $00 $C7 $C7 $00 $00
 
 ; Data from 17E55 to 17E94 (64 bytes)
-_DATA_17E55_:
+_DATA_17E55_Tiles_Playoff_Part2:
+; Raw 4bpp tile data: "-FF" (2 tiles)
 .db $FF $FF $00 $00 $FF $DF $EF $00 $FF $FF $6C $00 $FF $FF $6F $00
 .db $FF $FF $6C $00 $FE $FE $EC $00 $FE $DE $EC $00 $FE $FE $00 $00
 .db $FF $FF $00 $00 $FF $FF $BE $00 $FF $FF $30 $00 $FF $FF $BE $00
@@ -25481,25 +25487,26 @@ _LABEL_17E95_:
   out (PORT_VDP_ADDRESS), a
   ld a, $73
   out (PORT_VDP_ADDRESS), a
-  ld bc, $0020
-  ld hl, _DATA_17DD5_
-  call _LABEL_17EB4_
-  ld a, $80
+  ld bc, 4 * 8 ; 4 tiles
+  ld hl, _DATA_17DD5_Tiles_Playoff_Part1
+  call _LABEL_17EB4_LoadTileRow
+  ld a, $80 ; TIle $1a4
   out (PORT_VDP_ADDRESS), a
   ld a, $74
   out (PORT_VDP_ADDRESS), a
   ld bc, $0010
-  ld hl, _DATA_17E55_
-_LABEL_17EB4_:
-  push bc
-  ld b, $04
-  ld c, PORT_VDP_DATA
-  otir
+  ld hl, _DATA_17E55_Tiles_Playoff_Part2
+  ; fall through
+_LABEL_17EB4_LoadTileRow:
+-:push bc
+    ld b, $04
+    ld c, PORT_VDP_DATA
+    otir
   pop bc
   dec bc
   ld a, b
   or c
-  jr nz, _LABEL_17EB4_
+  jr nz, -
   ret
 
 ; Pointer Table from 17EC2 to 17ED1 (8 entries, indexed by _RAM_DB97_TrackType)
@@ -26311,8 +26318,8 @@ _LABEL_1BF17_:
 ; Data from 1C000 to 1F8D7 (14552 bytes)
 .incbin "Assets/raw/Micro Machines_1c000.inc" skip 0 read $1f3e4-$1c000
 
-_DATA_1F3E4_Tiles_Portrait_Powerboat:
-.incbin "Assets/raw/Micro Machines_1c000.inc" skip $1f3e4-$1c000 read $1f8d8-$1f3e4
+_DATA_1F3E4_Tiles_Portrait_Powerboats:
+.incbin "Assets/Powerboats/Portrait.3bpp.compressed"
 
 _LABEL_1F8D8_: ; Cheats!
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -27592,23 +27599,18 @@ _DATA_23ECF_HandlingData_SMS:
 
 _DATA_26C52_Tiles_Challenge_Icon:
 .incbin "Assets/Menu/Icon-Challenge.3bpp.compressed"
-;.incbin "Assets/raw/Micro Machines_24000.inc" skip $26C52-$24000 read $26FC6-$26C52
 
 _DATA_26FC6_Tiles_HeadToHead_Icon:
 .incbin "Assets/Menu/Icon-HeadToHead.3bpp.compressed"
-;.incbin "Assets/raw/Micro Machines_24000.inc" skip $26FC6-$24000 read $27391-$26FC6
 
 _DATA_27391_Tiles_Tournament_Icon:
 .incbin "Assets/Menu/Icon-Tournament.3bpp.compressed"
-;.incbin "Assets/raw/Micro Machines_24000.inc" skip $27391-$24000 read $27674-$27391
 
 _DATA_27674_Tiles_SingleRace_Icon:
 .incbin "Assets/Menu/Icon-SingleRace.3bpp.compressed"
-;.incbin "Assets/raw/Micro Machines_24000.inc" skip $27674-$24000 read $2794c-$27674
 
 _DATA_2794C_Tiles_MediumNumbers:
 .incbin "Assets/Menu/Numbers-Medium.3bpp.compressed"
-;.incbin "Assets/raw/Micro Machines_24000.inc" skip $2794c-$24000 read $279f0-$2794c
 
 _DATA_279F0_Tilemap_:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $279f0-$24000 read $27a12-$279f0
@@ -27626,8 +27628,8 @@ _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 ; Data from 28000 to 2B5D1 (13778 bytes)
 .incbin "Assets/raw/Micro Machines_28000.inc" skip 0 read $2AB4D-$28000
 
-_DATA_2AB4D_Tiles_RuffTruxPortrait:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2AB4D-$28000 read $2b02d-$2AB4D
+_DATA_2AB4D_Tiles_Portrait_RuffTrux:
+.incbin "Assets/RuffTrux/Portrait.3bpp.compressed"
 
 _DATA_2B02D_Tiles_Font:
 .incbin "Assets/raw/Micro Machines_28000.inc" skip $2b02d-$28000 read $2b151-$2b02d
@@ -28129,7 +28131,7 @@ _DATA_2FF6F_Tilemap:
 
 ; Data from 30000 to 30A67 (2664 bytes)
 _DATA_30000_F1CarTiles:
-.incbin "Assets/F1/CarTiles.runencoded"
+.incbin "Assets/Formula One/CarTiles.runencoded"
 _DATA_30330_WarriorsCarTiles:
 .incbin "Assets/Warriors/CarTiles.runencoded"
 _DATA_306D0_TanksCarTiles:
