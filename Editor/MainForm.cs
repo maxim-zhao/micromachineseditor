@@ -22,6 +22,7 @@ namespace MicroMachinesEditor
         private IList<SMSGraphics.Tile> _tiles;
         private IList<Color> _palette;
         private IList<MetaTile> _metaTiles;
+        private byte[] _raw;
 
         // Per-track-type data
         private readonly Dictionary<int, TrackTypeData> _trackTypeData = new Dictionary<int, TrackTypeData>();
@@ -69,7 +70,8 @@ namespace MicroMachinesEditor
             tbOutput.Text = HexToString(decoded);
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
 
-            RenderTiles(decoded.ToArray(), 0);
+            _raw = decoded.ToArray();
+            RenderRawAsTiles();
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -475,22 +477,34 @@ namespace MicroMachinesEditor
         {
             byte[] file = File.ReadAllBytes(tbFilename.Text);
             int offset = Convert.ToInt32(tbOffset.Text, 16);
-            RenderTiles(file, offset);
+            _raw = file.Skip(offset).Take(file.Length - offset).ToArray();
+            RenderRawAsTiles();
         }
 
-        private void RenderTiles(byte[] data, int offset)
+        private void RenderRawAsTiles()
         {
-            if (_palette == null)
+            if (_raw == null || _raw.Length == 0)
             {
-                // Load the menu palette
-                _palette = SMSGraphics.ReadPalette(File.ReadAllBytes(tbFilename.Text), 0xbf3e, 32);
+                return;
             }
+            if (cbPalette.SelectedIndex == -1)
+            {
+                cbPalette.SelectedIndex = 0;
+            }
+            var paletteOffset = Convert.ToInt32(cbPalette.Text.Split(' ')[0], 16);
+            _palette = SMSGraphics.ReadPalette(File.ReadAllBytes(tbFilename.Text), paletteOffset, 32);
+            if (cbPalette.Text.Contains("sprite"))
+            {
+                // Hot pink transparency
+                _palette[0] = Color.Fuchsia;
+            }
+            byte[] data = _raw.ToArray();
             var bpp = Convert.ToInt32(numericUpDown1.Value);
-            int numBytes = Math.Min(bpp * 8 * 512, data.Length - offset);
+            int numBytes = Math.Min(bpp * 8 * 512, data.Length);
             int numTiles = numBytes / bpp / 8;
-            var tiles = SMSGraphics.ReadTiles(data, offset, numBytes, _palette, bpp);
+            var tiles = SMSGraphics.ReadTiles(data, 0, numBytes, _palette, bpp);
             var width = Convert.ToInt32(udImageWidth.Value);
-            var height = Convert.ToInt32(Math.Ceiling(numTiles * 64.0 / width));
+            var height = Convert.ToInt32(Math.Ceiling(numTiles * 8.0 / width) * 8);
             var bm = new Bitmap(width, height);
             Graphics g = Graphics.FromImage(bm);
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
@@ -513,6 +527,11 @@ namespace MicroMachinesEditor
             }
 
             pbRaw.Image = bm;
+        }
+
+        private void numericUpDown1_ValueChanged(object sender, EventArgs e)
+        {
+            RenderRawAsTiles();
         }
     }
 }

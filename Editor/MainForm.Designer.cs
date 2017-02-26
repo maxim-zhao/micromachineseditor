@@ -64,6 +64,7 @@
             this.tbLog = new System.Windows.Forms.TextBox();
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
             this.cbLevelType = new System.Windows.Forms.ComboBox();
+            this.cbPalette = new System.Windows.Forms.ComboBox();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -235,12 +236,12 @@
             this.trackListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.editTrackToolStripMenuItem});
             this.trackListMenu.Name = "trackListMenu";
-            this.trackListMenu.Size = new System.Drawing.Size(189, 40);
+            this.trackListMenu.Size = new System.Drawing.Size(214, 42);
             // 
             // editTrackToolStripMenuItem
             // 
             this.editTrackToolStripMenuItem.Name = "editTrackToolStripMenuItem";
-            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(188, 36);
+            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(213, 38);
             this.editTrackToolStripMenuItem.Text = "Edit track";
             this.editTrackToolStripMenuItem.Click += new System.EventHandler(this.editTrackToolStripMenuItem_Click);
             // 
@@ -369,6 +370,7 @@
             // 
             // tabRaw
             // 
+            this.tabRaw.Controls.Add(this.cbPalette);
             this.tabRaw.Controls.Add(this.udImageWidth);
             this.tabRaw.Controls.Add(this.btnDecodeRaw);
             this.tabRaw.Controls.Add(this.numericUpDown1);
@@ -414,6 +416,7 @@
             0,
             0,
             0});
+            this.udImageWidth.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
             // 
             // btnDecodeRaw
             // 
@@ -447,6 +450,7 @@
             0,
             0,
             0});
+            this.numericUpDown1.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
             // 
             // pbRaw
             // 
@@ -539,6 +543,34 @@
             this.cbLevelType.TabIndex = 1;
             this.cbLevelType.SelectedIndexChanged += new System.EventHandler(this.TrackParametersChanged);
             // 
+            // cbPalette
+            // 
+            this.cbPalette.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cbPalette.FormattingEnabled = true;
+            this.cbPalette.Items.AddRange(new object[] {
+            "BF3E Menu",
+            "17ED2 Sportscars tiles",
+            "17EE2 Sportscars sprites",
+            "17EF2 Four by Four tiles",
+            "17F02 Four by Four sprites",
+            "17F12 Power Wheels tiles",
+            "17F22 Power Wheels sprites",
+            "17F32 Formula One tiles",
+            "17F42 Formula One sprites",
+            "17F52 Warriors tiles",
+            "17F62 Warriors sprites",
+            "17F72 Tanks tiles",
+            "17F82 Tanks sprites",
+            "17F92 RuffTrux tiles",
+            "17FA2 RuffTrux sprites",
+            "17FB2 Helicopter tiles",
+            "17FC2 Helicopter sprites"});
+            this.cbPalette.Location = new System.Drawing.Point(1250, 13);
+            this.cbPalette.Name = "cbPalette";
+            this.cbPalette.Size = new System.Drawing.Size(259, 33);
+            this.cbPalette.TabIndex = 11;
+            this.cbPalette.SelectedIndexChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
@@ -623,6 +655,7 @@
         private System.Windows.Forms.NumericUpDown numericUpDown1;
         private System.Windows.Forms.Button btnDecodeRaw;
         private System.Windows.Forms.NumericUpDown udImageWidth;
+        private System.Windows.Forms.ComboBox cbPalette;
     }
 }
 
