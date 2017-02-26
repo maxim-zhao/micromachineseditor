@@ -2190,7 +2190,7 @@
 02:9773 _DATA_9773_TileWriteAddresses
 02:977f _LABEL_977F_
 02:97af _LABEL_97AF_
-02:97df _DATA_97DF_MultiplesOf8
+02:97df _DATA_97DF_8TimesTable
 02:97ea _LABEL_97EA_DrawDriverPortraitColumn
 02:9817 _DATA_9817_
 02:9849 _DATA_9849_
@@ -2532,7 +2532,7 @@
 05:bf52 _DATA_17F52_SMSPalette_Garage
 05:bf72 _DATA_17F72_SMSPalette_Tanks
 05:bf92 _DATA_17F92_SMSPalette_RuffTrux
-05:bfb2 _DATA_17FB2_Helicopter
+05:bfb2 _DATA_17FB2_SMSPalette_Helicopter
 06:b1a2 _DATA_1B1A2_
 06:b232 _DATA_1B232_
 06:b2c3 _DATA_1B2C3_Tiles_Trophy

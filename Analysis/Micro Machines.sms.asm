@@ -8656,7 +8656,11 @@ _LABEL_3969_:
   ret
 
 _LABEL_39AE_:
-  ld hl, _DATA_3E04_
+  ld hl, _DATA_3E04_ ; Would be easier to do the maths
+  ; ld l,a
+  ; add a,a
+  ; add a,l
+  ; - assuming a is not out of range for the table and somehow that is needed
   ld a, (_RAM_DE86_)
   add a, l
   ld l, a
@@ -9181,8 +9185,8 @@ _LABEL_3DEC_:
 
 ; Data from 3E04 to 3E23 (32 bytes)
 _DATA_3E04_:
-.db $00 $03 $06 $09 $0C $0F $12 $15 $48 $4B $4E $51 $54 $57 $5A $5D
-.db $00 $04 $08 $0C $10 $14 $18 $1C $80 $84 $88 $8C $90 $94 $98 $9C
+.db $00 $03 $06 $09 $0C $0F $12 $15 $48 $4B $4E $51 $54 $57 $5A $5D ; Multiples of 3, jumping in the middle
+.db $00 $04 $08 $0C $10 $14 $18 $1C $80 $84 $88 $8C $90 $94 $98 $9C ; Multiples of 4, jumping in the middle
 
 _LABEL_3E24_:
   JumpToPagedFunction _LABEL_37817_
@@ -9192,7 +9196,7 @@ _LABEL_3E2F_:
 
 ; Data from 3E3A to 3E42 (9 bytes)
 _DATA_3E3A_TrackTypeDataPageNumbers:
-.db $03 $04 $05 $06 $07 $08 $09 $0A $0B
+.db :_LABEL_C000_TrackData_Desk $04 $05 $06 $07 $08 $09 $0A $0B
 ; Desk  Breakfast Bathtub Sandpit F1  Garage  Tanks Bonus
 
 _LABEL_3E43_:
@@ -9472,15 +9476,32 @@ _DATA_40F5_:
 
 ; Data from 4105 to 4224 (288 bytes)
 _DATA_4105_: ; 32 bytes per track type, not sure what it does, copied to $da00
-.db $08 $0B $0D $0E $0F $0E $0D $0B $08 $05 $03 $02 $02 $02 $03 $05 $02 $03 $04 $05 $08 $0B $0C $0D $0F $0D $0C $0B $08 $05 $04 $03
-.db $09 $0A $0A $0B $0C $0B $0A $0A $09 $08 $07 $06 $05 $06 $07 $08 $05 $06 $06 $06 $09 $0B $0B $0B $0C $0B $0B $0B $09 $06 $06 $06
-.db $09 $0B $0C $0D $0D $0D $0C $0B $09 $07 $05 $04 $04 $04 $05 $07 $04 $04 $06 $08 $09 $0A $0B $0C $0D $0C $0B $0A $09 $08 $06 $04
-.db $09 $0B $0B $0C $0D $0C $0B $0B $09 $07 $05 $04 $03 $04 $05 $07 $03 $03 $05 $07 $09 $0A $0B $0D $0D $0D $0B $0A $09 $07 $05 $03
-.db $08 $05 $04 $03 $04 $03 $04 $05 $08 $0B $0C $0D $0C $0D $0C $0B $0C $0D $0C $0B $08 $05 $04 $03 $04 $03 $04 $05 $08 $0B $0C $0D
-.db $09 $0A $0A $0B $0C $0B $0A $0A $09 $07 $06 $05 $05 $05 $06 $07 $05 $05 $06 $07 $08 $09 $0A $0B $0C $0B $0A $09 $08 $07 $06 $05
-.db $09 $08 $09 $07 $08 $07 $09 $09 $09 $09 $09 $0B $0A $0B $09 $0A $0A $0A $0A $0A $09 $08 $08 $08 $08 $08 $08 $08 $09 $0A $0A $0A
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $03 $05 $06 $06 $07 $06 $06 $05 $03 $02 $01 $01 $00 $01 $01 $02 $05 $06 $06 $07 $08 $0A $0B $0B $0C $0B $0B $0A $08 $07 $06 $06
+.db $08 $0B $0D $0E $0F $0E $0D $0B $08 $05 $03 $02 $02 $02 $03 $05
+.db $02 $03 $04 $05 $08 $0B $0C $0D $0F $0D $0C $0B $08 $05 $04 $03
+
+.db $09 $0A $0A $0B $0C $0B $0A $0A $09 $08 $07 $06 $05 $06 $07 $08
+.db $05 $06 $06 $06 $09 $0B $0B $0B $0C $0B $0B $0B $09 $06 $06 $06
+
+.db $09 $0B $0C $0D $0D $0D $0C $0B $09 $07 $05 $04 $04 $04 $05 $07
+.db $04 $04 $06 $08 $09 $0A $0B $0C $0D $0C $0B $0A $09 $08 $06 $04
+
+.db $09 $0B $0B $0C $0D $0C $0B $0B $09 $07 $05 $04 $03 $04 $05 $07
+.db $03 $03 $05 $07 $09 $0A $0B $0D $0D $0D $0B $0A $09 $07 $05 $03
+
+.db $08 $05 $04 $03 $04 $03 $04 $05 $08 $0B $0C $0D $0C $0D $0C $0B
+.db $0C $0D $0C $0B $08 $05 $04 $03 $04 $03 $04 $05 $08 $0B $0C $0D
+
+.db $09 $0A $0A $0B $0C $0B $0A $0A $09 $07 $06 $05 $05 $05 $06 $07
+.db $05 $05 $06 $07 $08 $09 $0A $0B $0C $0B $0A $09 $08 $07 $06 $05
+
+.db $09 $08 $09 $07 $08 $07 $09 $09 $09 $09 $09 $0B $0A $0B $09 $0A
+.db $0A $0A $0A $0A $09 $08 $08 $08 $08 $08 $08 $08 $09 $0A $0A $0A
+
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+
+.db $03 $05 $06 $06 $07 $06 $06 $05 $03 $02 $01 $01 $00 $01 $01 $02
+.db $05 $06 $06 $07 $08 $0A $0B $0B $0C $0B $0B $0A $08 $07 $06 $06
 
 ; Data from 4225 to 4424 (512 bytes)
 _DATA_4225_TrackMetatileLookup: ; indexes into "tile index data pointer table", for the 64 metatiles per track type
@@ -20261,7 +20282,7 @@ _LABEL_977F_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_MultiplesOf8
+  ld hl, _DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
@@ -20288,15 +20309,15 @@ _LABEL_97AF_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_MultiplesOf8
+  ld hl, _DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
   ret
 
 ; Data from 97DF to 97E9 (11 bytes)
-_DATA_97DF_MultiplesOf8:
-.db $00 $08 $10 $18 $20 $28 $30 $38 $40 $48 $50
+_DATA_97DF_8TimesTable:
+  TimesTableLo 0 8 11
 
 _LABEL_97EA_DrawDriverPortraitColumn:
 ; Seems to be what it does, not clear how yet
@@ -20697,7 +20718,7 @@ _LABEL_9B87_:
   ld a, $58
   ld (hl), a
   ld (_RAM_D6AA_), a
-  ld hl, _DATA_97DF_MultiplesOf8
+  ld hl, _DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_), a
@@ -21022,7 +21043,7 @@ _LABEL_9E70_:
 +:
   ld c, a
   ld b, $00
-  ld hl, _DATA_97DF_MultiplesOf8
+  ld hl, _DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
@@ -23584,8 +23605,8 @@ _LABEL_B31C_:
   jp -
 
 _LABEL_B323_Populate_RAM_DBFE_:
-  ; Copies data from _DATA_97DF_MultiplesOf8 to _RAM_DBFE_
-  ld hl, _DATA_97DF_MultiplesOf8
+  ; Copies data from _DATA_97DF_8TimesTable to _RAM_DBFE_
+  ld hl, _DATA_97DF_8TimesTable
   ld de, _RAM_DBFE_
   ld bc, $0000
 -:ld a, (hl)
@@ -23694,7 +23715,7 @@ _LABEL_B3C4_:
   ld d, (hl)
   call _LABEL_B361_VRAMAddressToDE
   ld (_RAM_D6A8_DisplayCaseTileAddress), de
-  ld hl, _DATA_97DF_MultiplesOf8
+  ld hl, _DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
@@ -25368,13 +25389,44 @@ _LABEL_EA34_Desk_Track1Layout:
 _LABEL_ED79_Desk_Track2Layout:
 .incbin "Assets/raw/Micro Machines_c000.inc" skip $2d79 read $03dc ; compressed
 _LABEL_F155_Desk_GGPalette:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $3155 read $0040 ; raw
-_LABEL_F195_Desk_DecoratorTiles:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $3195 read $0080 ; raw
+  GGCOLOUR $000000
+  GGCOLOUR $444400
+  GGCOLOUR $884400
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $888888
+  GGCOLOUR $444444
+  GGCOLOUR $880000
+  GGCOLOUR $004488
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_LABEL_F195_Desk_DecoratorTiles
+.incbin "Assets/Sportscars/Decorators.1bpp"
 _LABEL_F215_Desk_Data:
 .incbin "Assets/raw/Micro Machines_c000.inc" skip $3215 read $0040 ; raw
 _LABEL_F255_Desk_ExtraTiles:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $3255 read $0108 ; raw
+.incbin "Assets/Sportscars/Dust-Oil-Falling.3bpp"
 
 _DATA_F35D_Tiles_Portrait_FourByFour:
 .incbin "Assets/Four By Four/Portrait.3bpp.compressed"
@@ -25518,7 +25570,7 @@ _DATA_17EC2_SMSPalettes:
 .dw _DATA_17F52_SMSPalette_Garage
 .dw _DATA_17F72_SMSPalette_Tanks
 .dw _DATA_17F92_SMSPalette_RuffTrux
-.dw _DATA_17FB2_Helicopter
+.dw _DATA_17FB2_SMSPalette_Helicopter
 
 ; 1st entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17ED2 to 17EF1 (32 bytes)
@@ -25781,7 +25833,7 @@ _DATA_17F92_SMSPalette_RuffTrux:
 
 ; 8th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17FB2 to 17FFF (78 bytes)
-_DATA_17FB2_Helicopter: ; Unused
+_DATA_17FB2_SMSPalette_Helicopter: ; Unused
   SMSCOLOUR $000000
   SMSCOLOUR $FFFFFF
   SMSCOLOUR $AAAA55
@@ -28389,10 +28441,10 @@ _DATA_306D0_TanksCarTiles:
 ; Data from 30A68 to 30C67 (512 bytes)
 _DATA_30A68_HUDTiles:
 ; 4bpp tiles (32 bytes per tile)
-; - Car colour squares *4
+; - Car colour squares *4 (first is highlighted)
 ; - "st", "nd", "rd", "th"
 ; - Car colour "finished" squares *4
-; - Smoke (unused?)
+; - Smoke (unused?) *4
 ; - Lap remaining numbers (1-4)
 .incbin "Assets/Challenge HUD.4bpp"
 
@@ -29819,48 +29871,9 @@ _DATA_35D2D_HeadToHeadHUDTiles:
 ; - "BONUS" (first 4 tiles)
 ; - Exhaust smoke? TODO supposed to be showing this I guess, on the sprites following cars - broken?
 ; - "BONUS" (last 2 tiles)
-; - 4 digit for laps remaining
+; - Digit for laps remaining (unused - replaced with tile from challenge mode data)
 ; - Blank tile
-.db $00 $00 $00 $38 $38 $00 $7C $44 $00 $FE $B2 $30 ; red
-.db $FE $B2 $30 $FE $82 $00 $7C $44 $00 $38 $38 $00
-.db $00 $00 $00 $38 $38 $00 $44 $44 $38 $B2 $B2 $7C ; blue
-.db $B2 $B2 $7C $82 $82 $7C $44 $44 $38 $38 $38 $00
-.db $7A $7A $00 $7F $7F $30 $7F $7F $32 $7F $7F $37 ; WINNER
-.db $5F $7F $3F $7F $7F $1D $3F $3F $18 $3D $3D $00
-.db $FF $FF $00 $FF $FF $6D $FF $FF $6D $FF $FF $6D
-.db $DF $FF $ED $FF $FF $CD $FF $FF $CD $FF $FF $00
-.db $DF $DF $00 $FF $FF $8D $FF $FF $CD $FF $FF $ED
-.db $FF $FF $BD $FF $FF $9D $FF $FF $8D $DF $DF $00
-.db $DF $DF $00 $FF $FF $8D $FF $FF $CD $FF $FF $ED
-.db $FF $FF $BD $FF $FF $9D $FF $FF $8D $DF $DF $00
-.db $FF $FF $00 $FF $FF $FD $FF $FF $81 $FF $FF $F9
-.db $FF $FF $81 $FF $FF $FD $FF $FF $FD $FF $FF $00
-.db $FC $FC $00 $FE $FA $FC $FE $FE $8C $FE $FA $FC
-.db $BC $FC $F0 $FE $FE $98 $FE $FE $8C $DE $DE $00
-.db $0F $0F $00 $0F $0F $07 $0F $0F $06 $0F $0F $07 ; BONU-
-.db $0F $0F $06 $0F $0F $07 $0F $0F $07 $0F $0F $00
-.db $FF $FF $00 $FF $EB $F7 $FF $BF $76 $FF $EF $F6
-.db $FF $BF $76 $FF $FF $F7 $FF $EB $F7 $FF $FF $00
-.db $FF $FF $00 $FF $EF $F6 $FF $FF $37 $7F $7F $37
-.db $FF $FF $36 $FF $FF $F6 $FF $EF $F6 $FF $FF $00
-.db $7F $7F $00 $FF $FF $36 $FF $FF $36 $FF $FF $B6
-.db $FF $FF $F6 $FF $FF $77 $FF $FF $33 $7F $7F $00
-.db $00 $00 $00 $18 $18 $00 $38 $38 $10 $5C $64 $38 ; smoke
-.db $74 $6C $38 $38 $38 $00 $00 $00 $00 $00 $00 $00
-.db $18 $18 $00 $34 $3C $18 $3A $3E $1C $56 $6A $3C
-.db $AA $FE $7C $5A $66 $3C $3C $3C $00 $00 $00 $00
-.db $1C $1C $00 $2A $3E $1C $2D $3F $1E $53 $6D $3E
-.db $E6 $BA $7C $B5 $FF $7E $49 $77 $3E $3E $3E $00
-.db $1C $1C $00 $36 $2A $1C $22 $3E $1C $36 $2A $1C
-.db $7E $7E $00 $D7 $B5 $62 $7D $5B $26 $26 $26 $00
-.db $7F $7F $00 $7F $7B $37 $7F $7F $36 $7F $7B $37 ; -US
-.db $FF $FF $30 $FF $FF $F6 $FF $FB $E7 $FF $FF $00
-.db $F0 $F0 $00 $F0 $F0 $E0 $F0 $F0 $00 $F8 $E8 $F0
-.db $F8 $F8 $30 $F8 $F8 $30 $F8 $E8 $F0 $F0 $F0 $00
-.db $00 $00 $00 $3E $3E $00 $7F $5D $3E $7F $7F $36 ; 4
-.db $7F $7D $0E $7F $7B $1C $7F $7F $3E $7F $7F $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 ; blank
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+.incbin "Assets/Head to Head HUD.3bpp"
 
 _LABEL_35F0D_:
   ld a, $00
