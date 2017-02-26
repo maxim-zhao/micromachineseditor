@@ -25452,16 +25452,18 @@ _DATA_FAA5_Tiles_Portrait_SportsCars:
 ; $12B4D = dangling pointer for Helicopters portrait?
 
 _DATA_13C42_Tiles_BigNumbers:
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13C42-$10000 read $13D7F-$13C42
+.incbin "Assets/Menu/Numbers-Big.3bpp.compressed"
 
 _DATA_13D7F_Tiles_MicroMachinesText:
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13D7F-$10000 read $13f38-$13D7F
+.incbin "Assets/Menu/Text-MicroMachines.3bpp.compressed"
 
 _DATA_13F38_Tilemap_SmallLogo: ; 8x3
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f38-$10000 read $13f50-$13f38
+.incbin "Assets/Menu/Logo-small.tilemap"
 
 _DATA_13F50_Tilemap_MicroMachinesText:
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f50-$10000 read $13fff-$13f50
+.incbin "Assets/Menu/Text-MicroMachines.tilemap"
+
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f68-$10000 read $13fff-$13f68
 
 .db :CADDR
 
