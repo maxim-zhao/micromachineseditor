@@ -2638,8 +2638,7 @@
 0c:8000 _DATA_30000_F1CarTiles
 0c:8330 _DATA_30330_WarriorsCarTiles
 0c:86d0 _DATA_306D0_TanksCarTiles
-0c:8a68 _DATA_30A68_TournamentHUDTiles
-0c:8c68 _DATA_30C68_LapRemainingIndicators
+0c:8a68 _DATA_30A68_HUDTiles
 0c:8ce8 _LABEL_30CE8_PlayMenuMusic
 0c:8d28 _LABEL_30D28_StopMenuMusic
 0c:8d36 _LABEL_30D36_MenuMusicFrameHandler
