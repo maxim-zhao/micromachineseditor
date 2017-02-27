@@ -16936,7 +16936,7 @@ _LABEL_7C7D_:
   ld a, (de)
   ld h, a
   SetPaletteAddressImmediateGG 0
-  ld b, $40 ; 64 bytes = full palette
+  ld b, 64 ; 64 bytes = full palette
   ld c, PORT_VDP_DATA
   otir
   jp ++
@@ -16947,7 +16947,7 @@ _LABEL_7C7D_:
   ld (PAGING_REGISTER), a
   ld a, (_RAM_DB97_TrackType)
   sla a
-  ld d, $00
+  ld d, 0
   ld e, a
   ld hl, _DATA_17EC2_SMSPalettes
   add hl, de
@@ -16975,7 +16975,7 @@ _LABEL_7C7D_:
   ld a, (hl)
   ld d, a
   ; Copy to RAM
-  ld bc, $0080
+  ld bc, 16 * 8
   ld hl, _RAM_D980_CarDecoratorTileData1bpp
 -:ld a, (de)
   ld (hl), a
@@ -16986,7 +16986,7 @@ _LABEL_7C7D_:
   or c
   jr nz, -
 
-  ; Next pointer -> 64 bytes to _RAM_D900_
+  ; Next pointer -> 64 bytes to _RAM_D900_ ("Data", use TBC)
   ld hl, $8010
   ld a, (hl)
   ld e, a
@@ -17004,7 +17004,7 @@ _LABEL_7C7D_:
   or c
   jr nz, -
 
-  ; Next pointer
+  ; Next pointer: car-specific effects tiles
   ld hl, $8012
   ld a, (hl)
   ld e, a
@@ -25367,11 +25367,11 @@ _LABEL_C000_TrackData_SportsCars:
 ; $8004 dw Pointer to track 0 layout (compressed)
 ; $8006 dw Pointer to track 1 layout (compressed)
 ; $8008 dw Pointer to track 2 layout (compressed)
-; $800a dw Pointer to ???
+; $800a dw Pointer to ??? Seems to be a duplicate of one next to it
 ; $800c dw Pointer to GG palette (64 bytes)
 ; $800e dw Pointer to "decorator" tile data (16 * 1bpp tile = 128 bytes)
 ; $8010 dw Pointer to ??? (64 bytes, copied to _RAM_D900_)
-; $8012 dw Pointer to 11 tiles @3bpp (108 bytes)
+; $8012 dw Pointer to effects tile data (11 * 3bpp tile = 264 bytes)
 .dw _LABEL_E480_SportsCars_BehaviourData ; 2308B
 .dw _LABEL_E799_SportsCars_WallData ; 1156B = 12*12 bits * 64 tiles + 4 byte header
 .dw _LABEL_E811_SportsCars_Track0Layout ; 2048B
@@ -25379,24 +25379,24 @@ _LABEL_C000_TrackData_SportsCars:
 .dw _LABEL_ED79_SportsCars_Track2Layout ; 2048B
 .dw _LABEL_F155_SportsCars_GGPalette
 .dw _LABEL_F155_SportsCars_GGPalette ; GG palette, raw
-.dw _LABEL_F195_SportsCars_DecoratorTiles
-.dw _LABEL_F215_SportsCars_Data
-.dw _LABEL_F255_SportsCars_ExtraTiles
+.dw _LABEL_F195_SportsCars_DecoratorTiles ; 128B = 16 tiles @ 1bpp
+.dw _LABEL_F215_SportsCars_Data ; 64B
+.dw _LABEL_F255_SportsCars_EffectsTiles ; 264B = 11 tiles @ 3bpp
 
 .incbin "Assets/raw/Micro Machines_c000.inc" skip $0014 read $246c ; ??? Looks uninitialised
 ; Theory: The pointers above were done by hand and they started the real data at +$80
 ; So the gap is unused
 
 _LABEL_E480_SportsCars_BehaviourData:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $2480 read $0319 ; compressed
+.incbin "Assets/Sportscars/Behaviour data.compressed"
 _LABEL_E799_SportsCars_WallData:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $2799 read $0078 ; compressed
+.incbin "Assets/Sportscars/Wall data.compressed"
 _LABEL_E811_SportsCars_Track0Layout:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $2811 read $0223 ; compressed
+.incbin "Assets/Sportscars/Track 0 layout.compressed"
 _LABEL_EA34_SportsCars_Track1Layout:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $2a34 read $0345 ; compressed
+.incbin "Assets/Sportscars/Track 1 layout.compressed"
 _LABEL_ED79_SportsCars_Track2Layout:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $2d79 read $03dc ; compressed
+.incbin "Assets/Sportscars/Track 2 layout.compressed"
 _LABEL_F155_SportsCars_GGPalette:
   GGCOLOUR $000000
   GGCOLOUR $444400
@@ -25433,9 +25433,9 @@ _LABEL_F155_SportsCars_GGPalette:
 _LABEL_F195_SportsCars_DecoratorTiles
 .incbin "Assets/Sportscars/Decorators.1bpp"
 _LABEL_F215_SportsCars_Data:
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $3215 read $0040 ; raw
-_LABEL_F255_SportsCars_ExtraTiles:
-.incbin "Assets/Sportscars/Dust-Oil-Falling.3bpp"
+.db $22 $00 $5D $4D $6F $7B $00 $00 $00 $00 $22 $22 $22 $22 $80 $C0 $C0 $C0 $C0 $E0 $E0 $C0 $E0 $C0 $80 $A0 $A0 $A0 $A0 $A0 $22 $C0 $22 $C0 $A0 $A0 $C0 $C0 $C0 $C0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $80 $80 $C0 $A0 $80 $C0 $00 $00
+_LABEL_F255_SportsCars_EffectsTiles:
+.incbin "Assets/Sportscars/Effects.3bpp"
 
 _DATA_F35D_Tiles_Portrait_FourByFour:
 .incbin "Assets/Four By Four/Portrait.3bpp.compressed"
@@ -25456,11 +25456,80 @@ _DATA_FDC1_: ; looks like data, can't see a reference
 
 ; Data from 10000 to 13FFF (16384 bytes)
 _LABEL_10000_TrackData_FourByFour: ; TODO
-.incbin "Assets/raw/Micro Machines_10000.inc" skip 0 read $13C42-$10000
+;.incbin "Assets/raw/Micro Machines_10000.inc" skip 0 read $13C42-$10000
+.dw _LABEL_9E50_FourByFour_BehaviourData ; 2308B
+.dw _LABEL_A105_FourByFour_WallData ; 1156B = 12*12 bits * 64 tiles + 4 byte header
+.dw _LABEL_A152_FourByFour_Track0Layout ; 2048B
+.dw _LABEL_A378_FourByFour_Track1Layout ; 2048B
+.dw _LABEL_A466_FourByFour_Track2Layout ; 2048B
+.dw _LABEL_A466_FourByFour_Track2Layout
+.dw _LABEL_A762_FourByFour_GGPalette ; GG palette, raw
+.dw _LABEL_A7A2_FourByFour_DecoratorTiles
+.dw _LABEL_A822_FourByFour_Data
+.dw _LABEL_A862_FourByFour_EffectsTiles
 
-; 1296a = ruff trux car tiles run encoded
+; Unused space?
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $10014-$10000 read $11e50-$10014
 
-; $12B4D = dangling pointer for Helicopters portrait?
+_LABEL_9E50_FourByFour_BehaviourData:
+.incbin "Assets/Four by Four/Behaviour data.compressed"
+_LABEL_A105_FourByFour_WallData:
+.incbin "Assets/Four by Four/Wall data.compressed"
+_LABEL_A152_FourByFour_Track0Layout:
+.incbin "Assets/Four by Four/Track 0 layout.compressed"
+_LABEL_A378_FourByFour_Track1Layout:
+.incbin "Assets/Four by Four/Track 1 layout.compressed"
+_LABEL_A466_FourByFour_Track2Layout:
+.incbin "Assets/Four by Four/Track 2 layout.compressed"
+_LABEL_A762_FourByFour_GGPalette:
+  GGCOLOUR $000000
+  GGCOLOUR $884400
+  GGCOLOUR $444400
+  GGCOLOUR $CCCCCC
+  GGCOLOUR $888888
+  GGCOLOUR $004488
+  GGCOLOUR $4488EE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+
+_LABEL_A7A2_FourByFour_DecoratorTiles:
+.incbin "Assets/Four by Four/Decorators.1bpp"
+
+_LABEL_A822_FourByFour_Data:
+.db $C0 $00 $22 $49 $73 $00 $00 $00 $00 $22 $22 $22 $22 $00 $C0 $C0
+.db $C0 $C0 $C0 $C0 $C0 $C0 $80 $80 $80 $00 $80 $C0 $C0 $C0 $A0 $C0
+.db $22 $C0 $C0 $80 $80 $80 $80 $80 $00 $00 $80 $80 $80 $80 $80 $00
+.db $00 $80 $80 $80 $80 $45 $77 $00 $00 $00 $00 $00 $00 $00 $00 $00
+
+_LABEL_A862_FourByFour_EffectsTiles:
+.incbin "Assets/Four by Four/Effects.3bpp"
+
+; Unknown
+.incbin "Assets/raw/Micro Machines_10000.inc" skip $1296a-$10000 read $13c42-$1296a
 
 _DATA_13C42_Tiles_BigNumbers:
 .incbin "Assets/Menu/Numbers-Big.3bpp.compressed"
