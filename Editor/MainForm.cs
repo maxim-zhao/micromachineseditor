@@ -498,7 +498,7 @@ namespace MicroMachinesEditor
                 // Hot pink transparency
                 _palette[0] = Color.Fuchsia;
             }
-            byte[] data = _raw.ToArray();
+            byte[] data = _raw.Skip(Convert.ToInt32(udSkip.Value)).ToArray();
             var bpp = Convert.ToInt32(numericUpDown1.Value);
             int numBytes = Math.Min(bpp * 8 * 512, data.Length);
             int numTiles = numBytes / bpp / 8;
