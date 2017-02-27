@@ -9159,18 +9159,19 @@ _LABEL_3DBD_:
 
 ; Data from 3DC8 to 3DD0 (9 bytes)
 _DATA_3DC8_TrackTypeTileDataPages:
-.db $0F $0E $0F $0E $0D $0E $0E $0F $0D
+.db :_DATA_3C000_Sportscars_Tiles $0E $0F $0E $0D $0E $0E $0F 
+.db $0D ; Dangling helicopters reference
 
 _LABEL_3DD1_:
   JumpToPagedFunction _LABEL_3636E_
 
 ; Data from 3DDC to 3DE3 (8 bytes)
 _DATA_3DDC_TrackTypeTileDataPointerLo:
-.db $00 $83 $01 $00 $00 $FA $68 $8D
+.db <_DATA_3C000_Sportscars_Tiles $83 $01 $00 $00 $FA $68 $8D
 
 ; Data from 3DE4 to 3DEB (8 bytes)
 _DATA_3DE4_TrackTypeTileDataPointerHi:
-.db $80 $9C $99 $80 $80 $A8 $91 $8D
+.db >_DATA_3C000_Sportscars_Tiles $9C $99 $80 $80 $A8 $91 $8D
 
 _LABEL_3DEC_:
   ld a, $E0
@@ -17165,7 +17166,7 @@ _LABEL_7F02_Copy3bppTileDataToVRAM:
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
   jr nz, +
-  ld a, $C6     ; Stop after $600 bytes
+  ld a, $C6     ; Stop after $600 bytes for RuffTrux
   ld (_RAM_DF1C_CopyToVRAMUpperBoundHi), a
   ld a, $00
   out (PORT_VDP_ADDRESS), a
@@ -34218,10 +34219,10 @@ _LABEL_37FF7_ret:
 .incbin "Assets/raw/Micro Machines_3941a.inc" skip 0 read $3B32F-$3941A
 
 _DATA_3B32F_DisplayCaseTilemapCompressed:
-.incbin "Assets/raw/Micro Machines_3941a.inc" skip $3B32F-$3941A read $3B37F-$3B32F
+.incbin "Assets/Menu/DisplayCase.tilemap.compressed"
 
 _DATA_3B37F_Tiles_DisplayCase:
-.incbin "Assets/raw/Micro Machines_3941a.inc" skip $3B37F-$3941A read $3B971-$3B37F
+.incbin "Assets/Menu/DisplayCase.3bpp.compressed"
 
 _LABEL_3B971_RamCodeLoaderStage2:
   ; Copy more code into RAM...
@@ -34927,12 +34928,20 @@ _LABEL_3BD0F_RamCodeEnd:
 .ORG $0000
 
 ; Data from 3C000 to 3FFFF (16384 bytes)
-.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3C000-$3C000 read $3e5d7-$3C000
+_DATA_3C000_Sportscars_Tiles:
+.incbin "Assets/Sportscars/Tiles.compressed" ; bitplane-split 3bpp
+
+_DATA_3CD8D_RuffTrux_Tiles:
+.incbin "Assets/RuffTrux/Tiles.compressed" ; bitplane-split 3bpp
+
+_DATA_3D901_FormulaOne_Tiles:
+.incbin "Assets/Formula One/Tiles.compressed" ; bitplane-split 3bpp
 
 _DATA_3E5D7_Tiles_MediumLogo:
-.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3e5d7-$3C000 read $3ec67-$3e5d7
+.incbin "Assets/Menu/Logo-Medium.3bpp.compressed" ; bitplane-split 3bpp
 
-.incbin "Assets/raw/Micro Machines_3c000.inc" skip $3ec67-$3C000 read $3ECA9-$3ec67
+_DATA_3EC67_Tiles_MediumLogo:
+.incbin "Assets/Menu/Logo-Medium.tilemap.compressed"
 
 _TEXT_3ECA9_VEHICLE_NAME_BLANK:
 .asc "                "
