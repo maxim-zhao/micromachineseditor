@@ -9159,7 +9159,7 @@ _LABEL_3DBD_:
 
 ; Data from 3DC8 to 3DD0 (9 bytes)
 _DATA_3DC8_TrackTypeTileDataPages:
-.db :_DATA_3C000_Sportscars_Tiles $0E $0F $0E $0D $0E $0E $0F 
+.db :_DATA_3C000_Sportscars_Tiles :_DATA_39C83_FourByFour_Tiles :_DATA_3D901_Powerboats_Tiles :_DATA_38000_TurboWheels_Tiles :_DATA_34000_FormulaOne_Tiles :_DATA_3A8FA_Warriors_Tiles :_DATA_39168_Tanks_Tiles :_DATA_3CD8D_RuffTrux_Tiles
 .db $0D ; Dangling helicopters reference
 
 _LABEL_3DD1_:
@@ -9167,11 +9167,11 @@ _LABEL_3DD1_:
 
 ; Data from 3DDC to 3DE3 (8 bytes)
 _DATA_3DDC_TrackTypeTileDataPointerLo:
-.db <_DATA_3C000_Sportscars_Tiles $83 $01 $00 $00 $FA $68 $8D
+.db <_DATA_3C000_Sportscars_Tiles <_DATA_39C83_FourByFour_Tiles <_DATA_3D901_Powerboats_Tiles <_DATA_38000_TurboWheels_Tiles <_DATA_34000_FormulaOne_Tiles <_DATA_3A8FA_Warriors_Tiles <_DATA_39168_Tanks_Tiles <_DATA_3CD8D_RuffTrux_Tiles
 
 ; Data from 3DE4 to 3DEB (8 bytes)
 _DATA_3DE4_TrackTypeTileDataPointerHi:
-.db >_DATA_3C000_Sportscars_Tiles $9C $99 $80 $80 $A8 $91 $8D
+.db >_DATA_3C000_Sportscars_Tiles >_DATA_39C83_FourByFour_Tiles >_DATA_3D901_Powerboats_Tiles >_DATA_38000_TurboWheels_Tiles >_DATA_34000_FormulaOne_Tiles >_DATA_3A8FA_Warriors_Tiles >_DATA_39168_Tanks_Tiles >_DATA_3CD8D_RuffTrux_Tiles
 
 _LABEL_3DEC_:
   ld a, $E0
@@ -25596,27 +25596,8 @@ _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
 .incbin "Assets/Menu/Text-TwoPlayersOnOneGameGear.4bpp.compressed"
 
 ; Data from 17DD5 to 17E54 (128 bytes)
-_DATA_17DD5_Tiles_Playoff_Part1:
-; Raw 4bpp tile data: "PLAYO-" (4 tiles)
-.db $FF $FF $00 $00 
-.db $FF $FD $7E $00 
-.db $FF $FF $66 $00 
-.db $FF $FD $7E $00
-.db $FF $FF $60 $00 $F1 $F1 $60 $00 $F1 $F1 $60 $00 $F1 $F1 $00 $00
-.db $E3 $E3 $00 $00 $E7 $E5 $C3 $00 $E7 $E7 $C3 $00 $E7 $E7 $C3 $00
-.db $FF $FF $C3 $00 $FF $FF $FB $00 $FF $FF $FB $00 $FF $FF $00 $00
-.db $FF $FF $00 $00 $FF $EF $F6 $00 $FF $FF $36 $00 $FF $FB $F7 $00
-.db $FF $FF $31 $00 $FB $FB $31 $00 $FB $FB $31 $00 $FB $FB $00 $00
-.db $F7 $F7 $00 $00 $FF $FB $67 $00 $FF $FF $66 $00 $FF $DF $E6 $00
-.db $EF $EF $86 $00 $CF $CF $87 $00 $CF $CB $87 $00 $C7 $C7 $00 $00
-
-; Data from 17E55 to 17E94 (64 bytes)
-_DATA_17E55_Tiles_Playoff_Part2:
-; Raw 4bpp tile data: "-FF" (2 tiles)
-.db $FF $FF $00 $00 $FF $DF $EF $00 $FF $FF $6C $00 $FF $FF $6F $00
-.db $FF $FF $6C $00 $FE $FE $EC $00 $FE $DE $EC $00 $FE $FE $00 $00
-.db $FF $FF $00 $00 $FF $FF $BE $00 $FF $FF $30 $00 $FF $FF $BE $00
-.db $FF $FF $30 $00 $78 $78 $30 $00 $78 $78 $30 $00 $78 $78 $00 $00
+_DATA_17DD5_Tiles_Playoff:
+.incbin "Assets/Playoff.4bpp"
 
 _LABEL_17E95_:
   ld a, $80 ; Tile $19c
@@ -25624,14 +25605,14 @@ _LABEL_17E95_:
   ld a, $73
   out (PORT_VDP_ADDRESS), a
   ld bc, 4 * 8 ; 4 tiles
-  ld hl, _DATA_17DD5_Tiles_Playoff_Part1
+  ld hl, _DATA_17DD5_Tiles_Playoff
   call _LABEL_17EB4_LoadTileRow
   ld a, $80 ; TIle $1a4
   out (PORT_VDP_ADDRESS), a
   ld a, $74
   out (PORT_VDP_ADDRESS), a
-  ld bc, $0010
-  ld hl, _DATA_17E55_Tiles_Playoff_Part2
+  ld bc, 2 * 8 ; 2 tiles
+  ld hl, _DATA_17DD5_Tiles_Playoff+4*32
   ; fall through
 _LABEL_17EB4_LoadTileRow:
 -:push bc
@@ -25647,18 +25628,18 @@ _LABEL_17EB4_LoadTileRow:
 
 ; Pointer Table from 17EC2 to 17ED1 (8 entries, indexed by _RAM_DB97_TrackType)
 _DATA_17EC2_SMSPalettes:
-.dw _DATA_17ED2_SMSPalette_Desk
-.dw _DATA_17EF2_SMSPalette_Breakfast
-.dw _DATA_17F12_SMSPalette_Sandpit
-.dw _DATA_17F32_SMSPalette_F1
-.dw _DATA_17F52_SMSPalette_Garage
-.dw _DATA_17F72_SMSPalette_Tanks
-.dw _DATA_17F92_SMSPalette_RuffTrux
-.dw _DATA_17FB2_SMSPalette_Helicopter
+.dw _DATA_17ED2_SMSPalette_SportsCars
+.dw _DATA_17EF2_SMSPalette_FourByFour
+.dw _DATA_17F12_SMSPalette_Powerboats
+.dw _DATA_17F32_SMSPalette_TurboWheels
+.dw _DATA_17F52_SMSPalette_FormulaOne
+.dw _DATA_17F72_SMSPalette_Warriors
+.dw _DATA_17F92_SMSPalette_Tanks
+.dw _DATA_17FB2_SMSPalette_RuffTrux
 
 ; 1st entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17ED2 to 17EF1 (32 bytes)
-_DATA_17ED2_SMSPalette_Desk:
+_DATA_17ED2_SMSPalette_SportsCars:
   SMSCOLOUR $000000
   SMSCOLOUR $555500
   SMSCOLOUR $AA5500
@@ -25695,7 +25676,7 @@ _DATA_17ED2_SMSPalette_Desk:
 
 ; 2nd entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17EF2 to 17F11 (32 bytes)
-_DATA_17EF2_SMSPalette_Breakfast:
+_DATA_17EF2_SMSPalette_FourByFour:
   SMSCOLOUR $000000
   SMSCOLOUR $AA5500
   SMSCOLOUR $555500
@@ -25732,7 +25713,7 @@ _DATA_17EF2_SMSPalette_Breakfast:
 
 ; 3rd entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F12 to 17F31 (32 bytes)
-_DATA_17F12_SMSPalette_Sandpit:
+_DATA_17F12_SMSPalette_Powerboats:
   SMSCOLOUR $5555AA
   SMSCOLOUR $000000
   SMSCOLOUR $FFFFFF
@@ -25769,7 +25750,7 @@ _DATA_17F12_SMSPalette_Sandpit:
 
 ; 4th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F32 to 17F51 (32 bytes)
-_DATA_17F32_SMSPalette_F1:
+_DATA_17F32_SMSPalette_TurboWheels:
   SMSCOLOUR $000000
   SMSCOLOUR $AAAAAA
   SMSCOLOUR $FFFFFF
@@ -25806,7 +25787,7 @@ _DATA_17F32_SMSPalette_F1:
 
 ; 5th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F52 to 17F71 (32 bytes)
-_DATA_17F52_SMSPalette_Garage:
+_DATA_17F52_SMSPalette_FormulaOne:
   SMSCOLOUR $000000
   SMSCOLOUR $00AA00
   SMSCOLOUR $005500
@@ -25843,7 +25824,7 @@ _DATA_17F52_SMSPalette_Garage:
 
 ; 6th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F72 to 17F91 (32 bytes)
-_DATA_17F72_SMSPalette_Tanks:
+_DATA_17F72_SMSPalette_Warriors:
   SMSCOLOUR $000000
   SMSCOLOUR $555555
   SMSCOLOUR $AAAAAA
@@ -25880,7 +25861,7 @@ _DATA_17F72_SMSPalette_Tanks:
 
 ; 7th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17F92 to 17FB1 (32 bytes)
-_DATA_17F92_SMSPalette_RuffTrux:
+_DATA_17F92_SMSPalette_Tanks:
   SMSCOLOUR $000000
   SMSCOLOUR $0000FF
   SMSCOLOUR $5555FF
@@ -25917,7 +25898,7 @@ _DATA_17F92_SMSPalette_RuffTrux:
 
 ; 8th entry of Pointer Table from 17EC2 (indexed by _RAM_DB97_TrackType)
 ; Data from 17FB2 to 17FFF (78 bytes)
-_DATA_17FB2_SMSPalette_Helicopter: ; Unused
+_DATA_17FB2_SMSPalette_RuffTrux:
   SMSCOLOUR $000000
   SMSCOLOUR $FFFFFF
   SMSCOLOUR $AAAA55
@@ -29360,8 +29341,8 @@ _DATA_3150F_:
 .ORG $0000
 
 ; Data from 34000 to 35707 (5896 bytes)
-_DATA_34000_Compressed:
-.incbin "Assets/raw/Micro Machines_34000.inc" skip $0000 read $0958 ; -> 6144 uncompressed, contents TBC
+_DATA_34000_FormulaOne_Tiles:
+.incbin "Assets/Formula One/Tiles.compressed" ; 3bpp bitplane separated
 _DATA_34958_DeskCarTiles:
 .incbin "Assets/raw/Micro Machines_34000.inc" skip $0958 read $0398 ; RLE, size TBC
 _DATA_34CF0_FourByFourTiles:
@@ -34158,65 +34139,17 @@ _LABEL_37FF7_ret:
 .ORG $0000
 
 ; Data from 38000 to 393CD (5070 bytes)
-.incbin "Assets/raw/Micro Machines_38000.inc"
+_DATA_38000_TurboWheels_Tiles:
+.incbin "Assets/Turbo Wheels/Tiles.compressed"
 
-  ret nz
-  adc a, b
-  ld ($475E), a
-  sub c
-  ld l, h
-  add a, d
-  add a, b
-  call z, $2620
-  ld h, b
-  ld l, h
-  ld (bc), a
-  ld (bc), a
-  jr nz, +
-  ld b, b
-  ld a, (hl)
-  dec d
-  add a, (hl)
-  pop bc
-  ld c, $F2
-  ld e, b
-  inc e
-  add a, h
-  pop de
-  ld l, l
-  nop
-  inc b
-  rlca
-  adc a, (hl)
-  jp m, _LABEL_1FBF_
-  and l
-  ld d, l
-  rst $08 ; _LABEL_8_
-  push af
-  ld e, d
-  rla
-  ld c, (hl)
-  call po, $54D1  ; Possibly invalid
-  ld a, a
-  ld bc, $C705
-  ld d, c
-  sbc a, h
-  jp po, $CE38  ; Possibly invalid
-+:
-  ld b, e
-  inc d
-  add a, b
-  jp p, $1C6D
-  ld b, (hl)
-  ld ($6C9E), a
-  jp p, $5DE8 ; Possibly invalid
-  adc a, a
-  ld c, $31
-  ld c, a
-  jp p, $FA7F ; Possibly invalid
+_DATA_39168_Tanks_Tiles:
+.incbin "Assets/Tanks/Tiles.compressed"
 
-  ; Data from 3941A to 3B970 (9559 bytes)
-.incbin "Assets/raw/Micro Machines_3941a.inc" skip 0 read $3B32F-$3941A
+_DATA_39C83_FourByFour_Tiles:
+.incbin "Assets/Four By Four/Tiles.compressed"
+
+_DATA_3A8FA_Warriors_Tiles:
+.incbin "Assets/Warriors/Tiles.compressed"
 
 _DATA_3B32F_DisplayCaseTilemapCompressed:
 .incbin "Assets/Menu/DisplayCase.tilemap.compressed"
@@ -34511,6 +34444,7 @@ __:   ldi
 ; End of decompress code
 
 ; Data from 3BACF to 3BAF0 (34 bytes)
+; Unused?
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $07 $0F $0F $0F $0F $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00
@@ -34934,8 +34868,8 @@ _DATA_3C000_Sportscars_Tiles:
 _DATA_3CD8D_RuffTrux_Tiles:
 .incbin "Assets/RuffTrux/Tiles.compressed" ; bitplane-split 3bpp
 
-_DATA_3D901_FormulaOne_Tiles:
-.incbin "Assets/Formula One/Tiles.compressed" ; bitplane-split 3bpp
+_DATA_3D901_Powerboats_Tiles:
+.incbin "Assets/Powerboats/Tiles.compressed" ; bitplane-split 3bpp
 
 _DATA_3E5D7_Tiles_MediumLogo:
 .incbin "Assets/Menu/Logo-Medium.3bpp.compressed" ; bitplane-split 3bpp
