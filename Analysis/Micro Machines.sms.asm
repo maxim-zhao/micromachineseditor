@@ -270,7 +270,7 @@ _RAM_D5C8_MetatileX db
 _RAM_D5C9_MetatileY db
 _RAM_D5CA_ db
 _RAM_D5CB_ db
-_RAM_D5CC_ db
+_RAM_D5CC_PlayoffTileLoadFlag db
 _RAM_D5CD_CarIsSkidding db
 _RAM_D5CE_ db ; unused?
 _RAM_D5CF_ db
@@ -1787,12 +1787,12 @@ _LABEL_33A_GameVBlankVDPWork:
 
   call _LABEL_31F1_UpdateSpriteTable
   call _LABEL_324C_UpdatePerFrameTiles
-  ld a, (_RAM_D5CC_)
+  ld a, (_RAM_D5CC_PlayoffTileLoadFlag)
   or a
   jr z, +
-  CallPagedFunction _LABEL_17E95_ ; Call only when flag is set, then reset it
+  CallPagedFunction _LABEL_17E95_LoadPlayoffTiles ; Call only when flag is set, then reset it
   xor a
-  ld (_RAM_D5CC_), a
+  ld (_RAM_D5CC_PlayoffTileLoadFlag), a
 +:call _LABEL_BC5_UpdateFloorTiles
   call _LABEL_2D07_UpdatePalette_RuffTruxSubmerged
   call _LABEL_3FB4_UpdateAnimatedPalette
@@ -9197,15 +9197,15 @@ _LABEL_3E2F_:
 
 ; Data from 3E3A to 3E42 (9 bytes)
 _DATA_3E3A_TrackTypeDataPageNumbers:
-.db :_LABEL_C000_TrackData_SportsCars
-.db :_LABEL_10000_TrackData_FourByFour
-.db :_LABEL_14000_TrackData_Powerboats
-.db :_LABEL_18000_TrackData_TurboWheels
-.db :_LABEL_1C000_TrackData_FormulaOne
-.db :_LABEL_20000_TrackData_Warriors
-.db :_LABEL_24000_TrackData_Tanks
-.db :_LABEL_28000_TrackData_RuffTrux
-.db :_LABEL_2C000_TrackData_Helicopters_BadReference
+.db :_DATA_C000_TrackData_SportsCars
+.db :_DATA_10000_TrackData_FourByFour
+.db :_DATA_14000_TrackData_Powerboats
+.db :_DATA_18000_TrackData_TurboWheels
+.db :_DATA_1C000_TrackData_FormulaOne
+.db :_DATA_20000_TrackData_Warriors
+.db :_DATA_24000_TrackData_Tanks
+.db :_DATA_28000_TrackData_RuffTrux
+.db :_DATA_2C000_TrackData_Helicopters_BadReference
 
 _LABEL_3E43_:
   ld a, (_RAM_DE87_)
@@ -16366,7 +16366,7 @@ _LABEL_7AF2_:
   jr nz, -
   ld a, $01
   ld (_RAM_D5CB_), a
-  ld (_RAM_D5CC_), a
+  ld (_RAM_D5CC_PlayoffTileLoadFlag), a
   ld a, $14
   ld (_RAM_D963_SFXTrigger2), a
   ld (_RAM_D974_SFXTrigger), a
@@ -16873,7 +16873,8 @@ _LABEL_7C7D_:
   ld (PAGING_REGISTER), a
   ld (_RAM_DE8E_PageNumber), a ; And make that the "page to keep there"
 
-  ld hl, $8000 ; Read data from that page. First word points to compressed behaviour data.
+  ; Read data from that page.We use the sports cars labels as our template.
+  ld hl, _DATA_C000_TrackData_SportsCars.BehaviourData
   ld a, (hl)
   ld e, a
   inc hl
@@ -16883,7 +16884,7 @@ _LABEL_7C7D_:
   ex de, hl
   call _LABEL_7B21_Decompress ; Decompress data there
 
-  ld hl, $8002 ; Next pointer for "wall" data
+  ld hl, _DATA_C000_TrackData_SportsCars.WallData
   ld a, (hl)
   ld e, a
   inc hl
@@ -16914,7 +16915,7 @@ _LABEL_7C7D_:
   or a
   rl a        ; *2
   ld l, a
-  ld a, $80   ; Look up -> 0 @ 8004, 1 @ 8006, 2 @ 8008
+  ld a, >_DATA_C000_TrackData_SportsCars.TrackLayout1 ; Look up -> 0 @ 8004, 1 @ 8006, 2 @ 8008
   ld h, a
   ld a, (hl)
   ld e, a
@@ -16930,7 +16931,7 @@ _LABEL_7C7D_:
   cp $00
   jr z, +
   ; Game Gear
-  ld de, $800C ; GG palette at +c
+  ld de, _DATA_C000_TrackData_SportsCars.GameGearPalette ; GG palette at +c
   ld a, (de)
   ld l, a
   inc de
@@ -16969,7 +16970,7 @@ _LABEL_7C7D_:
   CallPagedFunction _LABEL_1BEB1_ChangePoolTableColour
 
   ; Load "decorator" 1bpp tile data to RAM buffer
-  ld hl, $800E ; Pointer here in each car's bank
+  ld hl, _DATA_C000_TrackData_SportsCars.DecoratorTiles
   ld a, (hl)
   ld e, a
   inc hl
@@ -16988,7 +16989,7 @@ _LABEL_7C7D_:
   jr nz, -
 
   ; Next pointer -> 64 bytes to _RAM_D900_ ("Data", use TBC)
-  ld hl, $8010
+  ld hl, _DATA_C000_TrackData_SportsCars.UnknownData
   ld a, (hl)
   ld e, a
   inc hl
@@ -17006,7 +17007,7 @@ _LABEL_7C7D_:
   jr nz, -
 
   ; Next pointer: car-specific effects tiles
-  ld hl, $8012
+  ld hl, _DATA_C000_TrackData_SportsCars.EffectsTiles
   ld a, (hl)
   ld e, a
   inc hl
@@ -25360,45 +25361,49 @@ _DATA_BFFF_Page2PageNumber:
 .BANK 3
 .ORG $0000
 
-; Desk tracks data
-_LABEL_C000_TrackData_SportsCars:
+/*
 ; Track data format:
-; $8000 dw Pointer to behaviour data (compressed)
-; $8002 dw Pointer to wall data (compressed)
-; $8004 dw Pointer to track 0 layout (compressed)
-; $8006 dw Pointer to track 1 layout (compressed)
-; $8008 dw Pointer to track 2 layout (compressed)
-; $800a dw Pointer to ??? Seems to be a duplicate of one next to it
-; $800c dw Pointer to GG palette (64 bytes)
-; $800e dw Pointer to "decorator" tile data (16 * 1bpp tile = 128 bytes)
-; $8010 dw Pointer to ??? (64 bytes, copied to _RAM_D900_)
-; $8012 dw Pointer to effects tile data (11 * 3bpp tile = 264 bytes)
-.dw _LABEL_E480_SportsCars_BehaviourData ; 2308B
-.dw _LABEL_E799_SportsCars_WallData ; 1156B = 12*12 bits * 64 tiles + 4 byte header
-.dw _LABEL_E811_SportsCars_Track0Layout ; 2048B
-.dw _LABEL_EA34_SportsCars_Track1Layout ; 2048B
-.dw _LABEL_ED79_SportsCars_Track2Layout ; 2048B
-.dw _LABEL_F155_SportsCars_GGPalette
-.dw _LABEL_F155_SportsCars_GGPalette ; GG palette, raw
-.dw _LABEL_F195_SportsCars_DecoratorTiles ; 128B = 16 tiles @ 1bpp
-.dw _LABEL_F215_SportsCars_Data ; 64B
-.dw _LABEL_F255_SportsCars_EffectsTiles ; 264B = 11 tiles @ 3bpp
+; $8000 dw Pointer to behaviour data (compressed) -> 2308B
+; $8002 dw Pointer to wall data (compressed) -> 1156B = 12*12 bits * 6 yiles + 4 byte header
+; $8004 dw Pointer to track 0 layout (compressed) = 2048B = 32 * 32 * 2
+; $8006 dw Pointer to track 1 layout (compressed) = 2048B = 32 * 32 * 2
+; $8008 dw Pointer to track 2 layout (compressed) = 2048B = 32 * 32 * 2
+; $800a dw Unused?
+; $800c dw Pointer to GG palette = 64B = 16 * 2 * 2
+; $800e dw Pointer to "decorator" tile data = 128B = 16 * 8*8 bit tile
+; $8010 dw Pointer to ??? (copied to _RAM_D900_) = 64B
+; $8012 dw Pointer to effects tile data = 264B = 11 * 8 * 8 * 3bpp tile
+*/
 
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $0014 read $246c ; ??? Looks uninitialised
-; Theory: The pointers above were done by hand and they started the real data at +$80
-; So the gap is unused
+.struct TrackData
+BehaviourData   dw
+WallData        dw
+TrackLayout1    dw
+TrackLayout2    dw
+TrackLayout3    dw
+Unknown         dw ; Unused?
+GameGearPalette dw
+DecoratorTiles  dw
+UnknownData     dw
+EffectsTiles    dw
+.endst
 
-_LABEL_E480_SportsCars_BehaviourData:
+; Desk tracks data
+.dstruct _DATA_C000_TrackData_SportsCars instanceof TrackData data  _DATA_E480_SportsCars_BehaviourData _DATA_E799_SportsCars_WallData _DATA_E811_SportsCars_Track0Layout _DATA_EA34_SportsCars_Track1Layout _DATA_ED79_SportsCars_Track2Layout _DATA_F155_SportsCars_GGPalette _DATA_F155_SportsCars_GGPalette _DATA_F195_SportsCars_DecoratorTiles _DATA_F215_SportsCars_Data _DATA_F255_SportsCars_EffectsTiles
+
+.incbin "Assets/raw/Micro Machines_c000.inc" skip $0014 read $246c ; ??? 
+
+_DATA_E480_SportsCars_BehaviourData:
 .incbin "Assets/Sportscars/Behaviour data.compressed"
-_LABEL_E799_SportsCars_WallData:
+_DATA_E799_SportsCars_WallData:
 .incbin "Assets/Sportscars/Wall data.compressed"
-_LABEL_E811_SportsCars_Track0Layout:
+_DATA_E811_SportsCars_Track0Layout:
 .incbin "Assets/Sportscars/Track 0 layout.compressed"
-_LABEL_EA34_SportsCars_Track1Layout:
+_DATA_EA34_SportsCars_Track1Layout:
 .incbin "Assets/Sportscars/Track 1 layout.compressed"
-_LABEL_ED79_SportsCars_Track2Layout:
+_DATA_ED79_SportsCars_Track2Layout:
 .incbin "Assets/Sportscars/Track 2 layout.compressed"
-_LABEL_F155_SportsCars_GGPalette:
+_DATA_F155_SportsCars_GGPalette:
   GGCOLOUR $000000
   GGCOLOUR $444400
   GGCOLOUR $884400
@@ -25431,11 +25436,11 @@ _LABEL_F155_SportsCars_GGPalette:
   GGCOLOUR $000000
   GGCOLOUR $000000
   GGCOLOUR $000000
-_LABEL_F195_SportsCars_DecoratorTiles
+_DATA_F195_SportsCars_DecoratorTiles
 .incbin "Assets/Sportscars/Decorators.1bpp"
-_LABEL_F215_SportsCars_Data:
+_DATA_F215_SportsCars_Data:
 .db $22 $00 $5D $4D $6F $7B $00 $00 $00 $00 $22 $22 $22 $22 $80 $C0 $C0 $C0 $C0 $E0 $E0 $C0 $E0 $C0 $80 $A0 $A0 $A0 $A0 $A0 $22 $C0 $22 $C0 $A0 $A0 $C0 $C0 $C0 $C0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $80 $80 $C0 $A0 $80 $C0 $00 $00
-_LABEL_F255_SportsCars_EffectsTiles:
+_DATA_F255_SportsCars_EffectsTiles:
 .incbin "Assets/Sportscars/Effects.3bpp"
 
 _DATA_F35D_Tiles_Portrait_FourByFour:
@@ -25456,33 +25461,22 @@ _DATA_FDC1_: ; looks like data, can't see a reference
 .ORG $0000
 
 ; Data from 10000 to 13FFF (16384 bytes)
-_LABEL_10000_TrackData_FourByFour: ; TODO
-;.incbin "Assets/raw/Micro Machines_10000.inc" skip 0 read $13C42-$10000
-.dw _LABEL_9E50_FourByFour_BehaviourData ; 2308B
-.dw _LABEL_A105_FourByFour_WallData ; 1156B = 12*12 bits * 64 tiles + 4 byte header
-.dw _LABEL_A152_FourByFour_Track0Layout ; 2048B
-.dw _LABEL_A378_FourByFour_Track1Layout ; 2048B
-.dw _LABEL_A466_FourByFour_Track2Layout ; 2048B
-.dw _LABEL_A466_FourByFour_Track2Layout
-.dw _LABEL_A762_FourByFour_GGPalette ; GG palette, raw
-.dw _LABEL_A7A2_FourByFour_DecoratorTiles
-.dw _LABEL_A822_FourByFour_Data
-.dw _LABEL_A862_FourByFour_EffectsTiles
+.dstruct _DATA_10000_TrackData_FourByFour instanceof TrackData data _DATA_9E50_FourByFour_BehaviourData _DATA_A105_FourByFour_WallData _DATA_A152_FourByFour_Track0Layout _DATA_A378_FourByFour_Track1Layout _DATA_A466_FourByFour_Track2Layout _DATA_A466_FourByFour_Track2Layout _DATA_A762_FourByFour_GGPalette _DATA_A7A2_FourByFour_DecoratorTiles _DATA_A822_FourByFour_Data _DATA_A862_FourByFour_EffectsTiles
 
-; Unused space?
+; ???
 .incbin "Assets/raw/Micro Machines_10000.inc" skip $10014-$10000 read $11e50-$10014
 
-_LABEL_9E50_FourByFour_BehaviourData:
+_DATA_9E50_FourByFour_BehaviourData:
 .incbin "Assets/Four by Four/Behaviour data.compressed"
-_LABEL_A105_FourByFour_WallData:
+_DATA_A105_FourByFour_WallData:
 .incbin "Assets/Four by Four/Wall data.compressed"
-_LABEL_A152_FourByFour_Track0Layout:
+_DATA_A152_FourByFour_Track0Layout:
 .incbin "Assets/Four by Four/Track 0 layout.compressed"
-_LABEL_A378_FourByFour_Track1Layout:
+_DATA_A378_FourByFour_Track1Layout:
 .incbin "Assets/Four by Four/Track 1 layout.compressed"
-_LABEL_A466_FourByFour_Track2Layout:
+_DATA_A466_FourByFour_Track2Layout:
 .incbin "Assets/Four by Four/Track 2 layout.compressed"
-_LABEL_A762_FourByFour_GGPalette:
+_DATA_A762_FourByFour_GGPalette:
   GGCOLOUR $000000
   GGCOLOUR $884400
   GGCOLOUR $444400
@@ -25517,16 +25511,16 @@ _LABEL_A762_FourByFour_GGPalette:
   GGCOLOUR $000000
   GGCOLOUR $000000
 
-_LABEL_A7A2_FourByFour_DecoratorTiles:
+_DATA_A7A2_FourByFour_DecoratorTiles:
 .incbin "Assets/Four by Four/Decorators.1bpp"
 
-_LABEL_A822_FourByFour_Data:
+_DATA_A822_FourByFour_Data:
 .db $C0 $00 $22 $49 $73 $00 $00 $00 $00 $22 $22 $22 $22 $00 $C0 $C0
 .db $C0 $C0 $C0 $C0 $C0 $C0 $80 $80 $80 $00 $80 $C0 $C0 $C0 $A0 $C0
 .db $22 $C0 $C0 $80 $80 $80 $80 $80 $00 $00 $80 $80 $80 $80 $80 $00
 .db $00 $80 $80 $80 $80 $45 $77 $00 $00 $00 $00 $00 $00 $00 $00 $00
 
-_LABEL_A862_FourByFour_EffectsTiles:
+_DATA_A862_FourByFour_EffectsTiles:
 .incbin "Assets/Four by Four/Effects.3bpp"
 
 ; Unknown
@@ -25551,7 +25545,7 @@ _DATA_13F50_Tilemap_MicroMachinesText:
 .BANK 5
 .ORG $0000
 
-_LABEL_14000_TrackData_Powerboats: ; TODO
+_DATA_14000_TrackData_Powerboats: ; TODO
 ; Data from 14000 to 169A7 (10664 bytes)
 .incbin "Assets/raw/Micro Machines_14000.inc"
 
@@ -25599,7 +25593,7 @@ _DATA_17C0C_Tiles_TwoPlayersOnOneGameGear:
 _DATA_17DD5_Tiles_Playoff:
 .incbin "Assets/Playoff.4bpp"
 
-_LABEL_17E95_:
+_LABEL_17E95_LoadPlayoffTiles:
   ld a, $80 ; Tile $19c
   out (PORT_VDP_ADDRESS), a
   ld a, $73
@@ -25945,7 +25939,7 @@ _DATA_17FB2_SMSPalette_RuffTrux:
 .ORG $0000
 
 ; Data from 18000 to 1B1A1 (12706 bytes)
-_LABEL_18000_TrackData_TurboWheels: ; TODO
+_DATA_18000_TrackData_TurboWheels: ; TODO
 .incbin "Assets/raw/Micro Machines_18000.inc"
 
 ; Data from 1B1A2 to 1B231 (144 bytes)
@@ -26682,7 +26676,7 @@ _LABEL_1BF17_:
 .ORG $0000
 
 ; Data from 1C000 to 1F8D7 (14552 bytes)
-_LABEL_1C000_TrackData_FormulaOne: ; TODO
+_DATA_1C000_TrackData_FormulaOne: ; TODO
 .incbin "Assets/raw/Micro Machines_1c000.inc" skip 0 read $1f3e4-$1c000
 
 _DATA_1F3E4_Tiles_Portrait_Powerboats:
@@ -27092,7 +27086,7 @@ _LABEL_1FB35_:
 .ORG $0000
 
 ; Data from 20000 to 237E1 (14306 bytes)
-_LABEL_20000_TrackData_Warriors: ; TODO
+_DATA_20000_TrackData_Warriors: ; TODO
 .incbin "Assets/raw/Micro Machines_20000.inc" skip 0 read $22B2C-$20000
 
 _DATA_22B2C_Tiles_PunctuationAndLine:
@@ -27964,7 +27958,7 @@ _DATA_23ECF_HandlingData_SMS:
 .ORG $0000
 
 ; Data from 24000 to 27FFF (16384 bytes)
-_LABEL_24000_TrackData_Tanks: ; TODO
+_DATA_24000_TrackData_Tanks: ; TODO
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $24000-$24000 read $26C52-$24000
 
 _DATA_26C52_Tiles_Challenge_Icon:
@@ -27996,7 +27990,7 @@ _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .ORG $0000
 
 ; Data from 28000 to 2B5D1 (13778 bytes)
-_LABEL_28000_TrackData_RuffTrux: ; TODO
+_DATA_28000_TrackData_RuffTrux: ; TODO
 .incbin "Assets/raw/Micro Machines_28000.inc" skip 0 read $2AB4D-$28000
 
 _DATA_2AB4D_Tiles_Portrait_RuffTrux:
@@ -28441,7 +28435,7 @@ _DATA_2B911_:
 .BANK 11
 .ORG $0000
 
-_LABEL_2C000_TrackData_Helicopters_BadReference:
+_DATA_2C000_TrackData_Helicopters_BadReference:
 
 ; Data from 2C000 to 2FFFF (16384 bytes)
 ; Portrait data (3bpp)
