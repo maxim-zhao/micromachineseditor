@@ -1462,7 +1462,6 @@ _LABEL_75_EnterGameTrampolineImpl:
 .db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00
 ; _RAM_DBD9_DisplayCaseData
 .dsb 24 0
-
 ; _RAM_DBF1_RaceNumberText
 .asc "RACE 01-" ;.db $11 $00 $02 $04 $0E $1A $1B $B5
 ; End stuff copied to RAM
@@ -16857,7 +16856,7 @@ _LABEL_7C7D_:
   ld (PAGING_REGISTER), a
   ld (_RAM_DE8E_PageNumber), a ; And make that the "page to keep there"
 
-  ; Read data from that page.We use the sports cars labels as our template.
+  ; Read data from that page. We use the sports cars labels as our template, as the addresses are the same for all pages.
   ld hl, _DATA_C000_TrackData_SportsCars.BehaviourData
   ld a, (hl)
   ld e, a
@@ -25400,9 +25399,9 @@ _DATA_BFFF_Page2PageNumber:
 ; $8004 dw Pointer to track 0 layout (compressed) = 2048B = 32 * 32 * 2
 ; $8006 dw Pointer to track 1 layout (compressed) = 2048B = 32 * 32 * 2
 ; $8008 dw Pointer to track 2 layout (compressed) = 2048B = 32 * 32 * 2
-; $800a dw Unused?
+; $800a dw Pointer to track 3 layout (compressed) = 2048B = 32 * 32 * 2 (usually not set to something sensible as most track types only have three tracks)
 ; $800c dw Pointer to GG palette = 64B = 16 * 2 * 2
-; $800e dw Pointer to "decorator" tile data = 128B = 16 * 8*8 bit tile
+; $800e dw Pointer to "decorator" tile data = 128B = 16 * 8 * 8 * 1bpp tile
 ; $8010 dw Pointer to ??? (copied to _RAM_D900_) = 64B
 ; $8012 dw Pointer to effects tile data = 264B = 11 * 8 * 8 * 3bpp tile
 */
@@ -25410,10 +25409,10 @@ _DATA_BFFF_Page2PageNumber:
 .struct TrackData
 BehaviourData   dw
 WallData        dw
+TrackLayout0    dw
 TrackLayout1    dw
 TrackLayout2    dw
 TrackLayout3    dw
-Unknown         dw ; Unused?
 GameGearPalette dw
 DecoratorTiles  dw
 UnknownData     dw
@@ -25606,9 +25605,65 @@ _DATA_13F50_Tilemap_MicroMachinesText:
 .BANK 5
 .ORG $0000
 
-_DATA_14000_TrackData_Powerboats: ; TODO
-; Data from 14000 to 169A7 (10664 bytes)
-.incbin "Assets/raw/Micro Machines_14000.inc"
+.dstruct _DATA_14000_TrackData_Powerboats instanceof TrackData data _DATA_9D30_Powerboats_BehaviourData _DATA_9FE3_Powerboats_WallData _DATA_A03C_Powerboats_Track0Layout _DATA_A134_Powerboats_Track1Layout _DATA_A352_Powerboats_Track2Layout _DATA_A5B1_Powerboats_Track3Layout _DATA_A7A0_Powerboats_GGPalette _DATA_A7E0_Powerboats_DecoratorTiles _DATA_A860_Powerboats_Data _DATA_A8A0_Powerboats_EffectsTiles 
+
+; ???
+.incbin "Assets/raw/Micro Machines_14000.inc" skip $14014-$14000 read $15d30-$14014
+
+_DATA_9D30_Powerboats_BehaviourData:
+.incbin "Assets/Powerboats/Behaviour data.compressed"
+_DATA_9FE3_Powerboats_WallData:
+.incbin "Assets/Powerboats/Wall data.compressed"
+_DATA_A03C_Powerboats_Track0Layout:
+.incbin "Assets/Powerboats/Track 0 layout.compressed"
+_DATA_A134_Powerboats_Track1Layout:
+.incbin "Assets/Powerboats/Track 1 layout.compressed"
+_DATA_A352_Powerboats_Track2Layout:
+.incbin "Assets/Powerboats/Track 2 layout.compressed"
+_DATA_A5B1_Powerboats_Track3Layout:
+.incbin "Assets/Powerboats/Track 3 layout.compressed"
+_DATA_A7A0_Powerboats_GGPalette:
+  GGCOLOUR $444488
+  GGCOLOUR $000000
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $440000
+  GGCOLOUR $884400
+  GGCOLOUR $004444
+  GGCOLOUR $448888
+  GGCOLOUR $440088
+  GGCOLOUR $444488
+  GGCOLOUR $8888EE
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $8888EE
+  GGCOLOUR $444488
+  GGCOLOUR $440088
+  GGCOLOUR $000044
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_DATA_A7E0_Powerboats_DecoratorTiles:
+.incbin "Assets/Powerboats/Decorators.1bpp"
+_DATA_A860_Powerboats_Data:
+.db $C0 $A0 $A0 $E0 $73 $80 $C0 $49 $80 $E0 $77 $C0 $45 $C0 $A0 $A0
+.db $A0 $C0 $80 $80 $80 $00 $80 $80 $80 $A0 $A0 $C0 $C0 $22 $A0 $A0
+.db $A0 $A0 $80 $C0 $80 $80 $A0 $A0 $A0 $22 $41 $63 $A0 $A0 $A0 $A0
+.db $A0 $A0 $A0 $A0 $A0 $A0 $A0 $80 $C0 $C0 $C0 $41 $A0 $00 $00 $00
+_DATA_A8A0_Powerboats_EffectsTiles:
+.incbin "Assets/Powerboats/Effects.3bpp"
 
 ; Data from 169A8 to 16A37 (144 bytes)
 _DATA_169A8_IndexToBitmask:
