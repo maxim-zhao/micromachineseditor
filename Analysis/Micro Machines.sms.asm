@@ -1461,6 +1461,7 @@ _LABEL_75_EnterGameTrampolineImpl:
 ; _RAM_DBCD_MenuIndex onwards
 .db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00
 ; _RAM_DBD9_DisplayCaseData
+.dsb 24 0
 
 ; _RAM_DBF1_RaceNumberText
 .asc "RACE 01-" ;.db $11 $00 $02 $04 $0E $1A $1B $B5
@@ -25512,6 +25513,7 @@ _DATA_FFA2_TrackName_24: .asc " WIN THIS RACE TO BE CHAMPION!" ; Special case fo
 _DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 
 ; blank fill
+.dsb 44 $ff
 ; Page number marker
 .db :CADDR
 
