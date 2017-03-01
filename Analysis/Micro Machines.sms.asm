@@ -610,7 +610,7 @@ _RAM_DBD6_ db
 _RAM_DBD7_ db
 _RAM_DBD8_CourseSelectIndex db
 _RAM_DBD9_DisplayCaseData dsb $18 ; includes the following three labels; 0 = blank, 1 = filled, 2 = flashing
-_RAM_DBF1_RaceNumberText dsb 8
+_RAM_DBF1_RaceNumberText dsb 8 ; "RACE xx-", xx is replaced at runtime
 _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
@@ -1461,7 +1461,7 @@ _LABEL_75_EnterGameTrampolineImpl:
 ; _RAM_DBCD_MenuIndex onwards
 .db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00
 ; _RAM_DBD9_DisplayCaseData
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+
 ; _RAM_DBF1_RaceNumberText
 .asc "RACE 01-" ;.db $11 $00 $02 $04 $0E $1A $1B $B5
 ; End stuff copied to RAM
@@ -7773,9 +7773,9 @@ _LABEL_324C_UpdatePerFrameTiles:
   sla a
   ld e, a
   ld d, $00
-  ld a, :_DATA_30A68_HUDTiles ; $0C
+  ld a, :_DATA_30A68_ChallengeHUDTiles ; $0C
   ld (PAGING_REGISTER), a
-  ld hl, _DATA_30A68_HUDTiles + 32 * 16 ; Just the laps remaining indicators
+  ld hl, _DATA_30A68_ChallengeHUDTiles + 32 * 16 ; Just the laps remaining indicators
   add hl, de
   ld b, $20
   ld c, PORT_VDP_DATA
@@ -13796,14 +13796,14 @@ _LABEL_6704_LoadHUDTiles:
   ret
 
 +:; Head to head
-  ld a, :_DATA_30A68_HUDTiles ;$0C
+  ld a, :_DATA_30A68_ChallengeHUDTiles ;$0C
   ld (PAGING_REGISTER), a
   ld a, $80 ; Tile $194
   out (PORT_VDP_ADDRESS), a
   ld a, $72
   out (PORT_VDP_ADDRESS), a
   ld bc, $00A0 ; 20 tiles * 8 rows
-  ld hl, _DATA_30A68_HUDTiles
+  ld hl, _DATA_30A68_ChallengeHUDTiles
 -:
   push bc
     ld b, $04 ; Emit four bytes = 1 row
@@ -22458,14 +22458,14 @@ _LABEL_AA02_:
   sla a
   ld c, a
   ld b, $00
-  ld hl, _DATA_AB06_
+  ld hl, _DATA_AB06_TrackNumberText
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBF1_RaceNumberText + 5), a
   inc hl
   ld a, (hl)
   ld (_RAM_DBF1_RaceNumberText + 6), a
-  ld hl, _DATA_AACE_
+  ld hl, _DATA_AACE_TrackNamePointers
   add hl, bc
   ld c, (hl)
   inc hl
@@ -22543,22 +22543,70 @@ _TEXT_AAAE_Blanks:
 .asc "                                "
 
 ; Data from AACE to AB05 (56 bytes)
-_DATA_AACE_:
-.db $C1 $BD $D5 $BD $E9 $BD $FD $BD $11 $BE $25 $BE $39 $BE $4D $BE
-.db $61 $BE $75 $BE $89 $BE $9D $BE $B1 $BE $C5 $BE $D9 $BE $ED $BE
-.db $01 $BF $15 $BF $29 $BF $3D $BF $51 $BF $65 $BF $79 $BF $8D $BF
-.db $BF $BF $BF $BF $BF $BF $BF $BF
+_DATA_AACE_TrackNamePointers:
+.dw _DATA_FDC1_TrackName_00
+.dw _DATA_FDD5_TrackName_01
+.dw _DATA_FDE9_TrackName_02
+.dw _DATA_FDFD_TrackName_03
+.dw _DATA_FE11_TrackName_04
+.dw _DATA_FE25_TrackName_05
+.dw _DATA_FE39_TrackName_06
+.dw _DATA_FE4D_TrackName_07
+.dw _DATA_FE61_TrackName_08
+.dw _DATA_FE75_TrackName_09
+.dw _DATA_FE89_TrackName_10
+.dw _DATA_FE9D_TrackName_11
+.dw _DATA_FEB1_TrackName_12
+.dw _DATA_FEC5_TrackName_13
+.dw _DATA_FED9_TrackName_14
+.dw _DATA_FEED_TrackName_15
+.dw _DATA_FF01_TrackName_16
+.dw _DATA_FF15_TrackName_17
+.dw _DATA_FF29_TrackName_18
+.dw _DATA_FF3D_TrackName_19
+.dw _DATA_FF51_TrackName_20
+.dw _DATA_FF65_TrackName_21
+.dw _DATA_FF79_TrackName_22
+.dw _DATA_FF8D_TrackName_23
+.dw _DATA_FFBF_TrackName_25
+.dw _DATA_FFBF_TrackName_25
+.dw _DATA_FFBF_TrackName_25
+.dw _DATA_FFBF_TrackName_25
+
 
 ; Data from AB06 to AB2B (38 bytes)
-_DATA_AB06_:
-.db $0E $1B $0E $1C $0E $1D $0E $1E $0E $1F $0E $20 $0E $21 $0E $22
-.db $0E $23 $00 $00 $1B $1A $1B $1B $1B $1C $1B $1D $1B $1E $1B $1F
-.db $00 $00 $1B $20 $1B $21
-
+_DATA_AB06_TrackNumberText:
+.asc " 1"
+.asc " 2"
+.asc " 3"
+.asc " 4"
+.asc " 5"
+.asc " 6"
+.asc " 7"
+.asc " 8"
+.asc " 9"
+.db 0,0 ; Helicopter track
+.asc "10"
+.asc "11"
+.asc "12"
+.asc "13"
+.asc "14"
+.asc "15"
+.db 0,0 ; Helicopter track
+.asc "16"
+.asc "17"
 ; Data from AB2C to AB3D (18 bytes)
 _DATA_AB2C_:
-.db $1B $22 $1B $23 $00 $00 $1C $1A $1C $1B $1C $1C $1C $1D $1C $1E
-.db $1C $1F
+.asc "18"
+.asc "19"
+.db 0,0 ; Helicopter track
+.asc "20"
+.asc "21"
+.asc "22"
+.asc "23"
+.asc "24"
+.asc "25"
+
 
 ; Data from AB3E to AB4C (15 bytes)
 _DATA_AB3E_CourseSelect_TrackTypes:
@@ -25435,9 +25483,36 @@ _DATA_F765_Tiles_Portrait_Warriors:
 _DATA_FAA5_Tiles_Portrait_SportsCars:
 .incbin "Assets/Sportscars/Portrait.3bpp.compressed"
 
-_DATA_FDC1_: ; looks like data, can't see a reference
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $fdc1-$c000 read $ffff-$fdc1
+; Track names
+_DATA_FDC1_TrackName_00: .asc "THE BREAKFAST BENDS "
+_DATA_FDD5_TrackName_01: .asc "  DESKTOP DROP-OFF  "
+_DATA_FDE9_TrackName_02: .asc "    OILCAN ALLEY    "
+_DATA_FDFD_TrackName_03: .asc "  SANDY STRAIGHTS   "
+_DATA_FE11_TrackName_04: .asc "OATMEAL IN OVERDRIVE"
+_DATA_FE25_TrackName_05: .asc "THE CUE-BALL CIRCUIT"
+_DATA_FE39_TrackName_06: .asc "  HANDYMANS CURVE   "
+_DATA_FE4D_TrackName_07: .asc "  BERMUDA BATHTUB   "
+_DATA_FE61_TrackName_08: .asc "   SAHARA SANDPIT   "
+_DATA_FE75_TrackName_09: .asc " THE POTTED PASSAGE " ; Helicopter!
+_DATA_FE89_TrackName_10: .asc "FRUIT-JUICE FOLLIES "
+_DATA_FE9D_TrackName_11: .asc "    FOAMY FJORDS    "
+_DATA_FEB1_TrackName_12: .asc "BEDROOM BATTLEFIELD "
+_DATA_FEC5_TrackName_13: .asc "  PITFALL POCKETS   "
+_DATA_FED9_TrackName_14: .asc "  PENCIL PLATEAUX   "
+_DATA_FEED_TrackName_15: .asc "THE DARE-DEVIL DUNES"
+_DATA_FF01_TrackName_16: .asc "THE SHRUBBERY TWIST " ; Helicopter!
+_DATA_FF15_TrackName_17: .asc " PERILOUS PIT-STOP  "
+_DATA_FF29_TrackName_18: .asc "WIDE-AWAKE WAR-ZONE "
+_DATA_FF3D_TrackName_19: .asc "   CRAYON CANYONS   "
+_DATA_FF51_TrackName_20: .asc "  SOAP-LAKE CITY !  "
+_DATA_FF65_TrackName_21: .asc "  THE LEAFY BENDS   " ; Helicopter!
+_DATA_FF79_TrackName_22: .asc " CHALK-DUST CHICANE "
+_DATA_FF8D_TrackName_23: .asc "     GO FOR IT!     "
+_DATA_FFA2_TrackName_24: .asc " WIN THIS RACE TO BE CHAMPION!" ; Special case for length
+_DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 
+; blank fill
+; Page number marker
 .db :CADDR
 
 .BANK 4
@@ -28492,7 +28567,7 @@ _DATA_306D0_CarTiles_Tanks:
 .dsb 7, 0
 
 ; Data from 30A68 to 30C67 (512 bytes)
-_DATA_30A68_HUDTiles:
+_DATA_30A68_ChallengeHUDTiles:
 ; 4bpp tiles (32 bytes per tile)
 ; - Car colour squares *4 (first is highlighted)
 ; - "st", "nd", "rd", "th"
