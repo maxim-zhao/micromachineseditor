@@ -2652,7 +2652,7 @@
 06:bf17 _LABEL_1BF17_
 07:8000 _DATA_1C000_TrackData_FormulaOne
 07:b3e4 _DATA_1F3E4_Tiles_Portrait_Powerboats
-07:b8d8 _LABEL_1F8D8_
+07:b8d8 _LABEL_1F8D8_InGameCheatHandler
 07:b996 _LABEL_1F996_ret
 07:b9d4 _LABEL_1F9D4_Cheats_SportsCars
 07:ba05 _LABEL_1FA05_NoSkidCheatCheck

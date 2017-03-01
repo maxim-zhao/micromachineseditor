@@ -71,6 +71,32 @@ MenuScreen_TournamentChampion db ; 12 Tournament champion!
 MenuScreen_OnePlayerMode      db ; 13 Challenge or Head to Head
 .ende
 
+.enum 0
+SFX_00_Nothing db
+SFX_01 db ; Bong (lap complete?)
+SFX_02 db ; Car hits ground
+SFX_03 db ; Car hits wall
+SFX_04_TankMiss db ; Tank shell hits floor
+SFX_05 db ; Disappear (2-player cars reset)
+SFX_06 db ; Sticky driving?
+SFX_07_EnterSticky db
+SFX_08 db ; Explode?
+SFX_09_EnterPoolTableHole db ; Pool table hole
+SFX_0A_TankShoot db ; Tank shoots
+SFX_0B db ; Bang
+SFX_0C_LeavePoolTableHole db ; Powerup?
+SFX_0D db ; Hit car
+SFX_0E_FallToFloor db ; Fall
+SFX_0F_Skid db ; Skid
+SFX_10 db ; Small skid?
+SFX_11 db ; Hit ground?
+SFX_12_CheatAcivated db
+SFX_13_HeadToHeadWinPoint db
+SFX_14_Playoff db ; Playoff
+SFX_15_HitFloor db ; Hit floor, explode
+SFX_16_Respawn db ; Appear?
+.ende
+
 ; ASCII mapping for menu screen text
 .define BLANK_TILE_INDEX = $0e
 .define ZERO_DIGIT_TILE_INDEX = $1a
@@ -2712,7 +2738,7 @@ _LABEL_AD7_DelayIfPlayer2:
   JrToPagedFunction _LABEL_1BCCB_DelayIfPlayer2
 
 _LABEL_AE1_:
-  JrToPagedFunction _LABEL_1F8D8_
+  JrToPagedFunction _LABEL_1F8D8_InGameCheatHandler
 
 _LABEL_AEB_:
   JrToPagedFunction _LABEL_1BAB3_
@@ -2742,7 +2768,7 @@ _LABEL_B13_:
   jp +++
 
 +:
-  ld a, $12
+  ld a, SFX_12_CheatAcivated
   ld (_RAM_D963_SFXTrigger2), a
   jp ++
 
@@ -5346,7 +5372,7 @@ _LABEL_1DF2_:
   ld a, (_RAM_D5A4_IsReversing)
   or a
   jr nz, +
-  ld a, $03
+  ld a, SFX_03
   ld (_RAM_D963_SFXTrigger2), a
 +:
   ld hl, 1000 ; $03E8
@@ -5617,7 +5643,7 @@ _LABEL_2156_BehaviourA:
 _LABEL_2175_Behaviour6:
   ld a, (_RAM_DF00_)
   or a
-  jp nz, _LABEL_22CC_
+  jp nz, _LABEL_22CC_ ; ret
   ld a, (_RAM_DE2F_)
   or a
   jr z, +
@@ -5649,7 +5675,7 @@ _LABEL_2175_Behaviour6:
   ld a, (hl)
   ld (_RAM_DF02_), a
   cp $82
-  jp z, _LABEL_22CC_
+  jp z, _LABEL_22CC_ ; ret
   ld a, $01
   ld (_RAM_DF03_), a
   jp _LABEL_22A9_
@@ -5714,7 +5740,7 @@ _LABEL_2222_:
 +:
   ld a, (_RAM_DF00_)
   or a
-  jp nz, _LABEL_22CC_
+  jp nz, _LABEL_22CC_ ; ret
   ld a, (_RAM_D5CF_)
   ld l, a
   ld a, (_RAM_DE96_)
@@ -5795,8 +5821,8 @@ _LABEL_22A9_:
   ld (_RAM_D58C_), hl
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
-  jr z, _LABEL_22CC_
-  ld a, $02
+  jr z, _LABEL_22CC_ ; ret
+  ld a, SFX_02
   ld (_RAM_D963_SFXTrigger2), a
 _LABEL_22CC_:
   ret
@@ -5860,11 +5886,11 @@ _LABEL_22CD_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
   jr nz, +
-  ld a, $11
+  ld a, SFX_11
   jp ++
 
 +:
-  ld a, $02
+  ld a, SFX_02
 ++:
   ld (_RAM_D963_SFXTrigger2), a
   xor a
@@ -6510,7 +6536,7 @@ _LABEL_2934_BehaviourF:
   ld a, (_RAM_DF58_)
   or a
   jr nz, +
-  ld a, $05
+  ld a, SFX_05
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $01
   ld (_RAM_DF59_CarState), a
@@ -6576,7 +6602,7 @@ _LABEL_29A3_:
   ld a, (_RAM_DF58_)
   or a
   jr nz, ++
-  ld a, $09
+  ld a, SFX_09_EnterPoolTableHole
   ld (_RAM_D963_SFXTrigger2), a
   jp _LABEL_29BC_Behaviour1_FallToFloor
 
@@ -6600,7 +6626,7 @@ _LABEL_29BC_Behaviour1_FallToFloor:
   or a
   jr nz, +
   ; Play sound effect
-  ld a, $0E
+  ld a, SFX_0E_FallToFloor
   ld (_RAM_D963_SFXTrigger2), a
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -6841,7 +6867,7 @@ _LABEL_2BA4_:
 +:
   xor a
   ld (_RAM_D95E_), a
-  ld a, $09
+  ld a, SFX_09_EnterPoolTableHole
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $03
   ld (_RAM_DF59_CarState), a
@@ -6907,7 +6933,7 @@ _LABEL_2C29_Behaviour8_Sticky:
   sub $01
 ++:
   ld (_RAM_DE92_EngineVelocity), a
-  ld a, $07
+  ld a, SFX_07_EnterSticky
   ld (_RAM_D963_SFXTrigger2), a
 +++:
   ret
@@ -6926,7 +6952,7 @@ Behaviour8_Sticky_FourByFour:
   sub $01
 ++:
   ld (_RAM_DE92_EngineVelocity), a
-  ld a, $07
+  ld a, SFX_07_EnterSticky
   ld (_RAM_D963_SFXTrigger2), a
 +++:
   ret
@@ -6938,7 +6964,7 @@ _LABEL_2C69_Behaviour12:
   ld a, (_RAM_DF58_)
   or a
   jr nz, _LABEL_2CD0_
-  ld a, $08
+  ld a, SFX_08
   ld (_RAM_D963_SFXTrigger2), a
   ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
@@ -7423,7 +7449,7 @@ _LABEL_3028_:
   ld (_RAM_D5C1_), a
   ld a, $01
   ld (_RAM_DE8A_), a
-  ld a, $15
+  ld a, SFX_15_HitFloor
   ld (_RAM_D963_SFXTrigger2), a
 +:
   xor a
@@ -13540,7 +13566,7 @@ _LABEL_6571_:
   jr c, +
   xor a
   ld (_RAM_D948_), a
-  ld a, $0D
+  ld a, SFX_0D
   ld (_RAM_D963_SFXTrigger2), a
 +:
   ret
@@ -13577,14 +13603,14 @@ _LABEL_6593_:
   jr z, +
   cp TT_Warriors
   jr z, +
-  ld a, $0F
+  ld a, SFX_0F_Skid
 -:
   ld (_RAM_D963_SFXTrigger2), a
 _LABEL_65C2_:
   ret
 
 +:
-  ld a, $10
+  ld a, SFX_10
   jr -
 
 _LABEL_65C7_:
@@ -13604,7 +13630,7 @@ _LABEL_65D0_BehaviourE:
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
-  ld a, $08
+  ld a, SFX_08
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $03
   ld (_RAM_DF59_CarState), a
@@ -13826,19 +13852,19 @@ _LABEL_6756_:
   jr z, _LABEL_67AB_
   ld a, (_RAM_D5C5_)
   cp $02
-  jp z, _LABEL_6895_
+  jp z, _LABEL_6895_ret
   ld a, (_RAM_DE8C_)
   or a
   jr z, +
   ld a, (_RAM_DD1F_)
   or a
-  jp z, _LABEL_6895_
+  jp z, _LABEL_6895_ret
   ld a, (_RAM_DF59_CarState)
   or a
-  jp nz, _LABEL_6895_
+  jp nz, _LABEL_6895_ret
   ld a, (_RAM_DF5B_)
   or a
-  jp nz, _LABEL_6895_
+  jp nz, _LABEL_6895_ret
   ld a, $01
   ld (_RAM_D5C5_), a
   ld hl, $0000
@@ -13849,12 +13875,12 @@ _LABEL_6756_:
   ld a, (_RAM_DD1F_)
   or a
   jr z, +
-  jp _LABEL_6895_
+  jp _LABEL_6895_ret
 
 +:
   ld a, (_RAM_D945_)
   cp $02
-  jp z, _LABEL_6895_
+  jp z, _LABEL_6895_ret
   ld a, (_RAM_DF81_)
   or a
   jr nz, ++
@@ -13870,11 +13896,11 @@ _LABEL_67AB_:
 +:
   ld a, (_RAM_DF59_CarState)
   cp $FF
-  jp nz, _LABEL_6895_
+  jp nz, _LABEL_6895_ret
   ld a, (_RAM_DF5B_)
   cp $FF
   jr z, ++
-  jp _LABEL_6895_
+  jp _LABEL_6895_ret
 
 ++:
   ld a, (_RAM_DBAA_)
@@ -13965,21 +13991,22 @@ _LABEL_67AB_:
 ++++++:
   ld a, (_RAM_DEBA_)
   or a
-  jr nz, _LABEL_6895_
+  jr nz, _LABEL_6895_ret
   ld a, (_RAM_DEBB_)
   or a
-  jr nz, _LABEL_6895_
+  jr nz, _LABEL_6895_ret
   ld a, (_RAM_DE8C_)
   cp $01
   jp z, _LABEL_69DB_
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jr z, +
+  ; Not head to head
   ld a, $02
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_D946_), a
-  ld a, $16
+  ld a, SFX_16_Respawn
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $74
   ld (_RAM_DBA4_), a
@@ -13987,7 +14014,7 @@ _LABEL_67AB_:
   ld a, $64
   ld (_RAM_DBA5_), a
   ld (_RAM_DBA7_), a
-_LABEL_6895_:
+_LABEL_6895_ret:
   ret
 
 +:
@@ -13998,7 +14025,7 @@ _LABEL_6895_:
   jp nz, _LABEL_693F_
   ld a, $01
   ld (_RAM_DF7F_), a
-  ld a, $13
+  ld a, SFX_13_HeadToHeadWinPoint
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $00
   ld (_RAM_D95E_), a
@@ -14070,8 +14097,9 @@ _LABEL_6895_:
 _LABEL_693F_:
   ld a, (_RAM_DF7F_)
   cp $05
-  jp nz, _LABEL_6895_
-_LABEL_6947_:
+  jp nz, _LABEL_6895_ret
+
+  _LABEL_6947_:
   xor a
   ld (_RAM_D945_), a
   ld (_RAM_D940_), a
@@ -14119,7 +14147,7 @@ _LABEL_6947_:
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_D946_), a
-  ld a, $16
+  ld a, SFX_16_Respawn
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $74
   ld (_RAM_DBA4_), a
@@ -14162,12 +14190,12 @@ _LABEL_6A11_:
   xor a
   ld (_RAM_DF58_), a
   ld (_RAM_DF59_CarState), a
-  ld hl, $01F4
+  ld hl, 500 ; $01F4
   ld (_RAM_D95B_), hl
   ld (_RAM_D58C_), hl
   ld a, $0A
   ld (_RAM_D95E_), a
-  ld a, $0C
+  ld a, SFX_0C_LeavePoolTableHole
   ld (_RAM_D963_SFXTrigger2), a
   ld a, (_RAM_DE8D_)
   ld (_RAM_DE90_CarDirection), a
@@ -14562,7 +14590,7 @@ _LABEL_6D08_:
   ld (_RAM_D95B_), hl
   xor a
   ld (_RAM_D95E_), a
-  ld a, $05
+  ld a, SFX_05
   ld (_RAM_D963_SFXTrigger2), a
   xor a
   ld (_RAM_DE92_EngineVelocity), a
@@ -14620,7 +14648,7 @@ _LABEL_6D43_:
   ld a, (_RAM_DC55_CourseIndex) ; Track 0 = qualifying
   or a
   jr nz, +
-  ld a, $12
+  ld a, SFX_12_CheatAcivated
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $01
   ld (_RAM_DC50_Cheat_FasterVehicles), a
@@ -16350,7 +16378,7 @@ _LABEL_7AF2_:
   ld a, $01
   ld (_RAM_D5CB_), a
   ld (_RAM_D5CC_PlayoffTileLoadFlag), a
-  ld a, $14
+  ld a, SFX_14_Playoff
   ld (_RAM_D963_SFXTrigger2), a
   ld (_RAM_D974_SFXTrigger), a
   jp _LABEL_B2B_
@@ -26829,6 +26857,7 @@ _LABEL_1BF17_:
   jp _LABEL_2961_
 
 ; Data from 1BF35 to 1BF43 (15 bytes)
+; Dead code?
 .db $DD $7E $0C $6F $DD $BE $0D $3E $00 $20 $01 $3C $DD $77 $0B
 
 ++: ret
@@ -26857,7 +26886,7 @@ _DATA_1C000_TrackData_FormulaOne: ; TODO
 _DATA_1F3E4_Tiles_Portrait_Powerboats:
 .incbin "Assets/Powerboats/Portrait.3bpp.compressed"
 
-_LABEL_1F8D8_: ; Cheats!
+_LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   ret nz
@@ -26902,7 +26931,7 @@ _LABEL_1F8D8_: ; Cheats!
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   jr nz, +
-  ld a, $12
+  ld a, SFX_12_CheatAcivated
   ld (_RAM_D963_SFXTrigger2), a
   ld a, $01
   ld (_RAM_DC49_Cheat_ExplosiveOpponents), a
@@ -27038,8 +27067,8 @@ _LABEL_1FA05_NoSkidCheatCheck:
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_U_MASK | BUTTON_1_MASK | BUTTON_2_MASK ; $31
   jr nz, +
-  ld a, $12
-  ld (_RAM_D963_SFXTrigger2), a ; TODO: find more of these
+  ld a, SFX_12_CheatAcivated
+  ld (_RAM_D963_SFXTrigger2), a
   ld a, $01
   ld (_RAM_DC4D_Cheat_NoSkidding), a
 +:
@@ -31976,7 +32005,7 @@ _LABEL_36CA5_:
   ld (_RAM_D945_), a
   ld a, $02
   ld (_RAM_DF59_CarState), a
-  ld a, $16
+  ld a, SFX_16_Respawn
   ld (_RAM_D963_SFXTrigger2), a
 _LABEL_36D06_:
   ret
@@ -33673,7 +33702,7 @@ _LABEL_37A75_:
   ld (_RAM_D5A6_), a
   cp $25
   jr nz, +
-  ld a, $04
+  ld a, SFX_04_TankMiss
   ld (_RAM_D963_SFXTrigger2), a
 _LABEL_37B35_:
   xor a
@@ -33741,7 +33770,7 @@ _LABEL_37B6B_:
   ld (_RAM_D5A8_), a
   ld a, $01
   ld (_RAM_D5A6_), a
-  ld a, $0A
+  ld a, SFX_0A_TankShoot
   ld (_RAM_D963_SFXTrigger2), a
   ld ix, _RAM_DA60_SpriteTableXNs.57
   ld iy, _RAM_DAE0_SpriteTableYs.57
