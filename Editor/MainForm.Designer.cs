@@ -44,6 +44,7 @@
             this.editTrackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pgTrack = new System.Windows.Forms.PropertyGrid();
             this.tabTrack = new System.Windows.Forms.TabPage();
+            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.tabMetaTiles = new System.Windows.Forms.TabPage();
             this.panelMetaTiles = new System.Windows.Forms.Panel();
             this.pbMetaTiles = new System.Windows.Forms.PictureBox();
@@ -53,6 +54,8 @@
             this.tabPalette = new System.Windows.Forms.TabPage();
             this.pbPalette = new System.Windows.Forms.PictureBox();
             this.tabRaw = new System.Windows.Forms.TabPage();
+            this.udRunBytes = new System.Windows.Forms.NumericUpDown();
+            this.btnDecompressRun = new System.Windows.Forms.Button();
             this.udSkip = new System.Windows.Forms.NumericUpDown();
             this.cbPalette = new System.Windows.Forms.ComboBox();
             this.udImageWidth = new System.Windows.Forms.NumericUpDown();
@@ -65,9 +68,6 @@
             this.tbLog = new System.Windows.Forms.TextBox();
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
             this.cbLevelType = new System.Windows.Forms.ComboBox();
-            this.btnDecompressRun = new System.Windows.Forms.Button();
-            this.udRunBytes = new System.Windows.Forms.NumericUpDown();
-            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -86,13 +86,13 @@
             this.tabPalette.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).BeginInit();
             this.tabRaw.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.udSkip)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).BeginInit();
             this.tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).BeginInit();
             this.SuspendLayout();
             // 
             // tbFilename
@@ -241,12 +241,12 @@
             this.trackListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.editTrackToolStripMenuItem});
             this.trackListMenu.Name = "trackListMenu";
-            this.trackListMenu.Size = new System.Drawing.Size(214, 42);
+            this.trackListMenu.Size = new System.Drawing.Size(189, 40);
             // 
             // editTrackToolStripMenuItem
             // 
             this.editTrackToolStripMenuItem.Name = "editTrackToolStripMenuItem";
-            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(213, 38);
+            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(188, 36);
             this.editTrackToolStripMenuItem.Text = "Edit track";
             this.editTrackToolStripMenuItem.Click += new System.EventHandler(this.editTrackToolStripMenuItem_Click);
             // 
@@ -272,6 +272,16 @@
             this.tabTrack.TabIndex = 4;
             this.tabTrack.Text = "Track";
             this.tabTrack.UseVisualStyleBackColor = true;
+            // 
+            // trackEditor
+            // 
+            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.trackEditor.Location = new System.Drawing.Point(6, 6);
+            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
+            this.trackEditor.Name = "trackEditor";
+            this.trackEditor.Size = new System.Drawing.Size(1654, 491);
+            this.trackEditor.TabIndex = 0;
+            this.trackEditor.Track = null;
             // 
             // tabMetaTiles
             // 
@@ -388,6 +398,39 @@
             this.tabRaw.Text = "Raw";
             this.tabRaw.UseVisualStyleBackColor = true;
             // 
+            // udRunBytes
+            // 
+            this.udRunBytes.Location = new System.Drawing.Point(1045, 14);
+            this.udRunBytes.Maximum = new decimal(new int[] {
+            9999,
+            0,
+            0,
+            0});
+            this.udRunBytes.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+            this.udRunBytes.Name = "udRunBytes";
+            this.udRunBytes.Size = new System.Drawing.Size(69, 31);
+            this.udRunBytes.TabIndex = 12;
+            this.udRunBytes.Value = new decimal(new int[] {
+            150,
+            0,
+            0,
+            0});
+            // 
+            // btnDecompressRun
+            // 
+            this.btnDecompressRun.Location = new System.Drawing.Point(948, 5);
+            this.btnDecompressRun.Margin = new System.Windows.Forms.Padding(6);
+            this.btnDecompressRun.Name = "btnDecompressRun";
+            this.btnDecompressRun.Size = new System.Drawing.Size(88, 44);
+            this.btnDecompressRun.TabIndex = 11;
+            this.btnDecompressRun.Text = "Run";
+            this.btnDecompressRun.UseVisualStyleBackColor = true;
+            this.btnDecompressRun.Click += new System.EventHandler(this.btnDecompressRun_Click);
+            // 
             // udSkip
             // 
             this.udSkip.Location = new System.Drawing.Point(1560, 16);
@@ -411,18 +454,18 @@
             "17EE2 Sportscars sprites",
             "17EF2 Four by Four tiles",
             "17F02 Four by Four sprites",
-            "17F12 Power Wheels tiles",
-            "17F22 Power Wheels sprites",
-            "17F32 Formula One tiles",
-            "17F42 Formula One sprites",
-            "17F52 Warriors tiles",
-            "17F62 Warriors sprites",
-            "17F72 Tanks tiles",
-            "17F82 Tanks sprites",
-            "17F92 RuffTrux tiles",
-            "17FA2 RuffTrux sprites",
-            "17FB2 Helicopter tiles",
-            "17FC2 Helicopter sprites"});
+            "17F12 Powerboats tiles",
+            "17F22 Powerboats sprites",
+            "17F32 Turbo Wheels tiles",
+            "17F42 Turbo Wheels sprites",
+            "17F52 Formula One tiles",
+            "17F62 Formula One sprites",
+            "17F72 Warriors tiles",
+            "17F82 Warriors sprites",
+            "17F92 Tanks tiles",
+            "17FA2 Tanks sprites",
+            "17FB2 RuffTrux tiles",
+            "17FC2 RuffTrux sprites"});
             this.cbPalette.Location = new System.Drawing.Point(1295, 16);
             this.cbPalette.Name = "cbPalette";
             this.cbPalette.Size = new System.Drawing.Size(259, 33);
@@ -582,49 +625,6 @@
             this.cbLevelType.TabIndex = 1;
             this.cbLevelType.SelectedIndexChanged += new System.EventHandler(this.TrackParametersChanged);
             // 
-            // btnDecompressRun
-            // 
-            this.btnDecompressRun.Location = new System.Drawing.Point(948, 5);
-            this.btnDecompressRun.Margin = new System.Windows.Forms.Padding(6);
-            this.btnDecompressRun.Name = "btnDecompressRun";
-            this.btnDecompressRun.Size = new System.Drawing.Size(88, 44);
-            this.btnDecompressRun.TabIndex = 11;
-            this.btnDecompressRun.Text = "Run";
-            this.btnDecompressRun.UseVisualStyleBackColor = true;
-            this.btnDecompressRun.Click += new System.EventHandler(this.btnDecompressRun_Click);
-            // 
-            // udRunBytes
-            // 
-            this.udRunBytes.Location = new System.Drawing.Point(1045, 14);
-            this.udRunBytes.Maximum = new decimal(new int[] {
-            9999,
-            0,
-            0,
-            0});
-            this.udRunBytes.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            this.udRunBytes.Name = "udRunBytes";
-            this.udRunBytes.Size = new System.Drawing.Size(69, 31);
-            this.udRunBytes.TabIndex = 12;
-            this.udRunBytes.Value = new decimal(new int[] {
-            150,
-            0,
-            0,
-            0});
-            // 
-            // trackEditor
-            // 
-            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.trackEditor.Location = new System.Drawing.Point(6, 6);
-            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
-            this.trackEditor.Name = "trackEditor";
-            this.trackEditor.Size = new System.Drawing.Size(1654, 491);
-            this.trackEditor.TabIndex = 0;
-            this.trackEditor.Track = null;
-            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
@@ -661,6 +661,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).EndInit();
             this.tabRaw.ResumeLayout(false);
             this.tabRaw.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.udSkip)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
@@ -668,7 +669,6 @@
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
