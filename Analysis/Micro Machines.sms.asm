@@ -9274,7 +9274,6 @@ _DATA_3EF4_CarTilesDataLookup_PageNumber:
 _DATA_3EFD_CarTileDataLookup_Hi:
 .db >_DATA_34958_CarTiles_Sportscars >_DATA_34CF0_CarTiles_FourByFour >_DATA_35048_CarTiles_Powerboats >_DATA_35350_CarTiles_TurboWheels >_DATA_30000_CarTiles_FormulaOne >_DATA_30330_CarTiles_Warriors >_DATA_306D0_CarTiles_Tanks >_DATA_1296A_CarTiles_RuffTrux
 
-
 ; Pointer Table from 3F05 to 3F16 (9 entries, indexed by _RAM_DE88_)
 _DATA_3F05_:
 .dw _DATA_3F63_ _DATA_3F6C_ _DATA_3F75_ _DATA_3F7E_ _DATA_3F87_ _DATA_3F90_ _DATA_3F99_ _DATA_3FA2_
