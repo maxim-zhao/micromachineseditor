@@ -9263,32 +9263,16 @@ _DATA_3EA4_:
 
 ; Data from 3EEC to 3EF3 (8 bytes)
 _DATA_3EEC_CarTileDataLookup_Lo:
-.db $58 $F0 $48 $50 $00 $30 $D0 $6A     ; Pointer low bytes
+.db <_DATA_34958_CarTiles_Sportscars <_DATA_34CF0_CarTiles_FourByFour <_DATA_35048_CarTiles_Powerboats <_DATA_35350_CarTiles_TurboWheels <_DATA_30000_CarTiles_FormulaOne <_DATA_30330_CarTiles_Warriors <_DATA_306D0_CarTiles_Tanks <_DATA_1296A_CarTiles_RuffTrux
 
 ; Data from 3EF4 to 3EFC (9 bytes)
 _DATA_3EF4_CarTilesDataLookup_PageNumber:
-.db $0D $0D $0D $0D $0C $0C $0C $04 $0C ; Page numbers per track type
+.db :_DATA_34958_CarTiles_Sportscars :_DATA_34CF0_CarTiles_FourByFour :_DATA_35048_CarTiles_Powerboats :_DATA_35350_CarTiles_TurboWheels :_DATA_30000_CarTiles_FormulaOne :_DATA_30330_CarTiles_Warriors :_DATA_306D0_CarTiles_Tanks :_DATA_1296A_CarTiles_RuffTrux
+.db $0c ; dangling Helicopters reference
 
 ; Data from 3EFD to 3F04 (8 bytes)
 _DATA_3EFD_CarTileDataLookup_Hi:
-.db $89 $8C $90 $93 $80 $83 $86 $A9     ; Pointer high bytes
-
-; Rearranged:
-; $0D $0D $0D $0D $0C $0C $0C $04 $0C Page
-; $89 $8C $90 $93 $80 $83 $86 $A9     High
-; $58 $F0 $48 $50 $00 $30 $D0 $6A     Low
-; ->
-; $0d, $8958 = $34958
-; $0d, $8cf0 = $34CF0
-; etc
-; Desk        $34958
-; Breakfast   $34CF0
-; Bathtub     $35048
-; Sandpit     $35350
-; F1          $30000
-; Garage      $30330
-; Tanks       $306D0
-; Bonus       $1296A
+.db >_DATA_34958_CarTiles_Sportscars >_DATA_34CF0_CarTiles_FourByFour >_DATA_35048_CarTiles_Powerboats >_DATA_35350_CarTiles_TurboWheels >_DATA_30000_CarTiles_FormulaOne >_DATA_30330_CarTiles_Warriors >_DATA_306D0_CarTiles_Tanks >_DATA_1296A_CarTiles_RuffTrux
 
 
 ; Pointer Table from 3F05 to 3F16 (9 entries, indexed by _RAM_DE88_)
@@ -25523,8 +25507,9 @@ _DATA_A822_FourByFour_Data:
 _DATA_A862_FourByFour_EffectsTiles:
 .incbin "Assets/Four by Four/Effects.3bpp"
 
-; Unknown
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $1296a-$10000 read $13c42-$1296a
+_DATA_1296A_CarTiles_RuffTrux:
+.incbin "Assets/RuffTrux/Car.3bpp.runencoded"
+.dsb 3, 0 ; padding?
 
 _DATA_13C42_Tiles_BigNumbers:
 .incbin "Assets/Menu/Numbers-Big.3bpp.compressed"
@@ -28497,13 +28482,15 @@ _DATA_2FF6F_Tilemap:
 .ORG $0000
 
 ; Data from 30000 to 30A67 (2664 bytes)
-_DATA_30000_F1CarTiles:
-.incbin "Assets/Formula One/CarTiles.runencoded"
-_DATA_30330_WarriorsCarTiles:
-.incbin "Assets/Warriors/CarTiles.runencoded"
-_DATA_306D0_TanksCarTiles:
-.incbin "Assets/Tanks/CarTiles.runencoded"
-
+_DATA_30000_CarTiles_FormulaOne:
+.incbin "Assets/Formula One/Car.3bpp.runencoded"
+.dsb 4, 0 ; Unneeded padding from manual placement?
+_DATA_30330_CarTiles_Warriors:
+.incbin "Assets/Warriors/Car.3bpp.runencoded"
+.dsb 4, 0
+_DATA_306D0_CarTiles_Tanks:
+.incbin "Assets/Tanks/Car.3bpp.runencoded"
+.dsb 7, 0
 
 ; Data from 30A68 to 30C67 (512 bytes)
 _DATA_30A68_HUDTiles:
@@ -29337,15 +29324,18 @@ _DATA_3150F_:
 ; Data from 34000 to 35707 (5896 bytes)
 _DATA_34000_FormulaOne_Tiles:
 .incbin "Assets/Formula One/Tiles.compressed" ; 3bpp bitplane separated
-_DATA_34958_DeskCarTiles:
-.incbin "Assets/raw/Micro Machines_34000.inc" skip $0958 read $0398 ; RLE, size TBC
-_DATA_34CF0_FourByFourTiles:
-.incbin "Assets/raw/Micro Machines_34000.inc" skip $0cf0 read $0358 ; RLE, size TBC
-_DATA_35048_SpeedboatTiles:
-.incbin "Assets/raw/Micro Machines_34000.inc" skip $1048 read $0308 ; RLE, size TBC
-_DATA_35350_TurboWheelsCars:
-.incbin "Assets/raw/Micro Machines_34000.inc" skip $1350 read $03b8 ; RLE, size TBC
-
+_DATA_34958_CarTiles_Sportscars:
+.incbin "Assets/Sportscars/Car.3bpp.runencoded"
+.dsb 6, 0
+_DATA_34CF0_CarTiles_FourByFour:
+.incbin "Assets/Four By Four/Car.3bpp.runencoded"
+.dsb 1, 0
+_DATA_35048_CarTiles_Powerboats:
+.incbin "Assets/Powerboats/Car.3bpp.runencoded"
+.dsb 7, 0
+_DATA_35350_CarTiles_TurboWheels:
+.incbin "Assets/Turbo Wheels/Car.3bpp.runencoded"
+.dsb 1, 0
 
 ; Data from 35708 to 3576F (104 bytes)
 _DATA_35708_PlugholeTilesPart1:

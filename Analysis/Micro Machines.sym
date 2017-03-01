@@ -2539,6 +2539,7 @@
 04:a7a2 _DATA_A7A2_FourByFour_DecoratorTiles
 04:a822 _DATA_A822_FourByFour_Data
 04:a862 _DATA_A862_FourByFour_EffectsTiles
+04:a96a _DATA_1296A_CarTiles_RuffTrux
 04:bc42 _DATA_13C42_Tiles_BigNumbers
 04:bd7f _DATA_13D7F_Tiles_MicroMachinesText
 04:bf38 _DATA_13F38_Tilemap_SmallLogo
@@ -2672,9 +2673,9 @@
 0b:bb10 _DATA_Tiles_Walter_Sad
 0b:bde0 _DATA_2FDE0_Tiles_SmallLogo
 0b:bf6f _DATA_2FF6F_Tilemap
-0c:8000 _DATA_30000_F1CarTiles
-0c:8330 _DATA_30330_WarriorsCarTiles
-0c:86d0 _DATA_306D0_TanksCarTiles
+0c:8000 _DATA_30000_CarTiles_FormulaOne
+0c:8330 _DATA_30330_CarTiles_Warriors
+0c:86d0 _DATA_306D0_CarTiles_Tanks
 0c:8a68 _DATA_30A68_HUDTiles
 0c:8ce8 _LABEL_30CE8_PlayMenuMusic
 0c:8d28 _LABEL_30D28_StopMenuMusic
@@ -2714,10 +2715,10 @@
 0c:94f7 _DATA_314F7_
 0c:950f _DATA_3150F_
 0d:8000 _DATA_34000_FormulaOne_Tiles
-0d:8958 _DATA_34958_DeskCarTiles
-0d:8cf0 _DATA_34CF0_FourByFourTiles
-0d:9048 _DATA_35048_SpeedboatTiles
-0d:9350 _DATA_35350_TurboWheelsCars
+0d:8958 _DATA_34958_CarTiles_Sportscars
+0d:8cf0 _DATA_34CF0_CarTiles_FourByFour
+0d:9048 _DATA_35048_CarTiles_Powerboats
+0d:9350 _DATA_35350_CarTiles_TurboWheels
 0d:9708 _DATA_35708_PlugholeTilesPart1
 0d:9770 _DATA_35770_PlugholeTilesPart2
 0d:97f8 _LABEL_357F8_CarTilesToVRAM

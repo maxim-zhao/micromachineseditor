@@ -533,5 +533,34 @@ namespace MicroMachinesEditor
         {
             RenderRawAsTiles();
         }
+
+        private void btnDecompressRun_Click(object sender, EventArgs e)
+        {
+            byte[] file = File.ReadAllBytes(tbFilename.Text);
+            int offset = Convert.ToInt32(tbOffset.Text, 16);
+            int runBytes = Convert.ToInt32(udRunBytes.Value);
+            int rawOffset = offset + runBytes;
+            var result = new List<byte>();
+            byte lastByte = 0;
+            foreach (var b in file.Skip(offset).Take(runBytes))
+            {
+                for (int i = 0; i < 8; ++i)
+                {
+                    var bit = (b >> (7 - i)) & 1;
+                    if (bit == 0)
+                    {
+                        lastByte = file[rawOffset++];
+                        result.Add(lastByte);
+                    }
+                    else
+                    {
+                        result.Add(lastByte);
+                    }
+                }
+            }
+            _raw = result.ToArray();
+            RenderRawAsTiles();
+            Log($"Decoded {rawOffset - offset} bytes from {offset:X} to {rawOffset - 1:X} to {result.Count} bytes of data ({CompressionRatio(rawOffset - offset, result.Count):P2} compression)");
+        }
     }
 }
