@@ -74,8 +74,8 @@ MenuScreen_OnePlayerMode      db ; 13 Challenge or Head to Head
 .enum 0
 SFX_00_Nothing db
 SFX_01 db ; Bong (lap complete?)
-SFX_02 db ; Car hits ground
-SFX_03 db ; Car hits wall
+SFX_02_HitGround db ; Car hits ground
+SFX_03_Crash db ; Car hits wall or other player?
 SFX_04_TankMiss db ; Tank shell hits floor
 SFX_05 db ; Disappear (2-player cars reset)
 SFX_06 db ; Sticky driving?
@@ -83,14 +83,14 @@ SFX_07_EnterSticky db
 SFX_08 db ; Explode?
 SFX_09_EnterPoolTableHole db ; Pool table hole
 SFX_0A_TankShoot db ; Tank shoots
-SFX_0B db ; Bang
+SFX_0B db ; Bang - unused?
 SFX_0C_LeavePoolTableHole db ; Powerup?
 SFX_0D db ; Hit car
 SFX_0E_FallToFloor db ; Fall
-SFX_0F_Skid db ; Skid
-SFX_10 db ; Small skid?
+SFX_0F_Skid1 db ; Skid
+SFX_10_Skid2 db ; Small skid?
 SFX_11 db ; Hit ground?
-SFX_12_CheatAcivated db
+SFX_12_WinOrCheat db
 SFX_13_HeadToHeadWinPoint db
 SFX_14_Playoff db ; Playoff
 SFX_15_HitFloor db ; Hit floor, explode
@@ -514,7 +514,7 @@ _RAM_D95C_ db
 _RAM_D95D_ db
 _RAM_D95E_ db
 _RAM_D95F_ dsb 4 ; unused?
-_RAM_D963_SFXTrigger2 db
+_RAM_D963_SFXTrigger_Player1 db
 _RAM_D964_Sound1Control db
 _RAM_D965_ dsb 6 ; unused?
 _RAM_D96B_SoundMask db
@@ -523,7 +523,7 @@ _RAM_D96D_ db
 _RAM_D96E_ db ; unused?
 _RAM_D96F_ db
 _RAM_D970_ dsb 4 ; unused?
-_RAM_D974_SFXTrigger db
+_RAM_D974_SFXTrigger_Player2 db
 _RAM_D975_Sound2Control db
 _RAM_D976_ dsb 6 ; unused?
 _RAM_D97C_Sound db
@@ -2766,10 +2766,8 @@ _LABEL_B13_:
   cp $01
   jr z, +
   jp +++
-
-+:
-  ld a, SFX_12_CheatAcivated
-  ld (_RAM_D963_SFXTrigger2), a
++:ld a, SFX_12_WinOrCheat
+  ld (_RAM_D963_SFXTrigger_Player1), a
   jp ++
 
 _LABEL_B2B_:
@@ -2779,23 +2777,21 @@ _LABEL_B2B_:
   ld a, (_RAM_DB7B_)
   cp $07
   jr nz, +++
-+:
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a
++:ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a
 ++:
-  ld hl, _DATA_BB9_
+  ld hl, _DATA_BB9_BonusSpriteData
   jp ++++
 
 +++:
-  ld hl, _DATA_BAD_
+  ld hl, _DATA_BAD_WinnerSpriteData
 ++++:
   ld ix, _RAM_DAE0_SpriteTableYs.20
   ld de, _RAM_DA60_SpriteTableXNs.20
-  ld c, $0C
--:
-  ld a, (hl)
+  ld c, $0C ; Count
+-:ld a, (hl)
   ld (de), a
-  ld a, $50
+  ld a, $50 ; y - writes too many!
   ld (ix+0), a
   inc ix
   inc hl
@@ -2816,11 +2812,11 @@ _LABEL_B63_:
   cp $07
   jr nz, ++
 +:
-  ld ix, _DATA_BB9_
+  ld ix, _DATA_BB9_BonusSpriteData
   jp +++
 
 ++:
-  ld ix, _DATA_BAD_
+  ld ix, _DATA_BAD_WinnerSpriteData
 +++:
   ld de, _RAM_DA60_SpriteTableXNs.20
   ld iy, _RAM_DAE0_SpriteTableYs.20
@@ -2851,9 +2847,9 @@ _LABEL_BAC_ret:
   ret
 
 ; Data from BAD to BC4 (24 bytes)
-_DATA_BAD_:
+_DATA_BAD_WinnerSpriteData: ; Sprite X, N for "WINNER"
 .db $70 $9C $78 $9D $80 $9E $88 $9F $90 $A4 $98 $A5
-_DATA_BB9_:
+_DATA_BB9_BonusSpriteData: ; Sprite X, N for "BONUS"
 .db $70 $96 $78 $97 $80 $98 $88 $99 $90 $9A $98 $9B
 
 ;.section "Floor tiles updates" force
@@ -3206,7 +3202,7 @@ _LABEL_E3C_MoveFloorTilesRight:
 ;.ends
 
 ; Data from EA2 to EE5 (68 bytes)
-_DATA_EA2_:
+_DATA_EA2_: ; Engine velocity related?
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $01 $01 $00 $00 $01 $01 $02 $02 $01 $01 $02 $02 $03 $03 $02 $02
@@ -5372,8 +5368,8 @@ _LABEL_1DF2_:
   ld a, (_RAM_D5A4_IsReversing)
   or a
   jr nz, +
-  ld a, SFX_03
-  ld (_RAM_D963_SFXTrigger2), a
+  ld a, SFX_03_Crash
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +:
   ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
@@ -5822,8 +5818,8 @@ _LABEL_22A9_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
   jr z, _LABEL_22CC_ ; ret
-  ld a, SFX_02
-  ld (_RAM_D963_SFXTrigger2), a
+  ld a, SFX_02_HitGround
+  ld (_RAM_D963_SFXTrigger_Player1), a
 _LABEL_22CC_:
   ret
 
@@ -5890,9 +5886,9 @@ _LABEL_22CD_:
   jp ++
 
 +:
-  ld a, SFX_02
+  ld a, SFX_02_HitGround
 ++:
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   xor a
   ld (_RAM_DF00_), a
   ld (_RAM_DE66_), a
@@ -6537,7 +6533,7 @@ _LABEL_2934_BehaviourF:
   or a
   jr nz, +
   ld a, SFX_05
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
@@ -6603,7 +6599,7 @@ _LABEL_29A3_:
   or a
   jr nz, ++
   ld a, SFX_09_EnterPoolTableHole
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   jp _LABEL_29BC_Behaviour1_FallToFloor
 
 ++:
@@ -6627,7 +6623,7 @@ _LABEL_29BC_Behaviour1_FallToFloor:
   jr nz, +
   ; Play sound effect
   ld a, SFX_0E_FallToFloor
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -6868,7 +6864,7 @@ _LABEL_2BA4_:
   xor a
   ld (_RAM_D95E_), a
   ld a, SFX_09_EnterPoolTableHole
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $03
   ld (_RAM_DF59_CarState), a
   ld a, $01
@@ -6934,7 +6930,7 @@ _LABEL_2C29_Behaviour8_Sticky:
 ++:
   ld (_RAM_DE92_EngineVelocity), a
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +++:
   ret
 
@@ -6953,7 +6949,7 @@ Behaviour8_Sticky_FourByFour:
 ++:
   ld (_RAM_DE92_EngineVelocity), a
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +++:
   ret
 
@@ -6965,7 +6961,7 @@ _LABEL_2C69_Behaviour12:
   or a
   jr nz, _LABEL_2CD0_
   ld a, SFX_08
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
@@ -7450,7 +7446,7 @@ _LABEL_3028_:
   ld a, $01
   ld (_RAM_DE8A_), a
   ld a, SFX_15_HitFloor
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +:
   xor a
   ld (_RAM_DE87_), a
@@ -10491,8 +10487,8 @@ _LABEL_4DD4_:
   ld a, (_RAM_D5BE_)
   or a
   jr nz, +
-  ld a, $0E
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_0E_FallToFloor
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -11513,8 +11509,8 @@ _LABEL_5451_:
   ld a, (_RAM_D5A5_)
   or a
   jr nz, +
-  ld a, $03
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_03_Crash
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   ld hl, 1000 ; $03E8
   ld (_RAM_D96C_), hl
@@ -12135,8 +12131,8 @@ _LABEL_59FC_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
-  ld a, $03
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_03_Crash
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld hl, 1000 ; $03E8
   ld (_RAM_D96C_), hl
   call _LABEL_51CF_
@@ -12199,8 +12195,8 @@ _LABEL_5A77_:
   ld a, (ix+21)
   or a
   jr z, _LABEL_5A87_
-  ld a, $02
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_02_HitGround
+  ld (_RAM_D974_SFXTrigger_Player2), a
 _LABEL_5A87_:
   ret
 
@@ -12303,8 +12299,8 @@ _LABEL_5A88_:
   ld a, (ix+21)
   or a
   jr z, +
-  ld a, $02
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_02_HitGround
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   xor a
   ld (ix+20), a
@@ -12563,8 +12559,8 @@ _LABEL_5D4A_:
   ld (_RAM_DCFC_), a
   ld (_RAM_DB82_), a
   ld (_RAM_DB83_), a
-  ld a, $09
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_09_EnterPoolTableHole
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, (_RAM_DF56_)
   ld b, a
   ld a, (_RAM_DF57_)
@@ -13567,7 +13563,7 @@ _LABEL_6571_:
   xor a
   ld (_RAM_D948_), a
   ld a, SFX_0D
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 +:
   ret
 
@@ -13577,8 +13573,8 @@ _LABEL_6582_:
   jr c, +
   xor a
   ld (_RAM_D949_), a
-  ld a, $0D
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_0D
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   ret
 
@@ -13603,14 +13599,14 @@ _LABEL_6593_:
   jr z, +
   cp TT_Warriors
   jr z, +
-  ld a, SFX_0F_Skid
+  ld a, SFX_0F_Skid1
 -:
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 _LABEL_65C2_:
   ret
 
 +:
-  ld a, SFX_10
+  ld a, SFX_10_Skid2
   jr -
 
 _LABEL_65C7_:
@@ -13631,7 +13627,7 @@ _LABEL_65D0_BehaviourE:
   xor a
   ld (_RAM_D95E_), a
   ld a, SFX_08
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $03
   ld (_RAM_DF59_CarState), a
   ld a, $01
@@ -14007,7 +14003,7 @@ _LABEL_67AB_:
   xor a
   ld (_RAM_D946_), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $74
   ld (_RAM_DBA4_), a
   ld (_RAM_DBA6_), a
@@ -14026,7 +14022,7 @@ _LABEL_6895_ret:
   ld a, $01
   ld (_RAM_DF7F_), a
   ld a, SFX_13_HeadToHeadWinPoint
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $00
   ld (_RAM_D95E_), a
   ld (_RAM_D96F_), a
@@ -14148,7 +14144,7 @@ _LABEL_693F_:
   xor a
   ld (_RAM_D946_), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $74
   ld (_RAM_DBA4_), a
   ld (_RAM_DBA6_), a
@@ -14196,7 +14192,7 @@ _LABEL_6A11_:
   ld a, $0A
   ld (_RAM_D95E_), a
   ld a, SFX_0C_LeavePoolTableHole
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, (_RAM_DE8D_)
   ld (_RAM_DE90_CarDirection), a
   ld (_RAM_DE91_CarDirectionPrevious), a
@@ -14591,7 +14587,7 @@ _LABEL_6D08_:
   xor a
   ld (_RAM_D95E_), a
   ld a, SFX_05
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   xor a
   ld (_RAM_DE92_EngineVelocity), a
   ld (_RAM_DF00_), a
@@ -14648,8 +14644,8 @@ _LABEL_6D43_:
   ld a, (_RAM_DC55_CourseIndex) ; Track 0 = qualifying
   or a
   jr nz, +
-  ld a, SFX_12_CheatAcivated
-  ld (_RAM_D963_SFXTrigger2), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
   ld (_RAM_DC50_Cheat_FasterVehicles), a
 +:
@@ -15054,8 +15050,8 @@ _LABEL_709C_:
   ld (_RAM_DE51_), a
   or a
   jr z, +
-  ld a, $01
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_01
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   ld a, (_RAM_DE51_)
   cp $00
@@ -16379,8 +16375,8 @@ _LABEL_7AF2_:
   ld (_RAM_D5CB_), a
   ld (_RAM_D5CC_PlayoffTileLoadFlag), a
   ld a, SFX_14_Playoff
-  ld (_RAM_D963_SFXTrigger2), a
-  ld (_RAM_D974_SFXTrigger), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D974_SFXTrigger_Player2), a
   jp _LABEL_B2B_
 
 _LABEL_7B0B_:
@@ -26931,8 +26927,8 @@ _LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   jr nz, +
-  ld a, SFX_12_CheatAcivated
-  ld (_RAM_D963_SFXTrigger2), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
   ld (_RAM_DC49_Cheat_ExplosiveOpponents), a
   ret
@@ -26951,8 +26947,8 @@ _LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   ld a, (_RAM_DF59_CarState) ; Player car is falling?
   cp $03
   jr nz, +
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
   ld (_RAM_DC4B_Cheat_InfiniteLives), a
   ret
@@ -26965,8 +26961,8 @@ _LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   ld a, (_RAM_DF24_LapsRemaining)
   cp $05
   jr nz, +
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
   ld (_RAM_DC4C_Cheat_AlwaysFirstPlace), a
   ret
@@ -26988,8 +26984,8 @@ _LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   jr nz, _LABEL_1F996_ret
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a ; Play sound effect
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a ; Play sound effect
   ld a, $01
   ld (_RAM_DC4E_Cheat_SuperSkids), a ; And this
 _LABEL_1F996_ret:
@@ -27021,8 +27017,8 @@ _LABEL_1F996_ret:
   ld a, (_RAM_D5A4_IsReversing) ; Reversing
   or a
   jr z, +
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
   ld (_RAM_DC4F_Cheat_EasierOpponents), a
 +:
@@ -27036,7 +27032,7 @@ _LABEL_1F9D4_Cheats_SportsCars:
   ld a, (_RAM_DC4A_Cheat_ExtraLives) ; Laps done?
   or a
   jr nz, +
-  ; Tile 5, 24 = bototm half of pencil far to theleft of the start position, and 4 laps remaining
+  ; Tile 5, 24 = bottom half of pencil far to the left of the start position, and 4 laps remaining
   ld a, (_RAM_D5C8_MetatileX) ; 5, 24
   cp $05
   jr nz, +
@@ -27046,8 +27042,8 @@ _LABEL_1F9D4_Cheats_SportsCars:
   ld a, (_RAM_DF24_LapsRemaining) ; Haven't crossed the start line yet
   cp $04
   jr nz, +
-  ld a, $12
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
   ld (_RAM_DC4A_Cheat_ExtraLives), a
   ld a, $05
@@ -27067,8 +27063,8 @@ _LABEL_1FA05_NoSkidCheatCheck:
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_U_MASK | BUTTON_1_MASK | BUTTON_2_MASK ; $31
   jr nz, +
-  ld a, SFX_12_CheatAcivated
-  ld (_RAM_D963_SFXTrigger2), a
+  ld a, SFX_12_WinOrCheat
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
   ld (_RAM_DC4D_Cheat_NoSkidding), a
 +:
@@ -27256,8 +27252,8 @@ _LABEL_1FB35_:
   ld a, (ix+21)
   or a
   jr z, +++
-  ld a, $07
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_07_EnterSticky
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +++:
   ret
 
@@ -27277,8 +27273,8 @@ _LABEL_1FB35_:
   ld a, (ix+21)
   or a
   jr z, +++
-  ld a, $07
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_07_EnterSticky
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +++:
   ret
 
@@ -28258,11 +28254,11 @@ _LABEL_2B616_Sound:
   ld a, c
   and $03
   ld (_RAM_D956_), a
-  ld ix, _RAM_D963_SFXTrigger2
+  ld ix, _RAM_D963_SFXTrigger_Player1
   ld bc, _RAM_D94C_Sound1Channel0Volume
   call _LABEL_2B7A1_SoundFunction
   call +
-  ld ix, _RAM_D974_SFXTrigger
+  ld ix, _RAM_D974_SFXTrigger_Player2
   ld bc, _RAM_D94F_Sound2Channel0Volume
   call _LABEL_2B7A1_SoundFunction
   call ++
@@ -30847,16 +30843,16 @@ _LABEL_3636E_:
 _LABEL_3639C_:
   ld a, (_RAM_D5BC_)
   cp $04
-  jr c, _LABEL_363CB_
+  jr c, _LABEL_363CB_ret
   ld a, (_RAM_DD00_)
   or a
-  jr nz, _LABEL_363CB_
+  jr nz, _LABEL_363CB_ret
   ld a, (_RAM_DCF7_)
   cp $06
-  jr c, _LABEL_363CB_
+  jr c, _LABEL_363CB_ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
-  jr z, _LABEL_363CB_
+  jr z, _LABEL_363CB_ret
 --:
   xor a
   ld (_RAM_D5BC_), a
@@ -30865,20 +30861,20 @@ _LABEL_3639C_:
   jr z, +
   cp TT_Warriors
   jr z, +
-  ld a, $0F
+  ld a, SFX_0F_Skid1
 -:
-  ld (_RAM_D974_SFXTrigger), a
-_LABEL_363CB_:
+  ld (_RAM_D974_SFXTrigger_Player2), a
+_LABEL_363CB_ret:
   ret
 
 +:
-  ld a, $10
+  ld a, SFX_10_Skid2
   jr -
 
 _LABEL_363D0_:
   ld a, (_RAM_D5BC_)
   cp $04
-  jr c, _LABEL_363CB_
+  jr c, _LABEL_363CB_ret
   jr --
 
 _LABEL_363D9_:
@@ -32006,7 +32002,7 @@ _LABEL_36CA5_:
   ld a, $02
   ld (_RAM_DF59_CarState), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 _LABEL_36D06_:
   ret
 
@@ -33703,7 +33699,7 @@ _LABEL_37A75_:
   cp $25
   jr nz, +
   ld a, SFX_04_TankMiss
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
 _LABEL_37B35_:
   xor a
   ld (_RAM_D5A6_), a
@@ -33771,7 +33767,7 @@ _LABEL_37B6B_:
   ld a, $01
   ld (_RAM_D5A6_), a
   ld a, SFX_0A_TankShoot
-  ld (_RAM_D963_SFXTrigger2), a
+  ld (_RAM_D963_SFXTrigger_Player1), a
   ld ix, _RAM_DA60_SpriteTableXNs.57
   ld iy, _RAM_DAE0_SpriteTableYs.57
   ld (ix+1), $AD
@@ -33976,8 +33972,8 @@ _LABEL_37D33_:
   ld a, (ix+21)
   or a
   jr z, _LABEL_37D49_
-  ld a, $04
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_04_TankMiss
+  ld (_RAM_D974_SFXTrigger_Player2), a
 _LABEL_37D49_:
   xor a
   ld (ix+63), a
@@ -34079,8 +34075,8 @@ _LABEL_37D9C_:
   ld a, (ix+21)
   or a
   jr z, +
-  ld a, $0A
-  ld (_RAM_D974_SFXTrigger), a
+  ld a, SFX_0A_TankShoot
+  ld (_RAM_D974_SFXTrigger_Player2), a
 +:
   ld (iy+1), $AD
   ld (iy+3), $AE
