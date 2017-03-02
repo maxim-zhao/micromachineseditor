@@ -28272,8 +28272,61 @@ _DATA_23ECF_HandlingData_SMS:
 .ORG $0000
 
 ; Data from 24000 to 27FFF (16384 bytes)
-_DATA_24000_TrackData_Tanks: ; TODO
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $24000-$24000 read $26C52-$24000
+.dstruct _DATA_24000_TrackData_Tanks instanceof TrackData data  _DATA_9F70_Tanks_BehaviourData _DATA_A32A_Tanks_WallData _DATA_A42C_Tanks_Track0Layout _DATA_A5A6_Tanks_Track1Layout _DATA_A7D4_Tanks_Track2Layout _DATA_A7D4_Tanks_Track3Layout _DATA_AA4A_Tanks_GGPalette _DATA_AA8A_Tanks_DecoratorTiles _DATA_AB0A_Tanks_Data _DATA_AB4A_Tanks_EffectsTiles
+
+.incbin "Assets/raw/Micro Machines_24000.inc" skip $24014-$24000 read $25f70-$24014 ; ??? 
+
+_DATA_9F70_Tanks_BehaviourData:
+.incbin "Assets/Tanks/Behaviour data.compressed"
+_DATA_A32A_Tanks_WallData:
+.incbin "Assets/Tanks/Wall data.compressed"
+_DATA_A42C_Tanks_Track0Layout:
+.incbin "Assets/Tanks/Track 0 layout.compressed"
+_DATA_A5A6_Tanks_Track1Layout:
+.incbin "Assets/Tanks/Track 1 layout.compressed"
+_DATA_A7D4_Tanks_Track2Layout:
+_DATA_A7D4_Tanks_Track3Layout:
+.incbin "Assets/Tanks/Track 2 layout.compressed"
+_DATA_AA4A_Tanks_GGPalette:
+  GGCOLOUR $000000
+  GGCOLOUR $000088
+  GGCOLOUR $0044EE
+  GGCOLOUR $8888EE
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $440000
+  GGCOLOUR $880000
+  GGCOLOUR $008800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_DATA_AA8A_Tanks_DecoratorTiles:
+.incbin "Assets/Tanks/Decorators.1bpp"
+_DATA_AB0A_Tanks_Data:
+.db $22 $00 $63 $41 $63 $41 $49 $45 $77 $73 $22 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $C0 $E0 $C0 $E0 $A2 $C0 $A0 $A0 $A0 $A0 $80 $A0 $80 $A0 $A0 $A0 $8A $A0 $80 $8A $A0 $80 $82 $C0 $A0 $A0 $C0 $22 $A0 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+_DATA_AB4A_Tanks_EffectsTiles:
+.incbin "Assets/Tanks/Effects.3bpp"
+
 
 _DATA_26C52_Tiles_Challenge_Icon:
 .incbin "Assets/Menu/Icon-Challenge.3bpp.compressed"
