@@ -26887,9 +26887,60 @@ _LABEL_1BF17_:
 .BANK 7
 .ORG $0000
 
-; Data from 1C000 to 1F8D7 (14552 bytes)
-_DATA_1C000_TrackData_FormulaOne: ; TODO
-.incbin "Assets/raw/Micro Machines_1c000.inc" skip 0 read $1f3e4-$1c000
+.dstruct _DATA_1C000_TrackData_FormulaOne instanceof TrackData data  _DATA_A480_FormulaOne_BehaviourData _DATA_A819_FormulaOne_WallData _DATA_A8CA_FormulaOne_Track0Layout _DATA_AB11_FormulaOne_Track1Layout _DATA_AE73_FormulaOne_Track2Layout _DATA_AE73_FormulaOne_Track3Layout _DATA_B1DC_FormulaOne_GGPalette _DATA_B21C_FormulaOne_DecoratorTiles _DATA_B29C_FormulaOne_Data _DATA_B2DC_FormulaOne_EffectsTiles
+
+.incbin "Assets/raw/Micro Machines_1c000.inc" skip $1c014-$1c000 read $1e480-$1c014 ; ??? 
+
+_DATA_A480_FormulaOne_BehaviourData:
+.incbin "Assets/Formula One/Behaviour data.compressed"
+_DATA_A819_FormulaOne_WallData:
+.incbin "Assets/Formula One/Wall data.compressed"
+_DATA_A8CA_FormulaOne_Track0Layout:
+.incbin "Assets/Formula One/Track 0 layout.compressed"
+_DATA_AB11_FormulaOne_Track1Layout:
+.incbin "Assets/Formula One/Track 1 layout.compressed"
+_DATA_AE73_FormulaOne_Track2Layout:
+_DATA_AE73_FormulaOne_Track3Layout: ; points at #2
+.incbin "Assets/Formula One/Track 2 layout.compressed"
+_DATA_B1DC_FormulaOne_GGPalette:
+  GGCOLOUR $000000
+  GGCOLOUR $008800
+  GGCOLOUR $004400
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $888888
+  GGCOLOUR $444400
+  GGCOLOUR $EE8800
+  GGCOLOUR $EE0000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_DATA_B21C_FormulaOne_DecoratorTiles:
+.incbin "Assets/Formula One/Decorators.1bpp"
+_DATA_B29C_FormulaOne_Data:
+.db $C0 $00 $22 $63 $77 $73 $63 $C0 $22 $00 $45 $49 $41 $00 $22 $41 $A0 $80 $80 $80 $80 $2E $A0 $C0 $C0 $80 $00 $3A $A0 $C0 $C0 $C0 $00 $00 $1C $00 $C0 $80 $C0 $80 $00 $3A $3A $2E $08 $1C $C0 $80 $1C $80 $C0 $3A $C0 $C0 $C0 $1C $1C $A0 $A0 $C0 $22 $49 $45 $80
+_DATA_B2DC_FormulaOne_EffectsTiles:
+.incbin "Assets/Formula One/Effects.3bpp"
 
 _DATA_1F3E4_Tiles_Portrait_Powerboats:
 .incbin "Assets/Powerboats/Portrait.3bpp.compressed"
@@ -27297,9 +27348,60 @@ _LABEL_1FB35_:
 .BANK 8
 .ORG $0000
 
-; Data from 20000 to 237E1 (14306 bytes)
-_DATA_20000_TrackData_Warriors: ; TODO
-.incbin "Assets/raw/Micro Machines_20000.inc" skip 0 read $22B2C-$20000
+.dstruct _DATA_20000_TrackData_Warriors instanceof TrackData data  _DATA_9D30_Warriors_BehaviourData _DATA_A01A_Warriors_WallData _DATA_A10F_Warriors_Track0Layout _DATA_A3B8_Warriors_Track1Layout _DATA_A67C_Warriors_Track2Layout _DATA_A67C_Warriors_Track3Layout _DATA_A924_Warriors_GGPalette _DATA_A964_Warriors_DecoratorTiles _DATA_A9E4_Warriors_Data _DATA_AA24_Warriors_EffectsTiles
+
+.incbin "Assets/raw/Micro Machines_20000.inc" skip $20014-$20000 read $21d30-$20014 ; ??? 
+
+_DATA_9D30_Warriors_BehaviourData:
+.incbin "Assets/Warriors/Behaviour data.compressed"
+_DATA_A01A_Warriors_WallData:
+.incbin "Assets/Warriors/Wall data.compressed"
+_DATA_A10F_Warriors_Track0Layout:
+.incbin "Assets/Warriors/Track 0 layout.compressed"
+_DATA_A3B8_Warriors_Track1Layout:
+.incbin "Assets/Warriors/Track 1 layout.compressed"
+_DATA_A67C_Warriors_Track2Layout:
+_DATA_A67C_Warriors_Track3Layout:
+.incbin "Assets/Warriors/Track 2 layout.compressed"
+_DATA_A924_Warriors_GGPalette:
+  GGCOLOUR $000000
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $880000
+  GGCOLOUR $004400
+  GGCOLOUR $884400
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_DATA_A964_Warriors_DecoratorTiles:
+.incbin "Assets/Warriors/Decorators.1bpp"
+_DATA_A9E4_Warriors_Data:
+.db $00 $00 $80 $80 $22 $22 $A0 $A0 $73 $73 $73 $C0 $77 $77 $73 $22 $00 $00 $22 $49 $49 $C0 $45 $45 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $22 $C0 $C0 $C0 $80 $C0 $C0 $C0 $C0 $C0 $C0 $C0 $22 $C0 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
+_DATA_AA24_Warriors_EffectsTiles:
+.incbin "Assets/Warriors/Effects.3bpp"
 
 _DATA_22B2C_Tiles_PunctuationAndLine:
 .incbin "Assets/raw/Micro Machines_20000.inc" skip $22B2C-$20000 read $22B8C-$22B2C
