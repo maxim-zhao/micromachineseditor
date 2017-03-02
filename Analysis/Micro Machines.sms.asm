@@ -14694,7 +14694,7 @@ _LABEL_6DDB_:
 _LABEL_6E00_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
-  jp z, _LABEL_7171_
+  jp z, _LABEL_7171_ret
   ld a, (_RAM_DCC5_)
   cp $00
   jp nz, _LABEL_6F10_
@@ -15158,7 +15158,7 @@ _LABEL_709C_:
   ld a, $97
 ++:
   ld (hl), a
-_LABEL_7171_:
+_LABEL_7171_ret:
   ret
 
 ; Data from 7172 to 7175 (4 bytes)
@@ -15291,15 +15291,14 @@ _LABEL_71C7_:
   jp z, ++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, +
+  jr nz, + ; ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
-  jr nz, +
+  jr nz, + ; ret
   ld a, (_RAM_D5DE_)
   ld (_RAM_DF4F_), a
   ld (_RAM_D587_), a
-+:
-  ret
++:ret
 
 ++:
   JumpToPagedFunction _LABEL_36B29_
@@ -15412,12 +15411,11 @@ _LABEL_7367_:
   add hl, bc
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
-  jr nz, +
+  jr nz, + ; ret
   ld bc, $0004
   or a
   sbc hl, bc
-+:
-  ret
++:ret
 
 _LABEL_7393_:
   push hl
@@ -15441,12 +15439,11 @@ _LABEL_7393_:
   add hl, bc
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
-  jr nz, +
+  jr nz, + ; ret
   ld bc, $0004
   or a
   sbc hl, bc
-+:
-  ret
++:ret
 
 -:
   call _LABEL_6C39_
@@ -17090,16 +17087,16 @@ _LABEL_7EA5_:
   jr z, +
 
   ; RuffTrux
-  ld a, $04
+  ld a, VDP_REGISTER_SPRITESET_HIGH
   out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_UNUSED6
+  ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
   ret
 
 +:; Other cars
-  ld a, $00
+  ld a, VDP_REGISTER_SPRITESET_LOW
   out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_UNUSED6
+  ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -17558,7 +17555,7 @@ _LABEL_81C1_:
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_BB75_
   ret
 
@@ -17568,7 +17565,7 @@ _LABEL_8205_:
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $00
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
   call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
@@ -17611,7 +17608,7 @@ _LABEL_8272_:
   call _LABEL_BB85_ScreenOn
   ld a, MenuScreen_RaceName
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2DC_ ; blank screen
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine ; blank screen
   TilemapWriteAddressToHL 0, 5
   call _LABEL_B35A_VRAMAddressToHL
   call _LABEL_95AF_DrawHorizontalLineIfSMS
@@ -17665,7 +17662,7 @@ _LABEL_82DF_Menu1:
 
 +:
   call _LABEL_BB85_ScreenOn
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
@@ -17709,7 +17706,7 @@ _TEXT_834E_FailedToQualify:
 
 _LABEL_8360_:
   call _LABEL_BB85_ScreenOn
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
@@ -17784,8 +17781,8 @@ _LABEL_841C_:
   ld a, MenuScreen_WhoDoYouWantToRace
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B337_BlankTiles
-  call _LABEL_B2DC_
-  call _LABEL_A673_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
+  call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
   call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
@@ -17825,7 +17822,7 @@ _LABEL_8486_:
   call _LABEL_BB85_ScreenOn
   ld a, MenuScreen_StorageBox
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2BB_
+  call _LABEL_B2BB_DrawMenuScreenBase_WithLine
   ld c, $07
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A787_
@@ -17854,7 +17851,7 @@ _LABEL_84AA_Menu5:
 _LABEL_84C7_:
   ld a, MenuScreen_OnePlayerTrackIntro
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2BB_
+  call _LABEL_B2BB_DrawMenuScreenBase_WithLine
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
@@ -18001,7 +17998,7 @@ _LABEL_85F4_:
   ld a, MenuScreen_UnknownB
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, $0E
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
@@ -18054,7 +18051,7 @@ _LABEL_866C_Menu3:
   call _LABEL_BB85_ScreenOn
   ld a, MenuScreen_LifeList
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
@@ -18102,7 +18099,7 @@ _LABEL_866C_Menu3:
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
   add a, $1B
   ld (_RAM_D701_SpriteN), a
@@ -18203,7 +18200,7 @@ _LABEL_876B_:
   add a, $01
 +:
   ld (_RAM_DC09_Lives), a
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
   add a, $1A
   ld (_RAM_D701_SpriteN), a
@@ -18290,7 +18287,7 @@ _LABEL_8877_:
   call _LABEL_BB85_ScreenOn
   ld a, MenuScreen_UnknownD
   ld (_RAM_D699_MenuScreenIndex), a
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   ld a, TT_Unknown9
   call _LABEL_B478_SelectPortraitPage
@@ -18383,12 +18380,12 @@ _LABEL_8953_:
   ld (_RAM_D7B4_IsHeadToHead), a
   xor a
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
   call _LABEL_987B_BlankTile1B4
   call _LABEL_9434_
   call _LABEL_988D_
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
 
   TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
@@ -18459,7 +18456,7 @@ _LABEL_89E2_:
   xor a
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AC_), a
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_BB75_
   ret
 
@@ -18571,7 +18568,7 @@ _LABEL_8A38_Menu4:
   ld a, (_RAM_DC34_IsTournament)
   cp $01
   jr z, +
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   ld c, $05
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_9317_InitialiseHandSprites
@@ -22025,10 +22022,10 @@ _TEXT_A66D_One:
 _TEXT_A670_Two:
 .asc "TWO" ; $13 $16 $1A
 
-_LABEL_A673_:
-  ld a, $00
+_LABEL_A673_SelectLowSpriteTiles:
+  ld a, VDP_REGISTER_SPRITESET_LOW
   out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_UNUSED6
+  ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -23242,7 +23239,7 @@ _LABEL_AFCD_:
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_BB75_
   ret
 
@@ -23614,7 +23611,7 @@ _LABEL_B2B3_:
   ld h, a
   ret
 
-_LABEL_B2BB_:
+_LABEL_B2BB_DrawMenuScreenBase_WithLine:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
@@ -23630,7 +23627,7 @@ _LABEL_B2BB_:
 +:
   ret
 
-_LABEL_B2DC_:
+_LABEL_B2DC_DrawMenuScreenBase_NoLine:
   ld e, BLANK_TILE_INDEX
   call _LABEL_9170_BlankTilemap_BlankControlsRAM
   call _LABEL_9400_BlankSprites
@@ -24290,7 +24287,7 @@ _LABEL_B70B_:
   call _LABEL_ABB0_
   ld c, $07
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_A673_
+  call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_9317_InitialiseHandSprites
   ld hl, _DATA_2B356_SpriteNs_HandLeft
   CallRamCode _LABEL_3BBB5_PopulateSpriteNs
@@ -24448,10 +24445,10 @@ _LABEL_B877_:
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $B2
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
-  call _LABEL_B2DC_
+  call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
-  call _LABEL_B8CF_
-  call _LABEL_B8E3_
+  call _LABEL_B8CF_LoadTrophyTiles
+  call _LABEL_B8E3_LoadTrophyTilemap
   TileWriteAddressToHL $24
   call _LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC34_IsTournament)
@@ -24485,7 +24482,7 @@ _LABEL_B8C9_EmitTilemapRectangle_5x6_24:
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
   jp _LABEL_BCCF_EmitTilemapRectangleSequence
 
-_LABEL_B8CF_:
+_LABEL_B8CF_LoadTrophyTiles:
   ld a, :_DATA_1B2C3_Tiles_Trophy
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_1B2C3_Tiles_Trophy
@@ -24494,10 +24491,10 @@ _LABEL_B8CF_:
   ld de, 82 * 8 ; 82 tiles
   jp _LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
-_LABEL_B8E3_:
-  ld a, :_DATA_279F0_Tilemap_
+_LABEL_B8E3_LoadTrophyTilemap:
+  ld a, :_DATA_279F0_Tilemap_Trophy
   ld (_RAM_D741_RequestedPageIndex), a
-  ld hl, _DATA_279F0_Tilemap_
+  ld hl, _DATA_279F0_Tilemap_Trophy
   CallRamCode _LABEL_3B97D_DecompressFromHLToC000
   TilemapWriteAddressToHL 7, 14
   call _LABEL_B35A_VRAMAddressToHL
@@ -26776,9 +26773,9 @@ _LABEL_1BE82_:
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  ld a, $04
+  ld a, VDP_REGISTER_SPRITESET_HIGH
   out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_UNUSED6
+  ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
   xor a
   out (PORT_VDP_REGISTER), a
@@ -28176,7 +28173,7 @@ _DATA_27674_Tiles_SingleRace_Icon:
 _DATA_2794C_Tiles_MediumNumbers:
 .incbin "Assets/Menu/Numbers-Medium.3bpp.compressed"
 
-_DATA_279F0_Tilemap_:
+_DATA_279F0_Tilemap_Trophy:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $279f0-$24000 read $27a12-$279f0
 
 _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:

@@ -516,7 +516,7 @@
 00:d95d _RAM_D95D_
 00:d95e _RAM_D95E_
 00:d95f _RAM_D95F_
-00:d963 _RAM_D963_SFXTrigger2
+00:d963 _RAM_D963_SFXTrigger_Player1
 00:d964 _RAM_D964_Sound1Control
 00:d965 _RAM_D965_
 00:d96b _RAM_D96B_SoundMask
@@ -525,7 +525,7 @@
 00:d96e _RAM_D96E_
 00:d96f _RAM_D96F_
 00:d970 _RAM_D970_
-00:d974 _RAM_D974_SFXTrigger
+00:d974 _RAM_D974_SFXTrigger_Player2
 00:d975 _RAM_D975_Sound2Control
 00:d976 _RAM_D976_
 00:d97c _RAM_D97C_Sound
@@ -1980,7 +1980,7 @@
 00:6fff _LABEL_6FFF_
 00:7070 _LABEL_7070_
 00:709c _LABEL_709C_
-00:7171 _LABEL_7171_
+00:7171 _LABEL_7171_ret
 00:7172 _DATA_7172_
 00:7176 _LABEL_7176_
 00:718b _LABEL_718B_
@@ -2296,7 +2296,7 @@
 02:a66a _TEXT_A66A_Plr
 02:a66d _TEXT_A66D_One
 02:a670 _TEXT_A670_Two
-02:a673 _LABEL_A673_
+02:a673 _LABEL_A673_SelectLowSpriteTiles
 02:a67c _LABEL_A67C_
 02:a692 _LABEL_A692_
 02:a6ef _TEXT_A6EF_OpponentNames
@@ -2388,8 +2388,8 @@
 02:b27e _LABEL_B27E_
 02:b298 _LABEL_B298_
 02:b2b3 _LABEL_B2B3_
-02:b2bb _LABEL_B2BB_
-02:b2dc _LABEL_B2DC_
+02:b2bb _LABEL_B2BB_DrawMenuScreenBase_WithLine
+02:b2dc _LABEL_B2DC_DrawMenuScreenBase_NoLine
 02:b2f3 _LABEL_B2F3_DrawHorizontalLines_CharacterSelect
 02:b305 _LABEL_B305_DrawHorizontalLine_Top
 02:b30e _LABEL_B30E_
@@ -2435,8 +2435,8 @@
 02:b84d _LABEL_B84D_MenuScreen_TournamentChampion
 02:b877 _LABEL_B877_
 02:b8c9 _LABEL_B8C9_EmitTilemapRectangle_5x6_24
-02:b8cf _LABEL_B8CF_
-02:b8e3 _LABEL_B8E3_
+02:b8cf _LABEL_B8CF_LoadTrophyTiles
+02:b8e3 _LABEL_B8E3_LoadTrophyTilemap
 02:b911 _LABEL_B911_
 02:b966 _TEXT_B966_TournamentChampion
 02:b97a _TEXT_B97A_Challenge
@@ -2689,7 +2689,7 @@
 09:b391 _DATA_27391_Tiles_Tournament_Icon
 09:b674 _DATA_27674_Tiles_SingleRace_Icon
 09:b94c _DATA_2794C_Tiles_MediumNumbers
-09:b9f0 _DATA_279F0_Tilemap_
+09:b9f0 _DATA_279F0_Tilemap_Trophy
 09:ba12 _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon
 0a:8000 _DATA_28000_TrackData_RuffTrux
 0a:ab4d _DATA_2AB4D_Tiles_Portrait_RuffTrux
