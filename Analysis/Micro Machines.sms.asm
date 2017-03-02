@@ -97,6 +97,21 @@ SFX_15_HitFloor db ; Hit floor, explode
 SFX_16_Respawn db ; Appear?
 .ende
 
+.enum 1
+Music_01_TitleScreen db ; Title screen
+Music_02_CharacterSelect db ; Who do you want to be?
+Music_03_Ending db ; Tournament Champion!
+Music_04_Silence db ; (Stop music)
+Music_05_RaceStart db ; Smoke On The Water (race start)
+Music_06_Results db ; Qualified, results
+Music_07_Menus db ; Menus
+Music_08_GameOver db ; Game Over
+Music_09_PlayerOut db ; Someone is out
+Music_0A_LostLife db ; One life lost
+Music_0B_TwoPlayerResult db ; Tournament results
+Music_0C_TwoPlayerTournamentWinner db ; Tournament champion
+.ende
+
 ; ASCII mapping for menu screen text
 .define BLANK_TILE_INDEX = $0e
 .define ZERO_DIGIT_TILE_INDEX = $1a
@@ -17527,7 +17542,7 @@ _LABEL_8114_Menu0: ; init functions, need renaming
   call _LABEL_BF2E_LoadMenuPalette_SMS
   ld a, (_RAM_DC3C_IsGameGear)
   ld (_RAM_DC40_), a
-  ld c, $01
+  ld c, Music_01_TitleScreen
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
@@ -17542,7 +17557,7 @@ _LABEL_81C1_:
   call _LABEL_BAFF_LoadFontTiles
   call _LABEL_BAD5_LoadMenuLogoTiles
   call _LABEL_BDED_LoadMenuLogoTilemap
-  ld c, $07
+  ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $00
   ld (_RAM_D6C7_), a
@@ -17596,7 +17611,7 @@ _LABEL_8205_:
   ld (_RAM_D6B4_), a
   ld (_RAM_D6B0_), a
   call _LABEL_BDA6_
-  ld c, $02
+  ld c, Music_02_CharacterSelect
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A67C_
   call _LABEL_97EA_DrawDriverPortraitColumn
@@ -17632,7 +17647,7 @@ _LABEL_8272_:
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call _LABEL_BCCF_EmitTilemapRectangleSequence
 
-  ld c, $05
+  ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, :_TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
   ld (_RAM_D741_RequestedPageIndex), a
@@ -17685,7 +17700,7 @@ _LABEL_82DF_Menu1:
   ld bc, $0012
   ld hl, _TEXT_834E_FailedToQualify
   call _LABEL_A5B0_EmitToVDP_Text
-  ld c, $08
+  ld c, Music_08_GameOver
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -17753,7 +17768,7 @@ _LABEL_8360_:
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
-  ld c, $06
+  ld c, Music_06_Results
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld hl, $0190
   ld (_RAM_D6AB_), hl
@@ -17808,7 +17823,7 @@ _LABEL_841C_:
   ld a, (_RAM_DBFD_)
   ld (_RAM_D6AE_), a
   call _LABEL_B3AE_
-  ld c, $02
+  ld c, Music_02_CharacterSelect
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBFB_)
   ld (_RAM_D6A2_), a
@@ -17823,7 +17838,7 @@ _LABEL_8486_:
   ld a, MenuScreen_StorageBox
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2BB_DrawMenuScreenBase_WithLine
-  ld c, $07
+  ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A787_
   call _LABEL_AD42_DrawDisplayCase
@@ -17871,7 +17886,7 @@ _LABEL_84C7_:
   ld (_RAM_D6C1_), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  ld c, $05
+  ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
@@ -17969,7 +17984,7 @@ _LABEL_8507_Menu2:
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6C1_), a
-  ld c, $06
+  ld c, Music_06_Results
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
@@ -18042,7 +18057,7 @@ _LABEL_85F4_:
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  ld c, $09
+  ld c, Music_09_PlayerOut
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
@@ -18119,7 +18134,7 @@ _LABEL_866C_Menu3:
   ld (_RAM_D721_SpriteY), a
 ++:
   call _LABEL_93CE_UpdateSpriteTable
-  ld c, $0A
+  ld c, Music_0A_LostLife
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $80
   ld (_RAM_D6AB_), a
@@ -18153,7 +18168,7 @@ _LABEL_8717_:
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
-  ld c, $08
+  ld c, Music_08_GameOver
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -18217,7 +18232,7 @@ _LABEL_876B_:
   ld a, $E0
   ld (_RAM_D721_SpriteY), a
   call _LABEL_93CE_UpdateSpriteTable
-  ld c, $06
+  ld c, Music_06_Results
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $C8
   ld (_RAM_D6AB_), a
@@ -18245,7 +18260,7 @@ _LABEL_87E9_:
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
-  ld c, $0A
+  ld c, Music_0A_LostLife
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $80
   ld (_RAM_D6AB_), a
@@ -18355,7 +18370,7 @@ _LABEL_8877_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   ld (_RAM_D6C1_), a
-  ld c, $05
+  ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
@@ -18424,7 +18439,7 @@ _LABEL_8953_:
   call _LABEL_A67C_
   call _LABEL_97EA_DrawDriverPortraitColumn
   call _LABEL_B3AE_
-  ld c, $02
+  ld c, Music_02_CharacterSelect
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_BB75_
   ret
@@ -18450,7 +18465,7 @@ _LABEL_89E2_:
   call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
   call _LABEL_A530_DrawChooseGameText
-  ld c, $07
+  ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_9317_InitialiseHandSprites
   xor a
@@ -18569,7 +18584,7 @@ _LABEL_8A38_Menu4:
   cp $01
   jr z, +
   call _LABEL_A673_SelectLowSpriteTiles
-  ld c, $05
+  ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_9317_InitialiseHandSprites
   ld hl, _DATA_2B356_SpriteNs_HandLeft
@@ -18615,12 +18630,12 @@ _LABEL_8B55_:
   call _LABEL_AB68_GetPortraitSource_TrackType
   call _LABEL_AB9B_Decompress3bppTiles_Index160
   call _LABEL_ABB0_
-  ld c, $05
+  ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jp _LABEL_8B9D_
 
 _LABEL_8B89_:
-  ld c, $0B
+  ld c, Music_0B_TwoPlayerResult
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A0B4_
   call _LABEL_B7FF_
@@ -23136,7 +23151,7 @@ _LABEL_AF10_:
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
   ld a, $01
   ld (_RAM_DC41_GearToGearActive), a
-  ld c, $01
+  ld c, Music_01_TitleScreen
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jr _LABEL_AF5D_BlankControlsRAM
 
@@ -23226,7 +23241,7 @@ _LABEL_AFCD_:
   call _LABEL_9448_LoadHeaderTiles
   call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
-  ld c, $07
+  ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
   ld (_RAM_D6C7_), a
@@ -24285,7 +24300,7 @@ _LABEL_B70B_:
   call _LABEL_AB5B_GetPortraitSource_CourseSelect
   call _LABEL_AB9B_Decompress3bppTiles_Index160
   call _LABEL_ABB0_
-  ld c, $07
+  ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   call _LABEL_A673_SelectLowSpriteTiles
   call _LABEL_9317_InitialiseHandSprites
@@ -24454,12 +24469,12 @@ _LABEL_B877_:
   ld a, (_RAM_DC34_IsTournament)
   or a
   jr nz, +
-  ld c, $03
+  ld c, Music_03_Ending
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jp ++
 
 +:
-  ld c, $0C
+  ld c, Music_0C_TwoPlayerTournamentWinner
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
@@ -28724,7 +28739,7 @@ _LABEL_30CE8_PlayMenuMusic:
   ex af, af'
     ; Look up first value and put in RAM
     ld b, $00
-    ld hl, _DATA_31410_
+    ld hl, _DATA_31410_MusicIndirection
     add hl, bc
     ld a, (hl)  ; -ve number
     ld (_RAM_D916_MenuSound_), a
@@ -29500,8 +29515,9 @@ _DATA_3137A_:
 .db $1B $00 $19 $00 $18 $00 $16 $00 $15 $00 $14 $00 $13 $00 $12 $00
 .db $11 $00 $10 $00 $0F $00
 
-_DATA_31410_:
-.db $F6 $FB $FE $FA $FA $FC $FC $FB $FD $FD $FC $FE
+_DATA_31410_MusicIndirection:
+.db -10, -5, -2, -6, -6, -4, -4, -5, -3, -3, -4, -2
+;.db $F6 $FB $FE $FA $FA $FC $FC $FB $FD $FD $FC $FE
 
 ; Data from 3141C to 3150E (243 bytes)
 _DATA_3141C_:
