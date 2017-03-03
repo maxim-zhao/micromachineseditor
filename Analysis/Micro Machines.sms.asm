@@ -26907,7 +26907,10 @@ _LABEL_1BF17_:
 
 .dstruct _DATA_1C000_TrackData_FormulaOne instanceof TrackData data  _DATA_A480_FormulaOne_BehaviourData _DATA_A819_FormulaOne_WallData _DATA_A8CA_FormulaOne_Track0Layout _DATA_AB11_FormulaOne_Track1Layout _DATA_AE73_FormulaOne_Track2Layout _DATA_AE73_FormulaOne_Track3Layout _DATA_B1DC_FormulaOne_GGPalette _DATA_B21C_FormulaOne_DecoratorTiles _DATA_B29C_FormulaOne_Data _DATA_B2DC_FormulaOne_EffectsTiles
 
-.incbin "Assets/raw/Micro Machines_1c000.inc" skip $1c014-$1c000 read $1e480-$1c014 ; ??? 
+; Unused
+.db $FF $FF $FF $77 $FF $F7 $FF $DF $FF $FF $FF $D7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FD $EF $FF $FF $5D $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $77 $FD $DD $FF $FF $FF $FF $FF $FD $FF $FF $FF $DF $FF $7F $FF $FF $FF $F7 $FF $FF $FD $F7 $FF $DF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FD $FF $DF $FF $FF $FF $FF $ED $45 $FF $7F $FF $FD $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $FF $F7 $DF $F7 $FF $FF $FF $FF
+
+.incbin "Assets/Formula One/Metatiles.tilemap"
 
 _DATA_A480_FormulaOne_BehaviourData:
 .incbin "Assets/Formula One/Behaviour data.compressed"
@@ -27148,8 +27151,7 @@ _LABEL_1FA05_NoSkidCheatCheck:
   ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
   ld (_RAM_DC4D_Cheat_NoSkidding), a
-+:
-  ret
++:ret
 
 _LABEL_1FA23_ApplyFasterVehiclesCheat:
   ; Changes the car parameters to top speed = 12, acceleration and deceleration delay = 6
@@ -27165,8 +27167,7 @@ _LABEL_1FA23_ApplyFasterVehiclesCheat:
   ld a, $06 ; 6
   ld (_RAM_DB99_AccelerationDelay), a
   ld (_RAM_DB9A_DecelerationDelay), a
-+:
-  ret
++:ret
 
 _LABEL_1FA3D_:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -27196,8 +27197,7 @@ _LABEL_1FA3D_:
   jr z, _LABEL_1FAE5_
   jp ++
 
-+:
-  ld a, (_RAM_DB20_Player1Controls)
++:ld a, (_RAM_DB20_Player1Controls)
   ld d, a
   and BUTTON_L_MASK ; $04
   jr z, +++
@@ -27210,8 +27210,7 @@ _LABEL_1FA3D_:
   or a
   jr z, +
   dec (hl)
-+:
-  ld a, (_RAM_DE99_)
++:ld a, (_RAM_DE99_)
   or a
   jr nz, _LABEL_1FA95_
   ld hl, _RAM_DEA0_
@@ -27360,15 +27359,20 @@ _LABEL_1FB35_:
   ret
 
 ; Data from 1FB81 to 1FFFF (1151 bytes)
-; Unreferenced?
-.incbin "Assets/raw/Micro Machines_1fb81.inc"
+; Uninitialised/unused?
+.db $FF $FD $FF $FF $DD $FF $DD $FF $FF $7F $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $DF $77 $FF $7F $DF $DF $FF $FF $FF $FF $FF $DF $7F $FF $F7 $FD $FD $FD $FF $DF $FF $DD $FF $DF $FF $F7 $FF $FF $FF $F7 $D7 $FF $FF $FF $FF $FD $FF $5D $FF $FF $FF $7F $FF $FD $FF $7D $FF $FF $FF $FD $FF $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $FF $7F $FF $DF $FF $FF $FF $F7 $FF $FF $FF $7F $FF $FF $FF $FD $FF $FD $FF $77 $FF $FF $FF $F7 $FF $D5 $FF $7D $FF $FF $FF $FF $FF $FF $DD $FF $FF $FF $FF $F7 $FF $F7 $FF $F5 $20 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $08 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $44 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $40 $00 $00 $00 $00 $00 $00 $00 $40 $FF $FF $FF $FF $FF $FD $FF $FD $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $D7 $EF $77 $FF $7F $FF $DF $FF $5D $FF $7F $FF $FF $FE $FF $FF $FF $FF $FE $FF $F5 $FF $FF $FF $F7 $FF $FF $FF $FD $BE $FF $EF $5F $FE $FF $FF $57 $FF $F7 $FF $FF $FF $FF $FF $FD $FE $5F $FF $F7 $FF $FF $7F $DF $FF $FF $FF $7F $FF $F7 $FF $DD $FF $7F $FF $FF $FF $DF $FF $D7 $FF $7F $FF $FF $FF $5D $FF $FF $FF $FD $FF $FF $EF $F5 $DF $77 $FF $FD $FF $FF $FF $FF $FF $FF $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $40 $00 $44 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $04 $14 $00 $00 $00 $04 $00 $00 $00 $00 $00 $04 $00 $44 $00 $40 $00 $00 $00 $00 $00 $00 $40 $00 $00 $04 $00 $40 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $44 $FF $FF $FF $FF $FF $D7 $FF $7F $FF $FF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FD $ED $F7 $FF $FF $FF $FD $FF $FF $FF $F5 $FF $FF $FF $5D $FF $7F $FF $F7 $FF $FF $FD $F7 $FF $5F $FF $7D $FF $FF $FF $DF $FF $FF $7F $FF $FF $FF $FF $7F $FF $FF $DF $7F $FF $FF $FF $5D $DF $FE $FF $77 $FF $7F $FF $FF $FD $DF $FF $7F $EF $FF $FF $57 $FF $FF $DD $DF $FF $F7 $FF $7F $FF $DF $FF $77 $FF $FF $FF $FD $FF $FF $FF $D7 $FF $7F $F7 $F7 $FF $FF $FF $DD $FF $FF $FF $FF $FF $FF $FF $5F $FF $FF $DF $7F $FF $FF $FF $DD $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $40 $00 $01 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $80 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $40 $00 $40 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $04 $FF $FF $EF $FF $FF $FF $FF $77 $FF $FF $FF $FF $FF $FF $FF $7F $FE $FF $FF $DF $FF $FF $FF $DF $FF $D7 $FF $DF $FF $F5 $FF $D5 $FF $FF $FF $77 $FE $7F $FF $FF $FF $DF $FF $77 $FF $FF $FF $55 $FF $FF $FF $FF $FF $FF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FF $FF $DF $FD $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FD $DF $FD $FF $FF $FF $F7 $FF $5F $DF $F7 $FF $FF $FF $DF $FF $7F $FF $FD $FF $FF $F7 $7F $FF $FF $FF $D5 $FF $FF $FF $FF $FF $F7 $FF $F7 $BF $FF $BF $7F $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $00 $00 $00 $00 $00 $00 $00 $10 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $50 $00 $00 $00 $44 $00 $00 $00 $00 $00 $00 $00 $14 $00 $40 $00 $40 $00 $04 $00 $14 $00 $00 $00 $10 $00 $10 $00 $40 $00 $10 $00 $10 $00 $00 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $04 $00 $00 $40 $44 $00 $00 $40 $10 $00 $00 $00 $04 $00 $00 $00 $14 $00 $01 $00 $40 $00 $00 $00 $11 $00 $44 $00 $50 $00 $00 $00 $44 $00 $04 $00 $10 $00 $00 $00 $04 $00 $50 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $FF $FF $FF $F5 $FF $FD $FF $FD $FF $FF $FF $F7 $FF $FD $DF $F7 $FF $FD $77 $DF $FF $FF $FF $DF $FF $FF $FF $DF $DD $FD $F7 $D7 $FF $DF $FF $DD $FF $7F $FF $DF $FF $7F $FF $7F $FF $FF $FF $7F $FF $FD $FF $DF $FF $5F $FF $F7 $FF $FF $DD $57 $FF $DF $FF $7F $FF $DF $FF $FD $FF $DF $FF $D5 $FF $FF $FF $FF $FF $F7 $DF $77 $FF $D7 $FF $57 $FF $FF $FF $7F $FF $FF $FF $7F $FF $DF $FF $DD $FF $FF $FF $7D $FF $77 $FD $FF $FF $FF $FF $FF $FF $DD $FF $FD $FF $F7 $FF $FD $FF $7F $FD $7D $BF $FF $FF $FD $FF $F7 $F7
+
+.db :CADDR
 
 .BANK 8
 .ORG $0000
 
 .dstruct _DATA_20000_TrackData_Warriors instanceof TrackData data  _DATA_9D30_Warriors_BehaviourData _DATA_A01A_Warriors_WallData _DATA_A10F_Warriors_Track0Layout _DATA_A3B8_Warriors_Track1Layout _DATA_A67C_Warriors_Track2Layout _DATA_A67C_Warriors_Track3Layout _DATA_A924_Warriors_GGPalette _DATA_A964_Warriors_DecoratorTiles _DATA_A9E4_Warriors_Data _DATA_AA24_Warriors_EffectsTiles
 
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $20014-$20000 read $21d30-$20014 ; ??? 
+; Unused
+.db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+
+.incbin "Assets/Warriors/Metatiles.tilemap"
 
 _DATA_9D30_Warriors_BehaviourData:
 .incbin "Assets/Warriors/Behaviour data.compressed"
@@ -27422,15 +27426,15 @@ _DATA_AA24_Warriors_EffectsTiles:
 .incbin "Assets/Warriors/Effects.3bpp"
 
 _DATA_22B2C_Tiles_PunctuationAndLine:
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $22B2C-$20000 read $22B8C-$22B2C
+.incbin "Assets/Menu/PunctuationAndLine.3bpp"
 _DATA_22B8C_Tiles_ColouredCircles:
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $22B8C-$20000 read $22BEC-$22B8C
+.incbin "Assets/Menu/Balls.3bpp"
 _DATA_22BEC_Tiles_Cursor:
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $22BEC-$20000 read $22C4E-$22BEC
+.incbin "Assets/Menu/Cursor.3bpp.compressed"
 _DATA_22C4E_Tiles_BigLogo:
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $22C4E-$20000 read $23656-$22C4E
+.incbin "Assets/Menu/Logo-big.3bpp.compressed"
 _DATA_23656_Tiles_VsCPUPatch:
-.incbin "Assets/raw/Micro Machines_20000.inc" skip $23656-$20000 read $237e2-$23656
+.incbin "Assets/Menu/Icon-VsCPUPatch.3bpp.compressed"
 
 _LABEL_237E2_:
   xor a
