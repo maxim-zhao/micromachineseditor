@@ -542,7 +542,7 @@ _RAM_D974_SFXTrigger_Player2 db
 _RAM_D975_Sound2Control db
 _RAM_D976_ dsb 6 ; unused?
 _RAM_D97C_Sound db
-_RAM_D97D_ dsb 3 ; unused?
+_RAM_D97D_ dsb 3
 
 _RAM_D980_CarDecoratorTileData1bpp dsb 16*8 ; 16 * 1bpp tile data
 
@@ -28178,16 +28178,31 @@ _LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS:
 
 ; Data from 23DA6 to 23DB5 (16 bytes)
 _DATA_23DA6_HelicoptersAnimatedPalette_SMS
-.db $30 $35 $3A $3F $30 $35 $3A $3F
+  SMSCOLOUR $0000FF
+  SMSCOLOUR $5555FF
+  SMSCOLOUR $AAAAFF
+  SMSCOLOUR $FFFFFF
+  SMSCOLOUR $0000FF
+  SMSCOLOUR $5555FF
+  SMSCOLOUR $AAAAFF
+  SMSCOLOUR $FFFFFF
 _DATA_23DAE_PowerboatsAnimatedPalette_SMS
-.db $21 $25 $3A $3F $3A $25 $21 $10
+  SMSCOLOUR $5500AA
+  SMSCOLOUR $5555AA
+  SMSCOLOUR $AAAAFF
+  SMSCOLOUR $FFFFFF
+  SMSCOLOUR $AAAAFF
+  SMSCOLOUR $5555AA
+  SMSCOLOUR $5500AA
+  SMSCOLOUR $000055
 
 _LABEL_23DB6_:
-  ld a, $00
+  ; Clear tilemap
+  ld a, <(NAME_TABLE_ADDRESS | VDP_WRITE_MASK)
   out (PORT_VDP_ADDRESS), a
-  ld a, $77
+  ld a, >(NAME_TABLE_ADDRESS | VDP_WRITE_MASK)
   out (PORT_VDP_ADDRESS), a
-  ld bc, $0380
+  ld bc, TILEMAP_SIZE / TILEMAP_ENTRY_SIZE
 -:
   ld a, $00
   out (PORT_VDP_DATA), a
@@ -28197,6 +28212,7 @@ _LABEL_23DB6_:
   ld a, b
   or c
   jr nz, -
+  ; Then set some to tile $14? TODO
   ld a, $00
   out (PORT_VDP_ADDRESS), a
   ld a, $7E
@@ -28296,7 +28312,10 @@ _DATA_23ECF_HandlingData_SMS:
 ; Data from 24000 to 27FFF (16384 bytes)
 .dstruct _DATA_24000_TrackData_Tanks instanceof TrackData data  _DATA_9F70_Tanks_BehaviourData _DATA_A32A_Tanks_WallData _DATA_A42C_Tanks_Track0Layout _DATA_A5A6_Tanks_Track1Layout _DATA_A7D4_Tanks_Track2Layout _DATA_A7D4_Tanks_Track3Layout _DATA_AA4A_Tanks_GGPalette _DATA_AA8A_Tanks_DecoratorTiles _DATA_AB0A_Tanks_Data _DATA_AB4A_Tanks_EffectsTiles
 
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $24014-$24000 read $25f70-$24014 ; ??? 
+; Uninitialised
+.db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+
+.incbin "Assets/Tanks/Metatiles.tilemap"
 
 _DATA_9F70_Tanks_BehaviourData:
 .incbin "Assets/Tanks/Behaviour data.compressed"
@@ -28365,10 +28384,10 @@ _DATA_2794C_Tiles_MediumNumbers:
 .incbin "Assets/Menu/Numbers-Medium.3bpp.compressed"
 
 _DATA_279F0_Tilemap_Trophy:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $279f0-$24000 read $27a12-$279f0
+.incbin "Assets/Menu/Trophy.tilemap.compressed"
 
 _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $27a12-$24000 read $27efb-$27a12
+.incbin "Assets/Menu/Icon-TwoPlayersOnOneGameGear.4bpp.compressed"
 
 .rept 65
 .db $ff $ff $00 $00 ; Empty
@@ -28380,40 +28399,103 @@ _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .ORG $0000
 
 ; Data from 28000 to 2B5D1 (13778 bytes)
-_DATA_28000_TrackData_RuffTrux: ; TODO
-.incbin "Assets/raw/Micro Machines_28000.inc" skip 0 read $2AB4D-$28000
+.dstruct _DATA_28000_TrackData_RuffTrux instanceof TrackData data  _DATA_A1B0_RuffTrux_BehaviourData _DATA_A396_RuffTrux_WallData _DATA_A420_RuffTrux_Track0Layout _DATA_A5F0_RuffTrux_Track1Layout _DATA_A7A8_RuffTrux_Track2Layout _DATA_A7A8_RuffTrux_Track3Layout _DATA_A9C5_RuffTrux_GGPalette _DATA_A9C5_RuffTrux_DecoratorTiles _DATA_AA05_RuffTrux_Data _DATA_AA45_RuffTrux_EffectsTiles 
+
+; Unused
+.db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+
+; Metatiles
+.incbin "Assets/RuffTrux/Metatiles.tilemap" ; 64 metatiles
+
+_DATA_A1B0_RuffTrux_BehaviourData:
+.incbin "Assets/RuffTrux/Behaviour data.compressed"
+_DATA_A396_RuffTrux_WallData:
+.incbin "Assets/RuffTrux/Wall data.compressed"
+_DATA_A420_RuffTrux_Track0Layout:
+.incbin "Assets/RuffTrux/Track 0 layout.compressed"
+_DATA_A5F0_RuffTrux_Track1Layout:
+.incbin "Assets/RuffTrux/Track 1 layout.compressed"
+_DATA_A7A8_RuffTrux_Track3Layout: ; no data
+_DATA_A7A8_RuffTrux_Track2Layout:
+.incbin "Assets/RuffTrux/Track 2 layout.compressed"
+_DATA_A9C5_RuffTrux_DecoratorTiles: ; no data
+_DATA_A9C5_RuffTrux_GGPalette:
+  GGCOLOUR $000000
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $888844
+  GGCOLOUR $004400
+  GGCOLOUR $0088EE
+  GGCOLOUR $884400
+  GGCOLOUR $444400
+  GGCOLOUR $440000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $EE4444
+  GGCOLOUR $44EE00
+  GGCOLOUR $000000
+  GGCOLOUR $4488EE
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $EE8800
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+_DATA_AA05_RuffTrux_Data:
+.db $C0 $C0 $00 $00 $22 $22 $49 $45 $73 $77 $80 $00 $22 $22 $A0 $C0 $C0 $C0 $C0 $22 $E0 $A0 $A0 $A0 $A0 $A0 $A0 $E0 $E0 $A0 $00 $A0 $E0 $C0 $A0 $80 $80 $A0 $A0 $A0 $C0 $C0 $E0 $E0 $A0 $A0 $80 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $22 $22 $A0 $00 $00 $00 $00 $00
+_DATA_AA45_RuffTrux_EffectsTiles:
+.incbin "Assets/RuffTrux/Effects.3bpp"
 
 _DATA_2AB4D_Tiles_Portrait_RuffTrux:
 .incbin "Assets/RuffTrux/Portrait.3bpp.compressed"
 
 _DATA_2B02D_Tiles_Font:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b02d-$28000 read $2b151-$2b02d
+.incbin "Assets/RuffTrux/Font.3bpp.compressed"
 
 _DATA_2B151_Tiles_Hand:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b151-$28000 read $2b33e-$2b151
+.incbin "Assets/RuffTrux/Hand.3bpp.compressed"
 
 _DATA_2B33E_SpriteNs_Hand:
-
 _DATA_2B33E_SpriteNs_HandFist:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b33e-$28000 read $2b356-$2b33e
-
+.db  -1,  -1,  -1,  -1,  -1,  -1 
+.db  -1, $00, $01, $02, $03,  -1 
+.db  -1, $04, $05, $06, $07,  -1 
+.db  -1,  -1, $08, $09, $0A,  -1
+       
 _DATA_2B356_SpriteNs_HandLeft:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b356-$28000 read $2b36e-$2b356
-
+.db  -1,  -1,  -1,  -1,  -1,  -1
+.db $0B, $0C, $0D, $02, $03,  -1
+.db $0E, $0F, $05, $06, $07,  -1
+.db  -1,  -1, $08, $09, $0A,  -1
+       
 _DATA_2B36E_SpriteNs_HandRight:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b36e-$28000 read $2b386-$2b36e
+.db  -1,  -1, $10, $11, $12, $13
+.db  -1, $14, $15, $16, $17,  -1
+.db  -1, $18, $19, $1A, $1B,  -1
+.db  -1,  -1, $1C, $1D, $1E,  -1
 
 _DATA_2B386_Tiles_ChallengeText:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2b386-$28000 read $2B4BA-$2b386
+.incbin "Assets/Menu/Text-Challenge.3bpp.compressed"
 
 _DATA_2B4BA_Tilemap_ChallengeText:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4BA-$28000 read $2B4CA-$2B4BA
+.incbin "Assets/Menu/Text-Challenge.tilemap"
 
 _DATA_2B4CA_Tiles_HeadToHeadText:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B4CA-$28000 read $2B5BE-$2B4CA
+.incbin "Assets/Menu/Text-HeadtoHead.3bpp.compressed"
 
 _DATA_2B5BE_Tilemap_HeadToHeadText:
-.incbin "Assets/raw/Micro Machines_28000.inc" skip $2B5BE-$28000 read $2B5D2-$2B5BE
+.incbin "Assets/Menu/Text-HeadtoHead.tilemap"
 
 
 _LABEL_2B5D2_GameVBlankUpdateSoundTrampoline:
@@ -28431,6 +28513,7 @@ _LABEL_2B5D5_SilencePSG:
   ret
 
 ; Data from 2B5E6 to 2B615 (48 bytes)
+; Code TODO
 .db $3A $7E $D9 $32 $63 $D9 $C9 $3A $7F $D9 $32 $74 $D9 $C9 $2A $5B
 .db $D9 $01 $04 $00 $A7 $ED $42 $22 $5B $D9 $C9 $2A $6C $D9 $01 $04
 .db $00 $A7 $ED $42 $22 $6C $D9 $C9 $2A $5B $D9 $23 $22 $5B $D9 $C9
@@ -28668,14 +28751,14 @@ _LABEL_2B7A1_SoundFunction:
   ld a, (ix+0)
   or a
   jr z, +
-  dec a
-  add a, a
+  dec a ; Make 0-indexed
+  add a, a ; Multiply by 6
   ld e, a
   add a, a
   add a, e
-  ld e, a
+  ld e, a ; Look up
   ld d, $00
-  ld hl, _DATA_2B911_
+  ld hl, _DATA_2B911_SoundData_
   add hl, de
   push ix
   pop de
@@ -28812,11 +28895,235 @@ _DATA_2B87B_:
 .db $11 $00 $10 $00 $0F $00
 
 ; Data from 2B911 to 2BFFF (1775 bytes)
-_DATA_2B911_:
-.incbin "Assets/raw/Micro Machines_2b911.inc" read $57a
+_DATA_2B911_SoundData_:
+; TODO this is incomplete
+; 6-byte table of pointers into data pairs/triplets?
+; Some point to _RAM_D97D_ instead
+; Pointers point to various lengths of data follwing the table
+.dw $B995 $B99D $D97D
+.dw $B9A5 $B9AB $B9B1
+.dw $B9B6 $B9BE $B9C6
+.dw $B9CE $B9D8 $B9E1
+.dw $B9EA $BA00 $BA15
+.dw $BA29 $BA33 $BA3D
+.dw $BA46 $BA50 $BA5A
+.dw $BA63 $BA7A $BA90
+.dw $BAA6 $BAD3 $D97D
+.dw $BAF6 $BAFF $BB07
+.dw $BB0F $BB18 $BB21
+.dw $BB2A $BB3A $D97D
+.dw $BB4B $BB54 $BB5D
+.dw $BB66 $BB93 $D97D
+.dw $BBC1 $BBC9 $D97D
+.dw $BBD1 $BBD8 $BBDF
+.dw $BBE6 $BBEF $BBF8
+.dw $BC01 $BC92 $D97D
+.dw $BD25 $BD76 $D97D
+.dw $BDC7 $BE08 $D97D
+.dw $BE49 $BE51 $BE59
+.dw $BE61 $BE6F $BE7D
+
+_DATA_2B995_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $00 
+_DATA_2B99D_SoundData_: .db $18 $18 $18 $18 $18 $18 $18 $FF
+_DATA_2B9A5_SoundData_: .db $0F $0C $09 $06 $03 $00
+_DATA_2B9AB_SoundData_: .db $01 $05 $01 $05 $00 $FF 
+_DATA_2B9B1_SoundData_: .db $07 $06 $00 $00 $FF 
+_DATA_2B9B6_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $00 
+_DATA_2B9BE_SoundData_: .db $06 $05 $04 $03 $02 $01 $00 $FF 
+_DATA_2B9C6_SoundData_: .db $06 $00 $04 $00 $07 $00 $00 $FF 
+_DATA_2B9CE_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $08 $07 $00 
+_DATA_2B9D8_SoundData_: .db $05 $00 $00 $04 $00 $03 $00 $00 $FF 
+_DATA_2B9E1_SoundData_: .db $05 $00 $00 $06 $00 $07 $00 $00 $FF 
+_DATA_2B9EA_SoundData_: .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B $0A $0A $09 $09 $09 $08 $08 $08 $00 
+_DATA_2BA00_SoundData_: .db $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $FF
+_DATA_2BA15_SoundData_: .db $05 $00 $00 $00 $06 $00 $00 $00 $00 $04 $00 $00 $00 $00 $07 $00 $00 $00 $00 $FF
+_DATA_2BA29_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00 
+_DATA_2BA33_SoundData_:
+_DATA_2BA3D_SoundData_: 
+_DATA_2BA46_SoundData_: 
+_DATA_2BA50_SoundData_: 
+_DATA_2BA5A_SoundData_:
+_DATA_2BA63_SoundData_:
+_DATA_2BA7A_SoundData_:
+_DATA_2BA90_SoundData_:
+_DATA_2BAA6_SoundData_:
+_DATA_2BAD3_SoundData_:
+_DATA_2BAF6_SoundData_:
+_DATA_2BAFF_SoundData_:
+_DATA_2BB07_SoundData_:
+_DATA_2BB0F_SoundData_:
+_DATA_2BB18_SoundData_:
+_DATA_2BB21_SoundData_:
+_DATA_2BB2A_SoundData_:
+_DATA_2BB3A_SoundData_:
+_DATA_2BB4B_SoundData_:
+_DATA_2BB54_SoundData_:
+_DATA_2BB5D_SoundData_:
+_DATA_2BB66_SoundData_:
+_DATA_2BB93_SoundData_:
+_DATA_2BBC1_SoundData_:
+_DATA_2BBC9_SoundData_:
+_DATA_2BBD1_SoundData_:
+_DATA_2BBD8_SoundData_:
+_DATA_2BBDF_SoundData_:
+_DATA_2BBE6_SoundData_:
+_DATA_2BBEF_SoundData_:
+_DATA_2BBF8_SoundData_:
+_DATA_2BC01_SoundData_:
+_DATA_2BC92_SoundData_:
+_DATA_2BD25_SoundData_:
+_DATA_2BD76_SoundData_:
+_DATA_2BDC7_SoundData_:
+_DATA_2BE08_SoundData_:
+_DATA_2BE49_SoundData_:
+_DATA_2BE51_SoundData_:
+_DATA_2BE59_SoundData_:
+_DATA_2BE61_SoundData_:
+_DATA_2BE6F_SoundData_:
+_DATA_2BE7D_SoundData_:
+.db $1E $0A
+.db $0A $0C $0E $10 $12 $14 $00 $FF
+.db $06 $00 $05 $00 $04 $00 $07 $00
+.db $FF $0F $0F $0E $0E $0C $0C $0A
+.db $0A $08 $00 $02 $04 $08 $10 $20
+.db $00 $00 $00 $00 $FF $05 $00 $00
+.db $00 $07 $00 $00 $00 $FF $0F $0F
+.db $0E $0E $0C $0C $0A $0A $08 $08
+.db $07 $07 $06 $06 $06 $06 $06 $06
+.db $06 $06 $06 $06 $00 $18 $00 $16
+.db $00 $14 $00 $12 $00 $10 $00 $0E
+.db $00 $0C $00 $00 $00 $00 $00 $00
+.db $00 $00 $FF $06 $00 $00 $00 $05
+.db $00 $00 $00 $04 $00 $00 $00 $07
+.db $00 $00 $00 $00 $00 $00 $00 $00
+.db $FF $0F $0F $0F $0F $0E $0E $0E
+.db $0E $0D $0D $0D $0D $0C $0C $0C
+.db $0C $0B $0B $0B $0B $0A $0A $0A
+.db $0A $08 $08 $08 $08 $06 $06 $06
+.db $06 $04 $04 $04 $04 $03 $03 $03
+.db $03 $02 $02 $02 $02 $00 $32 $31
+.db $30 $2F $2E $2D $2C $2B $2A $29
+.db $28 $27 $26 $25 $24 $23 $22 $21
+.db $20 $1F $1E $1D $1C $1B $1A $19
+.db $18 $17 $16 $15 $0A $09 $08 $07
+.db $FF $0F $0E $0D $0C $0A $09 $08
+.db $07 $00 $05 $04 $03 $02 $01 $00
+.db $00 $FF $05 $00 $04 $00 $06 $00
+.db $00 $FF $0F $0D $0B $09 $07 $05
+.db $03 $01 $00 $14 $12 $10 $0E $0C
+.db $0A $08 $06 $FF $06 $00 $05 $00
+.db $00 $07 $00 $00 $FF $00 $01 $02
+.db $03 $04 $05 $06 $07 $08 $09 $0A
+.db $0B $0C $0D $0E $0F $28 $2A $2C
+.db $2E $30 $32 $0A $0F $14 $19 $1E
+.db $23 $28 $2D $32 $37 $FF $0F $0E
+.db $0C $0A $08 $06 $04 $02 $00 $0A
+.db $09 $08 $07 $06 $05 $00 $00 $FF
+.db $06 $00 $05 $00 $06 $00 $04 $00
+.db $FF $0F $0F $0F $0F $0E $0E $0E
+.db $0E $0D $0D $0D $0D $0C $0C $0C
+.db $0C $0B $0B $0B $0B $0A $0A $0A
+.db $0A $08 $08 $08 $08 $06 $06 $06
+.db $06 $04 $04 $04 $04 $03 $03 $03
+.db $03 $02 $02 $02 $02 $00 $22 $22
+.db $22 $21 $21 $21 $20 $20 $20 $1F
+.db $1F $1F $1E $1E $1E $1D $1D $1D
+.db $1C $1C $1C $1B $1B $1B $1A $1A
+.db $1A $19 $19 $19 $18 $18 $18 $17
+.db $17 $17 $16 $16 $16 $15 $15 $15
+.db $14 $14 $14 $FF $0F $0F $0F $0F
+.db $0F $0F $0F $00 $28 $27 $28 $29
+.db $28 $27 $28 $FF $0F $0F $0F $0F
+.db $0F $0F $00 $1E $1D $1E $1F $1E
+.db $1D $FF $07 $00 $00 $00 $00 $00
+.db $FF $0F $0F $0E $0D $0C $0A $08
+.db $06 $00 $00 $00 $00 $00 $00 $00
+.db $00 $00 $FF $07 $00 $04 $00 $07
+.db $00 $00 $00 $FF $01 $01 $02 $02
+.db $03 $03 $04 $04 $05 $05 $06 $06
+.db $07 $07 $08 $08 $09 $09 $0A $0A
+.db $0B $0B $0C $0C $0D $0D $0E $0E
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0E $0E $0D $0D $0C $0C $0B $0B
+.db $0A $0A $09 $09 $08 $08 $07 $07
+.db $06 $06 $05 $05 $04 $04 $03 $03
+.db $02 $02 $01 $01 $00 $0A $0B $0C
+.db $0D $0E $0F $10 $11 $12 $13 $14
+.db $15 $16 $17 $18 $19 $1A $1B $1C
+.db $1D $1E $1F $20 $21 $22 $23 $24
+.db $25 $26 $27 $28 $29 $2A $2B $2C
+.db $2D $2E $2F $30 $31 $32 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $28 $28
+.db $28 $28 $14 $14 $14 $14 $32 $31
+.db $30 $2F $2E $2D $2C $2B $2A $29
+.db $28 $27 $26 $25 $24 $23 $22 $21
+.db $20 $1F $1E $1D $1C $1B $1A $19
+.db $18 $17 $16 $15 $14 $13 $12 $11
+.db $10 $0F $0E $0D $0C $0B $0A $FF
+.db $0F $0F $0F $0F $0F $0F $0F $0F
+.db $0E $0E $0E $0E $0E $0E $0E $0E
+.db $0D $0D $0D $0D $0D $0D $0D $0D
+.db $0C $0C $0C $0C $0C $0C $0C $0C
+.db $0B $0B $0B $0B $0B $0B $0B $0B
+.db $0A $0A $0A $0A $0A $0A $0A $0A
+.db $08 $08 $08 $08 $08 $08 $08 $08
+.db $06 $06 $06 $06 $06 $06 $06 $06
+.db $04 $04 $04 $04 $04 $04 $04 $04
+.db $02 $02 $02 $02 $02 $02 $02 $02
+.db $00 $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $1E $20 $22 $24 $28 $2A $2C
+.db $2E $FF $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $0F $0E $0D $0C $0B $0A
+.db $08 $06 $00 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $28 $28 $28 $28 $20
+.db $20 $20 $20 $FF $00 $04 $08 $0C
+.db $0F $0F $0F $00 $00 $00 $00 $00
+.db $00 $00 $00 $FF $06 $00 $05 $00
+.db $04 $07 $00 $FF $07 $08 $09 $0A
+.db $0B $0C $0D $0E $0F $0F $0F $0F
+.db $0F $00 $00 $00 $00 $00 $00 $00
+.db $00 $00 $00 $00 $00 $00 $00 $FF
+.db $07 $00 $00 $04 $00 $00 $05 $00
+.db $00 $06 $00 $00 $00 $FF
+
 
 ; End of bank
-
 .repeat $174/4
 .db $ff $ff $00 $00 ; Uninitialised data
 .endr
