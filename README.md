@@ -8,7 +8,9 @@ Editor for the Master System version of Micro Machines, based on disassembly of 
 Status
 ----
 
-This project is on hold. I got bored with it. Feel free to continue it!
+The editor itself is on hold. I got bored with it. Feel free to continue it!
+
+I have instead been working on a disassembly of the game, under the Analysis section.
 
 What is done
 -----
