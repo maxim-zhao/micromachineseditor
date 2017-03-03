@@ -9138,8 +9138,7 @@ _LABEL_3C54_:
   jr z, +
   ret
 
-+:
-  JumpToPagedFunction _LABEL_35F41_
++:JumpToPagedFunction _LABEL_35F41_
 
 _LABEL_3D59_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -9428,21 +9427,14 @@ _DATA_3FD3_:
 ; Bank marker
 .db :CADDR
 
-; Data from 4000 to 4040 (65 bytes)
+; Metatile tilemaps are stored from $0080 in each track data bank 
+; Each metatile is 12 * 12 = 144 bytes of tile indices
+; There are up to $41(?) for each track type
+; So we use our "times table" macro to generate the split pointers
 _DATA_4000_TileIndexPointerLow: ; Low bytes of "tile index data pointer table"
-.db $80 $10 $A0 $30 $C0 $50 $E0 $70 $00 $90 $20 $B0 $40 $D0 $60 $F0
-.db $80 $10 $A0 $30 $C0 $50 $E0 $70 $00 $90 $20 $B0 $40 $D0 $60 $F0
-.db $80 $10 $A0 $30 $C0 $50 $E0 $70 $00 $90 $20 $B0 $40 $D0 $60 $F0
-.db $80 $10 $A0 $30 $C0 $50 $E0 $70 $00 $90 $20 $B0 $40 $D0 $60 $F0
-.db $80 ; unused?
-
-; Data from 4041 to 4081 (65 bytes)
+  TimesTableLo $8080 144 $41
 _DATA_4041_TileIndexPointerHigh: ; High bytes of "tile index data pointer table"
-.db $80 $81 $81 $82 $82 $83 $83 $84 $85 $85 $86 $86 $87 $87 $88 $88
-.db $89 $8A $8A $8B $8B $8C $8C $8D $8E $8E $8F $8F $90 $90 $91 $91
-.db $92 $93 $93 $94 $94 $95 $95 $96 $97 $97 $98 $98 $99 $99 $9A $9A
-.db $9B $9C $9C $9D $9D $9E $9E $9F $A0 $A0 $A1 $A1 $A2 $A2 $A3 $A3
-.db $A4 ; unused?
+  TimesTableHi $8080 144 $41
 
 ; 1st entry of Pointer Table from 40D3 (indexed by _RAM_DE88_)
 ; Data from 4082 to 408A (9 bytes)
@@ -16546,7 +16538,7 @@ _get_next_mask:
     ld a, (hl)    ; Get byte
     inc hl        ; Point at next
 
-    adc a, a      ; High bit 1 = compressed, 0 = raw byte follows. Unrolled loop here, plus carry in
+    adc a, a      ; High bit 1 = compressed, 0 = raw  $byte follows. Unrolled loop here, plus carry in
     jr c, _compressed
     ldi
 _get_next_mask_7bits:
@@ -22480,7 +22472,7 @@ _LABEL_A9C6_:
 _LABEL_A9EB_:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, _LABEL_AA5D_ ; ret
+  jr z, _LABEL_AA5D_ret ; ret
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
@@ -22508,10 +22500,10 @@ _LABEL_AA02_:
   ld b, (hl)
   ld h, b
   ld l, c
-  ld a, $03
+  ld a, :_DATA_FDC1_TrackNames
   ld (_RAM_D741_RequestedPageIndex), a
   ld a, (_RAM_DBD8_CourseSelectIndex)
-  cp $19
+  cp $19 ; Final race
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -22532,7 +22524,7 @@ _LABEL_AA02_:
   ld bc, 8
   ld hl, _RAM_DBF1_RaceNumberText
   CallRamCode _LABEL_3BC6A_EmitText
-_LABEL_AA5D_:
+_LABEL_AA5D_ret:
   ret
 
 +++:
@@ -22544,17 +22536,17 @@ _LABEL_AA5D_:
   ld bc, 30
   jr ++
 
-+:; GG: emit "string" split across lines
++:; GG: emit string split across lines
   TilemapWriteAddressToHL 9, 13
   call _LABEL_B35A_VRAMAddressToHL
   ld bc, 15
-  ld hl, _DATA_BFB0_
+  ld hl, _DATA_FFA2_TrackName_24 + 15 ; "TO BE CHAMPION!"
   CallRamCode _LABEL_3BC6A_EmitText
   TilemapWriteAddressToHL 9, 12
   ld bc, 15
 ++:
   call _LABEL_B35A_VRAMAddressToHL
-  ld hl, _DATA_BFA1_
+  ld hl, _DATA_FFA2_TrackName_24 ; " WIN THIS RACE "
   CallRamCode _LABEL_3BC6A_EmitText
   ret
 
@@ -25405,18 +25397,42 @@ _LABEL_BF70_: ; unused code? Left over memory?
   otir
   ret
 
-_DATA_BF80_: ; GG menu palette(s)?
-.db $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $44 $0E $00 $00
-.db $22 $02 $44 $04 $88 $08 $40 $00 $C0 $00 $E0 $00 $AE $0A $00 $00
-.db $04
-
-_DATA_BFA1_: ; Treated as text but not text..? Unused?
-.db     $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $88 $0E $00 $00
-_DATA_BFB0_: ; Same as above
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-
+_DATA_BF80_: ; GG menu palette
+  GGCOLOUR $440088
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $008800
+  GGCOLOUR $880000
+  GGCOLOUR $EE4444
+  GGCOLOUR $EE8800
+  GGCOLOUR $4444EE
+  GGCOLOUR $000000
+  GGCOLOUR $222222
+  GGCOLOUR $444444
+  GGCOLOUR $888888
+  GGCOLOUR $004400
+  GGCOLOUR $00CC00
+  GGCOLOUR $00EE00
+  GGCOLOUR $EEAAAA
+  GGCOLOUR $000000
+  GGCOLOUR $440088
+  GGCOLOUR $EEEEEE
+  GGCOLOUR $008800
+  GGCOLOUR $880000
+  GGCOLOUR $EE4444
+  GGCOLOUR $EE8800
+  GGCOLOUR $8888EE
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  GGCOLOUR $000000
+  
 ; blank space?
-.db $00 $FE $FF $EE $FF $FE $EF $EF $EE $FF $FF $EF $EF $FA $EF $FF
+.db $FE $FF $EE $FF $FE $EF $EF $EE $FF $FF $EF $EF $FA $EF $FF
 .db $7F $EA $EF $EE $FF $FA $FF $EB $FF $FF $FE $7F $EF $BA $FE $EF
 .db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
 .db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
@@ -25440,6 +25456,8 @@ _DATA_BFFF_Page2PageNumber:
 ; $800e dw Pointer to "decorator" tile data = 128B = 16 * 8 * 8 * 1bpp tile
 ; $8010 dw Pointer to ??? (copied to _RAM_D900_) = 64B
 ; $8012 dw Pointer to effects tile data = 264B = 11 * 8 * 8 * 3bpp tile
+; $8014 dsb 108 Unused!
+; $8080 dsb 144*n Metatile indices for n metatiles (varies by track)
 */
 
 .struct TrackData
@@ -25458,7 +25476,11 @@ EffectsTiles    dw
 ; Desk tracks data
 .dstruct _DATA_C000_TrackData_SportsCars instanceof TrackData data  _DATA_E480_SportsCars_BehaviourData _DATA_E799_SportsCars_WallData _DATA_E811_SportsCars_Track0Layout _DATA_EA34_SportsCars_Track1Layout _DATA_ED79_SportsCars_Track2Layout _DATA_F155_SportsCars_Track3Layout _DATA_F155_SportsCars_GGPalette _DATA_F195_SportsCars_DecoratorTiles _DATA_F215_SportsCars_Data _DATA_F255_SportsCars_EffectsTiles
 
-.incbin "Assets/raw/Micro Machines_c000.inc" skip $0014 read $246c ; ??? 
+; Unused
+.db $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $FF $FF $BF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $DF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF
+
+; Metatiles
+.incbin "Assets/Sportscars/Metatiles.tilemap" ; 64 metatiles
 
 _DATA_E480_SportsCars_BehaviourData:
 .incbin "Assets/Sportscars/Behaviour data.compressed"
@@ -25522,6 +25544,7 @@ _DATA_FAA5_Tiles_Portrait_SportsCars:
 .incbin "Assets/Sportscars/Portrait.3bpp.compressed"
 
 ; Track names
+_DATA_FDC1_TrackNames:
 _DATA_FDC1_TrackName_00: .asc "THE BREAKFAST BENDS "
 _DATA_FDD5_TrackName_01: .asc "  DESKTOP DROP-OFF  "
 _DATA_FDE9_TrackName_02: .asc "    OILCAN ALLEY    "
@@ -25560,8 +25583,10 @@ _DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 ; Data from 10000 to 13FFF (16384 bytes)
 .dstruct _DATA_10000_TrackData_FourByFour instanceof TrackData data _DATA_9E50_FourByFour_BehaviourData _DATA_A105_FourByFour_WallData _DATA_A152_FourByFour_Track0Layout _DATA_A378_FourByFour_Track1Layout _DATA_A466_FourByFour_Track2Layout _DATA_A466_FourByFour_Track3Layout _DATA_A762_FourByFour_GGPalette _DATA_A7A2_FourByFour_DecoratorTiles _DATA_A822_FourByFour_Data _DATA_A862_FourByFour_EffectsTiles
 
-; ???
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $10014-$10000 read $11e50-$10014
+; Unused
+.db $FF $FF $FF $EF $FF $EF $EB $FF $FB $FF $BF $BF $FF $FF $FF $EF $EF $BF $EF $FF $AF $FF $FF $FF $AF $EF $FF $BF $FF $EF $FF $FF $FF $FF $FF $FF $ED $45 $EF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $EF $FF $FF $EF $EF $FF $FF $FE $FF $EF $EF $FF $FF $AF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $EF $FF $FF $BB $FF $FB $FF $FF $FE $FF $FF $FF $FF $FB $FF $FE $EF $FB $FF
+
+.incbin "Assets/Four By Four/Metatiles.tilemap"
 
 _DATA_9E50_FourByFour_BehaviourData:
 .incbin "Assets/Four by Four/Behaviour data.compressed"
@@ -25646,8 +25671,10 @@ _DATA_13F50_Tilemap_MicroMachinesText:
 
 .dstruct _DATA_14000_TrackData_Powerboats instanceof TrackData data _DATA_9D30_Powerboats_BehaviourData _DATA_9FE3_Powerboats_WallData _DATA_A03C_Powerboats_Track0Layout _DATA_A134_Powerboats_Track1Layout _DATA_A352_Powerboats_Track2Layout _DATA_A5B1_Powerboats_Track3Layout _DATA_A7A0_Powerboats_GGPalette _DATA_A7E0_Powerboats_DecoratorTiles _DATA_A860_Powerboats_Data _DATA_A8A0_Powerboats_EffectsTiles 
 
-; ???
-.incbin "Assets/raw/Micro Machines_14000.inc" skip $14014-$14000 read $15d30-$14014
+; Unused
+.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $CF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF
+
+.incbin "Assets/Powerboats/Metatiles.tilemap"
 
 _DATA_9D30_Powerboats_BehaviourData:
 .incbin "Assets/Powerboats/Behaviour data.compressed"
@@ -28327,7 +28354,6 @@ _DATA_AB0A_Tanks_Data:
 _DATA_AB4A_Tanks_EffectsTiles:
 .incbin "Assets/Tanks/Effects.3bpp"
 
-
 _DATA_26C52_Tiles_Challenge_Icon:
 .incbin "Assets/Menu/Icon-Challenge.3bpp.compressed"
 
@@ -28349,7 +28375,9 @@ _DATA_279F0_Tilemap_Trophy:
 _DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .incbin "Assets/raw/Micro Machines_24000.inc" skip $27a12-$24000 read $27efb-$27a12
 
-.incbin "Assets/raw/Micro Machines_24000.inc" skip $27efb-$24000 read $27fff-$27efb
+.rept 65
+.db $ff $ff $00 $00 ; Empty
+.endr
 
 .db :CADDR
 
@@ -35278,4 +35306,4 @@ _DATA_3F753_JonsSquinkyTennisCompressed:
 .dw $0000
 
 ; Bank marker
-.db :CADDR
+.db :CADDR

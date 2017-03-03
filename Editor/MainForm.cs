@@ -492,7 +492,14 @@ namespace MicroMachinesEditor
                 cbPalette.SelectedIndex = 0;
             }
             var paletteOffset = Convert.ToInt32(cbPalette.Text.Split(' ')[0], 16);
-            _palette = SMSGraphics.ReadPalette(File.ReadAllBytes(tbFilename.Text), paletteOffset, 32);
+            if (cbPalette.Text.Contains("(GG)"))
+            {
+                _palette = SMSGraphics.ReadPaletteGG(File.ReadAllBytes(tbFilename.Text), paletteOffset, 16);
+            }
+            else
+            {
+                _palette = SMSGraphics.ReadPalette(File.ReadAllBytes(tbFilename.Text), paletteOffset, 16);
+            }
             if (cbPalette.Text.Contains("sprite"))
             {
                 // Hot pink transparency

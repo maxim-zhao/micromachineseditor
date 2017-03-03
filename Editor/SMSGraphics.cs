@@ -8,7 +8,7 @@ namespace MicroMachinesEditor
         public static IList<Color> ReadPalette(byte[] data, int offset, int count)
         {
             var result = new List<Color>(count);
-            for (int i = 0; i < 32; ++i)
+            for (int i = 0; i < count; ++i)
             {
                 byte b = data[offset + i];
                 Color color = PaletteEntryToColor(b);
@@ -17,7 +17,20 @@ namespace MicroMachinesEditor
             return result;
         }
 
-        public static Color PaletteEntryToColor(byte b)
+        public static IList<Color> ReadPaletteGG(byte[] data, int offset, int count)
+        {
+            var result = new List<Color>(count);
+            for (int i = 0; i < count; ++i)
+            {
+                byte b1 = data[offset + i*2];
+                byte b2 = data[offset + i*2 + 1];
+                Color color = PaletteEntryToColorGG(b1, b2);
+                result.Add(color);
+            }
+            return result;
+        }
+
+        private static Color PaletteEntryToColor(byte b)
         {
             // Pull out the components
             int red = (b >> 0) & 0x03;
@@ -27,6 +40,20 @@ namespace MicroMachinesEditor
             red |= red << 2; red |= red << 4;
             green |= green << 2; green |= green << 4;
             blue |= blue << 2; blue |= blue << 4;
+            // Convert to a colour
+            return Color.FromArgb(red, green, blue);
+        }
+
+        private static Color PaletteEntryToColorGG(byte b1, byte b2)
+        {
+            // Pull out the components
+            int red = (b1 >> 0) & 0x0f;
+            int green = (b1 >> 4) & 0x0f;
+            int blue = (b2 >> 0) & 0x0f;
+            // Extend them to full-range
+            red |= red << 4;
+            green |= green << 4;
+            blue |= blue << 4;
             // Convert to a colour
             return Color.FromArgb(red, green, blue);
         }

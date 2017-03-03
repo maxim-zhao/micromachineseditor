@@ -2327,7 +2327,7 @@
 02:a9c6 _LABEL_A9C6_
 02:a9eb _LABEL_A9EB_
 02:aa02 _LABEL_AA02_
-02:aa5d _LABEL_AA5D_
+02:aa5d _LABEL_AA5D_ret
 02:aa8b _LABEL_AA8B_
 02:aaae _TEXT_AAAE_Blanks
 02:aace _DATA_AACE_TrackNamePointers
@@ -2492,8 +2492,6 @@
 02:bf5e _LABEL_BF5E_
 02:bf70 _LABEL_BF70_
 02:bf80 _DATA_BF80_
-02:bfa1 _DATA_BFA1_
-02:bfb0 _DATA_BFB0_
 02:bfff _DATA_BFFF_Page2PageNumber
 03:8000 _DATA_C000_TrackData_SportsCars
 03:8000 _DATA_C000_TrackData_SportsCars.BehaviourData
@@ -2519,6 +2517,7 @@
 03:b35d _DATA_F35D_Tiles_Portrait_FourByFour
 03:b765 _DATA_F765_Tiles_Portrait_Warriors
 03:baa5 _DATA_FAA5_Tiles_Portrait_SportsCars
+03:bdc1 _DATA_FDC1_TrackNames
 03:bdc1 _DATA_FDC1_TrackName_00
 03:bdd5 _DATA_FDD5_TrackName_01
 03:bde9 _DATA_FDE9_TrackName_02

@@ -241,12 +241,12 @@
             this.trackListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.editTrackToolStripMenuItem});
             this.trackListMenu.Name = "trackListMenu";
-            this.trackListMenu.Size = new System.Drawing.Size(189, 40);
+            this.trackListMenu.Size = new System.Drawing.Size(214, 42);
             // 
             // editTrackToolStripMenuItem
             // 
             this.editTrackToolStripMenuItem.Name = "editTrackToolStripMenuItem";
-            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(188, 36);
+            this.editTrackToolStripMenuItem.Size = new System.Drawing.Size(213, 38);
             this.editTrackToolStripMenuItem.Text = "Edit track";
             this.editTrackToolStripMenuItem.Click += new System.EventHandler(this.editTrackToolStripMenuItem_Click);
             // 
@@ -450,6 +450,7 @@
             this.cbPalette.FormattingEnabled = true;
             this.cbPalette.Items.AddRange(new object[] {
             "BF3E Menu",
+            "BF80 Menu (GG)",
             "17ED2 Sportscars tiles",
             "17EE2 Sportscars sprites",
             "17EF2 Four by Four tiles",
