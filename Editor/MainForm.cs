@@ -158,7 +158,7 @@ namespace MicroMachinesEditor
         {
             // There are 64 metatiles, each 96x96px
             // We render them as an 8x8 grid
-            var bm = new Bitmap(8*96, 8*96);
+            var bm = new Bitmap(8*96/8, 8*8*96);
             var g = Graphics.FromImage(bm);
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
@@ -180,6 +180,7 @@ namespace MicroMachinesEditor
             }
 
             pbMetaTiles.Image = bm;
+            Clipboard.SetImage(bm);
         }
 
         private void RenderTiles()

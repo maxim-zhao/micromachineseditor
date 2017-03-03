@@ -61,7 +61,7 @@ namespace MicroMachinesEditor
                         _tiles[x, y] = tiles[tileIndex];
 
                         g.DrawImageUnscaled(tiles[tileIndex].Bitmap, x*8, y*8);
-
+                        /*
                         // We also extract the wall solidity data
                         int tileNumber = y*TilesPerSide + x;
                         int wallDataBitNumber = tileNumber % 8;
@@ -76,7 +76,7 @@ namespace MicroMachinesEditor
                             {
                                 g.DrawRectangle(Pens.Black, x*8, y*8, 7, 7);
                             }
-                        }
+                        }*/
                     }
                 }
                 
