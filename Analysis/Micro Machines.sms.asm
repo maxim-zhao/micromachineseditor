@@ -1135,7 +1135,7 @@ _RAM_DE69_ db
 _RAM_DE6A_ db
 _RAM_DE6B_ db
 _RAM_DE6C_ db
-_RAM_DE6D_ db
+_RAM_DE6D_ db ; actually a dw?
 _RAM_DE6E_ db
 _RAM_DE6F_ db
 _RAM_DE70_ db
@@ -5843,10 +5843,10 @@ _LABEL_22CD_:
   ld a, (_RAM_DF00_)
   or a
   jp z, _LABEL_23C2_
-  ld hl, _DATA_1B232_ ; $B232
+  ld hl, _DATA_1B232_SinTable ; $B232
   ld e, a
   add hl, de
-  ld a, :_DATA_1B232_ ; $06
+  ld a, :_DATA_1B232_SinTable ; $06
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld b, a
@@ -6156,8 +6156,8 @@ _LABEL_2673_:
   ld (_RAM_DEAF_), a
   jp +++
 
-; Data from 26B1 to 26B1 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -9649,8 +9649,8 @@ _LABEL_44C3_:
   ld (_RAM_DEAF_), a
   jp +++
 
-; Data from 4534 to 4534 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -9678,8 +9678,8 @@ _LABEL_44C3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 4562 to 4562 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +:
   sub l
@@ -9688,8 +9688,8 @@ _LABEL_44C3_:
   ld (_RAM_DEB2_), a
   jp +++
 
-; Data from 4570 to 4570 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 ++:
   ld a, (_RAM_DEB1_VScrollDelta)
@@ -9701,16 +9701,16 @@ _LABEL_44C3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 4583 to 4583 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 458C to 458C (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +++:
   ld a, (_RAM_DEB2_)
@@ -12218,10 +12218,10 @@ _LABEL_5A88_:
   ld a, (ix+20)
   or a
   jp z, _LABEL_5B77_
-  ld hl, _DATA_1B232_
+  ld hl, _DATA_1B232_SinTable
   ld e, a
   add hl, de
-  ld a, :_DATA_1B232_
+  ld a, :_DATA_1B232_SinTable
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld b, a
@@ -23147,8 +23147,8 @@ _LABEL_AF10_:
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   jr _LABEL_AF5D_BlankControlsRAM
 
-; Data from AF4F to AF4F (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +++:
   call _LABEL_AF92_
@@ -25358,23 +25358,6 @@ _DATA_BF3E_MenuPalette_SMS:
   SMSCOLOUR $000000
   SMSCOLOUR $000000
 
-/*
-; Data from BF5E to BF6E (16 bytes)
-; Code?
-.db $18 $00
-.db $CD $58 $B3 $0E $05 $3E $0E $D3 $BE $AF $D3 $BE $0D $20 $F6
-
-; Data from BF6F to BFFE (144 bytes)
-.db $C9 $21 $00 $C0 $CD $58 $B3 $21 $80 $BF $06 $40 $0E $BE $ED $B3
-.db $C9 $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $44 $0E $00
-.db $00 $22 $02 $44 $04 $88 $08 $40 $00 $C0 $00 $E0 $00 $AE $0A $00
-.db $00 $04 $08 $EE $0E $80 $00 $08 $00 $4E $04 $8E $00 $88 $0E $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $FE $FF $EE $FF $FE $EF $EF $EE $FF $FF $EF $EF $FA $EF $FF
-.db $7F $EA $EF $EE $FF $FA $FF $EB $FF $FF $FE $7F $EF $BA $FE $EF
-.db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
-.db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
-*/
 
 _LABEL_BF5E_: ; GG-only code, misaligned here
   jr + ; Weird
@@ -25662,7 +25645,7 @@ _DATA_13F38_Tilemap_SmallLogo: ; 8x3
 _DATA_13F50_Tilemap_MicroMachinesText:
 .incbin "Assets/Menu/Text-MicroMachines.tilemap"
 
-.incbin "Assets/raw/Micro Machines_10000.inc" skip $13f68-$10000 read $13fff-$13f68
+.db $00 $00 $20 $00 $00 $02 $00 $00 $02 $00 $08 $00 $00 $00 $00 $00 $00 $08 $00 $00 $02 $80 $00 $00 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF $FA $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FE $FF $FF $FF $FF
 
 .db :CADDR
 
@@ -26123,8 +26106,10 @@ _DATA_17FB2_SMSPalette_RuffTrux:
 ; Data from 18000 to 1B1A1 (12706 bytes)
 .dstruct _DATA_18000_TrackData_TurboWheels instanceof TrackData data _DATA_A480_TurboWheels_BehaviourData _DATA_A7B6_TurboWheels_WallData _DATA_A838_TurboWheels_Track0Layout _DATA_AACF_TurboWheels_Track1Layout _DATA_AD10_TurboWheels_Track2Layout _DATA_AD10_TurboWheels_Track3Layout _DATA_AF9A_TurboWheels_GGPalette _DATA_AFDA_TurboWheels_DecoratorTiles _DATA_B05A_TurboWheels_Data _DATA_B09A_TurboWheels_EffectsTiles 
 
-; ???
-.incbin "Assets/raw/Micro Machines_18000.inc" skip $18014-$18000 read $1a480-$18014
+; Unused
+.db $FE $FF $FF $FF $BF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $BF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $ED $45 $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $EE $FF $FF $FF $EF $FF $FF $EF $ED $45 $FF $FF $EF $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $FB $FF $FF
+
+.incbin "Assets/Turbo Wheels/Metatiles.tilemap"
 
 _DATA_A480_TurboWheels_BehaviourData:
 .incbin "Assets/Turbo Wheels/Behaviour data.compressed"
@@ -26182,6 +26167,7 @@ _DATA_B09A_TurboWheels_EffectsTiles:
 
 ; Data from 1B1A2 to 1B231 (144 bytes)
 _DATA_1B1A2_:
+; Indexed by _RAM_DE6D_?
 .db $00 $00 $01 $01 $02 $02 $03 $03 $04 $04 $05 $05 $00 $00 $01 $01
 .db $02 $02 $03 $03 $04 $04 $05 $05 $06 $06 $07 $07 $08 $08 $09 $09
 .db $0A $0A $0B $0B $06 $06 $07 $07 $08 $08 $09 $09 $0A $0A $0B $0B
@@ -26193,17 +26179,22 @@ _DATA_1B1A2_:
 .db $22 $22 $23 $23 $1E $1E $1F $1F $20 $20 $21 $21 $22 $22 $23 $23
 
 ; Data from 1B232 to 1BAB2 (2177 bytes)
-_DATA_1B232_:
-.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1B232-$1B232 read $1b2c3-$1B232
+_DATA_1B232_SinTable:
+; Holds a sine curve, padded with an extra 0 at the start and 15 extra at the end
+; It curves from 0 to 127 to 0 again in the remaining space
+; Hard to exactly reproduce, it seems to round weirdly
+.db $00 
+.db $00 $03 $06 $09 $0C $0F $12 $15 $18 $1C $1F $22 $25 $28 $2B $2E $30 $33 $36 $39 $3C $3F $41 $44 $47 $49 $4C $4E $51 $53 $55 $58 $5A $5C $5E $60 $62 $64 $66 $68 $6A $6C $6D $6F $70 $72 $73 $75 $76 $77 $78 $79 $7A $7B $7C $7C $7D $7E $7E $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7E $7E $7D $7C $7C $7B $7A $79 $78 $77 $76 $75 $73 $72 $70 $6F $6D $6C $6A $68 $66 $64 $62 $60 $5E $5C $5A $58 $55 $53 $51 $4E $4C $49 $47 $44 $41 $3F $3C $39 $36 $33 $30 $2E $2B $28 $25 $22 $1F $1C $18 $15 $12 $0F $0C $09 $06 $03 $00 
+.dsb 15 $00
 
 _DATA_1B2C3_Tiles_Trophy:
-.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b2c3-$1B232 read $1b7a7-$1b2c3
+.incbin "Assets/Menu/Trophy.3bpp.compressed"
 
 _DATA_1B7A7_SMS:
-.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b7a7-$1B232 read $1b987-$1b7a7
+.incbin "Assets/Menu/Driver select tilemap data (SMS).bin"
 
 _DATA_1B987_GG:
-.incbin "Assets/raw/Micro Machines_1b232.inc" skip $1b987-$1B232 read $1bab3-$1b987
+.incbin "Assets/Menu/Driver select tilemap data (GG).bin"
 
 _LABEL_1BAB3_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -26484,8 +26475,8 @@ _LABEL_1BC3F_:
   ld (_RAM_DEAF_), a
   jp +++
 
-; Data from 1BC87 to 1BC87 (1 bytes)
-.db $C9 ; ret
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -26742,8 +26733,8 @@ _LABEL_1BDF3_:
   ld (_RAM_DEAF_), a
   jp +++
 
-; Data from 1BE31 to 1BE31 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -26765,8 +26756,8 @@ _LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 1BE56 to 1BE56 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   sub l
@@ -26775,8 +26766,8 @@ _LABEL_1BDF3_:
   ld (_RAM_DEB2_), a
   jp +++
 
-; Data from 1BE64 to 1BE64 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 ++:
   ld a, (_RAM_DEB1_VScrollDelta)
@@ -26788,16 +26779,16 @@ _LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 1BE77 to 1BE77 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-; Data from 1BE80 to 1BE80 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +++:
   ret
@@ -27653,8 +27644,8 @@ _LABEL_239C6_:
   ld (_RAM_DCFB_), a
   jp +++
 
-; Data from 23A40 to 23A40 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -27676,8 +27667,8 @@ _LABEL_239C6_:
   ld (_RAM_DCFC_), a
   jp +++
 
-; Data from 23A65 to 23A65 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   sub l
@@ -27686,8 +27677,8 @@ _LABEL_239C6_:
   ld (_RAM_DD0C_), a
   jp +++
 
-; Data from 23A73 to 23A73 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 ++:
   ld a, (_RAM_DCFC_)
@@ -27699,16 +27690,16 @@ _LABEL_239C6_:
   ld (_RAM_DCFC_), a
   jp +++
 
-; Data from 23A86 to 23A86 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
   ld (_RAM_DCFC_), a
   jp +++
 
-; Data from 23A8F to 23A8F (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +++:
   ret
@@ -30585,8 +30576,8 @@ _LABEL_3608C_:
   ld (_RAM_DE9D_), a
   jp ++
 
-; Data from 360B1 to 360B1 (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $00
@@ -30641,8 +30632,8 @@ _LABEL_360B9_:
   ld (_RAM_DEAF_), a
   jp +++
 
-; Data from 3610E to 3610E (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07
@@ -30732,8 +30723,8 @@ _LABEL_3616B_:
   ld (_RAM_DCFB_), a
   jp +++
 
-; Data from 361AC to 361AC (1 bytes)
-.db $C9
+  ; Unreachable code
+  ret
 
 +:
   ld a, $07

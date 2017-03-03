@@ -535,6 +535,7 @@ namespace MicroMachinesEditor
             }
 
             pbRaw.Image = bm;
+            Clipboard.SetImage(bm);
         }
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)
