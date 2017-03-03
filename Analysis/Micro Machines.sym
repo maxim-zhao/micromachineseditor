@@ -2911,13 +2911,15 @@
 0c:91e8 _LABEL_311E8_
 0c:91f3 _LABEL_311F3_
 0c:9229 _DATA_31229_
+0c:9249 _DATA_31249_
+0c:9279 _DATA_31279_
 0c:937a _DATA_3137A_
 0c:9410 _DATA_31410_MusicIndirection
 0c:941c _DATA_3141C_
 0c:94af _DATA_314AF_MenuMusicStopData
 0c:94be _DATA_314AF_MenuMusicStopData_End
 0c:94f7 _DATA_314F7_
-0c:950f _DATA_3150F_
+0c:950f _DATA_3150F_MusicData
 0d:8000 _DATA_34000_FormulaOne_Tiles
 0d:8958 _DATA_34958_CarTiles_Sportscars
 0d:8cf0 _DATA_34CF0_CarTiles_FourByFour
@@ -2935,7 +2937,7 @@
 0d:998d _LABEL_3598D_emitThreeTilesVFlipped
 0d:99c0 _LABEL_359C0_emitThreeTilesHFlipped
 0d:99f8 _hflipByte_usingHL
-0d:9a1b _LABEL_35A1B_hlipByte_usingBC
+0d:9a1b _LABEL_35A1B_hflipByte_usingBC
 0d:9a3e _LABEL_35A3E_CarTileLoader_HFlipSwapData
 0d:9abf _DATA_35ABF_
 0d:9ae3 _DATA_35AE3_CarTileRAMLocations

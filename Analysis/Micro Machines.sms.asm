@@ -28899,7 +28899,7 @@ _DATA_2B911_SoundData_:
 ; TODO this is incomplete
 ; 6-byte table of pointers into data pairs/triplets?
 ; Some point to _RAM_D97D_ instead
-; Pointers point to various lengths of data follwing the table
+; Pointers point to various lengths of data following the table
 .dw $B995 $B99D $D97D
 .dw $B9A5 $B9AB $B9B1
 .dw $B9B6 $B9BE $B9C6
@@ -29297,7 +29297,7 @@ _LABEL_30D36_MenuMusicFrameHandler:
   add a, a
   ld c, a
   ld b, $00
-  ld hl, _DATA_3150F_
+  ld hl, _DATA_3150F_MusicData
   add hl, bc
   ld a, (hl)
   inc hl
@@ -29314,12 +29314,12 @@ _LABEL_30D36_MenuMusicFrameHandler:
   call _LABEL_31093_
   call _LABEL_31068_
   ld ix, _RAM_D769_
-  ld iy, $D923
+  ld iy, _RAM_D923_
   ld a, (_RAM_D917_MenuSound_)
   call _LABEL_31093_
   call _LABEL_31068_
   ld ix, _RAM_D78E_
-  ld iy, $D924
+  ld iy, _RAM_D924_
   ld a, (_RAM_D918_MenuSound_)
   call _LABEL_31093_
   call _LABEL_31068_
@@ -29341,9 +29341,9 @@ _LABEL_30DC7_:
 
 +:
   ld a, (ix+0)
-  cp $FF
+  cp -1
   jp z, _LABEL_30FEA_
-  cp $FE
+  cp -2
   ret z
   ld a, (ix+9)
   or a
@@ -29354,13 +29354,13 @@ _LABEL_30DC7_:
   dec a
   jr nz, _LABEL_30E59_
   ld a, (hl)
-  cp $FF
+  cp -1
   jr nz, +
   ld a, (ix+2)
   jr ++
 
 +:
-  cp $FE
+  cp -2
   jr nz, +
   ld l, (ix+17)
   ld h, (ix+18)
@@ -29388,13 +29388,13 @@ _LABEL_30DC7_:
   ld c, a
   ld b, $00
   push hl
-  ld hl, _DATA_3137A_
-  add hl, bc
-  ld a, (hl)
-  ld (iy+0), a
-  inc hl
-  ld a, (hl)
-  ld (iy+1), a
+    ld hl, _DATA_3137A_
+    add hl, bc
+    ld a, (hl)
+    ld (iy+0), a
+    inc hl
+    ld a, (hl)
+    ld (iy+1), a
 +++:
   pop hl
   ld a, (ix+21)
@@ -29417,14 +29417,14 @@ _LABEL_30E59_:
 +:
   ld (ix+28), a
   ld a, (hl)
-  cp $FF
+  cp -1
   jr nz, +
   ld a, $01
   ld (ix+28), a
   jr ++
 
 +:
-  cp $FE
+  cp -2
   jr nz, ++
   ld l, (ix+24)
   ld h, (ix+25)
@@ -29803,87 +29803,81 @@ _LABEL_310EF_:
   ld (ix+2), a
   add a, a
   push hl
-  ld l, a
-  xor a
-  ld (ix+9), a
-  ld (ix+36), a
-  ld a, (ix+7)
-  or a
-  jr z, ++
-  ld c, a
-  ld a, (ix+10)
-  or a
-  ld a, c
-  jr nz, +
-  ld (ix+0), a
-+:
-  pop hl
+    ld l, a
+    xor a
+    ld (ix+9), a
+    ld (ix+36), a
+    ld a, (ix+7)
+    or a
+    jr z, ++
+    ld c, a
+    ld a, (ix+10)
+    or a
+    ld a, c
+    jr nz, +
+    ld (ix+0), a
++:pop hl
   inc hl
   ret
 
-++:
-  ld a, (ix+36)
-  or a
-  jr nz, +
-  ld (ix+35), a
-+:
-  ld h, $00
-  ld a, (ix+0)
-  cp $FE
-  jr nz, +
-  ld (ix+0), h
-+:
-  ld bc, $937A
-  add hl, bc
-  ld a, (hl)
-  ld (ix+3), a
-  inc hl
-  ld a, (hl)
-  ld (ix+4), a
-  ld l, (ix+5)
-  ld h, (ix+6)
-  ld c, (hl)
-  inc hl
-  ld b, (hl)
-  ld a, (bc)
-  ld (ix+23), a
-  inc bc
-  ld a, (bc)
-  ld (ix+21), a
-  ld (ix+22), a
-  inc bc
-  ld (ix+17), c
-  ld (ix+19), c
-  ld (ix+18), b
-  ld (ix+20), b
-  ld a, $01
-  ld (ix+28), a
-  inc hl
-  ld c, (hl)
-  inc hl
-  ld b, (hl)
-  ld a, (bc)
-  cp (ix+1)
-  jr nc, +
-  ld a, (ix+1)
-+:
-  ld e, a
-  ld a, (_RAM_D914_)
-  cp e
-  jr nc, +
-  ld a, e
-+:
-  ld (iy+0), a
-  dec bc
-  ld (ix+24), c
-  ld (ix+26), c
-  ld (ix+25), b
-  ld (ix+27), b
-  ld a, (ix+30)
-  ld (ix+32), a
-  xor a
-  ld (ix+33), a
-  ld (ix+34), a
+++: ld a, (ix+36)
+    or a
+    jr nz, +
+    ld (ix+35), a
++:  ld h, $00
+    ld a, (ix+0)
+    cp $FE
+    jr nz, +
+    ld (ix+0), h
++:  ld bc, $937A
+    add hl, bc
+    ld a, (hl)
+    ld (ix+3), a
+    inc hl
+    ld a, (hl)
+    ld (ix+4), a
+    ld l, (ix+5)
+    ld h, (ix+6)
+    ld c, (hl)
+    inc hl
+    ld b, (hl)
+    ld a, (bc)
+    ld (ix+23), a
+    inc bc
+    ld a, (bc)
+    ld (ix+21), a
+    ld (ix+22), a
+    inc bc
+    ld (ix+17), c
+    ld (ix+19), c
+    ld (ix+18), b
+    ld (ix+20), b
+    ld a, $01
+    ld (ix+28), a
+    inc hl
+    ld c, (hl)
+    inc hl
+    ld b, (hl)
+    ld a, (bc)
+    cp (ix+1)
+    jr nc, +
+    ld a, (ix+1)
++:  ld e, a
+    ld a, (_RAM_D914_)
+    cp e
+    jr nc, +
+    ld a, e
++:  ld (iy+0), a
+    dec bc
+    ld (ix+24), c
+    ld (ix+26), c
+    ld (ix+25), b
+    ld (ix+27), b
+    ld a, (ix+30)
+    ld (ix+32), a
+    xor a
+    ld (ix+33), a
+    ld (ix+34), a
   pop hl
 _LABEL_31196_:
   inc hl
@@ -29899,11 +29893,11 @@ _LABEL_311BC_:
   ld c, a
   ld b, $00
   push hl
-  ld hl, $94BE
-  add hl, bc
-  ld (_RAM_D929_MenuSound_), hl
-  ld a, $01
-  ld (_RAM_D92F_), a
+    ld hl, $94BE ; TODO this is a pointer
+    add hl, bc
+    ld (_RAM_D929_MenuSound_), hl
+    ld a, $01
+    ld (_RAM_D92F_), a
   pop hl
   inc hl
   ld a, $01
@@ -29926,51 +29920,52 @@ _LABEL_311E8_:
 
 _LABEL_311F3_:
   push de
-  ld a, (hl)
-  and $0F
-  ld e, a
-  add a, a
-  ld c, a
-  ld b, $00
-  push hl
-  ld hl, _DATA_31229_
-  add hl, bc
-  ld c, (hl)
-  ld (ix+5), c
-  inc hl
-  ld b, (hl)
-  ld (ix+6), b
-  ld (ix+7), $00
-  inc bc
-  ld a, (bc)
-  cp $FF
-  jr nz, +
-  ld (ix+7), e
-+:
-  inc bc
-  inc bc
-  inc bc
-  ld a, (bc)
-  ld (ix+31), a
-  inc bc
-  ld a, (bc)
-  ld (ix+30), a
-  pop hl
+    ld a, (hl)
+    and $0F
+    ld e, a
+    add a, a
+    ld c, a
+    ld b, $00
+    push hl
+      ld hl, _DATA_31229_
+      add hl, bc
+      ld c, (hl)
+      ld (ix+5), c
+      inc hl
+      ld b, (hl)
+      ld (ix+6), b
+      ld (ix+7), $00
+      inc bc
+      ld a, (bc)
+      cp $FF
+      jr nz, +
+      ld (ix+7), e
++:    inc bc
+      inc bc
+      inc bc
+      ld a, (bc)
+      ld (ix+31), a
+      inc bc
+      ld a, (bc)
+      ld (ix+30), a
+    pop hl
   pop de
   inc hl
   jp _LABEL_310A0_
 
 ; Pointer Table from 31229 to 3124C (18 entries, indexed by unknown)
 _DATA_31229_:
-.dw $9249 $9279 $928B $9267 $9273 $9255 $9261 $924F
+.dw _DATA_31249_ _DATA_31279_ $928B $9267 $9273 $9255 $9261 $924F
 .dw $9261 $9261 $927F $9261 $925B $926D $924F $924F
-.dw $9291 $92F2
-
-; Data from 3124D to 31379 (301 bytes)
-.db $FF $FF $E9 $92 $07 $93 $FF $FF $95 $92 $40 $93 $FF $FF $9F $92
-.db $5C $93 $02 $1E $00 $FF $F8 $92 $FF $FF $B1 $92 $07 $93 $FF $FF
-.db $BD $92 $51 $93 $FF $FF $C4 $92 $51 $93 $FF $FF $D9 $92 $6E $93
-.db $04 $06 $E1 $92 $40 $93 $FF $FF $95 $92 $16 $93 $05 $06 $CB $92
+; Followed by more
+; TODO chase this all down, some is real data?
+_DATA_31249_:
+.dw $9291 $92F2 $FFFF $92E9 $9307 $FFFF $9295 $9340 $FFFF $929F
+.dw $935C $1E02 $FF00 $92F8 $FFFF $92B1 $9307 $FFFF
+.dw $92BD $9351 $FFFF $92C4 $9351 $FFFF 
+_DATA_31279_:
+.dw $92D9 $936E
+.dw $0604 $92E1 $9340 $FFFF $9295 $9316 $0605 $92CB
 .db $16 $93 $05 $06 $00 $01 $00 $FF $01 $01 $00 $02 $00 $04 $00 $02
 .db $00 $FF $00 $01 $00 $0C $00 $00 $00 $00 $00 $FF $00 $01 $00 $0C
 .db $00 $0C $00 $FF $00 $01 $00 $04 $07 $0C $00 $04 $07 $0C $00 $FF
@@ -30028,8 +30023,8 @@ _DATA_314F7_:
 .dw $94BE $94D6 $94E3 $94E9 $94EA $94EB $94EC $94F1 $94F2 $94F3 $94F4 $94F5
 
 ; Data from 3150F to 33FFF (10993 bytes)
-_DATA_3150F_:
-.incbin "Assets/raw/Micro Machines_3150f.inc"
+_DATA_3150F_MusicData:
+.incbin "Assets/raw/Micro Machines_3150f.inc" ; Seems to have code in there too
 
 .BANK 13
 .ORG $0000
@@ -30434,7 +30429,7 @@ _hflipByte_usingHL:
   ld a, h
   ret
 
-_LABEL_35A1B_hlipByte_usingBC:
+_LABEL_35A1B_hflipByte_usingBC:
   ld c, a
   rr c
   rl b
@@ -30484,10 +30479,10 @@ _LABEL_35A3E_CarTileLoader_HFlipSwapData:
 -:push bc
     ; H-flip and swap bytes at hl and de
     ld a, (hl)
-    call _LABEL_35A1B_hlipByte_usingBC
+    call _LABEL_35A1B_hflipByte_usingBC
     ld (_RAM_DB78_CarTileLoaderTempByte), a
     ld a, (de)
-    call _LABEL_35A1B_hlipByte_usingBC
+    call _LABEL_35A1B_hflipByte_usingBC
     ld (hl), a
     ld a, (_RAM_DB78_CarTileLoaderTempByte)
     ld (de), a
@@ -30527,7 +30522,7 @@ _LABEL_35A3E_CarTileLoader_HFlipSwapData:
 -:
   push bc
     ld a, (hl)
-    call _LABEL_35A1B_hlipByte_usingBC ; hflip it back again???
+    call _LABEL_35A1B_hflipByte_usingBC ; hflip it back again???
     ld (hl), a
   pop bc
   inc hl
