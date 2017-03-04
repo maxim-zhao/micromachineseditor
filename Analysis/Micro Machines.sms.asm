@@ -28562,7 +28562,7 @@ _LABEL_2B5ED_:
   ret 
   
 _LABEL_2B5F4_:
-  _RAM_D95B_ -= 4
+  ; _RAM_D95B_ -= 4
   ld hl, (_RAM_D95B_) 
   ld bc, 4
   and a 
@@ -28964,33 +28964,33 @@ _DATA_2B87B_:
 
 ; Data from 2B911 to 2BFFF (1775 bytes)
 _DATA_2B911_SoundData_:
-; TODO this is incomplete
 ; 6-byte table of pointers into data pairs/triplets?
 ; Some point to _RAM_D97D_ instead
 ; Pointers point to various lengths of data following the table
-.dw $B995 $B99D $D97D
-.dw $B9A5 $B9AB $B9B1
-.dw $B9B6 $B9BE $B9C6
-.dw $B9CE $B9D8 $B9E1
-.dw $B9EA $BA00 $BA15
-.dw $BA29 $BA33 $BA3D
-.dw $BA46 $BA50 $BA5A
-.dw $BA63 $BA7A $BA90
-.dw $BAA6 $BAD3 $D97D
-.dw $BAF6 $BAFF $BB07
-.dw $BB0F $BB18 $BB21
-.dw $BB2A $BB3A $D97D
-.dw $BB4B $BB54 $BB5D
-.dw $BB66 $BB93 $D97D
-.dw $BBC1 $BBC9 $D97D
-.dw $BBD1 $BBD8 $BBDF
-.dw $BBE6 $BBEF $BBF8
-.dw $BC01 $BC92 $D97D
-.dw $BD25 $BD76 $D97D
-.dw $BDC7 $BE08 $D97D
-.dw $BE49 $BE51 $BE59
-.dw $BE61 $BE6F $BE7D
+.dw _DATA_2B995_SoundData_ _DATA_2B99D_SoundData_ _RAM_D97D_
+.dw _DATA_2B9A5_SoundData_ _DATA_2B9AB_SoundData_ _DATA_2B9B1_SoundData_
+.dw _DATA_2B9B6_SoundData_ _DATA_2B9BE_SoundData_ _DATA_2B9C6_SoundData_
+.dw _DATA_2B9CE_SoundData_ _DATA_2B9D8_SoundData_ _DATA_2B9E1_SoundData_
+.dw _DATA_2B9EA_SoundData_ _DATA_2BA00_SoundData_ _DATA_2BA15_SoundData_
+.dw _DATA_2BA29_SoundData_ _DATA_2BA33_SoundData_ _DATA_2BA3D_SoundData_
+.dw _DATA_2BA46_SoundData_ _DATA_2BA50_SoundData_ _DATA_2BA5A_SoundData_
+.dw _DATA_2BA63_SoundData_ _DATA_2BA7A_SoundData_ _DATA_2BA90_SoundData_
+.dw _DATA_2BAA6_SoundData_ _DATA_2BAD3_SoundData_ _RAM_D97D_
+.dw _DATA_2BAF6_SoundData_ _DATA_2BAFF_SoundData_ _DATA_2BB07_SoundData_
+.dw _DATA_2BB0F_SoundData_ _DATA_2BB18_SoundData_ _DATA_2BB21_SoundData_
+.dw _DATA_2BB2A_SoundData_ _DATA_2BB3A_SoundData_ _RAM_D97D_
+.dw _DATA_2BB4B_SoundData_ _DATA_2BB54_SoundData_ _DATA_2BB5D_SoundData_
+.dw _DATA_2BB66_SoundData_ _DATA_2BB93_SoundData_ _RAM_D97D_
+.dw _DATA_2BBC1_SoundData_ _DATA_2BBC9_SoundData_ _RAM_D97D_
+.dw _DATA_2BBD1_SoundData_ _DATA_2BBD8_SoundData_ _DATA_2BBDF_SoundData_
+.dw _DATA_2BBE6_SoundData_ _DATA_2BBEF_SoundData_ _DATA_2BBF8_SoundData_
+.dw _DATA_2BC01_SoundData_ _DATA_2BC92_SoundData_ _RAM_D97D_
+.dw _DATA_2BD25_SoundData_ _DATA_2BD76_SoundData_ _RAM_D97D_
+.dw _DATA_2BDC7_SoundData_ _DATA_2BE08_SoundData_ _RAM_D97D_
+.dw _DATA_2BE49_SoundData_ _DATA_2BE51_SoundData_ _DATA_2BE59_SoundData_
+.dw _DATA_2BE61_SoundData_ _DATA_2BE6F_SoundData_ _DATA_2BE7D_SoundData_
 
+; Most data seems terminated by a $00 or $ff, bt not all
 _DATA_2B995_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $00 
 _DATA_2B99D_SoundData_: .db $18 $18 $18 $18 $18 $18 $18 $FF
 _DATA_2B9A5_SoundData_: .db $0F $0C $09 $06 $03 $00
@@ -29006,189 +29006,49 @@ _DATA_2B9EA_SoundData_: .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B 
 _DATA_2BA00_SoundData_: .db $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $FF
 _DATA_2BA15_SoundData_: .db $05 $00 $00 $00 $06 $00 $00 $00 $00 $04 $00 $00 $00 $00 $07 $00 $00 $00 $00 $FF
 _DATA_2BA29_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00 
-_DATA_2BA33_SoundData_:
-_DATA_2BA3D_SoundData_: 
-_DATA_2BA46_SoundData_: 
-_DATA_2BA50_SoundData_: 
-_DATA_2BA5A_SoundData_:
-_DATA_2BA63_SoundData_:
-_DATA_2BA7A_SoundData_:
-_DATA_2BA90_SoundData_:
-_DATA_2BAA6_SoundData_:
-_DATA_2BAD3_SoundData_:
-_DATA_2BAF6_SoundData_:
-_DATA_2BAFF_SoundData_:
-_DATA_2BB07_SoundData_:
-_DATA_2BB0F_SoundData_:
-_DATA_2BB18_SoundData_:
-_DATA_2BB21_SoundData_:
-_DATA_2BB2A_SoundData_:
-_DATA_2BB3A_SoundData_:
-_DATA_2BB4B_SoundData_:
-_DATA_2BB54_SoundData_:
-_DATA_2BB5D_SoundData_:
-_DATA_2BB66_SoundData_:
-_DATA_2BB93_SoundData_:
-_DATA_2BBC1_SoundData_:
-_DATA_2BBC9_SoundData_:
-_DATA_2BBD1_SoundData_:
-_DATA_2BBD8_SoundData_:
-_DATA_2BBDF_SoundData_:
-_DATA_2BBE6_SoundData_:
-_DATA_2BBEF_SoundData_:
-_DATA_2BBF8_SoundData_:
-_DATA_2BC01_SoundData_:
-_DATA_2BC92_SoundData_:
-_DATA_2BD25_SoundData_:
-_DATA_2BD76_SoundData_:
-_DATA_2BDC7_SoundData_:
-_DATA_2BE08_SoundData_:
-_DATA_2BE49_SoundData_:
-_DATA_2BE51_SoundData_:
-_DATA_2BE59_SoundData_:
-_DATA_2BE61_SoundData_:
-_DATA_2BE6F_SoundData_:
-_DATA_2BE7D_SoundData_:
-.db $1E $0A
-.db $0A $0C $0E $10 $12 $14 $00 $FF
-.db $06 $00 $05 $00 $04 $00 $07 $00
-.db $FF $0F $0F $0E $0E $0C $0C $0A
-.db $0A $08 $00 $02 $04 $08 $10 $20
-.db $00 $00 $00 $00 $FF $05 $00 $00
-.db $00 $07 $00 $00 $00 $FF $0F $0F
-.db $0E $0E $0C $0C $0A $0A $08 $08
-.db $07 $07 $06 $06 $06 $06 $06 $06
-.db $06 $06 $06 $06 $00 $18 $00 $16
-.db $00 $14 $00 $12 $00 $10 $00 $0E
-.db $00 $0C $00 $00 $00 $00 $00 $00
-.db $00 $00 $FF $06 $00 $00 $00 $05
-.db $00 $00 $00 $04 $00 $00 $00 $07
-.db $00 $00 $00 $00 $00 $00 $00 $00
-.db $FF $0F $0F $0F $0F $0E $0E $0E
-.db $0E $0D $0D $0D $0D $0C $0C $0C
-.db $0C $0B $0B $0B $0B $0A $0A $0A
-.db $0A $08 $08 $08 $08 $06 $06 $06
-.db $06 $04 $04 $04 $04 $03 $03 $03
-.db $03 $02 $02 $02 $02 $00 $32 $31
-.db $30 $2F $2E $2D $2C $2B $2A $29
-.db $28 $27 $26 $25 $24 $23 $22 $21
-.db $20 $1F $1E $1D $1C $1B $1A $19
-.db $18 $17 $16 $15 $0A $09 $08 $07
-.db $FF $0F $0E $0D $0C $0A $09 $08
-.db $07 $00 $05 $04 $03 $02 $01 $00
-.db $00 $FF $05 $00 $04 $00 $06 $00
-.db $00 $FF $0F $0D $0B $09 $07 $05
-.db $03 $01 $00 $14 $12 $10 $0E $0C
-.db $0A $08 $06 $FF $06 $00 $05 $00
-.db $00 $07 $00 $00 $FF $00 $01 $02
-.db $03 $04 $05 $06 $07 $08 $09 $0A
-.db $0B $0C $0D $0E $0F $28 $2A $2C
-.db $2E $30 $32 $0A $0F $14 $19 $1E
-.db $23 $28 $2D $32 $37 $FF $0F $0E
-.db $0C $0A $08 $06 $04 $02 $00 $0A
-.db $09 $08 $07 $06 $05 $00 $00 $FF
-.db $06 $00 $05 $00 $06 $00 $04 $00
-.db $FF $0F $0F $0F $0F $0E $0E $0E
-.db $0E $0D $0D $0D $0D $0C $0C $0C
-.db $0C $0B $0B $0B $0B $0A $0A $0A
-.db $0A $08 $08 $08 $08 $06 $06 $06
-.db $06 $04 $04 $04 $04 $03 $03 $03
-.db $03 $02 $02 $02 $02 $00 $22 $22
-.db $22 $21 $21 $21 $20 $20 $20 $1F
-.db $1F $1F $1E $1E $1E $1D $1D $1D
-.db $1C $1C $1C $1B $1B $1B $1A $1A
-.db $1A $19 $19 $19 $18 $18 $18 $17
-.db $17 $17 $16 $16 $16 $15 $15 $15
-.db $14 $14 $14 $FF $0F $0F $0F $0F
-.db $0F $0F $0F $00 $28 $27 $28 $29
-.db $28 $27 $28 $FF $0F $0F $0F $0F
-.db $0F $0F $00 $1E $1D $1E $1F $1E
-.db $1D $FF $07 $00 $00 $00 $00 $00
-.db $FF $0F $0F $0E $0D $0C $0A $08
-.db $06 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $FF $07 $00 $04 $00 $07
-.db $00 $00 $00 $FF $01 $01 $02 $02
-.db $03 $03 $04 $04 $05 $05 $06 $06
-.db $07 $07 $08 $08 $09 $09 $0A $0A
-.db $0B $0B $0C $0C $0D $0D $0E $0E
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0E $0E $0D $0D $0C $0C $0B $0B
-.db $0A $0A $09 $09 $08 $08 $07 $07
-.db $06 $06 $05 $05 $04 $04 $03 $03
-.db $02 $02 $01 $01 $00 $0A $0B $0C
-.db $0D $0E $0F $10 $11 $12 $13 $14
-.db $15 $16 $17 $18 $19 $1A $1B $1C
-.db $1D $1E $1F $20 $21 $22 $23 $24
-.db $25 $26 $27 $28 $29 $2A $2B $2C
-.db $2D $2E $2F $30 $31 $32 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $28 $28
-.db $28 $28 $14 $14 $14 $14 $32 $31
-.db $30 $2F $2E $2D $2C $2B $2A $29
-.db $28 $27 $26 $25 $24 $23 $22 $21
-.db $20 $1F $1E $1D $1C $1B $1A $19
-.db $18 $17 $16 $15 $14 $13 $12 $11
-.db $10 $0F $0E $0D $0C $0B $0A $FF
-.db $0F $0F $0F $0F $0F $0F $0F $0F
-.db $0E $0E $0E $0E $0E $0E $0E $0E
-.db $0D $0D $0D $0D $0D $0D $0D $0D
-.db $0C $0C $0C $0C $0C $0C $0C $0C
-.db $0B $0B $0B $0B $0B $0B $0B $0B
-.db $0A $0A $0A $0A $0A $0A $0A $0A
-.db $08 $08 $08 $08 $08 $08 $08 $08
-.db $06 $06 $06 $06 $06 $06 $06 $06
-.db $04 $04 $04 $04 $04 $04 $04 $04
-.db $02 $02 $02 $02 $02 $02 $02 $02
-.db $00 $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $1E $20 $22 $24 $28 $2A $2C
-.db $2E $FF $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $0F $0E $0D $0C $0B $0A
-.db $08 $06 $00 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $28 $28 $28 $28 $20
-.db $20 $20 $20 $FF $00 $04 $08 $0C
-.db $0F $0F $0F $00 $00 $00 $00 $00
-.db $00 $00 $00 $FF $06 $00 $05 $00
-.db $04 $07 $00 $FF $07 $08 $09 $0A
-.db $0B $0C $0D $0E $0F $0F $0F $0F
-.db $0F $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $FF
-.db $07 $00 $00 $04 $00 $00 $05 $00
-.db $00 $06 $00 $00 $00 $FF
+_DATA_2BA33_SoundData_: .db $1E $0A $0A $0C $0E $10 $12 $14 $00 $FF
+_DATA_2BA3D_SoundData_: .db $06 $00 $05 $00 $04 $00 $07 $00 $FF
+_DATA_2BA46_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
+_DATA_2BA50_SoundData_: .db $02 $04 $08 $10 $20 $00 $00 $00 $00 $FF
+_DATA_2BA5A_SoundData_: .db $05 $00 $00 $00 $07 $00 $00 $00 $FF
+_DATA_2BA63_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $08 $07 $07 $06 $06 $06 $06 $06 $06 $06 $06 $06 $06 $00
+_DATA_2BA7A_SoundData_: .db $18 $00 $16 $00 $14 $00 $12 $00 $10 $00 $0E $00 $0C $00 $00 $00 $00 $00 $00 $00 $00 $FF
+_DATA_2BA90_SoundData_: .db $06 $00 $00 $00 $05 $00 $00 $00 $04 $00 $00 $00 $07 $00 $00 $00 $00 $00 $00 $00 $00 $FF
+_DATA_2BAA6_SoundData_: .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
+_DATA_2BAD3_SoundData_: .db $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $0A $09 $08 $07 $FF
+_DATA_2BAF6_SoundData_: .db $0F $0E $0D $0C $0A $09 $08 $07 $00
+_DATA_2BAFF_SoundData_: .db $05 $04 $03 $02 $01 $00 $00 $FF
+_DATA_2BB07_SoundData_: .db $05 $00 $04 $00 $06 $00 $00 $FF
+_DATA_2BB0F_SoundData_: .db $0F $0D $0B $09 $07 $05 $03 $01 $00
+_DATA_2BB18_SoundData_: .db $14 $12 $10 $0E $0C $0A $08 $06 $FF
+_DATA_2BB21_SoundData_: .db $06 $00 $05 $00 $00 $07 $00 $00 $FF
+_DATA_2BB2A_SoundData_: .db $00 $01 $02 $03 $04 $05 $06 $07 $08 $09 $0A $0B $0C $0D $0E $0F
+_DATA_2BB3A_SoundData_: .db $28 $2A $2C $2E $30 $32 $0A $0F $14 $19 $1E $23 $28 $2D $32 $37 $FF
+_DATA_2BB4B_SoundData_: .db $0F $0E $0C $0A $08 $06 $04 $02 $00
+_DATA_2BB54_SoundData_: .db $0A $09 $08 $07 $06 $05 $00 $00 $FF
+_DATA_2BB5D_SoundData_: .db $06 $00 $05 $00 $06 $00 $04 $00 $FF
+_DATA_2BB66_SoundData_: .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
+_DATA_2BB93_SoundData_: .db $22 $22 $22 $21 $21 $21 $20 $20 $20 $1F $1F $1F $1E $1E $1E $1D $1D $1D $1C $1C $1C $1B $1B $1B $1A $1A $1A $19 $19 $19 $18 $18 $18 $17 $17 $17 $16 $16 $16 $15 $15 $15 $14 $14 $14 $FF
+_DATA_2BBC1_SoundData_: .db $0F $0F $0F $0F $0F $0F $0F $00
+_DATA_2BBC9_SoundData_: .db $28 $27 $28 $29 $28 $27 $28 $FF
+_DATA_2BBD1_SoundData_: .db $0F $0F $0F $0F $0F $0F $00
+_DATA_2BBD8_SoundData_: .db $1E $1D $1E $1F $1E $1D $FF
+_DATA_2BBDF_SoundData_: .db $07 $00 $00 $00 $00 $00 $FF
+_DATA_2BBE6_SoundData_: .db $0F $0F $0E $0D $0C $0A $08 $06 $00
+_DATA_2BBEF_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $00 $FF
+_DATA_2BBF8_SoundData_: .db $07 $00 $04 $00 $07 $00 $00 $00 $FF
+_DATA_2BC01_SoundData_: .db $01 $01 $02 $02 $03 $03 $04 $04 $05 $05 $06 $06 $07 $07 $08 $08 $09 $09 $0A $0A $0B $0B $0C $0C $0D $0D $0E $0E $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0D $0D $0C $0C $0B $0B $0A $0A $09 $09 $08 $08 $07 $07 $06 $06 $05 $05 $04 $04 $03 $03 $02 $02 $01 $01 $00
+_DATA_2BC92_SoundData_: .db $0A $0B $0C $0D $0E $0F $10 $11 $12 $13 $14 $15 $16 $17 $18 $19 $1A $1B $1C $1D $1E $1F $20 $21 $22 $23 $24 $25 $26 $27 $28 $29 $2A $2B $2C $2D $2E $2F $30 $31 $32 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $14 $13 $12 $11 $10 $0F $0E $0D $0C $0B $0A $FF
+_DATA_2BD25_SoundData_: .db $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0E $0E $0E $0E $0E $0E $0D $0D $0D $0D $0D $0D $0D $0D $0C $0C $0C $0C $0C $0C $0C $0C $0B $0B $0B $0B $0B $0B $0B $0B $0A $0A $0A $0A $0A $0A $0A $0A $08 $08 $08 $08 $08 $08 $08 $08 $06 $06 $06 $06 $06 $06 $06 $06 $04 $04 $04 $04 $04 $04 $04 $04 $02 $02 $02 $02 $02 $02 $02 $02 $00
+_DATA_2BD76_SoundData_: .db $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $FF
+_DATA_2BDC7_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $00
+_DATA_2BE08_SoundData_: .db $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $FF
+_DATA_2BE49_SoundData_: .db $00 $04 $08 $0C $0F $0F $0F $00
+_DATA_2BE51_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $FF
+_DATA_2BE59_SoundData_: .db $06 $00 $05 $00 $04 $07 $00 $FF
+_DATA_2BE61_SoundData_: .db $07 $08 $09 $0A $0B $0C $0D $0E $0F $0F $0F $0F $0F $00
+_DATA_2BE6F_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $FF
+_DATA_2BE7D_SoundData_: .db $07 $00 $00 $04 $00 $00 $05 $00 $00 $06 $00 $00 $00 $FF
 
 
 ; End of bank
