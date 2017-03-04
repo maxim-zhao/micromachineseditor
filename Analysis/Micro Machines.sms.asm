@@ -580,7 +580,9 @@ _RAM_D974_SFXTrigger_Player2 db
 _RAM_D975_Sound2Control db
 _RAM_D976_ dsb 6 ; unused?
 _RAM_D97C_Sound db
-_RAM_D97D_ dsb 3
+_RAM_D97D_ db
+_RAM_D97E_ db
+_RAM_D97F_ db
 
 _RAM_D980_CarDecoratorTileData1bpp dsb 16*8 ; 16 * 1bpp tile data
 
@@ -28548,11 +28550,41 @@ _LABEL_2B5D5_SilencePSG:
   out (PORT_PSG), a
   ret
 
-; Data from 2B5E6 to 2B615 (48 bytes)
-; Code TODO
-.db $3A $7E $D9 $32 $63 $D9 $C9 $3A $7F $D9 $32 $74 $D9 $C9 $2A $5B
-.db $D9 $01 $04 $00 $A7 $ED $42 $22 $5B $D9 $C9 $2A $6C $D9 $01 $04
-.db $00 $A7 $ED $42 $22 $6C $D9 $C9 $2A $5B $D9 $23 $22 $5B $D9 $C9
+; Unreachable code?
+_LABEL_2B5E6_:
+  ld a, (_RAM_D97E_) 
+  ld (_RAM_D963_SFXTrigger_Player1), a 
+  ret 
+  
+_LABEL_2B5ED_:
+  ld a, (_RAM_D97F_) 
+  ld (_RAM_D974_SFXTrigger_Player2), a 
+  ret 
+  
+_LABEL_2B5F4_:
+  _RAM_D95B_ -= 4
+  ld hl, (_RAM_D95B_) 
+  ld bc, 4
+  and a 
+  sbc hl, bc 
+  ld (_RAM_D95B_), hl 
+  ret 
+  
+_LABEL_2B601_:
+  ; _RAM_D96C_ += 4
+  ld hl, (_RAM_D96C_) 
+  ld bc, 4
+  and a 
+  sbc hl, bc 
+  ld (_RAM_D96C_), hl 
+  ret 
+  
+_LABEL_2B60E_:
+  ld hl, (_RAM_D95B_) 
+  inc hl 
+  ld (_RAM_D95B_), hl 
+  ret 
+; Unreachable code? end
 
 _LABEL_2B616_Sound:
   ld a, (_RAM_D957_SoundIndex)
