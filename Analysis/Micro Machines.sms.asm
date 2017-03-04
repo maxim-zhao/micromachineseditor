@@ -29316,7 +29316,7 @@ _LABEL_30DC7_:
   ld c, a
   ld b, $00
   push hl
-    ld hl, _DATA_3137A_
+    ld hl, _DATA_3137A_PSGNotes
     add hl, bc
     ld a, (hl)
     ld (iy+0), a
@@ -29585,7 +29585,7 @@ _LABEL_30FEA_:
   add a, a
   ld c, a
   ld b, $00
-  ld hl, _DATA_3137A_
+  ld hl, _DATA_3137A_PSGNotes
   add hl, bc
   ld a, (hl)
   ld (iy+0), a
@@ -29683,21 +29683,22 @@ _LABEL_310A0_: ; TODO
   ld c, a
   ld b, $00
   push hl
-  ld hl, _DATA_310BE_
-  add hl, bc
-  ld e, (hl)
-  inc hl
-  ld d, (hl)
+    ld hl, _DATA_310BE_PointerTable
+    add hl, bc
+    ld e, (hl)
+    inc hl
+    ld d, (hl)
   pop hl
-  push de
+  push de ; jp (de)
   ret
 
-; Data from 310BA to 310BD (4 bytes)
-.db $23 $C3 $A0 $90
+_LABEL_310BA_:
+  inc hl
+  jp _LABEL_310A0_
 
 ; Data from 310BE to 310CD (16 bytes)
-_DATA_310BE_:
-.db $F3 $91 $CE $90 $E8 $91 $B3 $91 $BC $91 $98 $91 $A2 $91 $BA $90
+_DATA_310BE_PointerTable:
+.dw _LABEL_311F3_ _LABEL_310CE_ _LABEL_311E8_ _LABEL_311B3_ _LABEL_311BC_ _LABEL_31198_ _LABEL_311A2_ _LABEL_310BA_
 
 _LABEL_310CE_:
   ld a, (hl)
@@ -29811,10 +29812,27 @@ _LABEL_31196_:
   inc hl
   ret
 
-; Data from 31198 to 311BB (36 bytes)
-.db $4E $DD $7E $23 $91 $DD $77 $23 $18 $08 $4E $DD $7E $23 $81 $DD
-.db $77 $23 $3E $01 $DD $77 $24 $23 $C3 $A0 $90 $3E $01 $32 $2F $D9
-.db $23 $C3 $A0 $90
+_LABEL_31198_:
+  ld c, (hl)
+  ld a, (ix+$23)
+  sub c
+  ld (ix+$23), a
+  jr +
+
+_LABEL_311A2_:
+  ld c, (hl)
+  ld a, (ix+$23)
+  add a, c
+  ld (ix+$23), a
++:ld a, $01
+  ld (ix+$24), a
+  inc hl
+  jp _LABEL_310A0_
+_LABEL_311B3_:
+  ld a, $01
+  ld (_RAM_D92F_), a
+  inc hl
+  jp _LABEL_310A0_
 
 _LABEL_311BC_:
   ld a, (hl)
@@ -29855,7 +29873,7 @@ _LABEL_311F3_:
     ld c, a
     ld b, $00
     push hl
-      ld hl, _DATA_31229_
+      ld hl, _DATA_31229_PointerTable
       add hl, bc
       ld c, (hl)
       ld (ix+5), c
@@ -29882,48 +29900,66 @@ _LABEL_311F3_:
   jp _LABEL_310A0_
 
 ; Pointer Table from 31229 to 3124C (18 entries, indexed by unknown)
-_DATA_31229_:
-.dw _DATA_31249_ _DATA_31279_ $928B $9267 $9273 $9255 $9261 $924F
-.dw $9261 $9261 $927F $9261 $925B $926D $924F $924F
-; Followed by more
-; TODO chase this all down, some is real data?
-_DATA_31249_:
-.dw $9291 $92F2 $FFFF $92E9 $9307 $FFFF $9295 $9340 $FFFF $929F
-.dw $935C $1E02 $FF00 $92F8 $FFFF $92B1 $9307 $FFFF
-.dw $92BD $9351 $FFFF $92C4 $9351 $FFFF 
-_DATA_31279_:
-.dw $92D9 $936E
-.dw $0604 $92E1 $9340 $FFFF $9295 $9316 $0605 $92CB
-.db $16 $93 $05 $06 $00 $01 $00 $FF $01 $01 $00 $02 $00 $04 $00 $02
-.db $00 $FF $00 $01 $00 $0C $00 $00 $00 $00 $00 $FF $00 $01 $00 $0C
-.db $00 $0C $00 $FF $00 $01 $00 $04 $07 $0C $00 $04 $07 $0C $00 $FF
-.db $00 $01 $00 $03 $07 $0C $FE $00 $01 $00 $04 $07 $0C $FE $01 $01
-.db $00 $01 $00 $01 $00 $01 $00 $01 $00 $01 $00 $FF $01 $01 $00 $04
-.db $01 $03 $02 $FF $00 $01 $00 $18 $00 $18 $00 $FF $00 $01 $00 $0C
-.db $18 $00 $0C $18 $FF $0F $00 $03 $00 $00 $FF $06 $02 $01 $01 $06
-.db $00 $00 $0F $05 $01 $00 $03 $00 $00 $FF $00 $06 $00 $00 $0F $04
-.db $01 $0F $04 $01 $00 $03 $00 $00 $FF $00 $04 $00 $00 $0F $05 $01
-.db $0F $05 $01 $00 $03 $00 $00 $FF $0F $0C $01 $02 $0F $05 $01 $0F
-.db $05 $01 $00 $03 $00 $00 $FF $00 $08 $00 $00 $0F $04 $02 $00 $03
-.db $00 $00 $FF $00 $0A $04 $01 $00 $03 $00 $00 $FF $00 $FE $00 $00
-.db $03 $00 $00 $FF $06 $06 $01 $01 $FE $00 $00 $03 $00 $00 $FF $04
-.db $02 $01 $01 $18 $00 $00 $07 $05 $01 $10 $00 $00 $00 $03 $00 $00
-.db $FF $01 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF
+_DATA_31229_PointerTable:
+; Points to pointers + data?
+.dw _DATA_31249_ _DATA_31279_ _DATA_3128B_ _DATA_31267_ 
+.dw _DATA_31273_ _DATA_31255_ _DATA_31261_ _DATA_3124F_
+.dw _DATA_31261_ _DATA_31261_ _DATA_3127F_ _DATA_31261_
+.dw _DATA_3125B_ _DATA_3126D_ _DATA_3124F_ _DATA_3124F_
+; Pointed-to from above
+_DATA_31249_: .dw _DATA_31291_ _DATA_312F2_ $FFFF 
+_DATA_3124F_: .dw _DATA_312E9_ _DATA_31307_ $FFFF 
+_DATA_31255_: .dw _DATA_31295_ _DATA_31340_ $FFFF
+_DATA_3125B_: .dw _DATA_3129F_ _DATA_3135C_ $1E02 
+_DATA_31261_: .dw $FF00 _DATA_312F8_ $FFFF
+_DATA_31267_: .dw _DATA_312B1_ _DATA_31307_ $FFFF
+_DATA_3126D_: .dw _DATA_312BD_ _DATA_31351_ $FFFF
+_DATA_31273_: .dw _DATA_312C4_ _DATA_31351_ $FFFF 
+_DATA_31279_: .dw _DATA_312D9_ _DATA_3136E_ $0604 
+_DATA_3127F_: .dw _DATA_312E1_ _DATA_31340_ $FFFF
+.dw _DATA_31295_ _DATA_31316_ $0605 ; Unreferenced?
+_DATA_3128B_: .dw _DATA_312CB_ _DATA_31316_ $0605 
+; Pointed-to from above
+_DATA_31291_: .db $00 $01 $00 $FF 
+_DATA_31295_: .db $01 $01 $00 $02 $00 $04 $00 $02 $00 $FF
+_DATA_3129F_: .db $00 $01 $00 $0C $00 $00 $00 $00 $00 $FF
+.db $00 $01 $00 $0C $00 $0C $00 $FF
+_DATA_312B1_: .db $00 $01 $00 $04 $07 $0C $00 $04 $07 $0C $00 $FF
+_DATA_312BD_: .db $00 $01 $00 $03 $07 $0C $FE
+_DATA_312C4_: .db $00 $01 $00 $04 $07 $0C $FE
+_DATA_312CB_: .db $01 $01 $00 $01 $00 $01 $00 $01 $00 $01 $00 $01 $00 $FF
+_DATA_312D9_: .db $01 $01 $00 $04 $01 $03 $02 $FF
+_DATA_312E1_: .db $00 $01 $00 $18 $00 $18 $00 $FF
+_DATA_312E9_: .db $00 $01 $00 $0C $18 $00 $0C $18 $FF
+_DATA_312F2_: .db $0F $00 $03 $00 $00 $FF
+_DATA_312F8_: .db $06 $02 $01 $01 $06 $00 $00 $0F $05 $01 $00 $03 $00 $00 $FF
+_DATA_31307_: .db $00 $06 $00 $00 $0F $04 $01 $0F $04 $01 $00 $03 $00 $00 $FF
+_DATA_31316_: .db $00 $04 $00 $00 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF 
+.db $0F $0C $01 $02 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF 
+.db $00 $08 $00 $00 $0F $04 $02 $00 $03 $00 $00 $FF
+_DATA_31340_: .db $00 $0A $04 $01 $00 $03 $00 $00 $FF
+.db  $00 $FE 
+.db $00 $00 $03 $00 $00 $FF
+_DATA_31351_: .db $06 $06 $01 $01 $FE
+.db  $00 $00 $03 $00 $00 $FF
+_DATA_3135C_: .db $04 $02 $01 $01 $18 $00 $00 $07 $05 $01 $10 $00 $00 $00 $03 $00 $00 $FF
+_DATA_3136E_: .db $01 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF
 
 ; Data from 3137A to 3141B (162 bytes)
-_DATA_3137A_:
-.db $00 $00 $F9 $03 $C0 $03 $8A $03 $57 $03 $27 $03 $FA $02 $CF $02
-.db $A7 $02 $81 $02 $5D $02 $3B $02 $1B $02 $FC $01 $E0 $01 $C5 $01
-.db $AC $01 $94 $01 $7D $01 $68 $01 $53 $01 $40 $01 $2E $01 $1D $01
-.db $0D $01 $FE $00 $F0 $00 $E2 $00 $D6 $00 $CA $00 $BE $00 $B4 $00
-.db $AA $00 $A0 $00 $97 $00 $8F $00 $87 $00 $7F $00 $78 $00 $71 $00
-.db $6B $00 $65 $00 $5F $00 $5A $00 $55 $00 $50 $00 $4C $00 $47 $00
-.db $43 $00 $40 $00 $3C $00 $39 $00 $35 $00 $32 $00 $30 $00 $2D $00
-.db $2A $00 $28 $00 $26 $00 $24 $00 $22 $00 $20 $00 $1E $00 $1C $00
-.db $1B $00 $19 $00 $18 $00 $16 $00 $15 $00 $14 $00 $13 $00 $12 $00
-.db $11 $00 $10 $00 $0F $00
+_DATA_3137A_PSGNotes:
+; SN76489 frequency counter values
+; A4 = ~440Hz
+;   A     A#    B     C     C#    D     D#    E     F     F#    G     G#  
+.dw $0000 
+.dw $03F9 $03C0 $038A $0357 $0327 $02FA $02CF $02A7 $0281 $025D $023B $021B ; octave 4
+.dw $01FC $01E0 $01C5 $01AC $0194 $017D $0168 $0153 $0140 $012E $011D $010D ; octave 5
+.dw $00FE $00F0 $00E2 $00D6 $00CA $00BE $00B4 $00AA $00A0 $0097 $008F $0087 ; octave 6
+.dw $007F $0078 $0071 $006B $0065 $005F $005A $0055 $0050 $004C $0047 $0043 ; octave 7
+.dw $0040 $003C $0039 $0035 $0032 $0030 $002D $002A $0028 $0026 $0024 $0022 ; octave 8
+.dw $0020 $001E $001C $001B $0019 $0018 $0016 $0015 $0014 $0013 $0012 $0011 ; octave 9
+.dw $0010 $000F 
 
-_DATA_31410_MusicIndirection:
+ _DATA_31410_MusicIndirection:
 .db -10, -5, -2, -6, -6, -4, -4, -5, -3, -3, -4, -2
 ;.db $F6 $FB $FE $FA $FA $FC $FC $FB $FD $FD $FC $FE
 
