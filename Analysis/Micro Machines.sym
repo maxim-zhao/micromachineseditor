@@ -414,7 +414,7 @@
 00:d6c4 _RAM_D6C4_
 00:d6c5 _RAM_D6C5_PaletteFadeIndex
 00:d6c6 _RAM_D6C6_
-00:d6c7 _RAM_D6C7_
+00:d6c7 _RAM_D6C7_IsTwoPlayer
 00:d6c8 _RAM_D6C8_HeaderTilesIndexOffset
 00:d6c9 _RAM_D6C9_ControllingPlayersLR1Buttons
 00:d6ca _RAM_D6CA_
@@ -2459,8 +2459,8 @@
 02:bb49 _LABEL_BB49_SetMenuHScroll
 02:bb5b _LABEL_BB5B_SetBackdropToColour0
 02:bb6c _LABEL_BB6C_ScreenOff
-02:bb75 _LABEL_BB75_
-02:bb85 _LABEL_BB85_ScreenOn
+02:bb75 _LABEL_BB75_ScreenOnAtLineFF
+02:bb85 _LABEL_BB85_ScreenOffAtLineFF
 02:bb95 _LABEL_BB95_LoadIconMenuGraphics
 02:bbe0 _LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
 02:bc0c _LABEL_BC0C_

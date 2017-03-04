@@ -21,6 +21,44 @@ banks 14
 ; SMS stuff
 .include "System definitions.inc"
 
+; Some shorthand for the mode control registers
+; These are game-specific
+.define VDP_REGISTER_MODECONTROL1_VALUE    %00100110
+; D7 - 1= Disable vertical scrolling for    ||||||||
+;      columns 24-31 _______________________||||||||
+; D6 - 1= Disable horizontal scrolling for   |||||||
+;      rows 0-1 _____________________________|||||||
+; D5 - 1= Mask column 0 with overscan color   ||||||
+;      from register #7 ______________________||||||
+; D4 - (IE1) 1= Line interrupt enable _________|||||
+; D3 - (EC) 1= Shift sprites left by 8 pixels __||||
+; D2 - (M4) 1= Use Mode 4, 0= Use TMS9918 modes  |||
+;      (selected with M1, M2, M3) _______________|||
+; D1 - (M2) Must be 1 for M1/M3 to change screen  ||
+;      height in Mode 4. Otherwise has no effect._||
+; D0 - 1= No sync, display is monochrome,          |
+;      0= Normal display __________________________|
+
+.define VDP_REGISTER_MODECONTROL2_SCREENOFF %00010000
+.define VDP_REGISTER_MODECONTROL2_SCREENON  %01110000
+; D7 - No effect ____________________________||||||||
+; D6 - (BLK) 1= Display visible, 0= display   |||||||
+;      blanked. ______________________________|||||||
+; D5 - (IE0) 1= Frame interrupt enable. _______||||||
+; D4 - (M1) Selects 224_line screen for Mode 4  |||||
+;      if M2=1, else has no effect. ____________|||||
+; D3 - (M3) Selects 240_line screen for Mode 4   ||||
+;      if M2=1, else has no effect. _____________||||
+; D2 - No effect _________________________________|||
+; D1 - Sprites are 1=16x16,0=8x8 (TMS9918),        ||
+;      Sprites are 1=8x16,0=8x8 (Mode 4) __________||
+; D0 - Sprite pixels are doubled in size. __________|
+
+.if NAME_TABLE_ADDRESS == $3700
+.define VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE %00001110 ; can't be sensibly calculated?
+.endif
+.define VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE (SPRITE_TABLE_ADDRESS >> 7) & %01111110 | %00000001
+
 .enum 0 ; TrackTypes
 TT_SportsCars   db ; 0
 TT_FourByFour   db ; 1
@@ -397,7 +435,7 @@ _RAM_D6C3_ db
 _RAM_D6C4_ db ; Per-course value, usually -1, sometimes 0, 1, 2
 _RAM_D6C5_PaletteFadeIndex db
 _RAM_D6C6_ db
-_RAM_D6C7_ db ; 0 or 1
+_RAM_D6C7_IsTwoPlayer db ; 0 or 1
 _RAM_D6C8_HeaderTilesIndexOffset db
 _RAM_D6C9_ControllingPlayersLR1Buttons db ; Combination of player 1 and 2 when applicable, else player 1
 _RAM_D6CA_ db
@@ -7613,7 +7651,7 @@ _LABEL_317C_:
   ret
 
 _LABEL_318E_:
-  JumpToPagedFunction _LABEL_1BE82_
+  JumpToPagedFunction _LABEL_1BE82_InitialiseVDPRegisters
 
 _LABEL_3199_:
   JumpToPagedFunction _LABEL_37529_
@@ -9319,17 +9357,7 @@ _LABEL_3F17_:
   JumpToPagedFunction _LABEL_23BC6_
 
 _LABEL_3F22_ScreenOff:
-/*
- D7 - No effect
- D6 - (BLK) 1= Display visible, 0= display blanked.
- D5 - (IE0) 1= Frame interrupt enable.
- D4 - (M1) Selects 224-line screen for Mode 4 if M2=1, else has no effect.
- D3 - (M3) Selects 240-line screen for Mode 4 if M2=1, else has no effect.
- D2 - No effect
- D1 - Sprites are 1=16x16,0=8x8 (TMS9918), Sprites are 1=8x16,0=8x8 (Mode 4)
- D0 - Sprite pixels are doubled in size.
-*/
-  ld a, $10
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
@@ -9337,9 +9365,9 @@ _LABEL_3F22_ScreenOff:
 
 _LABEL_3F2B_:
   JumpToPagedFunction _LABEL_23B98_
-
+  
 _LABEL_3F36_ScreenOn:
-  ld a, $70
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
@@ -15843,14 +15871,14 @@ _DATA_776F_CourseList_SteeringDelay_GG:
 .db $08 $07 $08 $08 $07 $07 $07 $07 $08 $07 $07 $07 $08 $0A $07 $07 $07 $07 $07 $0A $07 $08 $07 $07 $0A $07 $07 $07 $07
 
 _LABEL_778C_ScreenOn:
-  ld a, $70
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
 _LABEL_7795_ScreenOff:
-  ld a, $10
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
@@ -17471,7 +17499,7 @@ _LABEL_80FC_EndMenuScreenHandler:
 .db $2F $DB $C9
 
 _LABEL_8114_Menu0: ; init functions, need renaming
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   call _LABEL_B44E_BlankMenuRAM
   ld a, MenuScreen_Title
   ld (_RAM_D699_MenuScreenIndex), a
@@ -17536,11 +17564,11 @@ _LABEL_8114_Menu0: ; init functions, need renaming
   ld (_RAM_DC40_), a
   ld c, Music_01_TitleScreen
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_81C1_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_SelectPlayerCount
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -17552,7 +17580,7 @@ _LABEL_81C1_:
   ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, $00
-  ld (_RAM_D6C7_), a
+  ld (_RAM_D6C7_IsTwoPlayer), a
   call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
   call _LABEL_A4B7_
@@ -17563,11 +17591,11 @@ _LABEL_81C1_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_SelectLowSpriteTiles
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_8205_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $00
@@ -17608,11 +17636,11 @@ _LABEL_8205_:
   call _LABEL_A67C_
   call _LABEL_97EA_DrawDriverPortraitColumn
   call _LABEL_B3AE_
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_8272_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_RaceName
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2DC_DrawMenuScreenBase_NoLine ; blank screen
@@ -17654,7 +17682,7 @@ _LABEL_8272_:
   ld (_RAM_D6AB_), hl
   xor a
   ld (_RAM_D6C1_), a
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_82DF_Menu1:
@@ -17668,7 +17696,7 @@ _LABEL_82DF_Menu1:
   jp _LABEL_8360_
 
 +:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
@@ -17704,7 +17732,7 @@ _LABEL_82DF_Menu1:
   ld hl, $0200
 ++:
   ld (_RAM_D6AB_), hl
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; Data from 834E to 835F (18 bytes)
@@ -17712,7 +17740,7 @@ _TEXT_834E_FailedToQualify:
 .asc "FAILED TO QUALIFY!" ; $05 $00 $08 $0B $04 $03 $0E $13 $1A $0E $10 $14 $00 $0B $08 $05 $18 $B4
 
 _LABEL_8360_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   call _LABEL_B2DC_DrawMenuScreenBase_NoLine
   call _LABEL_B305_DrawHorizontalLine_Top
   xor a
@@ -17764,7 +17792,7 @@ _LABEL_8360_:
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   ld hl, $0190
   ld (_RAM_D6AB_), hl
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; Data from 83ED to 83F5 (9 bytes)
@@ -17784,7 +17812,7 @@ _TEXT_8416_Lives:
 .asc "LIVES " ; $0B $08 $15 $04 $12 $0E
 
 _LABEL_841C_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_WhoDoYouWantToRace
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B337_BlankTiles
@@ -17822,11 +17850,11 @@ _LABEL_841C_:
   ld c, a
   ld b, $00
   call _LABEL_97EA_DrawDriverPortraitColumn
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_8486_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_StorageBox
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2BB_DrawMenuScreenBase_WithLine
@@ -17838,11 +17866,11 @@ _LABEL_8486_:
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_84AA_Menu5:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, _LABEL_84C7_
@@ -17880,11 +17908,11 @@ _LABEL_84C7_:
   ld (_RAM_D6AC_), a
   ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_8507_Menu2:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerTournamentResults
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -17993,7 +18021,7 @@ _LABEL_8507_Menu2:
   xor a
   ld (_RAM_DC0A_), a
 ++:
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; Data from 85EC to 85F3 (8 bytes)
@@ -18001,7 +18029,7 @@ _TEXT_85EC_Results:
 .asc "RESULTS-" ; $11 $04 $12 $14 $0B $13 $12 $B5
 
 _LABEL_85F4_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_UnknownB
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, $0E
@@ -18051,11 +18079,11 @@ _LABEL_85F4_:
   ld (_RAM_D6AC_), a
   ld c, Music_09_PlayerOut
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_866C_Menu3:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_LifeList
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2DC_DrawMenuScreenBase_NoLine
@@ -18259,7 +18287,7 @@ _LABEL_87E9_:
 _LABEL_8826_:
   xor a
   ld (_RAM_D6AC_), a
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; Data from 882E to 883B (14 bytes)
@@ -18291,7 +18319,7 @@ _TEXT_886E_NoBonus:
 .asc "NO  BONUS" ; $0D $1A $0E $0E $01 $1A $0D $14 $12
 
 _LABEL_8877_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_UnknownD
   ld (_RAM_D699_MenuScreenIndex), a
   call _LABEL_B2DC_DrawMenuScreenBase_NoLine
@@ -18364,7 +18392,7 @@ _LABEL_8877_:
   ld (_RAM_D6C1_), a
   ld c, Music_05_RaceStart
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; Data from 8929 to 8936 (14 bytes)
@@ -18380,7 +18408,7 @@ _TEXT_8945_BeatTheClock:
 .asc "BEAT THE CLOCK" ; $01 $04 $00 $13 $0E $13 $07 $04 $0E $02 $0B $1A $02 $0A
 
 _LABEL_8953_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $01
@@ -18433,11 +18461,11 @@ _LABEL_8953_:
   call _LABEL_B3AE_
   ld c, Music_02_CharacterSelect
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_89E2_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerGameType
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -18452,7 +18480,7 @@ _LABEL_89E2_:
   call _LABEL_94AD_DrawHeaderTilemap
   call _LABEL_B305_DrawHorizontalLine_Top
   ld a, $01
-  ld (_RAM_D6C7_), a
+  ld (_RAM_D6C7_IsTwoPlayer), a
   ld (_RAM_D7B3_), a
   call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
@@ -18464,16 +18492,16 @@ _LABEL_89E2_:
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_SelectLowSpriteTiles
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_8A30_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TrackSelect
   jp +
 
 _LABEL_8A38_Menu4:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerResult
 +:ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -18640,7 +18668,7 @@ _LABEL_8B9D_:
   xor a
   ld (_RAM_D6CB_), a
   call _LABEL_BF2E_LoadMenuPalette_SMS
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 ; 2nd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
@@ -19433,14 +19461,14 @@ _LABEL_90FF_ReadControllers:
   ret
 
 _LABEL_915E_ScreenOn:
-  ld a, $70
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
 _LABEL_9167_ScreenOff:
-  ld a, $10
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
@@ -23219,7 +23247,7 @@ _LABEL_AFAE_RamCodeLoader:
   ret
 
 _LABEL_AFCD_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerMode
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -23236,7 +23264,7 @@ _LABEL_AFCD_:
   ld c, Music_07_Menus
   call _LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
-  ld (_RAM_D6C7_), a
+  ld (_RAM_D6C7_IsTwoPlayer), a
   call _LABEL_BB95_LoadIconMenuGraphics
   call _LABEL_BC0C_
   call +
@@ -23247,7 +23275,7 @@ _LABEL_AFCD_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call _LABEL_A673_SelectLowSpriteTiles
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_B01D_SquinkyTennisHook:
@@ -24260,7 +24288,7 @@ _LABEL_B6B1_MenuScreen_TwoPlayerResult:
   jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B70B_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TrackSelect
   ld (_RAM_D699_MenuScreenIndex), a
   ld e, BLANK_TILE_INDEX
@@ -24299,7 +24327,7 @@ _LABEL_B70B_:
   ld hl, _DATA_2B356_SpriteNs_HandLeft
   CallRamCode _LABEL_3BBB5_PopulateSpriteNs
   call _LABEL_BF2E_LoadMenuPalette_SMS
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_B77C_:
@@ -24447,7 +24475,7 @@ _LABEL_B84D_MenuScreen_TournamentChampion:
   jp _LABEL_80FC_EndMenuScreenHandler
 
 _LABEL_B877_:
-  call _LABEL_BB85_ScreenOn
+  call _LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TournamentChampion
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $B2
@@ -24482,7 +24510,7 @@ _LABEL_B877_:
   call _LABEL_B8C9_EmitTilemapRectangle_5x6_24
   xor a
   ld (_RAM_D6AB_), a
-  call _LABEL_BB75_
+  call _LABEL_BB75_ScreenOnAtLineFF
   ret
 
 _LABEL_B8C9_EmitTilemapRectangle_5x6_24:
@@ -24828,48 +24856,51 @@ _LABEL_BB5B_SetBackdropToColour0:
   ret
 
 ; Data from BB63 to BB6B (9 bytes)
+; Unreachable code
 .db $3E $70 $D3 $BF $3E $81 $D3 $BF $C9
 
 _LABEL_BB6C_ScreenOff:
-  ld a, $10
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
-_LABEL_BB75_:
+_LABEL_BB75_ScreenOnAtLineFF:
   ; Wait for line $ff
+  ; This can be the end of VBlank or it can be earlier!
+  ; (Not sure what purpose this serves... turning it on earlier doesn't hurt?)
 -:in a, (PORT_VDP_LINECOUNTER)
   cp $FF
   jr nz, -
   ; Screen on
-  ld a, $70
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ei
   ret
 
-_LABEL_BB85_ScreenOn:
+_LABEL_BB85_ScreenOffAtLineFF:
 -:di
   ; Wait for line $ff
+  ; See comments above
   in a, (PORT_VDP_LINECOUNTER)
   cp $FF
   jr nz, -
-  ; Screen on
-  ld a, $10
+  ; Screen off
+  ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
-  ld a, $81
+  ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
 
 _LABEL_BB95_LoadIconMenuGraphics:
-  ld a, (_RAM_D6C7_)
+  ld a, (_RAM_D6C7_IsTwoPlayer)
   dec a
   jr z, _LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
   
-  ; _RAM_D6C7_ != 1
-  ; Load chopper portrait - unused
+  ; _RAM_D6C7_IsTwoPlayer != 1
   ld a, :_DATA_26C52_Tiles_Challenge_Icon
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, _DATA_26C52_Tiles_Challenge_Icon
@@ -24904,7 +24935,7 @@ _LABEL_BB95_LoadIconMenuGraphics:
   jp +++
 
 _LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
-  ; _RAM_D6C7_ == 1
+  ; _RAM_D6C7_IsTwoPlayer == 1
   ; Load tournament icon
   ld a, :_DATA_27391_Tiles_Tournament_Icon
   
@@ -24926,7 +24957,7 @@ _LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
   jp _LABEL_948A_LoadChallengeTextTiles ; tail call optimisation
 
 _LABEL_BC0C_:
-  ld a, (_RAM_D6C7_)
+  ld a, (_RAM_D6C7_IsTwoPlayer)
   or a
   jr z, +
   ld a, $09
@@ -24965,7 +24996,7 @@ _LABEL_BC0C_:
   jr ++
 +:TilemapWriteAddressToHL 16, 15
 ++:
-  ld a, (_RAM_D6C7_)
+  ld a, (_RAM_D6C7_IsTwoPlayer)
   or a
   jr z, +
   ; Right by 1
@@ -25056,29 +25087,34 @@ _LABEL_BCCF_EmitTilemapRectangleSequence:
   ret
 
 _LABEL_BD00_InitialiseVDPRegisters:
-  ld a, $26 ; TODO: docuement these
+  ld a, VDP_REGISTER_MODECONTROL1_VALUE
   out (PORT_VDP_REGISTER), a
-  ld a, $80
+  ld a, VDP_REGISTER_MODECONTROL1
   out (PORT_VDP_REGISTER), a
-  ld a, $0E
+  
+  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
-  ld a, $82
+  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  ld a, $7F
+  
+  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
-  ld a, $85
+  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  ld a, $04
+  
+  ld a, VDP_REGISTER_SPRITESET_HIGH
   out (PORT_VDP_REGISTER), a
-  ld a, $86
+  ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
+  
   xor a
   out (PORT_VDP_REGISTER), a
-  ld a, $88
+  ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
+  
   xor a
   out (PORT_VDP_REGISTER), a
-  ld a, $89
+  ld a, VDP_REGISTER_YSCROLL
   out (PORT_VDP_REGISTER), a
   ret
 
@@ -26793,16 +26829,16 @@ _LABEL_1BDF3_:
 +++:
   ret
 
-_LABEL_1BE82_:
-  ld a, $26
+_LABEL_1BE82_InitialiseVDPRegisters:
+  ld a, VDP_REGISTER_MODECONTROL1_VALUE
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL1
   out (PORT_VDP_REGISTER), a
-  ld a, $0E
+  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_NAMETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  ld a, $7F
+  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
