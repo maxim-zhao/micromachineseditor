@@ -1,5 +1,5 @@
 ; this file was created with wlalink by ville helin <vhelin@iki.fi>.
-; no$gmb symbolic information for "C:\Users\Maxim\Documents\Code\C#\MicroMachinesEditor\Analysis\Micro Machines.sms".
+; no$gmb symbolic information for "C:\Users\Maxim 2\Documents\Code\C#\MicroMachinesEditor\Analysis\Micro Machines.sms".
 00:c000 _RAM_C000_StartOfRam
 00:c000 _RAM_C000_DecompressionTemporaryBuffer
 00:c000 _RAM_C000_LevelLayout
@@ -1814,8 +1814,8 @@
 00:40c1 _DATA_40C1_
 00:40ca _DATA_40CA_
 00:40d3 _DATA_40D3_
-00:40e5 _DATA_40E5_
-00:40f5 _DATA_40F5_
+00:40e5 _DATA_40E5_Sign_
+00:40f5 _DATA_40F5_Sign_
 00:4105 _DATA_4105_
 00:4225 _DATA_4225_TrackMetatileLookup
 00:4425 _DATA_4425_
@@ -2977,8 +2977,36 @@
 0c:94f3 _DATA_314F3_
 0c:94f4 _DATA_314F4_
 0c:94f5 _DATA_314F5_
-0c:94f7 _DATA_314F7_
+0c:94f7 _DATA_314F7_PointerTable_
 0c:950f _DATA_3150F_MusicData
+0c:bae9 _LABEL_33AE9_
+0c:bb25 _LABEL_33B25_
+0c:bb35 _LABEL_33B35_
+0c:bb49 _LABEL_44B49_
+0c:bb5e _DATA_33B5E_
+0c:bbee _LABEL_33BEE_ret
+0c:bbef _LABEL_33BEF_
+0c:bc0a _DATA_33C0A_
+0c:bc1a _DATA_33C1A_
+0c:bc2a _DATA_33C2A_
+0c:bd33 _LABEL_33D33
+0c:bd49 _LABEL_33D49_
+0c:bd84 _LABEL_34D84_
+0c:bd87 _LABEL_34D87_
+0c:bd9c _LABEL_34D9C_
+0c:bdf4 _LABEL_33DF4_
+0c:be61 _LABEL_33E61_ret
+0c:be62 _LABEL_33E62_
+0c:be81 _LABEL_33E81_
+0c:bf10 _LABEL_33F10_ret
+0c:bf11 _LABEL_33F11_
+0c:bf39 _LABEL_33F39_ret
+0c:bf3a _LABEL_33F3A_
+0c:bf68 _LABEL_33F68_ret
+0c:bf69 _LABEL_33F69_
+0c:bf91 _LABEL_33D91_
+0c:bf92 _LABEL_33F92_
+0c:bff7 _LABEL_33FF7_ret
 0d:8000 _DATA_34000_FormulaOne_Tiles
 0d:8958 _DATA_34958_CarTiles_Sportscars
 0d:8cf0 _DATA_34CF0_CarTiles_FourByFour

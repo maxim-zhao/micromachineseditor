@@ -3607,7 +3607,7 @@ _LABEL_1121_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DEAF_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -3646,7 +3646,7 @@ _LABEL_1121_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DEB1_VScrollDelta), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -6308,7 +6308,7 @@ _LABEL_2724_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0B_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -6345,7 +6345,7 @@ _LABEL_2724_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0C_), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -9447,11 +9447,15 @@ _LABEL_3FB4_UpdateAnimatedPalette:
 
 ; Data from 3FC3 to 3FD2 (16 bytes)
 _DATA_3FC3_:
+; Multiples of 6 from 0 to 24 to 0 to 24 to ...
 .db $00 $06 $0C $12 $18 $12 $0C $06 $00 $06 $0C $12 $18 $12 $0C $06
 
 ; Data from 3FD3 to 3FFF (45 bytes)
 _DATA_3FD3_:
+; Antiphase of the above
 .db $18 $12 $0C $06 $00 $06 $0C $12 $18 $12 $0C $06 $00 $06 $0C $12
+
+; Uninitialised memory containing source code
 .db "D", 9, "A,(BULLON2)", 13, 10, 9, "OR", 9, "A", 13, 10, 9, "JR", 9, "Z,"
 
 ; Bank marker
@@ -9517,11 +9521,11 @@ _DATA_40D3_:
 .dw _DATA_40CA_
 
 ; Data from 40E5 to 40F4 (16 bytes)
-_DATA_40E5_:
+_DATA_40E5_Sign_: ; Sign bit, 1 = negative, 0 = positive
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $01 $01 $01 $01 $01 $01
 
 ; Data from 40F5 to 4104 (16 bytes)
-_DATA_40F5_:
+_DATA_40F5_Sign_:
 .db $01 $01 $01 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $01 $01
 
 ; Data from 4105 to 4224 (288 bytes)
@@ -9787,7 +9791,7 @@ _LABEL_4595_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF82_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -9824,7 +9828,7 @@ _LABEL_4595_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF83_), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -11844,7 +11848,7 @@ _LABEL_5769_:
   ld h, a
   ld a, (hl)
   ld (ix+15), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_DE56_)
   add a, l
   ld l, a
@@ -11899,7 +11903,7 @@ _LABEL_5769_:
   ld h, a
   ld a, (hl)
   ld (ix+16), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_DE56_)
   add a, l
   ld l, a
@@ -13767,7 +13771,7 @@ _LABEL_6677_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0B_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -13804,7 +13808,7 @@ _LABEL_6677_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0C_), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -26629,7 +26633,7 @@ _LABEL_1BCE2_:
   ld a, (hl)
   ld (ix+15), a
   ld (_RAM_DF7D_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (iy+0)
   add a, l
   ld l, a
@@ -26693,7 +26697,7 @@ _LABEL_1BCE2_:
   ld a, (hl)
   ld (ix+16), a
   ld (_RAM_DF7E_), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (iy+0)
   add a, l
   ld l, a
@@ -27782,7 +27786,7 @@ _LABEL_23A91_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF82_), a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -27860,7 +27864,7 @@ _LABEL_23A91_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF83_), a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -29164,7 +29168,7 @@ _LABEL_30CE8_PlayMenuMusic:
   ex af, af'
   add a, a
   ld c, a
-  ld hl, _DATA_314F7_ ; Look up second value
+  ld hl, _DATA_314F7_PointerTable_ ; Look up second value
   add hl, bc
   ld a, (hl)
   inc hl
@@ -29672,7 +29676,7 @@ _LABEL_31093_:
   ld (ix+1), a
   xor a
   ld (ix+36), a
-_LABEL_310A0_: ; TODO
+_LABEL_310A0_:
   ld a, (hl)
   cp $80
   jp c, _LABEL_310EF_
@@ -29698,6 +29702,7 @@ _LABEL_310BA_:
 
 ; Data from 310BE to 310CD (16 bytes)
 _DATA_310BE_PointerTable:
+; Points to bits of code
 .dw _LABEL_311F3_ _LABEL_310CE_ _LABEL_311E8_ _LABEL_311B3_ _LABEL_311BC_ _LABEL_31198_ _LABEL_311A2_ _LABEL_310BA_
 
 _LABEL_310CE_:
@@ -29828,6 +29833,7 @@ _LABEL_311A2_:
   ld (ix+$24), a
   inc hl
   jp _LABEL_310A0_
+  
 _LABEL_311B3_:
   ld a, $01
   ld (_RAM_D92F_), a
@@ -30006,12 +30012,655 @@ _DATA_314F3_: .db $27
 _DATA_314F4_: .db $28
 _DATA_314F5_: .db $29 $2A
 ; Points into the above
-_DATA_314F7_:
+_DATA_314F7_PointerTable_:
 .dw _DATA_314BE_ _DATA_314D6_ _DATA_314E3_ _DATA_314E9_ _DATA_314EA_ _DATA_314EB_ _DATA_314EC_ _DATA_314F1_ _DATA_314F2_ _DATA_314F3_ _DATA_314F4_ _DATA_314F5_
 
 ; Data from 3150F to 33FFF (10993 bytes)
 _DATA_3150F_MusicData:
-.incbin "Assets/raw/Micro Machines_3150f.inc" ; Seems to have code in there too
+.incbin "Assets/raw/Micro Machines_3150f.inc" skip 0 read $33ae9-$3150f
+
+; Sprite handling code...
+_LABEL_33AE9_:
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ld hl, _RAM_DEAD_
+  add a, (hl)
+  ld h, d
+  ld l, e
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ld c, a
+  ld hl, _DATA_40F5_Sign_
+  ld a, (_RAM_D5A7_)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, +
+  ld a, (iy+$00)
+  sub c ; subtract
+  ld (iy+$00), a
+  jp ++
++:ld a, (iy+$00)
+  add a, c ; add
+  ld (iy+$00), a
+++:
+  cp $f8
+  jr nc, _LABEL_33B35_
+  call _LABEL_33BEF_
+_LABEL_33B25_:
+  ld a, (_RAM_D5A6_)
+  inc a
+  ld (_RAM_D5A6_), a
+  cp $25
+  jr nz, ++
+  ld a, SFX_04_TankMiss
+  ld (_RAM_D963_SFXTrigger_Player1), a
+_LABEL_33B35_:
+  xor a
+  ld (_RAM_D5A6_), a
+  ld (ix+$00), a
+  ld (iy+$00), a
+  ld (ix+$02), a
+  ld (iy+$01), a
+  ret
+++:
+  jp _LABEL_33F92_
+
+_LABEL_44B49_:
+  sub $1a
+  ld e, a
+  ld d, $00
+  ld hl, _DATA_33B5E_
+  add hl, de
+  ld a, (hl)
+  ld (ix+$01), a
+  ld a, $ac
+  ld (ix+$03), a
+  jp _LABEL_33B25_
+  
+_DATA_33B5E_:
+.db $A0 $A0 $A0 $A1 $A1 $A1 $A2 $A2 $A2 $A3 $A3 $A3 $AC
+
+  ld a, (_RAM_DC3F_GameMode)
+  or a
+  jr nz, +
+  ld a, (_RAM_DC54_IsGameGear)
+  or a
+  jr z, +
+  ld a, (_RAM_DC41_GearToGearActive)
+  or a
+  jr nz, +
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr nz, ++
+  ld a, (_RAM_D5AB_)
+  cp $a0
+  jr nz, _LABEL_33BEE_ret
++: ld a, (_RAM_DB20_Player1Controls)
+  and $30
+  jr nz, _LABEL_33BEE_ret
+++: ld a, (_RAM_DE4F_)
+  cp $80
+  jr nz, _LABEL_33BEE_ret
+  ld a, (_RAM_DF58_)
+  or a
+  jr nz, _LABEL_33BEE_ret
+  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  or a
+  jr nz, _LABEL_33BEE_ret
+  ld a, (_RAM_DE91_CarDirectionPrevious)
+  ld (_RAM_D5A7_), a
+  ld a, (_RAM_DE92_EngineVelocity)
+  add a, $06
+  and $0f
+  ld (_RAM_D5A8_), a
+  ld a, $01
+  ld (_RAM_D5A6_), a
+  ld a, SFX_0A_TankShoot
+  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld ix, _RAM_DA60_SpriteTableXNs.57.x
+  ld iy, _RAM_DAE0_SpriteTableYs.57
+  ld (ix+$01), $ad
+  ld (ix+$03), $ae
+  ld hl, _DATA_33C0A_
+  ld a, (_RAM_DE91_CarDirectionPrevious)
+  ld e, a
+  ld d, $00
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (_RAM_DBA4_)
+  add a, l
+  ld (ix+$00), a
+  ld hl, _DATA_33C1A_
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (_RAM_DBA5_)
+  add a, l
+  ld (iy+$00), a
+_LABEL_33BEE_ret:
+  ret
+
+_LABEL_33BEF_: 
+  ld a, (_RAM_D5A6_)
+  ld e, a
+  ld d, $00
+  ld hl, _DATA_33C2A_
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (ix+$00)
+  add a, l
+  ld (ix+$02), a
+  ld a, (iy+$00)
+  add a, l
+  ld (iy+$01), a
+  ret
+    
+_DATA_33C0A_:
+.db $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 $00 $03 $05 $08 
+_DATA_33C1A_:
+.db $00 $03 $05 $08 $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 
+_DATA_33C2A_:
+.db $00 $07 $08 $09 $0A $0B $0C $0D $0E $0F $10 $0F $0E $0D $0C $0B $0A $09 $08 $07 $06 $05 $04 $03 $02 $01 $00
+
+  ld ix, _RAM_DCAB_
+  ld iy, _RAM_DA60_SpriteTableXNs.59.x
+  jr ++
+  ld ix, _RAM_DCEC_
+  ld iy, _RAM_DA60_SpriteTableXNs.61.x
+  jr ++
+  ld a, (_RAM_D5AB_)
+  cp $a0
+  jr z, +
+  inc a
+  ld (_RAM_D5AB_), a
+  ret
++:ld ix, _RAM_DD2D_
+  ld iy, _RAM_DA60_SpriteTableXNs.63.x
+++:
+  ld a, (ix+$3f)
+  or a
+  jp z, _LABEL_34D9C_
+  cp $1a
+  jp nc, _LABEL_34D87_
+  ; e = _DATA_1D65_[ix+$40]
+  ld hl, _DATA_1D65_
+  ld a, (ix+$40)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld e, (hl)
+  ; d = _DATA_1D76_[ix+$40]
+  ld hl, _DATA_1D76_
+  ld a, (ix+$40)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld d, (hl)
+  ; a = _DATA_3FC3_[ix+$3e] (one of 0, 6, 12, 18, 24)
+  ld hl, _DATA_3FC3_
+  ld a, (ix+$3e)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ; c = _RAM_DEAD_[a]
+  ld hl, _RAM_DEAD_
+  add a, (hl)
+  ld h, d
+  ld l, e
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ld c, a
+  ; Read _DATA_40E5_Sign_[ix+$3e] and add or subtract c accordingly
+  ld hl, _DATA_40E5_Sign_
+  ld a, (ix+$3e)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, +
+  ld a, (iy+$00)
+  sub c ; Subtract
+  ld (iy+$00), a
+  jr ++
++:; Add
+  ld a, (iy+$00)
+  add a, c
+  ld (iy+$00), a
+++:
+  cp $f8
+  jr nc, _LABEL_33D49_ ; Offscreen?
+  ld (_RAM_D5A9_), iy
+  
+  ; Selects which sprite to move
+  ld a, (ix+$2d)
+  cp $01
+  jr z, +
+  cp $02
+  jr z, ++
+  ld iy, _RAM_DAE0_SpriteTableYs.59
+  jr +++
++:
+  ld iy, _RAM_DAE0_SpriteTableYs.61
+  jr +++
+++:
+  ld iy, _RAM_DAE0_SpriteTableYs.63
++++:
+  ; Similar to previous phase...
+  ld hl, _DATA_3FD3_
+  ld a, (ix+$3e)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ld hl, _RAM_DEAD_
+  add a, (hl)
+  ld h, d
+  ld l, e
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  ld c, a
+  ld hl, _DATA_40F5_Sign_
+  ld a, (ix+$3e)
+  add a, l
+  ld l, a
+  ld a, $00
+  adc a, h
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, +
+  ld a, (iy+$00)
+  sub c
+  ld (iy+$00), a
+  jr ++
++:ld a, (iy+$00)
+  add a, c
+  ld (iy+$00), a
+++:
+  cp $f8
+  jr nc, _LABEL_33D49_
+  call _LABEL_33E62_
+_LABEL_33D33:
+  ld a, (ix+$3f)
+  inc a
+  ld (ix+$3f), a
+  cp $25
+  jr nz, _LABEL_34D84_
+  ld a, (ix+$15)
+  or a
+  jr z, _LABEL_33D49_
+  ld a, SFX_04_TankMiss
+  ld (_RAM_D974_SFXTrigger_Player2), a
+_LABEL_33D49_:
+  xor a
+  ld (ix+$3f), a
+  ld a, (ix+$2d)
+  cp $01
+  jr z, +
+  cp $02
+  jr z, ++
+  ld iy, _RAM_DAE0_SpriteTableYs.59
+  ld ix, _RAM_DA60_SpriteTableXNs.59.x
+  jp +++
++:
+  ld iy, _RAM_DAE0_SpriteTableYs.61
+  ld ix, _RAM_DA60_SpriteTableXNs.61.x
+  jp +++
+++:
+  ld iy, _RAM_DAE0_SpriteTableYs.63
+  ld ix, _RAM_DA60_SpriteTableXNs.63.x
++++:
+  xor a
+  ld (ix+$00), a
+  ld (ix+$02), a
+  ld (iy+$00), a
+  ld (iy+$01), a
+  ret
+_LABEL_34D84_:
+  jp _LABEL_33E81_
+_LABEL_34D87_:
+  sub $1a
+  ld e, a
+  ld d, $00
+  ld hl, _DATA_33B5E_
+  add hl, de
+  ld a, (hl)
+  ld (iy+$01), a
+  ld a, $ac
+  ld (iy+$03), a
+  jp _LABEL_33D33
+  
+_LABEL_34D9C_:
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr z, +
+  ld a, (_RAM_DC3F_GameMode)
+  or a
+  jr nz, +
+  ld a, (_RAM_DC54_IsGameGear)
+  or a
+  jr z, ++
+  ld a, (_RAM_DC41_GearToGearActive)
+  or a
+  jr z, +
+++:
+  ld a, (_RAM_DB21_Player2Controls)
+  and $30
+  jp nz, _LABEL_33E61_ret
++:ld a, (_RAM_DE4F_)
+  cp $80
+  jp nz, _LABEL_33E61_ret
+  ld a, (ix+$15)
+  or a
+  jp z, _LABEL_33E61_ret
+  ld a, (ix+$2e)
+  or a
+  jp nz, _LABEL_33E61_ret
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr nz, _LABEL_33DF4_
+  ld a, (ix+$11)
+  cp $e0
+  jp nc, _LABEL_33E61_ret
+  cp $20
+  jp c, _LABEL_33E61_ret
+  ld a, (ix+$12)
+  cp $20
+  jp c, _LABEL_33E61_ret
+  cp $e0
+  jp nc, _LABEL_33E61_ret
+  jr +
+_LABEL_33DF4_:
+  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  or a
+  jr nz, _LABEL_33E61_ret
++:ld a, (ix+$0d)
+  ld (ix+$3e), a
+  ld a, (ix+$0b)
+  add a, $06
+  and $0f
+  ld (ix+$40), a
+  ld a, $01
+  ld (ix+$3f), a
+  ld a, (ix+$15)
+  or a
+  jr z, +
+  ld a, $0a
+  ld (_RAM_D974_SFXTrigger_Player2), a
++:ld (iy+$01), $ad
+  ld (iy+$03), $ae
+  ld hl, $BC0A
+  ld a, (ix+$0d)
+  ld e, a
+  ld d, $00
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (ix+$11)
+  add a, l
+  ld (iy+$00), a
+  ld (_RAM_D5A9_), iy
+  ld a, (ix+$2d)
+  cp $01
+  jr z, +
+  cp $02
+  jr z, ++
+  ld iy, _RAM_DAE0_SpriteTableYs.59
+  jr +++
++:ld iy, _RAM_DAE0_SpriteTableYs.61
+  jr +++
+++:
+  ld iy, _RAM_DAE0_SpriteTableYs.63
++++:
+  ld hl, $BC1A
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (ix+$12)
+  add a, l
+  ld (iy+$00), a
+_LABEL_33E61_ret:
+  ret
+_LABEL_33E62_:
+  ld a, (ix+$3f)
+  ld e, a
+  ld d, $00
+  ld hl, $BC2A
+  add hl, de
+  ld a, (hl)
+  ld l, a
+  ld a, (iy+$00)
+  add a, l
+  ld (iy+$01), a
+  ld iy, (_RAM_D5A9_)
+  ld a, (iy+$00)
+  add a, l
+  ld (iy+$02), a
+  ret
+_LABEL_33E81_:
+  ld a, (ix+$2d)
+  cp $01
+  jr z, +
+  cp $02
+  jr z, ++
+  ld ix, _RAM_DCEC_
+  call _LABEL_33F11_
+  ld ix, _RAM_DD2D_
+  call _LABEL_33F11_
+  ld de, _RAM_DA60_SpriteTableXNs.59.x
+  ld bc, _RAM_DAE0_SpriteTableYs.59
+  jp +++
++:
+  ld ix, _RAM_DCAB_
+  call _LABEL_33F3A_
+  ld ix, _RAM_DD2D_
+  call _LABEL_33F3A_
+  ld de, _RAM_DA60_SpriteTableXNs.61.x
+  ld bc, _RAM_DAE0_SpriteTableYs.61
+  jp +++
+++:
+  ld ix, _RAM_DCAB_
+  call _LABEL_33F69_
+  ld ix, _RAM_DCEC_
+  call _LABEL_33F69_
+  ld de, _RAM_DA60_SpriteTableXNs.63.x
+  ld bc, _RAM_DAE0_SpriteTableYs.63
++++:
+  ld a, (_RAM_DF58_)
+  or a
+  jr nz, _LABEL_33F10_ret
+  ld a, (_RAM_DBA4_)
+  ld l, a
+  ld a, (de)
+  sub l
+  jr c, _LABEL_33F10_ret
+  cp $18
+  jr nc, _LABEL_33F10_ret
+  ld a, (_RAM_DBA5_)
+  ld l, a
+  ld a, (bc)
+  sub l
+  jr c, _LABEL_33F10_ret
+  cp $18
+  jr nc, _LABEL_33F10_ret
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr z, +
+  call ++
+  ld a, $01
+  ld (_RAM_D5BD_), a
+  jp _LABEL_29BC_Behaviour1_FallToFloor
++:
+  call _LABEL_2934_BehaviourF
+++:
+  xor a
+  ld (_RAM_DD2B_), a
+  ld (_RAM_DA60_SpriteTableXNs.61.x), a
+  ld (_RAM_DAE0_SpriteTableYs.61), a
+  ld (_RAM_DA60_SpriteTableXNs.62.x), a
+  ld (_RAM_DAE0_SpriteTableYs.62), a
+_LABEL_33F10_ret:
+  ret
+  
+_LABEL_33F11_:
+  ld a, (ix+$15)
+  or a
+  jr z, _LABEL_33F39_ret
+  ld a, (ix+$11)
+  ld l, a
+  ld a, (_RAM_DA60_SpriteTableXNs.59.x)
+  sub l
+  jr c, _LABEL_33F39_ret
+  cp $18
+  jr nc, _LABEL_33F39_ret
+  ld a, (ix+$12)
+  ld l, a
+  ld a, (_RAM_DAE0_SpriteTableYs.59)
+  sub l
+  jr c, _LABEL_33F39_ret
+  cp $18
+  jr nc, _LABEL_33F39_ret
+  call _LABEL_2961_
+  jp _LABEL_33D49_
+_LABEL_33F39_ret:
+  ret
+  
+_LABEL_33F3A_:
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr nz, _LABEL_33F68_ret
+  ld a, (ix+$15)
+  or a
+  jr z, _LABEL_33F68_ret
+  ld a, (ix+$11)
+  ld l, a
+  ld a, (_RAM_DA60_SpriteTableXNs.61.x)
+  sub l
+  jr c, _LABEL_33F68_ret
+  cp $18
+  jr nc, _LABEL_33F68_ret
+  ld a, (ix+$12)
+  ld l, a
+  ld a, (_RAM_DAE0_SpriteTableYs.61)
+  sub l
+  jr c, _LABEL_33F68_ret
+  cp $18
+  jr nc, _LABEL_33F68_ret
+  call _LABEL_2961_
+  jp _LABEL_33D49_
+_LABEL_33F68_ret:
+  ret
+
+_LABEL_33F69_:
+  ld a, (ix+$15)
+  or a
+  jr z, _LABEL_33D91_
+  ld a, (ix+$11)
+  ld l, a
+  ld a, (_RAM_DA60_SpriteTableXNs.63.x)
+  sub l
+  jr c, _LABEL_33D91_
+  cp $18
+  jr nc, _LABEL_33D91_
+  ld a, (ix+$12)
+  ld l, a
+  ld a, (_RAM_DAE0_SpriteTableYs.63)
+  sub l
+  jr c, _LABEL_33D91_
+  cp $18
+  jr nc, _LABEL_33D91_
+  call _LABEL_2961_
+  jp _LABEL_33D49_
+_LABEL_33D91_:
+  ret
+  
+_LABEL_33F92_:
+  ld ix, _RAM_DCEC_
+  call +
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr nz, _LABEL_33FF7_ret
+  ld ix, _RAM_DCAB_
+  call +
+  ld ix, _RAM_DD2D_
++:
+  ld a, (ix+$2e)
+  or a
+  jr nz, _LABEL_33FF7_ret
+  ld a, (ix+$15)
+  or a
+  jr z, _LABEL_33FF7_ret
+  ld a, (ix+$11)
+  ld l, a
+  ld a, (_RAM_DA60_SpriteTableXNs.57.x)
+  sub l
+  jr c, _LABEL_33FF7_ret
+  cp $18
+  jr nc, _LABEL_33FF7_ret
+  ld a, (ix+$12)
+  ld l, a
+  ld a, (_RAM_DAE0_SpriteTableYs.57)
+  sub l
+  jr c, _LABEL_33FF7_ret
+  cp $18
+  jr nc, _LABEL_33FF7_ret
+  ld a, (ix+$2d)
+  cp $01
+  jr nz, +
+  ld a, (_RAM_DC3D_IsHeadToHead)
+  or a
+  jr z, +
+  ld a, $01
+  ld (_RAM_D5BE_), a
+  call _LABEL_4DD4_
+  jr ++
++:
+  call _LABEL_2961_
+++:
+  ld ix, _RAM_DA60_SpriteTableXNs.57.x
+  ld iy, _RAM_DAE0_SpriteTableYs.57
+  jp _LABEL_33B35_
+_LABEL_33FF7_ret:
+  ret
+
+; Unused space
+.db $ff $00 $00 $ff $ff $00 $00 
+
+.db :CADDR
 
 .BANK 13
 .ORG $0000
@@ -34108,7 +34757,7 @@ _LABEL_37A75_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -34149,7 +34798,7 @@ _LABEL_37A75_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -34363,7 +35012,7 @@ _LABEL_37C59_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, _DATA_40E5_
+  ld hl, _DATA_40E5_Sign_
   ld a, (ix+62)
   add a, l
   ld l, a
@@ -34420,7 +35069,7 @@ _LABEL_37C59_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, _DATA_40F5_
+  ld hl, _DATA_40F5_Sign_
   ld a, (ix+62)
   add a, l
   ld l, a
