@@ -1,6 +1,6 @@
 ; Some options for what we want to keep...
 .define BLANK_FILL_ORIGINAL ; disable to squash blanks and blank unused bytes
-.define UNREACHABLE_CODE ; disable to drop out the unreachable code
+.define UNREACHABLE_CODE ; disable to drop out the unreachable code - buggy
 
 ; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
@@ -75,6 +75,15 @@ TT_Tanks        db ; 6
 TT_RuffTrux     db ; 7
 TT_Helicopters  db ; 8 - Incomplete support
 TT_Unknown9     db ; 9 - for portrait drawing only?
+.ende
+
+.enum -1 ; Car states
+CarState_ff db ; 2-player reset?
+CarState_0_Normal db ; Normal
+CarState_1_Exploding db ; Exploding?
+CarState_2_Respawning db ; Reappearing?
+CarState_3_Falling db ; Falling?
+CarState_4_Submerged db ; ???
 .ende
 
 .define BUTTON_U_MASK %00000001
@@ -1203,7 +1212,7 @@ _RAM_DE86_ db
 _RAM_DE87_ db
 _RAM_DE88_ db
 _RAM_DE89_ db
-_RAM_DE8A_ db
+_RAM_DE8A_CarState2 db ; Car state?
 _RAM_DE8B_ db
 _RAM_DE8C_ db
 _RAM_DE8D_ db
@@ -1403,7 +1412,7 @@ _RAM_DF56_ db
 _RAM_DF57_ db
 _RAM_DF58_ db
 _RAM_DF59_CarState db ; 3 = falling, ..?
-_RAM_DF5A_ db
+_RAM_DF5A_CarState3 db
 _RAM_DF5B_ db
 _RAM_DF5C_ db
 _RAM_DF5D_ db
@@ -6627,7 +6636,7 @@ LABEL_2934_BehaviourF:
   jr nz, +
   ld a, SFX_05
   ld (_RAM_D963_SFXTrigger_Player1), a
-  ld a, $01
+  ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
   xor a
@@ -6677,8 +6686,8 @@ LABEL_2961_:
   ret
 
 +++:
-  ld a, $01
-  ld (_RAM_DF5A_), a
+  ld a, CarState_1_Exploding
+  ld (_RAM_DF5A_CarState3), a
   ret
 
 LABEL_29A3_:
@@ -6731,9 +6740,9 @@ LABEL_29BC_Behaviour1_FallToFloor:
   ld a, (_RAM_D5BF_)
   or a
   jr z, +
-  ld a, $04
+  ld a, CarState_4_Submerged
   jp ++
-+:ld a, $03
++:ld a, CarState_3_Falling
 ++:ld (_RAM_DF59_CarState), a
   ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
@@ -6774,9 +6783,9 @@ LABEL_2A36_ret:
 
 LABEL_2A4A_:
   ld a, (_RAM_DF59_CarState)
-  cp $03
+  cp CarState_3_Falling
   jr z, -
-  cp $04
+  cp CarState_4_Submerged
   jr z, -
 LABEL_2A55_:
   xor a
@@ -6958,7 +6967,7 @@ LABEL_2BA4_:
   ld (_RAM_D95E_), a
   ld a, SFX_09_EnterPoolTableHole
   ld (_RAM_D963_SFXTrigger_Player1), a
-  ld a, $03
+  ld a, CarState_3_Falling
   ld (_RAM_DF59_CarState), a
   ld a, $01
   ld (_RAM_DF58_), a
@@ -7071,7 +7080,7 @@ LABEL_2C69_Behaviour12:
   jp LABEL_29BC_Behaviour1_FallToFloor
 
 +:
-  ld a, $04
+  ld a, CarState_4_Submerged
   ld (_RAM_DF59_CarState), a
   ld a, $01
   ld (_RAM_DF58_), a
@@ -7115,7 +7124,7 @@ LABEL_2CD4_:
   jr c, ++
   cp $0C
   jr c, +
-  ld a, $01
+  ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_DF5D_), a
@@ -7524,14 +7533,14 @@ LABEL_2FF6_:
   ld a, $01
   ld (_RAM_DE89_), a
   xor a
-  ld (_RAM_DE8A_), a
+  ld (_RAM_DE8A_CarState2), a ; CarState_0_Normal
   jp +
 
 LABEL_3028_:
   xor a
   ld (_RAM_D5C1_), a
-  ld a, $01
-  ld (_RAM_DE8A_), a
+  ld a, CarState_1_Exploding
+  ld (_RAM_DE8A_CarState2), a
   ld a, SFX_15_HitFloor
   ld (_RAM_D963_SFXTrigger_Player1), a
 +:
@@ -8375,10 +8384,10 @@ LABEL_35E0_:
 +++:
   ld a, (_RAM_DF59_CarState)
   or a
-  jp z, LABEL_3709_
-  cp $03
+  jp z, LABEL_3709_ ; 0
+  cp CarState_3_Falling
   jr z, +
-  cp $04
+  cp CarState_4_Submerged
   jr nz, ++
 +:
   ld a, (_RAM_D5BF_)
@@ -8412,7 +8421,7 @@ LABEL_3674_:
   xor a
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF59_CarState)
-  ld (_RAM_DE8A_), a
+  ld (_RAM_DE8A_CarState2), a
   ld a, (_RAM_DE8C_)
   ld (_RAM_DE8B_), a
   ld a, (_RAM_D5BD_)
@@ -8426,7 +8435,7 @@ LABEL_3674_:
   ld (_RAM_D5BD_), a
   ld a, (_RAM_DE8B_)
   ld (_RAM_DE8C_), a
-  ld a, (_RAM_DE8A_)
+  ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF59_CarState), a
   ld a, (_RAM_DE88_)
   ld (_RAM_DF61_), a
@@ -8436,7 +8445,7 @@ LABEL_3674_:
   cp $01
   jr nz, ++
   ld a, (_RAM_DF59_CarState)
-  cp $02
+  cp CarState_2_Respawning
   jr nz, +
   ld a, $0A
   ld (_RAM_D95E_), a
@@ -8450,12 +8459,12 @@ LABEL_3674_:
   ld a, (_RAM_D5B0_)
   or a
   jr z, +
-  ld a, $FF
+  ld a, CarState_ff
   ld (_RAM_DF59_CarState), a
   jp +++
 
 +:
-  xor a
+  xor a ; CarState_0_Normal
   ld (_RAM_DF59_CarState), a
 ++:
   jp +++
@@ -8486,12 +8495,12 @@ LABEL_370F_:
   ld a, $E0
   ld (_RAM_DE85_), a
 +:
-  ld a, (_RAM_DF5A_)
-  or a
+  ld a, (_RAM_DF5A_CarState3)
+  or a ; CarState_0_Normal
   jr z, LABEL_37B5_
-  cp $03
+  cp CarState_3_Falling
   jr z, +
-  cp $04
+  cp CarState_4_Submerged
   jr nz, ++
 +:
   ld a, (_RAM_DCB8_)
@@ -8507,15 +8516,15 @@ LABEL_370F_:
   ld (_RAM_DE88_), a
   xor a
   ld (_RAM_DE89_), a
-  ld a, (_RAM_DF5A_)
-  ld (_RAM_DE8A_), a
+  ld a, (_RAM_DF5A_CarState3)
+  ld (_RAM_DE8A_CarState2), a
   ld a, (_RAM_DCDE_)
   ld (_RAM_DE8B_), a
   call LABEL_3B74_
   ld a, (_RAM_DE8B_)
   ld (_RAM_DCDE_), a
-  ld a, (_RAM_DE8A_)
-  ld (_RAM_DF5A_), a
+  ld a, (_RAM_DE8A_CarState2)
+  ld (_RAM_DF5A_CarState3), a
   ld a, (_RAM_DE88_)
   ld (_RAM_DF62_), a
   ld a, (_RAM_DE87_)
@@ -8523,8 +8532,8 @@ LABEL_370F_:
   ld a, (_RAM_DE89_)
   cp $01
   jr nz, ++
-  ld a, (_RAM_DF5A_)
-  cp $02
+  ld a, (_RAM_DF5A_CarState3)
+  cp CarState_2_Respawning
   jr nz, +
   xor a
   ld (_RAM_DCD9_), a
@@ -8532,7 +8541,7 @@ LABEL_370F_:
   ld (_RAM_DCB8_), a
 +:
   xor a
-  ld (_RAM_DF5A_), a
+  ld (_RAM_DF5A_CarState3), a ; CarState_0_Normal
 ++:
   jp LABEL_37BE_
 
@@ -8596,7 +8605,7 @@ LABEL_3813_:
   xor a
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF5B_)
-  ld (_RAM_DE8A_), a
+  ld (_RAM_DE8A_CarState2), a
   ld a, (_RAM_DD1F_)
   ld (_RAM_DE8B_), a
   ld a, (_RAM_D5BE_)
@@ -8610,7 +8619,7 @@ LABEL_3813_:
   ld (_RAM_D5BE_), a
   ld a, (_RAM_DE8B_)
   ld (_RAM_DD1F_), a
-  ld a, (_RAM_DE8A_)
+  ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF5B_), a
   ld a, (_RAM_DE88_)
   ld (_RAM_DF63_), a
@@ -8702,13 +8711,13 @@ LABEL_38B9_:
   xor a
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF5C_)
-  ld (_RAM_DE8A_), a
+  ld (_RAM_DE8A_CarState2), a
   ld a, (_RAM_DD60_)
   ld (_RAM_DE8B_), a
   call LABEL_3B74_
   ld a, (_RAM_DE8B_)
   ld (_RAM_DD60_), a
-  ld a, (_RAM_DE8A_)
+  ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF5C_), a
   ld a, (_RAM_DE88_)
   ld (_RAM_DF64_), a
@@ -8863,7 +8872,7 @@ LABEL_3A6B_:
   ld a, (_RAM_DF59_CarState)
   or a
   jr z, LABEL_3AC9_
-  cp $03
+  cp CarState_3_Falling
   jr nz, +
   ld a, (_RAM_DF73_)
   cp $0C
@@ -8887,7 +8896,7 @@ LABEL_3A6B_:
   cp $01
   jr nz, LABEL_3AC8_
   ld a, (_RAM_DF59_CarState)
-  cp $02
+  cp CarState_2_Respawning
   jr nz, +
   ld a, $0A
   ld (_RAM_D95E_), a
@@ -8899,7 +8908,7 @@ LABEL_3A6B_:
 +:
   xor a
   ld (_RAM_DF74_RuffTruxSubmergedCounter), a
-  ld (_RAM_DF59_CarState), a
+  ld (_RAM_DF59_CarState), a ; CarState_0_Normal
 LABEL_3AC8_:
   ret
 
@@ -8976,12 +8985,12 @@ LABEL_3ACF_:
   ret
 
 LABEL_3B74_:
-  ld a, (_RAM_DE8A_)
-  cp $03
+  ld a, (_RAM_DE8A_CarState2)
+  cp CarState_3_Falling
   jp z, LABEL_2FDC_
-  cp $04
+  cp CarState_4_Submerged
   jp z, LABEL_3E43_
-  cp $FF
+  cp CarState_ff
   jr z, LABEL_3BEC_ret
   xor a
   ld (ix-2), a
@@ -9324,8 +9333,8 @@ LABEL_3E43_:
   jr z, ++
   cp $80
   jr c, +
-  ld a, $01
-  ld (_RAM_DE8A_), a
+  ld a, CarState_1_Exploding
+  ld (_RAM_DE8A_CarState2), a
   xor a
   ld (_RAM_D5C2_), a
   ld (_RAM_D5C1_), a
@@ -10547,8 +10556,8 @@ LABEL_4DD4_:
   ld a, (_RAM_DCD9_)
   or a
   jr nz, +
-  ld a, $03
-  ld (_RAM_DF5A_), a
+  ld a, CarState_3_Falling
+  ld (_RAM_DF5A_CarState3), a
   ld a, $01
   ld (_RAM_DCD9_), a
   xor a
@@ -10557,8 +10566,7 @@ LABEL_4DD4_:
   ld (_RAM_DE67_), a
   ld (_RAM_DE31_), a
   ld (_RAM_DE32_), a
-+:
-  ret
++:ret
 
 ++:
   ld a, (_RAM_D5B0_)
@@ -12659,8 +12667,8 @@ LABEL_5DAD_:
   xor a
   ld (_RAM_DE67_), a
   ld (_RAM_DE32_), a
-  ld a, $03
-  ld (_RAM_DF5A_), a
+  ld a, CarState_3_Falling
+  ld (_RAM_DF5A_CarState3), a
 LABEL_5DB9_:
   ld a, $01
   ld (ix+46), a
@@ -13711,7 +13719,7 @@ LABEL_65D0_BehaviourE:
   ld (_RAM_D95E_), a
   ld a, SFX_08
   ld (_RAM_D963_SFXTrigger_Player1), a
-  ld a, $03
+  ld a, CarState_3_Falling
   ld (_RAM_DF59_CarState), a
   ld a, $01
   ld (_RAM_DF58_), a
@@ -13974,7 +13982,7 @@ LABEL_67AB_:
 
 +:
   ld a, (_RAM_DF59_CarState)
-  cp $FF
+  cp CarState_ff
   jp nz, LABEL_6895_ret
   ld a, (_RAM_DF5B_)
   cp $FF
@@ -14081,7 +14089,7 @@ LABEL_67AB_:
   cp $01
   jr z, +
   ; Not head to head
-  ld a, $02
+  ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_D946_), a
@@ -14222,7 +14230,7 @@ LABEL_693F_:
   ld d, $00
   add hl, de
   ld (_RAM_DCEE_), hl
-  ld a, $02
+  ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_D946_), a
@@ -14268,7 +14276,7 @@ LABEL_69DB_:
 LABEL_6A11_:
   xor a
   ld (_RAM_DF58_), a
-  ld (_RAM_DF59_CarState), a
+  ld (_RAM_DF59_CarState), a ; CarState_0_Normal
   ld hl, 500 ; $01F4
   ld (_RAM_D95B_), hl
   ld (_RAM_D58C_), hl
@@ -14350,7 +14358,7 @@ LABEL_6A97_:
   or a
   jr nz, +++
   ld a, (_RAM_DF59_CarState)
-  cp $FF
+  cp CarState_ff
   jr z, +
   or a
   jr nz, +++
@@ -14360,14 +14368,15 @@ LABEL_6A97_:
   ld a, (_RAM_DCD9_)
   or a
   jp z, LABEL_6B34_
-  ld a, (_RAM_DF5A_)
+  ld a, (_RAM_DF5A_CarState3)
   or a
   jp nz, LABEL_6B34_
+  ; CarState_0_Normal
   ld a, (_RAM_DCDE_)
   or a
   jr nz, +
-  ld a, $02
-  ld (_RAM_DF5A_), a
+  ld a, CarState_2_Respawning
+  ld (_RAM_DF5A_CarState3), a
   xor a
   ld (_RAM_DCB6_), a
   jp LABEL_7295_
@@ -14396,7 +14405,7 @@ LABEL_6A97_:
   ld (_RAM_DCAD_), hl
   xor a
   ld (_RAM_DCD9_), a
-  ld (_RAM_DF5A_), a
+  ld (_RAM_DF5A_CarState3), a ; CarState_0_Normal
   ld a, (_RAM_DCDF_)
   ld (_RAM_DCB7_), a
   ld (_RAM_DCB8_), a
@@ -14662,7 +14671,7 @@ LABEL_6D08_:
   jp LABEL_29BC_Behaviour1_FallToFloor
 
 +:
-  ld a, $01
+  ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
   ld hl, 1000 ; $03E8
@@ -16303,8 +16312,8 @@ LABEL_79C8_:
   ld a, (_RAM_DCD9_)
   cp $00
   jr nz, +
-  ld a, $04
-  ld (_RAM_DF5A_), a
+  ld a, CarState_4_Submerged
+  ld (_RAM_DF5A_CarState3), a
   ld a, $01
   ld (_RAM_DCD9_), a
   xor a
@@ -16416,7 +16425,7 @@ LABEL_7AA6_:
   jr nc, LABEL_7AC4_
 LABEL_7AAF_:
   call +
-  ld a, $01
+  ld a, CarState_1_Exploding
   ld (_RAM_DF2A_), a
   ld (_RAM_DF59_CarState), a
   xor a
@@ -26823,7 +26832,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   cp $0B
   jr nz, +
   ld a, (_RAM_DF59_CarState) ; Player car is falling?
-  cp $03
+  cp CarState_3_Falling
   jr nz, +
   ld a, SFX_12_WinOrCheat
   ld (_RAM_D974_SFXTrigger_Player2), a
@@ -26890,7 +26899,7 @@ LABEL_1F996_ret:
   cp $01
   jr nz, +
   ld a, (_RAM_DF59_CarState) ; Falling
-  cp $03
+  cp CarState_3_Falling
   jr nz, +
   ld a, (_RAM_D5A4_IsReversing) ; Reversing
   or a
@@ -27745,8 +27754,8 @@ LABEL_23BC6_:
   ret
 
 +:
-  ld a, (_RAM_DF5A_)
-  cp $04
+  ld a, (_RAM_DF5A_CarState3)
+  cp CarState_4_Submerged
   jr z, +
 --:
   ld a, (_RAM_DCB8_)
@@ -31851,7 +31860,7 @@ LABEL_3636E_:
 
 +:
   ld a, (_RAM_DF59_CarState)
-  cp $04
+  cp CarState_4_Submerged
   jr z, +
 --:
   ld a, (_RAM_DE91_CarDirectionPrevious)
@@ -32654,7 +32663,7 @@ LABEL_36A3F_:
   cp $00
   jr nz, +
 -:
-  ld a, $01
+  ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   jp LABEL_2A08_
 
@@ -33027,7 +33036,7 @@ LABEL_36CA5_:
   jr nz, LABEL_36D06_
   ld a, $00
   ld (_RAM_D945_), a
-  ld a, $02
+  ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   ld a, SFX_16_Respawn
   ld (_RAM_D963_SFXTrigger_Player1), a
@@ -35410,7 +35419,8 @@ LABEL_3B989_Decompress:
 .include "decompressor.asm"
 
 ; Data from 3BACF to 3BAF0 (34 bytes)
-; Unused?
+; This is RAM data (!) for the menu music engine
+; TODO document it
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $07 $0F $0F $0F $0F $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00
@@ -35764,6 +35774,7 @@ LABEL_3BCC7_VRAMAddressToHL:
   out (PORT_VDP_ADDRESS), a
   ret
 
+.ifdef UNREACHABLE_CODE
 LABEL_3BCCE_ReadPagedByte_de: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ld a, (de)          ; 03BCD1 1A
@@ -35773,6 +35784,7 @@ LABEL_3BCD5_ReadPagedByte_bc: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ld a, (bc)          ; 03BCD8 0A
   JumpToRamCode LABEL_3BCFC_RestorePagingPreserveA
+.endif
 
 ; Executed in RAM at db1c
 LABEL_3BCDC_Trampoline2_PlayMenuMusic:
@@ -35787,9 +35799,11 @@ LABEL_3BCE6_Trampoline_StopMenuMusic:
   call LABEL_30D28_StopMenuMusic
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
+.ifdef UNREACHABLE_CODE
 LABEL_3BCEF_: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
   jp $a003 ; Don't know which page
+.endif
 
 ; Executed in RAM at db35
 LABEL_3BCF5_RestorePagingFromD741:
@@ -35797,6 +35811,7 @@ LABEL_3BCF5_RestorePagingFromD741:
   ld (PAGING_REGISTER), a
   ret
 
+.ifdef UNREACHABLE_CODE
 LABEL_3BCFC_RestorePagingPreserveA:
 ; Restores paging to slot 2 without losing the value in a
   ld (_RAM_D743_ReadPagedByteTemp),a
@@ -35804,7 +35819,7 @@ LABEL_3BCFC_RestorePagingPreserveA:
   ld (PAGING_REGISTER),a
   ld a, (_RAM_D743_ReadPagedByteTemp)
   ret
-
+.endif
 
 ; Executed in RAM at db48
 LABEL_3BD08_BackToSlot2:
