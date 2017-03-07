@@ -871,17 +871,6 @@
 00:db66 _RAM_DB66_
 00:db67 _RAM_DB67_
 00:db68 _RAM_DB68_
-00:db69 _RAM_DB69_
-00:db6a _RAM_DB6A_
-00:db6b _RAM_DB6B_
-00:db6c _RAM_DB6C_
-00:db6d _RAM_DB6D_
-00:db6e _RAM_DB6E_
-00:db6f _RAM_DB6F_
-00:db70 _RAM_DB70_
-00:db71 _RAM_DB71_
-00:db72 _RAM_DB72_
-00:db73 _RAM_DB73_
 00:db74 _RAM_DB74_CarTileLoaderTableIndex
 00:db75 _RAM_DB75_CarTileLoaderDataIndex
 00:db76 _RAM_DB76_CarTileLoaderPositionIndex

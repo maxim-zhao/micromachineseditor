@@ -622,18 +622,7 @@ _RAM_DB64_ db
 _RAM_DB65_ db
 _RAM_DB66_ db
 _RAM_DB67_ db
-_RAM_DB68_ db
-_RAM_DB69_ db
-_RAM_DB6A_ db
-_RAM_DB6B_ db
-_RAM_DB6C_ db
-_RAM_DB6D_ db
-_RAM_DB6E_ db
-_RAM_DB6F_ db
-_RAM_DB70_ db
-_RAM_DB71_ db
-_RAM_DB72_ db
-_RAM_DB73_ db
+_RAM_DB68_ dsb 12
 _RAM_DB74_CarTileLoaderTableIndex db
 _RAM_DB75_CarTileLoaderDataIndex db
 _RAM_DB76_CarTileLoaderPositionIndex db
@@ -2947,9 +2936,19 @@ LABEL_BAC_ret:
 
 ; Data from BAD to BC4 (24 bytes)
 DATA_BAD_WinnerSpriteData: ; Sprite X, N for "WINNER"
-.db $70 $9C $78 $9D $80 $9E $88 $9F $90 $A4 $98 $A5
+.db $70 $9C 
+.db $78 $9D 
+.db $80 $9E 
+.db $88 $9F
+.db $90 $A4
+.db $98 $A5
 DATA_BB9_BonusSpriteData: ; Sprite X, N for "BONUS"
-.db $70 $96 $78 $97 $80 $98 $88 $99 $90 $9A $98 $9B
+.db $70 $96
+.db $78 $97
+.db $80 $98
+.db $88 $99
+.db $90 $9A
+.db $98 $9B
 
 ;.section "Floor tiles updates" force
   ; Executed in RAM at da92 - or is it?
@@ -7311,7 +7310,7 @@ LABEL_2D63_:
   jr z, LABEL_2E42_
   jr c, +
 LABEL_2E42_:
-  ld a, (_RAM_DB6A_)
+  ld a, (_RAM_DB68_+2)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7320,7 +7319,7 @@ LABEL_2E42_:
   cp $01
   jr c, LABEL_2E42_
 ++:
-  ld a, (_RAM_DB6B_)
+  ld a, (_RAM_DB68_+3)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7333,12 +7332,12 @@ LABEL_2E42_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB69_)
+  ld a, (_RAM_DB68_+1)
   ld (_RAM_DCDC_), a
   ret
 
 ++:
-  ld a, (_RAM_DB68_)
+  ld a, (_RAM_DB68_+0)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7372,7 +7371,7 @@ LABEL_2E71_:
   jr z, LABEL_2EA4_
   jr c, +
 LABEL_2EA4_:
-  ld a, (_RAM_DB6E_)
+  ld a, (_RAM_DB68_+6)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7381,7 +7380,7 @@ LABEL_2EA4_:
   cp $01
   jr c, LABEL_2EA4_
 ++:
-  ld a, (_RAM_DB6F_)
+  ld a, (_RAM_DB68_+7)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7394,12 +7393,12 @@ LABEL_2EA4_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB6D_)
+  ld a, (_RAM_DB68_+5)
   ld (_RAM_DD1D_), a
   ret
 
 ++:
-  ld a, (_RAM_DB6C_)
+  ld a, (_RAM_DB68_+4)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7424,7 +7423,7 @@ LABEL_2ED3_:
   jr z, LABEL_2EF8_
   jr c, +
 LABEL_2EF8_:
-  ld a, (_RAM_DB72_)
+  ld a, (_RAM_DB68_+10)
   ld (_RAM_DD5E_), a
   ret
 
@@ -7433,7 +7432,7 @@ LABEL_2EF8_:
   cp $01
   jr c, LABEL_2EF8_
 ++:
-  ld a, (_RAM_DB73_)
+  ld a, (_RAM_DB68_+11)
   ld (_RAM_DD5E_), a
   ret
 
@@ -7446,12 +7445,12 @@ LABEL_2EF8_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB71_)
+  ld a, (_RAM_DB68_+9)
   ld (_RAM_DD5E_), a
   ret
 
 ++:
-  ld a, (_RAM_DB70_)
+  ld a, (_RAM_DB68_+8)
   ld (_RAM_DD5E_), a
   ret
 
@@ -27223,9 +27222,12 @@ LABEL_237E2_:
   ld (_RAM_DD1B_), hl
   ld hl, _RAM_DE38_
   ld (_RAM_DD5C_), hl
+  
   ld a, (_RAM_DC55_CourseIndex)
   sla a
   ld b, a
+  
+  ; Index *2
   ld e, a
   ld d, $00
   ld hl, DATA_238DE_
@@ -27235,6 +27237,8 @@ LABEL_237E2_:
   inc hl
   ld a, (hl)
   ld (_RAM_DB67_), a
+  
+  ; Index *6
   ld a, b
   sla a
   ld l, a
@@ -27246,13 +27250,13 @@ LABEL_237E2_:
     ld c, $06
   exx
   ld a, (_RAM_DC46_Cheat_HardMode)
-  ld c, a
+  ld c, a ; 1 for hard mode, 2 for rock hard mode
   ld a, (_RAM_DC54_IsGameGear)
   xor $01
-  sla a
+  sla a ; 2 for SMS, 0 for GG
   ld b, a
   ld de, _RAM_DB68_
--:
+-:; High nibble + adjustment -> _RAM_DB68_
   ld a, (hl)
   srl a
   srl a
@@ -27262,10 +27266,11 @@ LABEL_237E2_:
   add a, c
   cp $0E
   jr c, +
-  ld a, $0D
-+:
-  ld (de), a
+  ld a, $0D ; Maximum $d
++:ld (de), a
+  
   inc de
+  ; Low nibble + adjustment -> _RAM_DB69_
   ld a, (hl)
   and $0F
   add a, b
@@ -27273,19 +27278,20 @@ LABEL_237E2_:
   cp $0E
   jr c, +
   ld a, $0D
-+:
-  ld (de), a
++:ld (de), a
+
   inc de
   inc hl
   exx
     dec c
   exx
+  ; Loop over 6 bytes -> 12 nibbles
   jr nz, -
-  ld a, (_RAM_DB69_)
+  ld a, (_RAM_DB68_+1)
   ld (_RAM_DCDC_), a
-  ld a, (_RAM_DB6D_)
+  ld a, (_RAM_DB68_+5)
   ld (_RAM_DD1D_), a
-  ld a, (_RAM_DB71_)
+  ld a, (_RAM_DB68_+9)
   ld (_RAM_DD5E_), a
   ld a, (_RAM_DB97_TrackType)
   ld e, a
@@ -27320,24 +27326,42 @@ DATA_238D5_:
 .db $08 $07 $09 $08 $09 $08 $04 $05 $05
 
 ; Data from 238DE to 239C5 (232 bytes)
-DATA_238DE_:
+DATA_238DE_: ; indexed by _RAM_DC55_CourseIndex*2 and copied to _RAM_DB66_, _RAM_DB67_
+; They are all the same...
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 
-DATA_23918_:
+DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to _RAM_DB68_+
 .db $54 $42 $65 $53 $54 $42
-.db $54 $43 $65 $54 $54 $43 $86 $63 $75 $52 $75 $52 $87 $75 $87 $75
-.db $76 $65 $A9 $97 $A9 $87 $98 $86 $87 $75 $77 $66 $76 $65 $98 $87
-.db $A9 $88 $88 $76 $A9 $88 $98 $87 $88 $77 $87 $76 $99 $87 $87 $66
-.db $AA $98 $BB $A9 $A9 $87 $87 $76 $88 $77 $76 $66 $98 $77 $98 $88
-.db $87 $66 $97 $65 $A8 $76 $87 $76 $76 $65 $86 $66 $66 $55 $AA $87
-.db $AA $98 $98 $77 $CB $A9 $CC $BB $A9 $87 $A9 $97 $BA $98 $CB $A9
-.db $76 $65 $76 $65 $65 $55 $98 $87 $CB $A9 $BA $98 $86 $66 $87 $76
-.db $76 $65 $CC $BB $CB $A9 $A9 $87 $A9 $87 $BA $98 $97 $66 $76 $65
-.db $76 $65 $65 $55 $BB $A9 $BB $AA $AA $98 $87 $76 $88 $76 $77 $66
-.db $CC $CC $CC $BA $CB $A9 $66 $66 $66 $66 $66 $66 $66 $66 $66 $66
-.db $66 $66 $66 $66 $66 $66 $66 $66
+.db $54 $43 $65 $54 $54 $43
+.db $86 $63 $75 $52 $75 $52
+.db $87 $75 $87 $75 $76 $65
+.db $A9 $97 $A9 $87 $98 $86
+.db $87 $75 $77 $66 $76 $65
+.db $98 $87 $A9 $88 $88 $76
+.db $A9 $88 $98 $87 $88 $77
+.db $87 $76 $99 $87 $87 $66
+.db $AA $98 $BB $A9 $A9 $87
+.db $87 $76 $88 $77 $76 $66
+.db $98 $77 $98 $88 $87 $66
+.db $97 $65 $A8 $76 $87 $76
+.db $76 $65 $86 $66 $66 $55
+.db $AA $87 $AA $98 $98 $77
+.db $CB $A9 $CC $BB $A9 $87
+.db $A9 $97 $BA $98 $CB $A9
+.db $76 $65 $76 $65 $65 $55
+.db $98 $87 $CB $A9 $BA $98
+.db $86 $66 $87 $76 $76 $65
+.db $CC $BB $CB $A9 $A9 $87
+.db $A9 $87 $BA $98 $97 $66
+.db $76 $65 $76 $65 $65 $55
+.db $BB $A9 $BB $AA $AA $98
+.db $87 $76 $88 $76 $77 $66
+.db $CC $CC $CC $BA $CB $A9 ; Final
+.db $66 $66 $66 $66 $66 $66 ; Bonus
+.db $66 $66 $66 $66 $66 $66
+.db $66 $66 $66 $66 $66 $66 
 
 LABEL_239C6_:
   ld a, (_RAM_DC3D_IsHeadToHead)
