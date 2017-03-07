@@ -1627,7 +1627,7 @@ LABEL_100_Startup:
   or c
   jr nz, -
 
-  call _LABEL_173_LoadEnterMenuTrampolineToRAM
+  call LABEL_173_LoadEnterMenuTrampolineToRAM
 
   ld hl, _RAM_DC59_FloorTiles ; Fill floor tiles buffer with data
   ld de, DATA_C0_FloorTilesRawTileData
@@ -1669,7 +1669,7 @@ LABEL_156_:
   ld (_RAM_DC57_), a
 ++:ret
 
-_LABEL_173_LoadEnterMenuTrampolineToRAM:
+LABEL_173_LoadEnterMenuTrampolineToRAM:
   ; Copy some code to RAM
   ld hl, _RAM_DC99_EnterMenuTrampoline
   ld de, LABEL_AE_EnterMenuTrampolineImpl
@@ -4059,7 +4059,7 @@ LABEL_1345_:
   ld a, $7A
   ld (_RAM_DEC1_VRAMAddress.Hi), a
   push hl
-  call LABEL_12E0_
+    call LABEL_12E0_
   pop hl
   call LABEL_64E5_
   inc hl
@@ -7349,8 +7349,7 @@ LABEL_2E71_:
   ld (_RAM_DD1D_), a
   ret
 
-+:
-  ld a, (_RAM_DC4F_Cheat_EasierOpponents)
++:ld a, (_RAM_DC4F_Cheat_EasierOpponents)
   or a
   jr nz, ++
   ld hl, (_RAM_DF8D_)
@@ -7432,6 +7431,7 @@ LABEL_2EF8_:
   cp $01
   jr c, LABEL_2EF8_
 ++:
+  ; Easier opponents cheat is active, or ???
   ld a, (_RAM_DB68_HandlingData+11)
   ld (_RAM_DD5E_), a
   ret
@@ -9489,11 +9489,16 @@ DATA_3FD3_:
 ; Antiphase of the above
 .db $18 $12 $0C $06 $00 $06 $0C $12 $18 $12 $0C $06 $00 $06 $0C $12
 
+.ifdef BLANK_FILL_ORIGINAL
 ; Uninitialised memory containing source code
 .db "D", 9, "A,(BULLON2)", 13, 10, 9, "OR", 9, "A", 13, 10, 9, "JR", 9, "Z,"
+.endif
+.ends
 
+.orga $3fff
 ; Bank marker
 .db :CADDR
+.section "Bank 1"
 
 ; Metatile tilemaps are stored from $0080 in each track data bank 
 ; Each metatile is 12 * 12 = 144 bytes of tile indices
@@ -11866,59 +11871,59 @@ LABEL_5769_:
   ld h, a
   ld d, (hl)
   push de
-  ld hl, DATA_3FC3_
-  ld a, (_RAM_DE56_)
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  ld hl, _RAM_DEAD_
-  add a, (hl)
-  ld h, d
-  ld l, e
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  ld (ix+15), a
-  ld hl, DATA_40E5_Sign_
-  ld a, (_RAM_DE56_)
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  or a
-  jr z, +
-  ld (ix+33), $00
-  ld a, (ix+0)
-  ld l, a
-  ld a, (ix+1)
-  ld h, a
-  ld d, $00
-  ld a, (ix+15)
-  ld e, a
-  or a
-  sbc hl, de
-  ld (ix+0), l
-  ld (ix+1), h
-  jp ++
+    ld hl, DATA_3FC3_
+    ld a, (_RAM_DE56_)
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    ld hl, _RAM_DEAD_
+    add a, (hl)
+    ld h, d
+    ld l, e
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    ld (ix+15), a
+    ld hl, DATA_40E5_Sign_
+    ld a, (_RAM_DE56_)
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    or a
+    jr z, +
+    ld (ix+33), $00
+    ld a, (ix+0)
+    ld l, a
+    ld a, (ix+1)
+    ld h, a
+    ld d, $00
+    ld a, (ix+15)
+    ld e, a
+    or a
+    sbc hl, de
+    ld (ix+0), l
+    ld (ix+1), h
+    jp ++
 
 +:
-  ld (ix+33), $01
-  ld l, (ix+0)
-  ld h, (ix+1)
-  ld d, $00
-  ld a, (ix+15)
-  ld e, a
-  add hl, de
-  ld (ix+0), l
-  ld (ix+1), h
+    ld (ix+33), $01
+    ld l, (ix+0)
+    ld h, (ix+1)
+    ld d, $00
+    ld a, (ix+15)
+    ld e, a
+    add hl, de
+    ld (ix+0), l
+    ld (ix+1), h
 ++:
   pop de
   ld hl, DATA_3FD3_
@@ -15469,20 +15474,20 @@ LABEL_7332_:
 
 LABEL_7367_:
   push hl
-  and $3F
-  ld c, a
-  ld hl, _RAM_D900_
-  ld b, $00
-  add hl, bc
-  ld a, (hl)
-  and $1F
-  sra a
-  sra a
-  ld c, a
-  ld b, $00
-  ld hl, DATA_2FA7_
-  add hl, bc
-  ld a, (hl)
+    and $3F
+    ld c, a
+    ld hl, _RAM_D900_
+    ld b, $00
+    add hl, bc
+    ld a, (hl)
+    and $1F
+    sra a
+    sra a
+    ld c, a
+    ld b, $00
+    ld hl, DATA_2FA7_
+    add hl, bc
+    ld a, (hl)
   pop hl
   ld c, a
   ld b, $00
@@ -15497,20 +15502,20 @@ LABEL_7367_:
 
 LABEL_7393_:
   push hl
-  and $3F
-  ld c, a
-  ld hl, _RAM_D900_
-  ld b, $00
-  add hl, bc
-  ld a, (hl)
-  and $1F
-  sra a
-  sra a
-  ld c, a
-  ld b, $00
-  ld hl, DATA_2FAF_
-  add hl, bc
-  ld a, (hl)
+    and $3F
+    ld c, a
+    ld hl, _RAM_D900_
+    ld b, $00
+    add hl, bc
+    ld a, (hl)
+    and $1F
+    sra a
+    sra a
+    ld c, a
+    ld b, $00
+    ld hl, DATA_2FAF_
+    add hl, bc
+    ld a, (hl)
   pop hl
   ld c, a
   ld b, $00
@@ -15722,7 +15727,7 @@ LABEL_7545_:
   ld a, $01
 -:
   ld (_RAM_DBCE_), a
-  call _LABEL_173_LoadEnterMenuTrampolineToRAM
+  call LABEL_173_LoadEnterMenuTrampolineToRAM
   jp LABEL_14_EnterMenus
 
 ++:
@@ -21499,6 +21504,7 @@ TEXT_A423_Lost:
 .asc "LOST-" ; $0B $1A $12 $13 $B5
 
 ; Unused code (?)
+.ifdef UNREACHABLE_CODE
 LABEL_A428_DrawPlayerOpponentTypeSelectText:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -21559,6 +21565,7 @@ TEXT_A4AD_Computer:
 .asc "COMPUTER"
 TEXT_A4B5_Vs:
 .asc "VS"
+.endif
 
 LABEL_A4B7_:
   TilemapWriteAddressToHL 10, 13
@@ -25099,7 +25106,7 @@ DATA_BF3E_MenuPalette_SMS:
   SMSCOLOUR $000000
   SMSCOLOUR $000000
 
-
+.ifdef UNREACHABLE_CODE
 LABEL_BF5E_: ; GG-only code, misaligned here
   jr + ; Weird
 +:call $B358 ; not a function
@@ -25154,17 +25161,19 @@ DATA_BF80_: ; GG menu palette
   GGCOLOUR $000000
   GGCOLOUR $000000
   GGCOLOUR $000000
-  
-; blank space?
+.endif
+
+.ifdef BLANK_FILL_ORIGINAL
 .db $FE $FF $EE $FF $FE $EF $EF $EE $FF $FF $EF $EF $FA $EF $FF
 .db $7F $EA $EF $EE $FF $FA $FF $EB $FF $FF $FE $7F $EF $BA $FE $EF
 .db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
 .db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
+.endif
+.ends
 
-; Data from BFFF to BFFF (1 bytes)
+.orga $bfff
 DATA_BFFF_Page2PageNumber:
 .db :CADDR
-.ends
 
 .BANK 3
 .ORG $0000
@@ -25202,11 +25211,16 @@ EffectsTiles    dw
 ; Desk tracks data
 .dstruct DATA_C000_TrackData_SportsCars instanceof TrackData data  DATA_E480_SportsCars_BehaviourData DATA_E799_SportsCars_WallData DATA_E811_SportsCars_Track0Layout DATA_EA34_SportsCars_Track1Layout DATA_ED79_SportsCars_Track2Layout DATA_F155_SportsCars_Track3Layout DATA_F155_SportsCars_GGPalette DATA_F195_SportsCars_DecoratorTiles DATA_F215_SportsCarsDATA DATA_F255_SportsCars_EffectsTiles
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $FF $FF $BF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $DF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF
+.endif
+.ends
 
-; Metatiles
+.orga $8080
+.section "Sportscars metatiles" force
 .incbin "Assets/Sportscars/Metatiles.tilemap" ; 64 metatiles
+
+; Pretty much all this could be split up to optimise packing
 
 DATA_E480_SportsCars_BehaviourData:
 .incbin "Assets/Sportscars/Behaviour data.compressed"
@@ -25260,6 +25274,7 @@ DATA_F215_SportsCarsDATA:
 DATA_F255_SportsCars_EffectsTiles:
 .incbin "Assets/Sportscars/Effects.3bpp"
 
+; And these could be superfree sections
 DATA_F35D_Tiles_Portrait_FourByFour:
 .incbin "Assets/Four By Four/Portrait.3bpp.compressed"
 
@@ -25299,21 +25314,29 @@ DATA_FFA2_TrackName_24: .asc " WIN THIS RACE TO BE CHAMPION!" ; Special case for
 DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 
 ; blank fill
+.ifdef BLANK_FILL_ORIGINAL
 .dsb 44 $ff
-; Page number marker
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 4
 .ORG $0000
-.section "Bank 4"
+.section "Bank 4" force
 
 ; Data from 10000 to 13FFF (16384 bytes)
 .dstruct DATA_10000_TrackData_FourByFour instanceof TrackData data DATA_9E50_FourByFour_BehaviourData DATA_A105_FourByFour_WallData DATA_A152_FourByFour_Track0Layout DATA_A378_FourByFour_Track1Layout DATA_A466_FourByFour_Track2Layout DATA_A466_FourByFour_Track3Layout DATA_A762_FourByFour_GGPalette DATA_A7A2_FourByFour_DecoratorTiles DATA_A822_FourByFourDATA DATA_A862_FourByFour_EffectsTiles
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $EF $FF $EF $EB $FF $FB $FF $BF $BF $FF $FF $FF $EF $EF $BF $EF $FF $AF $FF $FF $FF $AF $EF $FF $BF $FF $EF $FF $FF $FF $FF $FF $FF $ED $45 $EF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $EF $FF $FF $EF $EF $FF $FF $FE $FF $EF $EF $FF $FF $AF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $EF $FF $FF $BB $FF $FB $FF $FF $FE $FF $FF $FF $FF $FB $FF $FE $EF $FB $FF
+.endif
 
+.ends
+
+.orga $8080
+.section "Four by Four metatiles" force
 .incbin "Assets/Four By Four/Metatiles.tilemap"
 
 DATA_9E50_FourByFour_BehaviourData:
@@ -25390,20 +25413,27 @@ DATA_13F38_Tilemap_SmallLogo: ; 8x3
 DATA_13F50_Tilemap_MicroMachinesText:
 .incbin "Assets/Menu/Text-MicroMachines.tilemap"
 
+.ifdef BLANK_FILL_ORIGINAL
 .db $00 $00 $20 $00 $00 $02 $00 $00 $02 $00 $08 $00 $00 $00 $00 $00 $00 $08 $00 $00 $02 $80 $00 $00 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF $FA $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FE $FF $FF $FF $FF
-
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 5
 .ORG $0000
-.section "Bank 5"
+.section "Bank 5" force
 
 .dstruct DATA_14000_TrackData_Powerboats instanceof TrackData data DATA_9D30_Powerboats_BehaviourData DATA_9FE3_Powerboats_WallData DATA_A03C_Powerboats_Track0Layout DATA_A134_Powerboats_Track1Layout DATA_A352_Powerboats_Track2Layout DATA_A5B1_Powerboats_Track3Layout DATA_A7A0_Powerboats_GGPalette DATA_A7E0_Powerboats_DecoratorTiles DATA_A860_PowerboatsDATA DATA_A8A0_Powerboats_EffectsTiles 
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $CF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF
+.endif
+.ends
 
+.orga $8080
+.section "Powerboats metatiles" force
 .incbin "Assets/Powerboats/Metatiles.tilemap"
 
 DATA_9D30_Powerboats_BehaviourData:
@@ -25833,24 +25863,29 @@ DATA_17FB2_SMSPalette_RuffTrux:
   SMSCOLOUR $000000
   SMSCOLOUR $000000
 
-; Uninitialised data? Mostly set bits
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $FF $FF $DF $FF $FF $FF $DF $FF $FF $FF $7F
 .db $FF $7F $FF $FF $FF $7F $FF $FF $FF $7F $FE $FF $FF $FF $FF $FF
 .db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
-
-; Bank index marker
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 6
 .ORG $0000
-.section "Bank 6"
+.section "Bank 6" force
 
-; Data from 18000 to 1B1A1 (12706 bytes)
 .dstruct DATA_18000_TrackData_TurboWheels instanceof TrackData data DATA_A480_TurboWheels_BehaviourData DATA_A7B6_TurboWheels_WallData DATA_A838_TurboWheels_Track0Layout DATA_AACF_TurboWheels_Track1Layout DATA_AD10_TurboWheels_Track2Layout DATA_AD10_TurboWheels_Track3Layout DATA_AF9A_TurboWheels_GGPalette DATA_AFDA_TurboWheels_DecoratorTiles DATA_B05A_TurboWheelsDATA DATA_B09A_TurboWheels_EffectsTiles 
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FE $FF $FF $FF $BF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $BF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $ED $45 $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $EE $FF $FF $FF $EF $FF $FF $EF $ED $45 $FF $FF $EF $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $FB $FF $FF
+.endif
+.ends
+
+.orga $8080
+.section "Turbo Wheels metatiles" force
 
 .incbin "Assets/Turbo Wheels/Metatiles.tilemap"
 
@@ -26315,68 +26350,67 @@ LABEL_1BCE2_:
   ld h, a
   ld d, (hl)
   push de
-  ld hl, DATA_3FC3_
-  ld a, (iy+0)
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  ld hl, _RAM_DEAD_
-  add a, (hl)
-  ld h, d
-  ld l, e
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  ld (ix+15), a
-  ld (_RAM_DF7D_), a
-  ld hl, DATA_40E5_Sign_
-  ld a, (iy+0)
-  add a, l
-  ld l, a
-  ld a, $00
-  adc a, h
-  ld h, a
-  ld a, (hl)
-  cp $00
-  jr z, +
-  xor a
-  ld (_RAM_DB85_), a
-  ld a, (ix+0)
-  ld l, a
-  ld a, (ix+1)
-  ld h, a
-  ld d, $00
-  ld a, (ix+15)
-  ld e, a
-  or a
-  sbc hl, de
-  ld a, l
-  ld (ix+0), a
-  ld a, h
-  ld (ix+1), a
-  jp ++
+    ld hl, DATA_3FC3_
+    ld a, (iy+0)
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    ld hl, _RAM_DEAD_
+    add a, (hl)
+    ld h, d
+    ld l, e
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    ld (ix+15), a
+    ld (_RAM_DF7D_), a
+    ld hl, DATA_40E5_Sign_
+    ld a, (iy+0)
+    add a, l
+    ld l, a
+    ld a, $00
+    adc a, h
+    ld h, a
+    ld a, (hl)
+    cp $00
+    jr z, +
+    xor a
+    ld (_RAM_DB85_), a
+    ld a, (ix+0)
+    ld l, a
+    ld a, (ix+1)
+    ld h, a
+    ld d, $00
+    ld a, (ix+15)
+    ld e, a
+    or a
+    sbc hl, de
+    ld a, l
+    ld (ix+0), a
+    ld a, h
+    ld (ix+1), a
+    jp ++
 
-+:
-  ld a, $01
-  ld (_RAM_DB85_), a
-  ld a, (ix+0)
-  ld l, a
-  ld a, (ix+1)
-  ld h, a
-  ld d, $00
-  ld a, (ix+15)
-  ld e, a
-  add hl, de
-  ld a, l
-  ld (ix+0), a
-  ld a, h
-  ld (ix+1), a
++:  ld a, $01
+    ld (_RAM_DB85_), a
+    ld a, (ix+0)
+    ld l, a
+    ld a, (ix+1)
+    ld h, a
+    ld d, $00
+    ld a, (ix+15)
+    ld e, a
+    add hl, de
+    ld a, l
+    ld (ix+0), a
+    ld a, h
+    ld (ix+1), a
 ++:
   pop de
   ld hl, DATA_3FD3_
@@ -26637,7 +26671,7 @@ LABEL_1BF17_:
 
 ++: ret
 
-; Data from 1BF45 to 1BFFF (187 bytes)
+.ifdef BLANK_FILL_ORIGINAL
 .db $00 $02 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $80 $00 $00 $00
@@ -26649,17 +26683,26 @@ LABEL_1BF17_:
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF
-.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF :CADDR
+.db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 7
 .ORG $0000
-.section "Bank 7"
+.section "Bank 7" force
 
 .dstruct DATA_1C000_TrackData_FormulaOne instanceof TrackData data  DATA_A480_FormulaOne_BehaviourData DATA_A819_FormulaOne_WallData DATA_A8CA_FormulaOne_Track0Layout DATA_AB11_FormulaOne_Track1Layout DATA_AE73_FormulaOne_Track2Layout DATA_AE73_FormulaOne_Track3Layout DATA_B1DC_FormulaOne_GGPalette DATA_B21C_FormulaOne_DecoratorTiles DATA_B29C_FormulaOneDATA DATA_B2DC_FormulaOne_EffectsTiles
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $77 $FF $F7 $FF $DF $FF $FF $FF $D7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FD $EF $FF $FF $5D $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $77 $FD $DD $FF $FF $FF $FF $FF $FD $FF $FF $FF $DF $FF $7F $FF $FF $FF $F7 $FF $FF $FD $F7 $FF $DF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FD $FF $DF $FF $FF $FF $FF $ED $45 $FF $7F $FF $FD $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $FF $F7 $DF $F7 $FF $FF $FF $FF
+.endif
+.ends
+
+.orga $8080
+.section "Formula One metatiles" force
 
 .incbin "Assets/Formula One/Metatiles.tilemap"
 
@@ -27109,21 +27152,27 @@ LABEL_1FB35_:
 +++:
   ret
 
-; Data from 1FB81 to 1FFFF (1151 bytes)
-; Uninitialised/unused?
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $FD $FF $FF $DD $FF $DD $FF $FF $7F $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $DF $77 $FF $7F $DF $DF $FF $FF $FF $FF $FF $DF $7F $FF $F7 $FD $FD $FD $FF $DF $FF $DD $FF $DF $FF $F7 $FF $FF $FF $F7 $D7 $FF $FF $FF $FF $FD $FF $5D $FF $FF $FF $7F $FF $FD $FF $7D $FF $FF $FF $FD $FF $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $FF $7F $FF $DF $FF $FF $FF $F7 $FF $FF $FF $7F $FF $FF $FF $FD $FF $FD $FF $77 $FF $FF $FF $F7 $FF $D5 $FF $7D $FF $FF $FF $FF $FF $FF $DD $FF $FF $FF $FF $F7 $FF $F7 $FF $F5 $20 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $08 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $44 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $40 $00 $00 $00 $00 $00 $00 $00 $40 $FF $FF $FF $FF $FF $FD $FF $FD $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $D7 $EF $77 $FF $7F $FF $DF $FF $5D $FF $7F $FF $FF $FE $FF $FF $FF $FF $FE $FF $F5 $FF $FF $FF $F7 $FF $FF $FF $FD $BE $FF $EF $5F $FE $FF $FF $57 $FF $F7 $FF $FF $FF $FF $FF $FD $FE $5F $FF $F7 $FF $FF $7F $DF $FF $FF $FF $7F $FF $F7 $FF $DD $FF $7F $FF $FF $FF $DF $FF $D7 $FF $7F $FF $FF $FF $5D $FF $FF $FF $FD $FF $FF $EF $F5 $DF $77 $FF $FD $FF $FF $FF $FF $FF $FF $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $40 $00 $44 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $04 $14 $00 $00 $00 $04 $00 $00 $00 $00 $00 $04 $00 $44 $00 $40 $00 $00 $00 $00 $00 $00 $40 $00 $00 $04 $00 $40 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $44 $FF $FF $FF $FF $FF $D7 $FF $7F $FF $FF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FD $ED $F7 $FF $FF $FF $FD $FF $FF $FF $F5 $FF $FF $FF $5D $FF $7F $FF $F7 $FF $FF $FD $F7 $FF $5F $FF $7D $FF $FF $FF $DF $FF $FF $7F $FF $FF $FF $FF $7F $FF $FF $DF $7F $FF $FF $FF $5D $DF $FE $FF $77 $FF $7F $FF $FF $FD $DF $FF $7F $EF $FF $FF $57 $FF $FF $DD $DF $FF $F7 $FF $7F $FF $DF $FF $77 $FF $FF $FF $FD $FF $FF $FF $D7 $FF $7F $F7 $F7 $FF $FF $FF $DD $FF $FF $FF $FF $FF $FF $FF $5F $FF $FF $DF $7F $FF $FF $FF $DD $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $40 $00 $01 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $80 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $40 $00 $40 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $04 $FF $FF $EF $FF $FF $FF $FF $77 $FF $FF $FF $FF $FF $FF $FF $7F $FE $FF $FF $DF $FF $FF $FF $DF $FF $D7 $FF $DF $FF $F5 $FF $D5 $FF $FF $FF $77 $FE $7F $FF $FF $FF $DF $FF $77 $FF $FF $FF $55 $FF $FF $FF $FF $FF $FF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FF $FF $DF $FD $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FD $DF $FD $FF $FF $FF $F7 $FF $5F $DF $F7 $FF $FF $FF $DF $FF $7F $FF $FD $FF $FF $F7 $7F $FF $FF $FF $D5 $FF $FF $FF $FF $FF $F7 $FF $F7 $BF $FF $BF $7F $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $00 $00 $00 $00 $00 $00 $00 $10 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $50 $00 $00 $00 $44 $00 $00 $00 $00 $00 $00 $00 $14 $00 $40 $00 $40 $00 $04 $00 $14 $00 $00 $00 $10 $00 $10 $00 $40 $00 $10 $00 $10 $00 $00 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $04 $00 $00 $40 $44 $00 $00 $40 $10 $00 $00 $00 $04 $00 $00 $00 $14 $00 $01 $00 $40 $00 $00 $00 $11 $00 $44 $00 $50 $00 $00 $00 $44 $00 $04 $00 $10 $00 $00 $00 $04 $00 $50 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $FF $FF $FF $F5 $FF $FD $FF $FD $FF $FF $FF $F7 $FF $FD $DF $F7 $FF $FD $77 $DF $FF $FF $FF $DF $FF $FF $FF $DF $DD $FD $F7 $D7 $FF $DF $FF $DD $FF $7F $FF $DF $FF $7F $FF $7F $FF $FF $FF $7F $FF $FD $FF $DF $FF $5F $FF $F7 $FF $FF $DD $57 $FF $DF $FF $7F $FF $DF $FF $FD $FF $DF $FF $D5 $FF $FF $FF $FF $FF $F7 $DF $77 $FF $D7 $FF $57 $FF $FF $FF $7F $FF $FF $FF $7F $FF $DF $FF $DD $FF $FF $FF $7D $FF $77 $FD $FF $FF $FF $FF $FF $FF $DD $FF $FD $FF $F7 $FF $FD $FF $7F $FD $7D $BF $FF $FF $FD $FF $F7 $F7
-
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 8
 .ORG $0000
-.section "Bank 8"
+.section "Bank 8" force
 
 .dstruct DATA_20000_TrackData_Warriors instanceof TrackData data  DATA_9D30_Warriors_BehaviourData DATA_A01A_Warriors_WallData DATA_A10F_Warriors_Track0Layout DATA_A3B8_Warriors_Track1Layout DATA_A67C_Warriors_Track2Layout DATA_A67C_Warriors_Track3Layout DATA_A924_Warriors_GGPalette DATA_A964_Warriors_DecoratorTiles DATA_A9E4_WarriorsDATA DATA_AA24_Warriors_EffectsTiles
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+.endif
+.ends
+
+.orga $8080
+.section "Warriors metatiles" force
 
 .incbin "Assets/Warriors/Metatiles.tilemap"
 
@@ -27333,6 +27382,9 @@ DATA_238DE_: ; indexed by _RAM_DC55_CourseIndex*2 and copied to _RAM_DB66_, _RAM
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 
 DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to _RAM_DB68_HandlingData+
+;    ,,--,,-- End up in _RAM_DB68_
+;    ||  ||  ,,--,,-- End up in _RAM_DD1D_
+;    ||  ||  ||  ||  ,,--,,-- End up in _RAM_DD5E_
 .db $54 $42 $65 $53 $54 $42
 .db $54 $43 $65 $54 $54 $43
 .db $86 $63 $75 $52 $75 $52
@@ -28071,24 +28123,29 @@ DATA_23ECF_HandlingData_SMS:
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Bonus
 
-; Fill to end of bank
+.ifdef BLANK_FILL_ORIGINAL
 .repeat 18
 .db $FF $FF $00 $00
 .endr
-
-; Bank number
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 9
 .ORG $0000
-.section "Bank 9"
+.section "Bank 9" force
 
-; Data from 24000 to 27FFF (16384 bytes)
 .dstruct DATA_24000_TrackData_Tanks instanceof TrackData data  DATA_9F70_Tanks_BehaviourData DATA_A32A_Tanks_WallData DATA_A42C_Tanks_Track0Layout DATA_A5A6_Tanks_Track1Layout DATA_A7D4_Tanks_Track2Layout DATA_A7D4_Tanks_Track3Layout DATA_AA4A_Tanks_GGPalette DATA_AA8A_Tanks_DecoratorTiles DATA_AB0A_TanksDATA DATA_AB4A_Tanks_EffectsTiles
 
-; Uninitialised
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+.endif
+.ends
+
+.orga $8080
+.section "Tanks metatiles" force
 
 .incbin "Assets/Tanks/Metatiles.tilemap"
 
@@ -28164,22 +28221,29 @@ DATA_279F0_Tilemap_Trophy:
 DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .incbin "Assets/Menu/Icon-TwoPlayersOnOneGameGear.4bpp.compressed"
 
+.ifdef BLANK_FILL_ORIGINAL
 .rept 65
 .db $ff $ff $00 $00 ; Empty
 .endr
-
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 10
 .ORG $0000
-.section "Bank 10"
+.section "Bank 10" force
 
-; Data from 28000 to 2B5D1 (13778 bytes)
 .dstruct DATA_28000_TrackData_RuffTrux instanceof TrackData data  DATA_A1B0_RuffTrux_BehaviourData DATA_A396_RuffTrux_WallData DATA_A420_RuffTrux_Track0Layout DATA_A5F0_RuffTrux_Track1Layout DATA_A7A8_RuffTrux_Track2Layout DATA_A7A8_RuffTrux_Track3Layout DATA_A9C5_RuffTrux_GGPalette DATA_A9C5_RuffTrux_DecoratorTiles DATA_AA05_RuffTruxDATA DATA_AA45_RuffTrux_EffectsTiles 
 
-; Unused
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
+.endif
+.ends
+
+.orga $8080
+.section "RuffTrux metatiles" force
 
 ; Metatiles
 .incbin "Assets/RuffTrux/Metatiles.tilemap" ; 64 metatiles
@@ -28790,13 +28854,15 @@ DATA_2BE61_SoundData_: .db $07 $08 $09 $0A $0B $0C $0D $0E $0F $0F $0F $0F $0F $
 DATA_2BE6F_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $FF
 DATA_2BE7D_SoundData_: .db $07 $00 $00 $04 $00 $00 $05 $00 $00 $06 $00 $00 $00 $FF
 
-
-; End of bank
+.ifdef BLANK_FILL_ORIGINAL
 .repeat $174/4
 .db $ff $ff $00 $00 ; Uninitialised data
 .endr
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 11
 .ORG $0000
@@ -28857,9 +28923,13 @@ DATA_2FDE0_Tiles_SmallLogo:
 DATA_2FF6F_Tilemap:
 .incbin "Assets/Menu/Logo-big.tilemap.compressed"
 
-; End of bank
-.db $00 $FF $FF $00 $00 :CADDR
+.ifdef BLANK_FILL_ORIGINAL
+.db $00 $FF $FF $00 $00
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 12
 .ORG $0000
@@ -29045,15 +29115,14 @@ LABEL_30DC7_:
   jr z, +
   ld b, $00
   push hl
-  ld l, (ix+3)
-  ld h, (ix+4)
-  add hl, bc
-  ld (iy+0), l
-  ld (iy+1), h
-  jr +++
+    ld l, (ix+3)
+    ld h, (ix+4)
+    add hl, bc
+    ld (iy+0), l
+    ld (iy+1), h
+    jr +++
 
-+:
-  ld a, (ix+2)
++:ld a, (ix+2)
   add a, c
 ++:
   add a, a
@@ -29108,10 +29177,10 @@ LABEL_30E59_:
   inc hl
   ld c, (hl)
   push de
-  ld e, a
-  ld d, $00
-  ld hl, DATA_30EAB_
-  add hl, de
+    ld e, a
+    ld d, $00
+    ld hl, DATA_30EAB_
+    add hl, de
   pop de
   ld a, (_RAM_D914_)
   ld b, a
@@ -29387,26 +29456,25 @@ LABEL_31068_:
   or a
   ret z
   push hl
-  dec a
-  add a, a
-  ld c, a
-  add a, a
-  add a, c
-  ld c, a
-  ld b, $00
-  ld hl, DATA_3141C_
-  add hl, bc
-  push ix
-  ld b, $06
--:
-  ld a, (hl)
-  ld (ix+11), a
-  inc ix
-  inc hl
-  djnz -
-  pop ix
-  ld a, $FF
-  ld (ix+0), a
+    dec a
+    add a, a
+    ld c, a
+    add a, a
+    add a, c
+    ld c, a
+    ld b, $00
+    ld hl, DATA_3141C_
+    add hl, bc
+    push ix
+      ld b, $06
+-:    ld a, (hl)
+      ld (ix+11), a
+      inc ix
+      inc hl
+      djnz -
+    pop ix
+    ld a, $FF
+    ld (ix+0), a
   pop hl
   ret
 
@@ -30486,11 +30554,13 @@ LABEL_33F92_:
 LABEL_33FF7_ret:
   ret
 
-; Unused space
+.ifdef BLANK_FILL_ORIGINAL
 .db $ff $00 $00 $ff $ff $00 $00 
-
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 13
 .ORG $0000
@@ -35285,13 +35355,14 @@ LABEL_37F92_:
 LABEL_37FF7_ret:
   ret
 
-; Data from 37FF8 to 37FFF (8 bytes)
+.ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF
 .db $FF $00 $00
-
-; Bank marker
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 14
 .ORG $0000
@@ -35741,18 +35812,22 @@ LABEL_3BD08_BackToSlot2:
   ld (PAGING_REGISTER), a
   ret
 
+.ifdef UNREACHABLE_CODE
 ; Extra byte picked up by RAM code copier...
 .db $00
+.endif
 
 LABEL_3BD0F_RamCodeEnd:
 
+.ifdef BLANK_FILL_ORIGINAL
 .repeat 188
 .db $FF $FF $00 $00
 .endr
-
-; Bank marker
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker
 
 .BANK 15
 .ORG $0000
@@ -35801,12 +35876,14 @@ DATA_3ED49_SplashScreenCompressed:
 DATA_3F753_JonsSquinkyTennisCompressed:
 .incbin "Assets/JonsSquinkyTennis.compressed"
 
+.ifdef BLANK_FILL_ORIGINAL
 ; Blank fill
 .repeat 33
 .dw $0000, $ffff
 .endr
 .dw $0000
-
-; Bank marker
-.db :CADDR
+.endif
 .ends
+
+.orga $bfff
+.db :CADDR ; Page number marker

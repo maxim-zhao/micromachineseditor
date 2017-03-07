@@ -870,7 +870,7 @@
 00:db65 _RAM_DB65_
 00:db66 _RAM_DB66_
 00:db67 _RAM_DB67_
-00:db68 _RAM_DB68_
+00:db68 _RAM_DB68_HandlingData
 00:db74 _RAM_DB74_CarTileLoaderTableIndex
 00:db75 _RAM_DB75_CarTileLoaderDataIndex
 00:db76 _RAM_DB76_CarTileLoaderPositionIndex
@@ -1476,7 +1476,7 @@
 00:0100 DATA_C0_FloorTilesRawTileDataEnd
 00:0100 LABEL_100_Startup
 00:0156 LABEL_156_
-00:0173 _LABEL_173_LoadEnterMenuTrampolineToRAM
+00:0173 LABEL_173_LoadEnterMenuTrampolineToRAM
 00:0186 LABEL_186_InitialiseSoundData
 00:0199 LABEL_199_GameVBlank
 00:01e0 LABEL_1E0_SkipVBlank
