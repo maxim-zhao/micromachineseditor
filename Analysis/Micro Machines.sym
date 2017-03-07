@@ -1478,14 +1478,16 @@
 00:0014 LABEL_14_EnterMenus
 00:0038 LABEL_38_
 00:0066 LABEL_66_NMI
+00:0075 LABEL_75_MenuRAMSection
 00:0075 LABEL_75_EnterGameTrampolineImpl
+00:00ae LABEL_75_MenuRAMSectionEnd
 00:00ae LABEL_AE_EnterMenuTrampolineImpl
 00:00c0 LABEL_AE_EnterMenuTrampolineImplEnd
 00:00c0 DATA_C0_FloorTilesRawTileData
 00:0100 DATA_C0_FloorTilesRawTileDataEnd
 00:0100 LABEL_100_Startup
 00:0156 LABEL_156_
-00:0173 LABEL_173_LoadEnterMenuTrampolineToRAM
+00:0173 _LABEL_173_LoadEnterMenuTrampolineToRAM
 00:0186 LABEL_186_InitialiseSoundData
 00:0199 LABEL_199_GameVBlank
 00:01e0 LABEL_1E0_SkipVBlank
@@ -2461,6 +2463,7 @@
 02:bb13 LABEL_BB13_
 02:bb49 LABEL_BB49_SetMenuHScroll
 02:bb5b LABEL_BB5B_SetBackdropToColour0
+02:bb63 LABEL_BB63_ScreenOn
 02:bb6c LABEL_BB6C_ScreenOff
 02:bb75 LABEL_BB75_ScreenOnAtLineFF
 02:bb85 LABEL_BB85_ScreenOffAtLineFF
