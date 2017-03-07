@@ -622,7 +622,7 @@ _RAM_DB64_ db
 _RAM_DB65_ db
 _RAM_DB66_ db
 _RAM_DB67_ db
-_RAM_DB68_ dsb 12
+_RAM_DB68_HandlingData dsb 12
 _RAM_DB74_CarTileLoaderTableIndex db
 _RAM_DB75_CarTileLoaderDataIndex db
 _RAM_DB76_CarTileLoaderPositionIndex db
@@ -7310,7 +7310,7 @@ LABEL_2D63_:
   jr z, LABEL_2E42_
   jr c, +
 LABEL_2E42_:
-  ld a, (_RAM_DB68_+2)
+  ld a, (_RAM_DB68_HandlingData+2)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7319,7 +7319,7 @@ LABEL_2E42_:
   cp $01
   jr c, LABEL_2E42_
 ++:
-  ld a, (_RAM_DB68_+3)
+  ld a, (_RAM_DB68_HandlingData+3)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7332,12 +7332,12 @@ LABEL_2E42_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB68_+1)
+  ld a, (_RAM_DB68_HandlingData+1)
   ld (_RAM_DCDC_), a
   ret
 
 ++:
-  ld a, (_RAM_DB68_+0)
+  ld a, (_RAM_DB68_HandlingData+0)
   ld (_RAM_DCDC_), a
   ret
 
@@ -7371,7 +7371,7 @@ LABEL_2E71_:
   jr z, LABEL_2EA4_
   jr c, +
 LABEL_2EA4_:
-  ld a, (_RAM_DB68_+6)
+  ld a, (_RAM_DB68_HandlingData+6)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7380,7 +7380,7 @@ LABEL_2EA4_:
   cp $01
   jr c, LABEL_2EA4_
 ++:
-  ld a, (_RAM_DB68_+7)
+  ld a, (_RAM_DB68_HandlingData+7)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7393,12 +7393,12 @@ LABEL_2EA4_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB68_+5)
+  ld a, (_RAM_DB68_HandlingData+5)
   ld (_RAM_DD1D_), a
   ret
 
 ++:
-  ld a, (_RAM_DB68_+4)
+  ld a, (_RAM_DB68_HandlingData+4)
   ld (_RAM_DD1D_), a
   ret
 
@@ -7423,7 +7423,7 @@ LABEL_2ED3_:
   jr z, LABEL_2EF8_
   jr c, +
 LABEL_2EF8_:
-  ld a, (_RAM_DB68_+10)
+  ld a, (_RAM_DB68_HandlingData+10)
   ld (_RAM_DD5E_), a
   ret
 
@@ -7432,7 +7432,7 @@ LABEL_2EF8_:
   cp $01
   jr c, LABEL_2EF8_
 ++:
-  ld a, (_RAM_DB68_+11)
+  ld a, (_RAM_DB68_HandlingData+11)
   ld (_RAM_DD5E_), a
   ret
 
@@ -7445,12 +7445,12 @@ LABEL_2EF8_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DB68_+9)
+  ld a, (_RAM_DB68_HandlingData+9)
   ld (_RAM_DD5E_), a
   ret
 
 ++:
-  ld a, (_RAM_DB68_+8)
+  ld a, (_RAM_DB68_HandlingData+8)
   ld (_RAM_DD5E_), a
   ret
 
@@ -27255,8 +27255,8 @@ LABEL_237E2_:
   xor $01
   sla a ; 2 for SMS, 0 for GG
   ld b, a
-  ld de, _RAM_DB68_
--:; High nibble + adjustment -> _RAM_DB68_
+  ld de, _RAM_DB68_HandlingData
+-:; High nibble + adjustment -> _RAM_DB68_HandlingData
   ld a, (hl)
   srl a
   srl a
@@ -27287,11 +27287,11 @@ LABEL_237E2_:
   exx
   ; Loop over 6 bytes -> 12 nibbles
   jr nz, -
-  ld a, (_RAM_DB68_+1)
+  ld a, (_RAM_DB68_HandlingData+1)
   ld (_RAM_DCDC_), a
-  ld a, (_RAM_DB68_+5)
+  ld a, (_RAM_DB68_HandlingData+5)
   ld (_RAM_DD1D_), a
-  ld a, (_RAM_DB68_+9)
+  ld a, (_RAM_DB68_HandlingData+9)
   ld (_RAM_DD5E_), a
   ld a, (_RAM_DB97_TrackType)
   ld e, a
@@ -27332,7 +27332,7 @@ DATA_238DE_: ; indexed by _RAM_DC55_CourseIndex*2 and copied to _RAM_DB66_, _RAM
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 
-DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to _RAM_DB68_+
+DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to _RAM_DB68_HandlingData+
 .db $54 $42 $65 $53 $54 $42
 .db $54 $43 $65 $54 $54 $43
 .db $86 $63 $75 $52 $75 $52
