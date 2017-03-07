@@ -1,4 +1,4 @@
-; This disassembly was created using Emulicious (http://www.emulicious.net)
+; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
 slotsize $7ff0
 slot 0 $0000
@@ -57,6 +57,7 @@ banks 14
 .if NAME_TABLE_ADDRESS == $3700
 .define VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE %00001110 ; can't be sensibly calculated?
 .endif
+
 .define VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE (SPRITE_TABLE_ADDRESS >> 7) & %01111110 | %00000001
 
 .enum 0 ; TrackTypes
@@ -69,7 +70,7 @@ TT_Warriors     db ; 5
 TT_Tanks        db ; 6
 TT_RuffTrux     db ; 7
 TT_Helicopters  db ; 8 - Incomplete support
-TT_Unknown9       db ; 9 - for portrait drawing only?
+TT_Unknown9     db ; 9 - for portrait drawing only?
 .ende
 
 .define BUTTON_U_MASK %00000001
@@ -581,8 +582,8 @@ _RAM_D975_Sound2Control db
 _RAM_D976_ dsb 6 ; unused?
 _RAM_D97C_Sound db
 _RAM_D97D_ db
-_RAM_D97E_ db
-_RAM_D97F_ db
+_RAM_D97E_Player1SFX_Unused db
+_RAM_D97F_Player2SFX_Unused db
 
 _RAM_D980_CarDecoratorTileData1bpp dsb 16*8 ; 16 * 1bpp tile data
 
@@ -1935,7 +1936,7 @@ _LABEL_383_:
   jr --
 
 _LABEL_3ED_:
-  call _LABEL_318E_
+  call _LABEL_318E_InitialiseVDPRegisters_Trampoline
   call _LABEL_3F22_ScreenOff
   call _LABEL_3F54_
   call _LABEL_19EE_
@@ -7652,7 +7653,7 @@ _LABEL_317C_:
 +:
   ret
 
-_LABEL_318E_:
+_LABEL_318E_InitialiseVDPRegisters_Trampoline:
   JumpToPagedFunction _LABEL_1BE82_InitialiseVDPRegisters
 
 _LABEL_3199_:
@@ -8949,7 +8950,7 @@ _LABEL_3B74_:
   cp $04
   jp z, _LABEL_3E43_
   cp $FF
-  jr z, _LABEL_3BEC_
+  jr z, _LABEL_3BEC_ret
   xor a
   ld (ix-2), a
   ld (iy-1), a
@@ -8987,23 +8988,22 @@ _LABEL_3B74_:
   cp $01
   jr z, +
   cp $05
-  jr nz, _LABEL_3BEC_
+  jr nz, _LABEL_3BEC_ret
   xor a
   ld (_RAM_DE87_), a
-_LABEL_3BEC_:
+_LABEL_3BEC_ret:
   ret
 
 +:
   ld a, (_RAM_DB97_TrackType)
   cp TT_RuffTrux
   jr nz, +
-  call _LABEL_3DEC_
-  ld hl, _DATA_3F05_
+  call _LABEL_3DEC_RuffTrux_
+  ld hl, _DATA_3F05_RuffTrux_
   jp ++
-
-+:
-  ld hl, _DATA_40D3_
++:ld hl, _DATA_40D3_NotRuffTrux_
 ++:
+  ; Index into table
   ld a, (_RAM_DE88_)
   sla a
   ld d, $00
@@ -9015,6 +9015,7 @@ _LABEL_3BEC_:
   ld a, (hl)
   ld h, a
   ld l, e
+  ; Then follow the pointer and emit 9 bytes to ???
   ld a, (hl)
   ld (ix+1), a
   inc hl
@@ -9041,18 +9042,19 @@ _LABEL_3BEC_:
   inc hl
   ld a, (hl)
   ld (ix+17), a
+  ; Cycle _RAM_DE88_ from 0 to 8
   ld a, (_RAM_DE88_)
   add a, $01
   ld (_RAM_DE88_), a
   cp $09
   jr nz, +
+  ; When it wraps, set/reset stuff
   ld a, $01
   ld (_RAM_DE89_), a
   xor a
   ld (_RAM_DE87_), a
   ld (_RAM_DE88_), a
-+:
-  ret
++:ret
 
 _LABEL_3C54_:
   ld a, (_RAM_DB97_TrackType)
@@ -9249,7 +9251,8 @@ _DATA_3DDC_TrackTypeTileDataPointerLo:
 _DATA_3DE4_TrackTypeTileDataPointerHi:
 .db >_DATA_3C000_Sportscars_Tiles >_DATA_39C83_FourByFour_Tiles >_DATA_3D901_Powerboats_Tiles >_DATA_38000_TurboWheels_Tiles >_DATA_34000_FormulaOne_Tiles >_DATA_3A8FA_Warriors_Tiles >_DATA_39168_Tanks_Tiles >_DATA_3CD8D_RuffTrux_Tiles
 
-_LABEL_3DEC_:
+_LABEL_3DEC_RuffTrux_:
+  ; Disable some sprites?
   ld a, $E0
   ld (iy+9), a
   ld (iy+10), a
@@ -9351,7 +9354,7 @@ _DATA_3EFD_CarTileDataLookup_Hi:
 .db >_DATA_34958_CarTiles_Sportscars >_DATA_34CF0_CarTiles_FourByFour >_DATA_35048_CarTiles_Powerboats >_DATA_35350_CarTiles_TurboWheels >_DATA_30000_CarTiles_FormulaOne >_DATA_30330_CarTiles_Warriors >_DATA_306D0_CarTiles_Tanks >_DATA_1296A_CarTiles_RuffTrux
 
 ; Pointer Table from 3F05 to 3F16 (9 entries, indexed by _RAM_DE88_)
-_DATA_3F05_:
+_DATA_3F05_RuffTrux_:
 .dw _DATA_3F63_ _DATA_3F6C_ _DATA_3F75_ _DATA_3F7E_ _DATA_3F87_ _DATA_3F90_ _DATA_3F99_ _DATA_3FA2_
 .dw _DATA_3FAB_
 
@@ -9384,7 +9387,7 @@ _LABEL_3F3F_:
   ret
 
 _LABEL_3F54_:
-  ld bc, $02EF
+  ld bc, $02EF ; Byte count
 -:
   ld hl, _RAM_DCAB_
   add hl, bc
@@ -9516,7 +9519,7 @@ _DATA_40CA_:
 .db $AC $AC $AC $AC $AC $AC $AC $AC $AC
 
 ; Pointer Table from 40D3 to 40E4 (9 entries, indexed by _RAM_DE88_)
-_DATA_40D3_:
+_DATA_40D3_NotRuffTrux_:
 .dw _DATA_4082_ _DATA_408B_ _DATA_4094_ _DATA_409D_ _DATA_40A6_ _DATA_40AF_ _DATA_40B8_ _DATA_40C1_
 .dw _DATA_40CA_
 
@@ -13620,28 +13623,28 @@ _LABEL_6582_:
 _LABEL_6593_:
   ld a, (_RAM_D94A_)
   cp $04
-  jr c, _LABEL_65C2_
+  jr c, _LABEL_65C2_ret
   ld a, (_RAM_DF00_)
   or a
-  jr nz, _LABEL_65C2_
+  jr nz, _LABEL_65C2_ret
   ld a, (_RAM_DE92_EngineVelocity)
   cp $06
-  jr c, _LABEL_65C2_
+  jr c, _LABEL_65C2_ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_Powerboats
-  jr z, _LABEL_65C2_
+  jr z, _LABEL_65C2_ret
 --:
   xor a
   ld (_RAM_D94A_), a
   ld a, (_RAM_DB97_TrackType)
-  cp TT_TurboWheels
+  cp TT_TurboWheels ; Alternative skid sound for these two
   jr z, +
   cp TT_Warriors
   jr z, +
   ld a, SFX_0F_Skid1
 -:
   ld (_RAM_D963_SFXTrigger_Player1), a
-_LABEL_65C2_:
+_LABEL_65C2_ret:
   ret
 
 +:
@@ -13651,7 +13654,7 @@ _LABEL_65C2_:
 _LABEL_65C7_:
   ld a, (_RAM_D94A_)
   cp $04
-  jr c, _LABEL_65C2_
+  jr c, _LABEL_65C2_ret
   jr --
 
 _LABEL_65D0_BehaviourE:
@@ -13711,7 +13714,7 @@ _LABEL_663D_InitialisePlugholeTiles:
   call _f             ; Emit it
   ld hl, _DATA_35770_PlugholeTilesPart2 ; Then some more
   ld de, $5DC3        ; Tile $ee bitplane 3?
-  ld bc, $0088        ; 11 tiles?
+  ld bc, $0088        ; 16 tiles?
   ; Fall through and ret
 __:
   ld a, e         ; Set VRAM address to de
@@ -23246,7 +23249,7 @@ _LABEL_AFAE_RamCodeLoader:
   ld (_RAM_D741_RequestedPageIndex), a
   ld (PAGING_REGISTER), a ; page in and call
   call _LABEL_3B971_RamCodeLoaderStage2
-  ld a, $02 ; restore paging
+  ld a, :_LABEL_AFAE_RamCodeLoader ; $02 ; restore paging
   ld (PAGING_REGISTER), a
   ret
 
@@ -28555,13 +28558,13 @@ _LABEL_2B5D5_SilencePSG:
   ret
 
 ; Unreachable code?
-_LABEL_2B5E6_:
-  ld a, (_RAM_D97E_) 
+_LABEL_2B5E6_Player1SFX_Unused:
+  ld a, (_RAM_D97E_Player1SFX_Unused) 
   ld (_RAM_D963_SFXTrigger_Player1), a 
   ret 
   
-_LABEL_2B5ED_:
-  ld a, (_RAM_D97F_) 
+_LABEL_2B5ED_Player2SFX_Unused:
+  ld a, (_RAM_D97F_Player2SFX_Unused) 
   ld (_RAM_D974_SFXTrigger_Player2), a 
   ret 
   
@@ -30197,7 +30200,7 @@ _DATA_33B5E_:
   cp $a0
   jr nz, _LABEL_33BEE_ret
 +: ld a, (_RAM_DB20_Player1Controls)
-  and $30
+  and BUTTON_1_MASK | BUTTON_2_MASK ; Both buttons pressed
   jr nz, _LABEL_33BEE_ret
 ++: ld a, (_RAM_DE4F_)
   cp $80
@@ -30468,7 +30471,7 @@ _LABEL_34D9C_:
   jr z, +
 ++:
   ld a, (_RAM_DB21_Player2Controls)
-  and $30
+  and BUTTON_1_MASK | BUTTON_2_MASK ; Both buttons pressed
   jp nz, _LABEL_33E61_ret
 +:ld a, (_RAM_DE4F_)
   cp $80
@@ -30508,7 +30511,7 @@ _LABEL_33DF4_:
   ld a, (ix+$15)
   or a
   jr z, +
-  ld a, $0a
+  ld a, SFX_0A_TankShoot
   ld (_RAM_D974_SFXTrigger_Player2), a
 +:ld (iy+$01), $ad
   ld (iy+$03), $ae
@@ -32075,13 +32078,12 @@ _LABEL_3639C_:
   xor a
   ld (_RAM_D5BC_), a
   ld a, (_RAM_DB97_TrackType)
-  cp TT_TurboWheels
+  cp TT_TurboWheels ; Alternative skid sounds for these two
   jr z, +
   cp TT_Warriors
   jr z, +
   ld a, SFX_0F_Skid1
--:
-  ld (_RAM_D974_SFXTrigger_Player2), a
+-:ld (_RAM_D974_SFXTrigger_Player2), a
 _LABEL_363CB_ret:
   ret
 
