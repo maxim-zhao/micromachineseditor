@@ -9981,11 +9981,9 @@ _LABEL_470C_:
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
   cp $2A
   jr z, +
-  ld bc, $B161
+  ld bc, _DATA_37161_
   jp ++
-
-+:
-  ld bc, $B0D1
++:ld bc, _DATA_370D1_
 ++:
   ld hl, _DATA_2652_TimesTable12Lo
   ld de, (_RAM_DE77_)
@@ -9996,7 +9994,7 @@ _LABEL_470C_:
   ld de, (_RAM_DE75_)
   add hl, de
   add hl, bc
-  ld a, $0D ; ??? relates to value in _RAM_DE75_
+  ld a, :_DATA_37161_
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld b, a
@@ -10121,11 +10119,11 @@ _LABEL_479E_:
   call _LABEL_9B2_ConvertMetatileIndexToDataIndex
   cp $2A
   jr z, +
-  ld bc, $B161
+  ld bc, _DATA_37161_
   jp ++
 
 +:
-  ld bc, $B0D1
+  ld bc, _DATA_370D1_
 ++:
   ld hl, _DATA_2652_TimesTable12Lo
   ld d, $00
@@ -10140,7 +10138,7 @@ _LABEL_479E_:
   ld e, a
   add hl, de
   add hl, bc
-  ld a, $0D
+  ld a, :_DATA_37161_
   ld (PAGING_REGISTER), a
   ld a, (hl)
   ld b, a
@@ -22381,7 +22379,7 @@ _LABEL_A8FC_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $A9AE
+  ld hl, _DATA_A9AE_TilemapAddresses_SMS
   jr ++
 
 +:
@@ -25415,7 +25413,7 @@ _LABEL_BF5E_: ; GG-only code, misaligned here
 
 _LABEL_BF70_: ; unused code? Left over memory?
   ld hl, $c000
-  call $b358
+  call $b358 ; not a function
   ld hl, _DATA_BF80_
   ld b, $40
   ld c, PORT_VDP_DATA
@@ -27528,7 +27526,7 @@ _LABEL_237E2_:
   ld l, a
   ld h, $00
   add hl, de
-  ld de, $B918
+  ld de, _DATA_23918_
   add hl, de
   exx
     ld c, $06
@@ -27612,7 +27610,9 @@ _DATA_238DE_:
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
-.db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $54 $42 $65 $53 $54 $42
+.db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 
+_DATA_23918_:
+.db $54 $42 $65 $53 $54 $42
 .db $54 $43 $65 $54 $54 $43 $86 $63 $75 $52 $75 $52 $87 $75 $87 $75
 .db $76 $65 $A9 $97 $A9 $87 $98 $86 $87 $75 $77 $66 $76 $65 $98 $87
 .db $A9 $88 $88 $76 $A9 $88 $98 $87 $88 $77 $87 $76 $99 $87 $87 $66
@@ -29763,7 +29763,7 @@ _LABEL_310EF_:
     cp $FE
     jr nz, +
     ld (ix+0), h
-+:  ld bc, $937A
++:  ld bc, _DATA_3137A_PSGNotes
     add hl, bc
     ld a, (hl)
     ld (ix+3), a
@@ -29845,7 +29845,7 @@ _LABEL_311BC_:
   ld c, a
   ld b, $00
   push hl
-    ld hl, $94BE ; TODO this is a pointer
+    ld hl, _DATA_314BE_
     add hl, bc
     ld (_RAM_D929_MenuSound_), hl
     ld a, $01
@@ -29999,6 +29999,7 @@ _DATA_314AF_MenuMusicStopData: ; 15 bytes, menu sound engine init?
 _DATA_314AF_MenuMusicStopData_End:
 
 ; Data pointed into by following table
+; Also looked up directly?
 _DATA_314BE_: .db $00 $05 $02 $03 $02 $04 $06 $07 $02 $03 $02 $04 $09 $08 $0B $0B $0A $0A $0C $0D $0C $0E $00 $00
 _DATA_314D6_: .db $0F $10 $11 $11 $12 $13 $11 $11 $14 $15 $16 $18 $17
 _DATA_314E3_: .db $19 $1A $1B $1B $1C $1D
@@ -30511,7 +30512,7 @@ _LABEL_33DF4_:
   ld (_RAM_D974_SFXTrigger_Player2), a
 +:ld (iy+$01), $ad
   ld (iy+$03), $ae
-  ld hl, $BC0A
+  ld hl, _DATA_33C0A_
   ld a, (ix+$0d)
   ld e, a
   ld d, $00
@@ -30534,7 +30535,7 @@ _LABEL_33DF4_:
 ++:
   ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
-  ld hl, $BC1A
+  ld hl, _DATA_33C1A_
   add hl, de
   ld a, (hl)
   ld l, a
@@ -30547,7 +30548,7 @@ _LABEL_33E62_:
   ld a, (ix+$3f)
   ld e, a
   ld d, $00
-  ld hl, $BC2A
+  ld hl, _DATA_33C2A_
   add hl, de
   ld a, (hl)
   ld l, a
