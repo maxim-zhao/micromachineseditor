@@ -765,13 +765,12 @@ _RAM_DC56_ db ;
 _RAM_DC57_ dw
 _RAM_DC59_FloorTiles dsb 32*2 ; 1bpp tile data
 _RAM_DC99_EnterMenuTrampoline dsb 18 ; Code in RAM
+; Game ram starts here?
 _RAM_DCAB_ dw
 _RAM_DCAD_ dw
 _RAM_DCAF_ db
 _RAM_DCB0_ db
-.ende
-
-.enum $DCB5 export
+_RAM_DCB1_ dsb 4 ; unused
 _RAM_DCB5_ db
 _RAM_DCB6_ db
 _RAM_DCB7_ db
@@ -1938,9 +1937,9 @@ _LABEL_383_:
 _LABEL_3ED_:
   call _LABEL_318E_InitialiseVDPRegisters_Trampoline
   call _LABEL_3F22_ScreenOff
-  call _LABEL_3F54_
+  call _LABEL_3F54_BlankGameRAM
   call _LABEL_19EE_
-  call _LABEL_7C7D_
+  call _LABEL_7C7D_LoadTrack
   call _LABEL_3A2E_
   call _LABEL_31B6_InitialiseFloorTiles
   call _LABEL_3C54_
@@ -7418,18 +7417,12 @@ _LABEL_2EF8_:
   ret
 
 ; Data from 2F27 to 2F66 (64 bytes)
-_DATA_2F27_:
-.db $00 $00 $20 $00 $40 $00 $60 $00 $80 $00 $A0 $00 $C0 $00 $E0 $00
-.db $00 $01 $20 $01 $40 $01 $60 $01 $80 $01 $A0 $01 $C0 $01 $E0 $01
-.db $00 $02 $20 $02 $40 $02 $60 $02 $80 $02 $A0 $02 $C0 $02 $E0 $02
-.db $00 $03 $20 $03 $40 $03 $60 $03 $80 $03 $A0 $03 $C0 $03 $E0 $03
+_DATA_2F27_MultiplesOf32:
+  TimesTable16 0 32 32
 
 ; Data from 2F67 to 2FA6 (64 bytes)
-_DATA_2F67_:
-.db $00 $00 $60 $00 $C0 $00 $20 $01 $80 $01 $E0 $01 $40 $02 $A0 $02
-.db $00 $03 $60 $03 $C0 $03 $20 $04 $80 $04 $E0 $04 $40 $05 $A0 $05
-.db $00 $06 $60 $06 $C0 $06 $20 $07 $80 $07 $E0 $07 $40 $08 $A0 $08
-.db $00 $09 $60 $09 $C0 $09 $20 $0A $80 $0A $E0 $0A $40 $0B $A0 $0B
+_DATA_2F67_MultiplesOf96:
+  TimesTable16 0 96 32
 
 ; Data from 2FA7 to 2FAE (8 bytes)
 _DATA_2FA7_:
@@ -7592,7 +7585,7 @@ _LABEL_30EA_:
   sla a
   ld l, a
   ld h, $00
-  ld de, _DATA_2F27_
+  ld de, _DATA_2F27_MultiplesOf32
   add hl, de
   ld a, (hl)
   ld (_RAM_DEF1_), a
@@ -7603,10 +7596,10 @@ _LABEL_30EA_:
 
 _LABEL_3100_:
   ld a, (_RAM_DEF5_)
-  sla a
+  sla a ; *2
   ld l, a
   ld h, $00
-  ld de, _DATA_2F67_
+  ld de, _DATA_2F67_MultiplesOf96
   add hl, de
   ld a, (hl)
   ld (_RAM_DEF1_), a
@@ -7626,6 +7619,7 @@ _DATA_3116_F1_TileHighBytesRunCompressed:
 .db $00 $10 $00 $10 $00
 ; Expands to:
 ; 0, 0, ... 0, 10, 10, 10, 10, 0, 0, ... 0, 10, 0, 0, ... 0
+; This sets the priority bit on certain tiles
 
 ; Data from 313B to 3163 (41 bytes)
 _DATA_313B_Powerboats_TileHighBytesRunCompressed:
@@ -9386,10 +9380,9 @@ _LABEL_3F3F_:
 +:
   ret
 
-_LABEL_3F54_:
-  ld bc, $02EF ; Byte count
--:
-  ld hl, _RAM_DCAB_
+_LABEL_3F54_BlankGameRAM:
+  ld bc, _RAM_DF9A_EndOfRAM - _RAM_DCAB_ ; $02EF ; Byte count
+-:ld hl, _RAM_DCAB_ ; Start
   add hl, bc
   xor a
   ld (hl), a
@@ -16772,7 +16765,7 @@ _LABEL_7C67_:
 _LABEL_7C72_:
   JumpToPagedFunction _LABEL_36F9E_
 
-_LABEL_7C7D_:
+_LABEL_7C7D_LoadTrack:
   call _LABEL_3214_BlankSpriteTable
 
   ; Load tile high bytes
