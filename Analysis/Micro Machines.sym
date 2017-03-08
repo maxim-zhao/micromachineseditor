@@ -418,7 +418,7 @@
 00:d6c8 _RAM_D6C8_HeaderTilesIndexOffset
 00:d6c9 _RAM_D6C9_ControllingPlayersLR1Buttons
 00:d6ca _RAM_D6CA_
-00:d6cb _RAM_D6CB_
+00:d6cb _RAM_D6CB_MenuScreenState
 00:d6cc _RAM_D6CC_
 00:d6cd _RAM_D6CD_
 00:d6ce _RAM_D6CE_
@@ -1246,7 +1246,7 @@
 00:de87 _RAM_DE87_
 00:de88 _RAM_DE88_
 00:de89 _RAM_DE89_
-00:de8a _RAM_DE8A_
+00:de8a _RAM_DE8A_CarState2
 00:de8b _RAM_DE8B_
 00:de8c _RAM_DE8C_
 00:de8d _RAM_DE8D_
@@ -1403,7 +1403,7 @@
 00:df57 _RAM_DF57_
 00:df58 _RAM_DF58_
 00:df59 _RAM_DF59_CarState
-00:df5a _RAM_DF5A_
+00:df5a _RAM_DF5A_CarState3
 00:df5b _RAM_DF5B_
 00:df5c _RAM_DF5C_
 00:df5d _RAM_DF5D_
