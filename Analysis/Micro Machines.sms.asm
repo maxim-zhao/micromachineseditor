@@ -1,6 +1,10 @@
-; Some options for what we want to keep...
+; Some options for what we want to keep identical to the original...
 .define BLANK_FILL_ORIGINAL ; disable to squash blanks and blank unused bytes
-.define UNREACHABLE_CODE ; disable to drop out the unreachable code - buggy
+.define UNREACHABLE_CODE ; disable to drop out the unreachable code - BUGGY
+.define JUMP_TO_RET ; disable to use conditional rets
+.define TAIL_CALL ; disable to optimise calls followed by rets to jumps - INCOMPLETE
+.define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - TODO
+.define IS_GAMEGEAR ; Only applies when GAME_GEAR_CHECKS is disabled - TODO
 
 ; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
@@ -274,6 +278,91 @@ map "?" = $B6
 .macro EmitGGColourImmediate args hex
   EmitDataToVDPImmediate16 ((hex >> 20) & %000001111) | ((hex >> 8) & %001111000) | ((hex << 4) & %111100000000)
 .endm
+
+; The original game has a bad habit of jumping to ret opcodes instead of returning in place.
+; These macros let us switch behaviour.
+; (A more cunning macro system would let us fold them better, but never mind...)
+
+.macro JpRet args label
+.ifdef JUMP_TO_RET
+  jp label
+.else
+  ret
+.endif
+.endm
+
+.macro JrRet args label
+.ifdef JUMP_TO_RET
+  jr label
+.else
+  ret
+.endif
+.endm
+
+.macro JrZRet args label
+.ifdef JUMP_TO_RET
+  jr z, label
+.else
+  ret z
+.endif
+.endm
+
+.macro JrNzRet args label
+.ifdef JUMP_TO_RET
+  jr nz, label
+.else
+  ret nz
+.endif
+.endm
+
+.macro JrCRet args label
+.ifdef JUMP_TO_RET
+  jr c, label
+.else
+  ret c
+.endif
+.endm
+
+.macro JrNcRet args label
+.ifdef JUMP_TO_RET
+  jr nc, label
+.else
+  ret nc
+.endif
+.endm
+
+.macro JpZRet args label
+.ifdef JUMP_TO_RET
+  jp z, label
+.else
+  ret z
+.endif
+.endm
+
+.macro JpNzRet args label
+.ifdef JUMP_TO_RET
+  jp nz, label
+.else
+  ret nz
+.endif
+.endm
+
+.macro JpCRet args label
+.ifdef JUMP_TO_RET
+  jp c, label
+.else
+  ret c
+.endif
+.endm
+
+.macro JpNcRet args label
+.ifdef JUMP_TO_RET
+  jp nc, label
+.else
+  ret nc
+.endif
+.endm
+
 
 ; Structs for RAM arrays
 .struct WallDataMetaTile
@@ -688,6 +777,7 @@ _RAM_DBBC_ db
 _RAM_DBBD_ db
 _RAM_DBBE_ db
 _RAM_DBBF_ db ; unused?
+; Block initialised from ROM ------>
 _RAM_DBC0_EnterGameTrampoline dsb 13
 _RAM_DBCD_MenuIndex db
 _RAM_DBCE_ db
@@ -703,6 +793,7 @@ _RAM_DBD7_ db
 _RAM_DBD8_CourseSelectIndex db
 _RAM_DBD9_DisplayCaseData dsb $18 ; includes the following three labels; 0 = blank, 1 = filled, 2 = flashing
 _RAM_DBF1_RaceNumberText dsb 8 ; "RACE xx-", xx is replaced at runtime
+; ------> End block initialised from ROM 
 _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
@@ -1572,11 +1663,20 @@ LABEL_75_EnterGameTrampolineImpl:
 ; Copied to $dbcd onwards
 ; This initialises a bunch of stuff...
 ; _RAM_DBCD_MenuIndex onwards
-.db $00 $01 $01 $00 $03 $02 $50 $50 $00 $00 $00 $00
-; _RAM_DBD9_DisplayCaseData
-.dsb 24 0
-; _RAM_DBF1_RaceNumberText
-.asc "RACE 01-" ;.db $11 $00 $02 $04 $0E $1A $1B $B5
+.db $00 ; _RAM_DBCD_MenuIndex
+.db $01 ; _RAM_DBCE_
+.db $01 ; _RAM_DBCF_LastRacePosition 
+.db $00 ; _RAM_DBD0_HeadToHeadLost2
+.db $03 ; _RAM_DBD1_
+.db $02 ; _RAM_DBD2_
+.db $50 ; _RAM_DBD3_
+.db $50 ; _RAM_DBD4_
+.db $00 ; _RAM_DBD5_
+.db $00 ; _RAM_DBD6_
+.db $00 ; _RAM_DBD7_
+.db $00 ; _RAM_DBD8_CourseSelectIndex
+.dsb 24 0 ; _RAM_DBD9_DisplayCaseData
+.asc "RACE 01-" ; _RAM_DBF1_RaceNumberText
 LABEL_75_MenuRAMSectionEnd:
 ; End stuff copied to RAM
 .ends
@@ -1672,7 +1772,7 @@ LABEL_156_:
   ld (_RAM_DC56_), a ; If GG
   ld a, $28
   ld (_RAM_DC57_), a
-  jp ++ ; ret
+  JpRet ++
 +:xor a
   ld (_RAM_DC56_), a ; If SMS
   ld (_RAM_DC57_), a
@@ -1853,11 +1953,11 @@ LABEL_29D_:
 LABEL_300_:
   ld a, (_RAM_DF6A_)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   dec a
   ld (_RAM_DF6A_), a
   or a
-  jr nz, + ; ret
+  JrNzRet + ; ret
   inc a
   ld (_RAM_DF6A_), a
   ld (_RAM_D5D6_), a
@@ -1875,16 +1975,15 @@ LABEL_318_:
   ret nz
   in a, (PORT_VDP_LINECOUNTER)
   cp $B8
-  jr c, + ; ret
+  JrCRet + ; ret
   cp $F0
-  jr nc, + ; ret
+  JrNcRet + ; ret
   call LABEL_33A_GameVBlankVDPWork
   ld a, $01
   ld (_RAM_D5D7_), a
 +:ret
 
--:
-  xor a
+-:xor a
   ld (_RAM_DBA8_), a
   ret
 
@@ -2218,8 +2317,10 @@ LABEL_4B2_:
   xor a
   jp -
 
+.ifdef JUMP_TO_RET  
 LABEL_5C8_ret:
   ret
+.endif
 
 LABEL_5C9_:
   ld iy, _RAM_DD6E_
@@ -2242,7 +2343,7 @@ LABEL_5C9_:
 LABEL_5FA_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr z, LABEL_5C8_ret ; 7 when nz, 12+10 otherwise; ret z = 5/11 so always better(!)
+  JrZRet LABEL_5C8_ret ; 7 when nz, 12+10 otherwise; ret z = 5/11 so always better(!)
   ld iy, _RAM_DD9E_
   ld ix, $DD9E
   ld a, (_RAM_DCB8_)
@@ -2281,7 +2382,7 @@ LABEL_633_:
 LABEL_665_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jp z, LABEL_5C8_ret
+  JpZRet LABEL_5C8_ret
   ld iy, _RAM_DDFE_
   ld ix, $DDFE
   ld a, (_RAM_DD3A_)
@@ -2664,7 +2765,7 @@ LABEL_92D_:
   jr z, +++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_97B_ret
+  JrNzRet LABEL_97B_ret
   ld a, (_RAM_DD3E_)
   ld (_RAM_DF66_), a
   ld a, (_RAM_DD42_)
@@ -2688,18 +2789,24 @@ LABEL_92D_:
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_97B_ret
+  JrNzRet LABEL_97B_ret
+.ifdef TAIL_CALL  
   call LABEL_6632_
   jp LABEL_97B_ret
+.else
+  jp LABEL_6632_
+.endif
 
 +:
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr nz, LABEL_97B_ret
+  JrNzRet LABEL_97B_ret
   jp LABEL_665_
 
+.ifdef JUMP_TO_RET
 LABEL_97B_ret:
   ret
+.endif
 
 LABEL_97C_RuffTrux:
   jp LABEL_5C9_
@@ -2834,9 +2941,11 @@ LABEL_ABB_:
 LABEL_AC5_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, + ; ret
+  JrNzRet + ; ret
   JrToPagedFunction LABEL_3616B_
-+:ret
+.ifdef JUMP_TO_RET
++: ret
+.endif
 
 LABEL_AD7_DelayIfPlayer2:
   JrToPagedFunction LABEL_1BCCB_DelayIfPlayer2
@@ -2909,7 +3018,7 @@ LABEL_B2B_:
 LABEL_B63_:
   ld a, (_RAM_D581_)
   cp $A0
-  jr nc, LABEL_BAC_ret
+  JrNcRet LABEL_BAC_ret
   ld a, (_RAM_DB7B_)
   cp $01
   jr z, +
@@ -2971,7 +3080,7 @@ DATA_BB9_BonusSpriteData: ; Sprite X, N for "BONUS"
 LABEL_BC5_UpdateFloorTiles:
   ld a, (_RAM_DF17_HaveFloorTiles)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   ld hl, (_RAM_DF18_FloorTilesVRAMAddress)
   ld a, l ; Point at them
   out (PORT_VDP_ADDRESS), a
@@ -3014,7 +3123,7 @@ LABEL_BF0_UpdateFloorTiles:
   ld a, b
   and $7F
   or a
-  jr z, LABEL_C2F_ret
+  JrZRet LABEL_C2F_ret
   dec a
   jr z, +
   dec a
@@ -3037,7 +3146,7 @@ LABEL_C2F_ret:
 +:
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_C2F_ret
+  JrZRet LABEL_C2F_ret
 ++:
   jp LABEL_CF8_MoveFloorTilesVertically
 
@@ -3045,7 +3154,7 @@ LABEL_C2F_ret:
   call LABEL_CF8_MoveFloorTilesVertically
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_C2F_ret
+  JrZRet LABEL_C2F_ret
   jp LABEL_CF8_MoveFloorTilesVertically
 
 ++++:
@@ -3057,7 +3166,7 @@ LABEL_C2F_ret:
   call LABEL_CF8_MoveFloorTilesVertically
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_C2F_ret
+  JrZRet LABEL_C2F_ret
   jp LABEL_CF8_MoveFloorTilesVertically
 
 ++++++:
@@ -3071,7 +3180,7 @@ LABEL_C2F_ret:
   call LABEL_CF8_MoveFloorTilesVertically
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_C2F_ret
+  JrZRet LABEL_C2F_ret
   jp LABEL_CF8_MoveFloorTilesVertically
 
 LABEL_C75_:
@@ -3088,7 +3197,7 @@ LABEL_C81_UpdateFloorTiles_H:
   ld a, b
   and $7F
   or a
-  jr z, LABEL_CA6_ret ; Nothing to do
+  JrZRet LABEL_CA6_ret ; Nothing to do
   dec a
   jr z, +
   dec a
@@ -3111,7 +3220,7 @@ LABEL_CA6_ret:
 +:; Shift if flag is set
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_CA6_ret
+  JrZRet LABEL_CA6_ret
 ++:
   jp LABEL_DCF_MoveFloorTilesHorizontally
 
@@ -3119,7 +3228,7 @@ LABEL_CA6_ret:
   call LABEL_DCF_MoveFloorTilesHorizontally
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_CA6_ret
+  JrZRet LABEL_CA6_ret
   jp LABEL_DCF_MoveFloorTilesHorizontally
 
 ++++:
@@ -3131,7 +3240,7 @@ LABEL_CA6_ret:
   call LABEL_DCF_MoveFloorTilesHorizontally
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_CA6_ret
+  JrZRet LABEL_CA6_ret
   jp LABEL_DCF_MoveFloorTilesHorizontally
 
 ++++++:
@@ -3145,7 +3254,7 @@ LABEL_CA6_ret:
   call LABEL_DCF_MoveFloorTilesHorizontally
   ld a, (_RAM_DEF8_)
   or a
-  jr z, LABEL_CA6_ret
+  JrZRet LABEL_CA6_ret
   jp LABEL_DCF_MoveFloorTilesHorizontally
 
 LABEL_CEC_:
@@ -3565,7 +3674,7 @@ LABEL_109B_:
   inc (hl)
   ld a, (hl)
   cp $06
-  jr nz, +
+  JrNzRet +
   ld a, $00
   ld (_RAM_DEAD_), a
   ld a, (_RAM_DB7D_)
@@ -3734,7 +3843,7 @@ LABEL_11BA_:
 +:
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DC4D_Cheat_NoSkidding)
   or a
   jr nz, ++
@@ -3743,7 +3852,7 @@ LABEL_11BA_:
   jr z, LABEL_11E4_
   ld a, (_RAM_DE99_)
   or a
-  jr z, +
+  JrZRet +
   cp $01
   jr z, +++
   jp LABEL_1242_
@@ -3770,19 +3879,20 @@ LABEL_11E4_:
 +++:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5B6_)
   or a
-  jr nz, LABEL_121A_
+  JrNzRet LABEL_121A_ret
   ld a, (_RAM_DEA0_)
   cp $00
   jr z, ++
   sub $01
   ld (_RAM_DEA0_), a
 +:ret
-
-LABEL_121A_:
+.ifdef JUMP_TO_RET
+LABEL_121A_ret:
   ret
+.endif
 
 ++:
   ld a, (_RAM_DEA3_)
@@ -3808,10 +3918,10 @@ LABEL_121A_:
 LABEL_1242_:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5B6_)
   or a
-  jr nz, LABEL_121A_
+  JrNzRet LABEL_121A_ret
   ld a, (_RAM_DEA0_)
   cp $00
   jr z, ++
@@ -3872,7 +3982,7 @@ LABEL_1295_:
   jr nz, +
   ld a, $01
   ld (_RAM_DEAB_), a
-  jp ++ ; ret
+  JpRet ++ ; ret
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -3941,7 +4051,7 @@ LABEL_12E0_:
   dec l
   ld a, l
   cp $00
-  jr z, + ; ret
+  JrZRet + ; ret
   ; Add a row to the VRAM address
   ld a, (_RAM_DEC1_VRAMAddress.Lo)
   add a, $40
@@ -4256,7 +4366,7 @@ LABEL_1593_:
 -:ret
 +:ld a, (_RAM_DEB2_)
   cp $01
-  jr nz, - ; ret
+  JrNzRet - ; ret
   call LABEL_3E24_
   ld a, (_RAM_DEB1_VScrollDelta)
   ld (_RAM_DEF6_), a
@@ -4331,7 +4441,7 @@ LABEL_162D_:
 -:ret
 +:ld a, (_RAM_DEB2_)
   or a
-  jr nz, - ; ret
+  JrNzRet - ; ret
   call LABEL_7C72_
   ld a, (_RAM_DEB1_VScrollDelta)
   or $80
@@ -4398,8 +4508,7 @@ LABEL_16C0_:
   jr z, +
   jp LABEL_174E_
 
-+:
-  ld a, (_RAM_DEB9_)
++:ld a, (_RAM_DEB9_)
   cp $01
   jr z, +
   ld a, (_RAM_DEBB_)
@@ -4411,13 +4520,11 @@ LABEL_16C0_:
   ld a, (_RAM_DE92_EngineVelocity)
   or a
   jr nz, +
--:
-  ret
+-:ret
 
-+:
-  ld a, (_RAM_DEB0_)
++:ld a, (_RAM_DEB0_)
   or a
-  jr nz, -
+  JrNzRet -
   call LABEL_7C67_
   ld a, (_RAM_DEAF_)
   ld (_RAM_DEF7_), a
@@ -4614,7 +4721,7 @@ LABEL_1801_:
   call LABEL_795E_
   ld a, (_RAM_DECD_)
   cp $01
-  jr z, +
+  JrZRet +
   xor a
   ld (_RAM_DEC7_), a
   ld (_RAM_DEE7_), a
@@ -4716,7 +4823,7 @@ LABEL_18FD_:
   call LABEL_4F1B_
   ld a, (_RAM_DEC9_)
   cp $01
-  jr z, LABEL_1989_
+  JrZRet LABEL_1989_ret
   xor a
   ld (_RAM_DEC6_), a
   ld a, (_RAM_DB9C_)
@@ -4731,7 +4838,7 @@ LABEL_18FD_:
   call LABEL_4F1B_
   ld a, (_RAM_DEC9_)
   cp $01
-  jr z, LABEL_1989_
+  JrZRet LABEL_1989_ret
   xor a
   ld (_RAM_DEC6_), a
   ld a, (_RAM_DB9C_)
@@ -4744,7 +4851,7 @@ LABEL_18FD_:
   and $C3
   ld (_RAM_DED2_), a
   call LABEL_4F1B_
-LABEL_1989_:
+LABEL_1989_ret:
   ret
 
 LABEL_198A_:
@@ -4913,7 +5020,7 @@ LABEL_19EE_:
 LABEL_1AC8_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, $01
   ld (_RAM_DF0C_), a
   xor a
@@ -4923,7 +5030,7 @@ LABEL_1AC8_:
 LABEL_1AD8_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, $01
   ld (_RAM_DF0C_), a
   ld (_RAM_DF0E_), a
@@ -4932,28 +5039,32 @@ LABEL_1AD8_:
 LABEL_1AE7_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, $01
   ld (_RAM_DF0B_), a
   xor a
   ld (_RAM_DF0D_), a
   jp LABEL_2673_
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_1AFA_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, $01
   ld (_RAM_DF0B_), a
   ld (_RAM_DF0D_), a
   jp LABEL_2673_
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_1B0C_:
   ld a, (ix+22)
   cp $01
-  jr z, +
+  JrZRet +
   ld de, $0001
   or a
   ld a, (ix+2)
@@ -4972,7 +5083,7 @@ LABEL_1B0C_:
 LABEL_1B2F_:
   ld a, (ix+22)
   cp $01
-  jr z, +
+  JrZRet +
   ld de, $0001
   ld a, (ix+2)
   ld l, a
@@ -4990,7 +5101,7 @@ LABEL_1B2F_:
 LABEL_1B50_:
   ld a, (ix+23)
   cp $01
-  jr z, +
+  JrZRet +
   ld de, $0001
   or a
   ld a, (ix+0)
@@ -5009,7 +5120,7 @@ LABEL_1B50_:
 LABEL_1B73_:
   ld a, (ix+23)
   cp $01
-  jr z, +
+  JrZRet +
   ld de, $0001
   ld a, (ix+0)
   ld l, a
@@ -5189,7 +5300,7 @@ LABEL_1CFF_:
   ld (_RAM_DF2D_), a
   ld a, (_RAM_DF6A_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, $F0
   ld (_RAM_DF6A_), a
 +:ret
@@ -5599,7 +5710,7 @@ LABEL_1FDC_:
 
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_20E3_BehaviourEnd
+  JrNzRet LABEL_20E3_BehaviourEnd_ret
 
   xor a
   ld (_RAM_D5CD_CarIsSkidding), a
@@ -5638,7 +5749,7 @@ LABEL_1FDC_:
   jp z, LABEL_2AB5_Behaviour9
   cp $13
   jp z, LABEL_2AA0_Behaviour13
-LABEL_20E3_BehaviourEnd:
+LABEL_20E3_BehaviourEnd_ret:
   ret
 
 LABEL_20E4_Behaviour2_Dust
@@ -5646,7 +5757,7 @@ LABEL_20E4_Behaviour2_Dust
   ; Behaviour 2 = dust/chalk
   ld a, (_RAM_DE92_EngineVelocity)
   cp $07
-  jr c, + ; Only when driving fast enough
+  JrCRet + ; Only when driving fast enough
   xor a
   ld (_RAM_DD9A_), a
   ld a, $01
@@ -5660,22 +5771,20 @@ LABEL_2128_Behaviour5_Skid
   ld (_RAM_D5CD_CarIsSkidding), a
   ld a, (_RAM_DE92_EngineVelocity)
   or a
-  jr z, +++ ; Not using the engine
+  JrZRet +++ ; Not using the engine
   ld a, $01
   ld (_RAM_DD9A_), a ; set ???
   ld (_RAM_DD9B_), a
   ld a, (_RAM_DB97_TrackType)
   cp TT_3_TurboWheels
-  jr z, +++
+  JrZRet +++
   cp TT_7_RuffTrux
-  jr z, +++
+  JrZRet +++
   cp TT_5_Warriors
   jr nz, +
   ld a, $08
   jr ++
-
-+:
-  ld a, $10
++:ld a, $10
 ++:
   ld (_RAM_D5B6_), a ; set to 8 or 16 (or not at all) depending on track type
 +++:ret
@@ -5683,7 +5792,7 @@ LABEL_2128_Behaviour5_Skid
 LABEL_2121_Behaviour0:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, LABEL_20E3_BehaviourEnd
+  JrNzRet LABEL_20E3_BehaviourEnd_ret
   ld a, (_RAM_DEFA_PreviousBehaviour)
   cp $04
   jr z, +
@@ -5692,7 +5801,7 @@ LABEL_2121_Behaviour0:
   cp $0D
   jr z, +
   cp $03
-  jr nz, LABEL_20E3_BehaviourEnd
+  JrNzRet LABEL_20E3_BehaviourEnd_ret
 +:; If coming from 3, 4, b, d:
   ld a, $1C
   ld (_RAM_DF0A_), a
@@ -5705,17 +5814,19 @@ LABEL_2121_Behaviour0:
 LABEL_214B_BehaviourD:
   ld a, (_RAM_DEFA_PreviousBehaviour)
   cp $0D
-  jr z, +
+  JrZRet +
   jp LABEL_2175_Behaviour6
-
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_2156_BehaviourA:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DEFA_PreviousBehaviour)
   cp $0B
+  ; ret nz would be smaller
   jr z, ++
 +:ret
 
@@ -5727,13 +5838,13 @@ LABEL_2156_BehaviourA:
   ld (_RAM_D5BD_), a
   jp LABEL_29BC_Behaviour1_FallToFloor
 
-+:
++:; jp z would be smaller
   jp LABEL_2934_BehaviourF
 
 LABEL_2175_Behaviour6:
   ld a, (_RAM_DF00_)
   or a
-  jp nz, LABEL_22CC_ ; ret
+  JpNzRet LABEL_22CC_ret ; ret
   ld a, (_RAM_DE2F_)
   or a
   jr z, +
@@ -5765,7 +5876,7 @@ LABEL_2175_Behaviour6:
   ld a, (hl)
   ld (_RAM_DF02_), a
   cp $82
-  jp z, LABEL_22CC_ ; ret
+  JpZRet LABEL_22CC_ret ; ret
   ld a, $01
   ld (_RAM_DF03_), a
   jp LABEL_22A9_
@@ -5775,7 +5886,7 @@ LABEL_21BF_BehaviourB:
   cp TT_4_FormulaOne
   jr z, ++
   cp TT_1_FourByFour
-  jr nz, +
+  JrNzRet +
 -:
   ld a, (_RAM_DEFA_PreviousBehaviour)
   or a
@@ -5794,7 +5905,7 @@ LABEL_21BF_BehaviourB:
 LABEL_21E1_Behaviour3:
   ld a, (_RAM_DEFA_PreviousBehaviour)
   cp $07
-  jr z, +
+  JrZRet  +
   ld a, (_RAM_DEFB_PreviousDifferentBehaviour)
   or a
   jr z, LABEL_2200_
@@ -5808,7 +5919,7 @@ LABEL_21F3_Behavour4:
   jr z, +
   ld a, (_RAM_DEFB_PreviousDifferentBehaviour)
   or a
-  jr nz, LABEL_2222_
+  JrNzRet LABEL_2222_ret
 LABEL_2200_:
   ld a, (_RAM_DE5C_)
   ld (_RAM_DBA4_), a
@@ -5822,13 +5933,13 @@ LABEL_2200_:
   ld (_RAM_DBA6_), a
   ld a, (_RAM_DBA5_)
   ld (_RAM_DBA7_), a
-LABEL_2222_:
+LABEL_2222_ret:
   ret
 
 +:
   ld a, (_RAM_DF00_)
   or a
-  jp nz, LABEL_22CC_ ; ret
+  JpNzRet LABEL_22CC_ret ; ret
   ld a, (_RAM_D5CF_)
   ld l, a
   ld a, (_RAM_DE96_)
@@ -5874,7 +5985,7 @@ LABEL_2222_:
   add hl, de
   ld a, (hl)
   or a
-  jr z, LABEL_2222_
+  JrZRet LABEL_2222_ret
   ld (_RAM_DF0A_), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
@@ -5909,17 +6020,17 @@ LABEL_22A9_:
   ld (_RAM_D58C_), hl
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr z, LABEL_22CC_ ; ret
+  JrZRet LABEL_22CC_ret ; ret
   ld a, SFX_02_HitGround
   ld (_RAM_D963_SFXTrigger_Player1), a
-LABEL_22CC_:
+LABEL_22CC_ret:
   ret
 
 LABEL_22CD_:
   ld d, $00
   ld a, (_RAM_DF00_)
   or a
-  jp z, LABEL_23C2_
+  JpZRet LABEL_23C2_ret
   ld hl, DATA_1B232_SinTable ; $B232
   ld e, a
   add hl, de
@@ -5968,7 +6079,7 @@ LABEL_22CD_:
   add a, l
   ld (_RAM_DF00_), a
   cp $82
-  jp c, LABEL_23C2_
+  JpCRet LABEL_23C2_ret
   ld hl, (_RAM_D58C_)
   ld (_RAM_D95B_), hl
   ld a, (_RAM_DB97_TrackType)
@@ -6031,7 +6142,7 @@ LABEL_22CD_:
 ++:
   xor a
   ld (_RAM_DF01_), a
-LABEL_23C2_:
+LABEL_23C2_ret:
   ret
 
 LABEL_23C3_:
@@ -6084,7 +6195,7 @@ LABEL_23DD_:
   ld (_RAM_DE55_), a
   ld a, (_RAM_DE54_)
   and $40
-  jr z, +
+  JrZRet +
   ld hl, DATA_1D97_
   ld d, $00
   ld a, (_RAM_DE55_)
@@ -6190,11 +6301,11 @@ DATA_2652_TimesTable12Lo:
 LABEL_265F_:
   ld a, (_RAM_DEB5_)
   or a
-  jp z, -
+  JpZRet -
   call LABEL_26F5_
   ld a, (_RAM_DEB5_)
   or a
-  jp z, -
+  JpZRet -
   call LABEL_2724_
 LABEL_2673_:
   ld a, (_RAM_DF0D_)
@@ -6301,7 +6412,7 @@ LABEL_26F5_:
   inc (hl)
   ld a, (hl)
   cp $06
-  jr nz, +
+  JrNzRet +
   ld a, $00
   ld (_RAM_DEAE_), a
 +:ret
@@ -6437,16 +6548,16 @@ LABEL_27B1_:
 LABEL_27FB_:
   ld a, (_RAM_D5C5_)
   cp $01
-  jr z, LABEL_284F_
+  JrZRet LABEL_284F_ret
   ld a, (_RAM_D5B0_)
   or a
-  jr nz, LABEL_284F_
+  JrNzRet LABEL_284F_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_284F_
+  JrNzRet LABEL_284F_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, LABEL_284F_
+  JrNzRet LABEL_284F_ret
   ld a, (_RAM_DB80_)
   ld l, a
   ld a, (_RAM_DEAF_)
@@ -6481,7 +6592,7 @@ LABEL_27FB_:
   ld a, l
   srl a
   ld (_RAM_DEB1_VScrollDelta), a
-LABEL_284F_:
+LABEL_284F_ret:
   ret
 
 +:
@@ -6492,7 +6603,7 @@ LABEL_284F_:
 LABEL_2857_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, LABEL_28A4_
+  JrNzRet _LABEL_28A4_ret
   ld a, (_RAM_DCFB_)
   ld (_RAM_DB7E_), a
   ld a, (_RAM_DB82_)
@@ -6531,7 +6642,7 @@ LABEL_2857_:
   ld a, l
   srl a
   ld (_RAM_DB7F_), a
-LABEL_28A4_:
+_LABEL_28A4_ret:
   ret
 
 +:
@@ -6617,10 +6728,10 @@ LABEL_28D6_:
 LABEL_2934_BehaviourF:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF58_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, SFX_05
   ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, CarState_1_Exploding
@@ -6639,10 +6750,10 @@ LABEL_2934_BehaviourF:
 LABEL_2961_:
   ld a, (ix+20)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (ix+46)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, $01
   ld (ix+46), a
   xor a
@@ -6680,11 +6791,11 @@ LABEL_29A3_:
   or a
   jr z, +
   cp $80
-  jr c, ++
+  JrCRet ++
 +:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, SFX_09_EnterPoolTableHole
   ld (_RAM_D963_SFXTrigger_Player1), a
   jp LABEL_29BC_Behaviour1_FallToFloor
@@ -6694,16 +6805,16 @@ LABEL_29A3_:
 LABEL_29BC_Behaviour1_FallToFloor:
   ld a, (_RAM_D5B0_)
   or a
-  jr nz, LABEL_2A36_ret
+  JrNzRet _LABEL_2A36_ret
   ld a, (_RAM_DF00_) ; 0 or <$80 -> do nothing
   or a
   jr z, +
   cp $80
-  jr c, LABEL_2A36_ret
+  JrCRet _LABEL_2A36_ret
 +:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_2A36_ret
+  JrNzRet _LABEL_2A36_ret
   ld a, (_RAM_D5BD_)
   or a
   jr nz, +
@@ -6752,7 +6863,7 @@ LABEL_2A08_:
   jr z, LABEL_2A4A_
   jp LABEL_71C7_
 
-LABEL_2A36_ret:
+_LABEL_2A36_ret:
   ret
 
 -:
@@ -6831,7 +6942,7 @@ LABEL_2AB5_Behaviour9:
 +:
   ld a, (_RAM_DE8C_)
   cp $01
-  jp z, LABEL_2C28_
+  JpZRet _LABEL_2C28_ret
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
   jp z, LABEL_2B7D_
@@ -6936,7 +7047,7 @@ LABEL_2B7D_:
 LABEL_2BA4_:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_2C28_
+  JrNzRet _LABEL_2C28_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -6994,7 +7105,7 @@ LABEL_2BA4_:
   or a
   sbc hl, de
   ld (_RAM_DBAF_), hl
-LABEL_2C28_:
+_LABEL_2C28_ret:
   ret
 
 LABEL_2C29_Behaviour8_Sticky:
@@ -7003,9 +7114,9 @@ LABEL_2C29_Behaviour8_Sticky:
   jr z, Behaviour8_Sticky_FourByFour
   ld a, (_RAM_DE92_EngineVelocity)
   or a
-  jr z, +++ ; 0 -> do nothing
+  JrZRet +++ ; 0 -> do nothing
   cp $01
-  jr z, +++ ; 1 -> do nothing
+  JrZRet +++ ; 1 -> do nothing
   cp $02
   jr z, +   ; 2 -> subtract 1
   sub $02   ; Otherwise, subtract 2
@@ -7023,7 +7134,7 @@ LABEL_2C29_Behaviour8_Sticky:
 Behaviour8_Sticky_FourByFour:
   ld a, (_RAM_DE92_EngineVelocity)
   cp $03
-  jr c, +++ ; 3 -> do nothing
+  JrCRet +++ ; 3 -> do nothing
   cp $04
   jr z, +   ; 4 -> subtract 1
   sub $02   ; Otherwise, subtract 2
@@ -7040,10 +7151,10 @@ Behaviour8_Sticky_FourByFour:
 LABEL_2C69_Behaviour12:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, LABEL_2CD0_
+  JrNzRet _LABEL_2CD0_ret
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_2CD0_
+  JrNzRet _LABEL_2CD0_ret
   ld a, SFX_08
   ld (_RAM_D963_SFXTrigger_Player1), a
   ld hl, 1000 ; $03E8
@@ -7083,7 +7194,7 @@ LABEL_2C69_Behaviour12:
   jr nz, +
   jp LABEL_71C7_
 
-LABEL_2CD0_:
+_LABEL_2CD0_ret:
   ret
 
 +:
@@ -7125,7 +7236,7 @@ LABEL_2D07_UpdatePalette_RuffTruxSubmerged:
   ; Game Gear
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr nz, + ; ret
+  JrNzRet + ; ret
   call LABEL_3F22_ScreenOff
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   sla a
@@ -7156,7 +7267,7 @@ DATA_2D36_RuffTruxSubmergedPaletteSequence_GG:
 ++: ; SMS
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr nz, + ; ret
+  JrNzRet + ; ret
   call LABEL_3F22_ScreenOff ; while we mess with the palette (?!)
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   ld hl, DATA_2FB7_RuffTruxSubmergedPaletteSequence_SMS
@@ -7658,7 +7769,7 @@ DATA_313B_Powerboats_TileHighBytesRunCompressed:
 LABEL_3164_:
   ld a, (_RAM_D582_)
   cp $01
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld a, $02
   ld (_RAM_D582_), a
   JumpToPagedFunction LABEL_3682E_
@@ -7668,7 +7779,7 @@ LABEL_3164_:
 LABEL_317C_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   JumpToPagedFunction LABEL_36971_
 
 +:ret
@@ -7708,7 +7819,7 @@ LABEL_31B6_InitialiseFloorTiles:
   ld a, (hl)
   ld (_RAM_DF18_FloorTilesVRAMAddress+1), a
   cp $FF
-  jr z, +
+  JrZRet +
   ; If not $ff
   ld a, $01
   ld (_RAM_DF17_HaveFloorTiles), a ; Set flag
@@ -7772,7 +7883,7 @@ LABEL_3214_BlankSpriteTable:
 LABEL_3231_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr z, +
+  JrZRet +
   ld a, $00
   out (PORT_VDP_ADDRESS), a
   ld a, $72
@@ -8063,7 +8174,7 @@ LABEL_3450_:
   ld (_RAM_DE43_), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr z, ++
+  JrZRet ++
   ld a, (_RAM_DE4A_)
   xor $FF
   ld (_RAM_DE4A_), a
@@ -8303,7 +8414,7 @@ LABEL_3556_:
   xor $FF
 +:
   cp $18
-  jr nc, +
+  JrNcRet +
   ld a, $03
   ld (_RAM_DE49_), a
 +:ret
@@ -8647,7 +8758,7 @@ LABEL_38B9_:
 ++:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jp z, LABEL_395C_
+  JpZRet _LABEL_395C_ret
   ld ix, _RAM_DA60_SpriteTableXNs.40
   ld iy, _RAM_DAE0_SpriteTableYs.40
   ld a, (_RAM_DD3E_)
@@ -8700,7 +8811,7 @@ LABEL_38B9_:
   ld (_RAM_DF60_), a
   ld a, (_RAM_DE89_)
   cp $01
-  jr nz, LABEL_395C_
+  JrNzRet _LABEL_395C_ret
   ld a, (_RAM_DF5C_)
   cp $02
   jr nz, +
@@ -8711,13 +8822,13 @@ LABEL_38B9_:
 +:
   xor a
   ld (_RAM_DF5C_), a
-LABEL_395C_:
+_LABEL_395C_ret:
   ret
 
 LABEL_395D_:
   ld a, (_RAM_DD5B_)
   or a
-  jr nz, LABEL_395C_
+  JrNzRet _LABEL_395C_ret
 LABEL_3963_:
   call LABEL_3969_
   jp LABEL_39AE_
@@ -8869,7 +8980,7 @@ LABEL_3A6B_:
   ld (_RAM_DF5D_), a
   ld a, (_RAM_DE89_)
   cp $01
-  jr nz, LABEL_3AC8_
+  JrNzRet _LABEL_3AC8_ret
   ld a, (_RAM_DF59_CarState)
   cp CarState_2_Respawning
   jr nz, +
@@ -8884,13 +8995,13 @@ LABEL_3A6B_:
   xor a
   ld (_RAM_DF74_RuffTruxSubmergedCounter), a
   ld (_RAM_DF59_CarState), a ; CarState_0_Normal
-LABEL_3AC8_:
+_LABEL_3AC8_ret:
   ret
 
 LABEL_3AC9_:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_3AC8_
+  JrNzRet _LABEL_3AC8_ret
 LABEL_3ACF_:
   ld a, (_RAM_DE84_)
   ld (ix+0), a
@@ -8966,7 +9077,7 @@ LABEL_3B74_:
   cp CarState_4_Submerged
   jp z, LABEL_3E43_
   cp CarState_ff
-  jr z, LABEL_3BEC_ret
+  JrZRet LABEL_3BEC_ret
   xor a
   ld (ix-2), a
   ld (iy-1), a
@@ -9004,7 +9115,7 @@ LABEL_3B74_:
   cp $01
   jr z, +
   cp $05
-  jr nz, LABEL_3BEC_ret
+  JrNzRet LABEL_3BEC_ret
   xor a
   ld (_RAM_DE87_), a
 LABEL_3BEC_ret:
@@ -9063,7 +9174,7 @@ LABEL_3BEC_ret:
   add a, $01
   ld (_RAM_DE88_), a
   cp $09
-  jr nz, +
+  JrNzRet +
   ; When it wraps, set/reset stuff
   ld a, $01
   ld (_RAM_DE89_), a
@@ -9201,21 +9312,21 @@ LABEL_3C54_:
 LABEL_3D59_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, LABEL_3DBC_
+  JrZRet _LABEL_3DBC_ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr nz, LABEL_3DBC_
+  JrNzRet _LABEL_3DBC_ret
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_3DBC_
+  JrNzRet _LABEL_3DBC_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_3DBC_
+  JrNzRet _LABEL_3DBC_ret
   ld a, (_RAM_DCF6_)
   and $3F
-  jr z, LABEL_3DBC_
+  JrZRet _LABEL_3DBC_ret
   cp $3C
-  jr z, LABEL_3DBC_
+  JrZRet _LABEL_3DBC_ret
   ld a, (_RAM_DD08_)
   and $18
   srl a
@@ -9241,11 +9352,11 @@ LABEL_3D59_:
   add hl, de
   ld a, (hl)
   cp $FE
-  jr z, LABEL_3DBC_
+  JrZRet _LABEL_3DBC_ret
   cp $FF
-  jr z, LABEL_3DBC_
+  JrZRet _LABEL_3DBC_ret
   ld (_RAM_D5B8_), a
-LABEL_3DBC_:
+_LABEL_3DBC_ret:
   ret
 
 LABEL_3DBD_:
@@ -9397,7 +9508,7 @@ LABEL_3F36_ScreenOn:
 LABEL_3F3F_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, +
+  JrNzRet +
   CallPagedFunction2 LABEL_362D3_
 +:ret
 
@@ -9600,18 +9711,18 @@ DATA_4425_:
 LABEL_4465_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr nz, LABEL_44C2_
+  JrNzRet _LABEL_44C2_ret
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_44C2_
+  JrNzRet _LABEL_44C2_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_44C2_
+  JrNzRet _LABEL_44C2_ret
   ld a, (_RAM_DE7D_)
   and $3F
-  jr z, LABEL_44C2_
+  JrZRet _LABEL_44C2_ret
   cp $3C
-  jr z, LABEL_44C2_
+  JrZRet _LABEL_44C2_ret
   ld a, (_RAM_DF79_CurrentCombinedByte)
   and $18 ; %00011000
   srl a
@@ -9637,20 +9748,20 @@ LABEL_4465_:
   add hl, de
   ld a, (hl)
   cp $FE
-  jr z, LABEL_44C2_
+  JrZRet _LABEL_44C2_ret
   cp $FF
-  jr z, LABEL_44C2_
+  JrZRet _LABEL_44C2_ret
   ld (_RAM_DF7A_), a
-LABEL_44C2_:
+_LABEL_44C2_ret:
   ret
 
 LABEL_44C3_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF7B_)
   or a
   jr nz, ++
@@ -9775,7 +9886,8 @@ LABEL_44C3_:
 +++:
   ld a, (_RAM_DEB2_)
   or a
-  jr nz, +
+  JrNzRet +
+  ; Nothing happens!
   ret
 
 +:ret
@@ -9875,13 +9987,13 @@ LABEL_4595_:
 LABEL_4622_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jp nz, LABEL_46C8_
+  JpNzRet _LABEL_46C8_ret
   ld a, (_RAM_DF58_)
   or a
-  jp nz, LABEL_46C8_
+  JpNzRet _LABEL_46C8_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jp nz, LABEL_46C8_
+  JpNzRet _LABEL_46C8_ret
   ld a, (_RAM_DE7D_)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
   cp $2A
@@ -9895,7 +10007,7 @@ LABEL_4622_:
   cp $10
   jr z, +
   cp $11
-  jr nz, LABEL_46C8_
+  JrNzRet _LABEL_46C8_ret
 +:
   ld hl, (_RAM_DBA2_)
   ld de, (_RAM_DE7B_)
@@ -9904,7 +10016,7 @@ LABEL_4622_:
   cp $1D
   jr z, +
   cp $1F
-  jr nz, LABEL_46C8_
+  JrNzRet _LABEL_46C8_ret
   ld a, $01
   ld (_RAM_DEB5_), a
   ld a, $61
@@ -9956,7 +10068,7 @@ LABEL_4682_:
   ld (_RAM_DEAF_), a
   jp +++
 
-LABEL_46C8_:
+_LABEL_46C8_ret:
   ret
 
 +:
@@ -10089,22 +10201,22 @@ LABEL_4793_:
   ld (_RAM_DF83_), a
   jp LABEL_29A3_
 
-LABEL_479D_:
+_LABEL_479D_ret:
   ret
 
 LABEL_479E_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr nz, LABEL_479D_
+  JrNzRet _LABEL_479D_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
   ld a, (_RAM_DD1A_)
   or a
-  jr nz, LABEL_479D_
+  JrNzRet _LABEL_479D_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_479D_
+  JrNzRet _LABEL_479D_ret
   ld ix, _RAM_DCEC_
   jp ++
 
@@ -10125,13 +10237,13 @@ LABEL_479E_:
   cp $10
   jr z, +
   cp $11
-  jr nz, LABEL_479D_
+  JrNzRet _LABEL_479D_ret
 +:
   ld a, (ix+5)
   cp $1D
   jr z, +
   cp $1F
-  jr nz, LABEL_479D_
+  JrNzRet _LABEL_479D_ret
   ld a, $61
   jp +++
 
@@ -10217,7 +10329,7 @@ LABEL_479E_:
 ++:
   ld a, b
   and $10
-  jr nz, ++
+  JrNzRet ++
   ld a, b
   and $40
   jr z, +
@@ -10399,7 +10511,7 @@ LABEL_4927_:
   jr nz, LABEL_49BF_
   ld a, l
   cp $E8
-  jr nc, -
+  JrNcRet -
 LABEL_49BF_:
   ld a, $E4
   ld (ix+18), a
@@ -10494,7 +10606,7 @@ LABEL_49C9_:
 LABEL_4DAA_:
   ld a, (ix+20)
   or a
-  jp nz, LABEL_5A87_
+  JpNzRet _LABEL_5A87_ret
   ld hl, DATA_24AE_
   ld d, $00
   ld a, (ix+11)
@@ -10507,7 +10619,7 @@ LABEL_4DAA_:
   ld a, (hl)
   ld (ix+37), a
   cp $82
-  jp z, LABEL_5A87_
+  JpZRet _LABEL_5A87_ret
   ld a, $01
   ld (ix+38), a
   jp LABEL_5A77_
@@ -10526,7 +10638,7 @@ LABEL_4DD4_:
 +:
   ld a, (_RAM_DCD9_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, CarState_3_Falling
   ld (_RAM_DF5A_CarState3), a
   ld a, $01
@@ -10542,10 +10654,10 @@ LABEL_4DD4_:
 ++:
   ld a, (_RAM_D5B0_)
   or a
-  jr nz, LABEL_4E7A_
+  JrNzRet _LABEL_4E7A_ret
   ld a, (_RAM_DD1A_)
   or a
-  jr nz, LABEL_4E7A_
+  JrNzRet _LABEL_4E7A_ret
   ld a, (_RAM_D5BE_)
   or a
   jr nz, +
@@ -10594,7 +10706,7 @@ LABEL_4E49_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jr z, LABEL_4EA0_
-LABEL_4E7A_:
+_LABEL_4E7A_ret:
   ret
 
 -:
@@ -10663,7 +10775,7 @@ LABEL_4EAB_:
 LABEL_4EFA_:
   ld a, (_RAM_DD5B_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, $03
   ld (_RAM_DF5C_), a
   ld a, $01
@@ -11153,7 +11265,7 @@ LABEL_523B_:
   jr z, LABEL_5298_
   ld a, (_RAM_DE4F_)
   cp $2C
-  jr nc, LABEL_5297_
+  JrNcRet _LABEL_5297_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, LABEL_5283_
@@ -11162,23 +11274,23 @@ LABEL_523B_:
 LABEL_5283_:
   ld a, (_RAM_DE4F_)
   cp $16
-  jr nc, LABEL_5297_
+  JrNcRet _LABEL_5297_ret
   ld a, $01
   ld (_RAM_DEB9_), a
   inc a
   ld (_RAM_DEAF_), a
   xor a
   ld (_RAM_DEB0_), a
-LABEL_5297_:
+_LABEL_5297_ret:
   ret
 
 LABEL_5298_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   dec a
-  jr nz, LABEL_5297_
+  JrNzRet _LABEL_5297_ret
   ld a, (_RAM_DE4F_)
   cp $08
-  jr nc, LABEL_5297_
+  JrNcRet _LABEL_5297_ret
   call LABEL_5283_
   ld a, $01
   ld (_RAM_DEB0_), a
@@ -12005,7 +12117,7 @@ LABEL_5872_:
   ld (ix+29), a
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_5902_
+  JrNzRet _LABEL_5902_ret
   ld a, (ix+29)
   or a
   jp z, LABEL_594E_
@@ -12035,13 +12147,13 @@ LABEL_5872_:
   jp z, LABEL_5B9A_
   cp $13
   jp z, LABEL_5E25_
-LABEL_5902_:
+_LABEL_5902_ret:
   ret
 
 +:
   ld a, (ix+11)
   cp $07
-  jr c, +
+  JrCRet +
   ld a, (ix+34)
   ld l, a
   ld a, (ix+35)
@@ -12072,9 +12184,9 @@ LABEL_5902_:
   ld (hl), a
   ld a, (_RAM_DB97_TrackType)
   cp TT_3_TurboWheels
-  jr z, +++
+  JrZRet +++
   cp TT_7_RuffTrux
-  jr z, +++
+  JrZRet +++
   cp TT_5_Warriors
   jr nz, +
   ld a, $08
@@ -12089,7 +12201,7 @@ LABEL_5902_:
 LABEL_594E_:
   ld a, (ix+20)
   or a
-  jr nz, LABEL_5978_
+  JrNzRet _LABEL_5978_ret
   ld a, (ix+30)
   cp $04
   jr z, +
@@ -12098,7 +12210,7 @@ LABEL_594E_:
   cp $0D
   jr z, +
   cp $03
-  jr nz, LABEL_5978_
+  JrNzRet _LABEL_5978_ret
 +:
   ld a, $1C
   ld (ix+36), a
@@ -12108,13 +12220,13 @@ LABEL_594E_:
   ld (ix+38), a
   jp LABEL_5A77_
 
-LABEL_5978_:
+_LABEL_5978_ret:
   ret
 
 LABEL_5979_:
   ld a, (ix+30)
   cp $0D
-  jr z, LABEL_5978_
+  JrZRet _LABEL_5978_ret
   jp LABEL_4DAA_
 
 LABEL_5983_:
@@ -12141,7 +12253,7 @@ LABEL_5983_:
 LABEL_59A4_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, (_RAM_DD0A_)
   cp $07
   jr z, +
@@ -12158,7 +12270,7 @@ LABEL_59BC_:
   jr z, ++
   ld a, (_RAM_DB97_TrackType)
   cp TT_1_FourByFour
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DD0A_)
   or a
   jp z, LABEL_59FC_
@@ -12183,11 +12295,11 @@ LABEL_59EF_:
   jr z, LABEL_5A39_
   ld a, (ix+31)
   or a
-  jr nz, +
+  JrNzRet +
 LABEL_59FC_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, SFX_03_Crash
   ld (_RAM_D974_SFXTrigger_Player2), a
   ld hl, 1000 ; $03E8
@@ -12212,7 +12324,7 @@ LABEL_59FC_:
 LABEL_5A39_:
   ld a, (ix+20)
   or a
-  jr nz, LABEL_5A87_
+  JrNzRet _LABEL_5A87_ret
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
@@ -12250,10 +12362,10 @@ LABEL_5A77_:
   ld (ix+20), a
   ld a, (ix+21)
   or a
-  jr z, LABEL_5A87_
+  JrZRet _LABEL_5A87_ret
   ld a, SFX_02_HitGround
   ld (_RAM_D974_SFXTrigger_Player2), a
-LABEL_5A87_:
+_LABEL_5A87_ret:
   ret
 
 LABEL_5A88_:
@@ -12266,7 +12378,7 @@ LABEL_5A88_:
   ld d, $00
   ld a, (ix+20)
   or a
-  jp z, LABEL_5B77_
+  JpZRet _LABEL_5B77_ret
   ld hl, DATA_1B232_SinTable
   ld e, a
   add hl, de
@@ -12351,7 +12463,7 @@ LABEL_5A88_:
   add a, l
   ld (ix+20), a
   cp $82
-  jr c, LABEL_5B77_
+  JrCRet _LABEL_5B77_ret
   ld a, (ix+21)
   or a
   jr z, +
@@ -12374,13 +12486,15 @@ LABEL_5A88_:
 +:
   ld a, (ix+38)
   cp $02
-  jr nz, LABEL_5B77_
+  JrNzRet _LABEL_5B77_ret
+  ; Nothing happens!
   ret
 
-LABEL_5B77_:
+_LABEL_5B77_ret:
   ret
 
 ; Data from 5B78 to 5B7F (8 bytes)
+; Unreachable code?
 .db $3E $8E $32 $00 $80 $C3 $03 $A0
 
 ++:
@@ -12406,7 +12520,7 @@ LABEL_5B9A_:
 +:
   ld a, (ix+51)
   or a
-  jp nz, LABEL_5E24_
+  JpNzRet _LABEL_5E24_ret
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
   jp z, LABEL_5CFC_
@@ -12586,7 +12700,7 @@ LABEL_5CFC_:
 LABEL_5D4A_:
   ld a, (ix+46)
   or a
-  jp nz, LABEL_5E24_
+  JpNzRet _LABEL_5E24_ret
   ld a, (ix+45)
   or a
   jr z, LABEL_5DAD_
@@ -12686,7 +12800,7 @@ LABEL_5DB9_:
   ld (ix+55), a
   ld a, h
   ld (ix+56), a
-LABEL_5E24_:
+_LABEL_5E24_ret:
   ret
 
 LABEL_5E25_:
@@ -12704,7 +12818,7 @@ LABEL_5E3A_:
   call LABEL_51B3_
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr z, +
+  JrZRet +
   xor a
   ld (_RAM_DCC1_), a
   ld (_RAM_DCC2_), a
@@ -12715,7 +12829,7 @@ LABEL_5E3A_:
   call LABEL_5F5E_
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr z, +
+  JrZRet +
   call ++
   call LABEL_60AE_
   call LABEL_619B_
@@ -12729,16 +12843,16 @@ LABEL_5E3A_:
   ld bc, $0000
   ld a, (_RAM_DCC0_)
   cp $01
-  jp nz, LABEL_5F52_
+  JpNzRet _LABEL_5F52_ret
   ld a, (_RAM_DE8C_)
   or a
-  jp nz, LABEL_5F52_
+  JpNzRet _LABEL_5F52_ret
   ld a, (_RAM_DF58_)
   or a
-  jp nz, LABEL_5F52_
+  JpNzRet _LABEL_5F52_ret
   ld a, (_RAM_DCD9_)
   or a
-  jp nz, LABEL_5F52_
+  JpNzRet _LABEL_5F52_ret
   ld a, (_RAM_DCBD_)
   ld l, a
   ld a, (_RAM_DBA5_)
@@ -12748,7 +12862,7 @@ LABEL_5E3A_:
   ld b, $01
 +:
   cp $10
-  jp nc, LABEL_5F52_
+  JpNcRet _LABEL_5F52_ret
   ld a, (_RAM_DCBC_)
   ld l, a
   ld a, (_RAM_DBA4_)
@@ -12758,7 +12872,7 @@ LABEL_5E3A_:
   ld c, $01
 +:
   cp $10
-  jp nc, LABEL_5F52_
+  JpNcRet _LABEL_5F52_ret
   ld a, $01
   cp b
   jr z, +
@@ -12839,7 +12953,7 @@ LABEL_5E3A_:
   xor a
   ld (_RAM_DCB6_), a
   ld (_RAM_DE92_EngineVelocity), a
-LABEL_5F52_:
+_LABEL_5F52_ret:
   ret
 
 +++:
@@ -12853,16 +12967,16 @@ LABEL_5F5E_:
   ld bc, $0000
   ld a, (_RAM_DD01_)
   cp $01
-  jp nz, LABEL_609C_
+  JpNzRet _LABEL_609C_ret
   ld a, (_RAM_DE8C_)
   or a
-  jp nz, LABEL_609C_
+  JpNzRet _LABEL_609C_ret
   ld a, (_RAM_DF58_)
   or a
-  jp nz, LABEL_609C_
+  JpNzRet _LABEL_609C_ret
   ld a, (_RAM_DD1A_)
   or a
-  jp nz, LABEL_609C_
+  JpNzRet _LABEL_609C_ret
   ld a, (_RAM_DCFE_)
   ld l, a
   ld a, (_RAM_DBA5_)
@@ -12872,7 +12986,7 @@ LABEL_5F5E_:
   ld b, $01
 +:
   cp $10
-  jp nc, LABEL_609C_
+  JpNcRet _LABEL_609C_ret
   ld a, (_RAM_DCFD_)
   ld l, a
   ld a, (_RAM_DBA4_)
@@ -12882,7 +12996,7 @@ LABEL_5F5E_:
   ld c, $01
 +:
   cp $10
-  jp nc, LABEL_609C_
+  JpNcRet _LABEL_609C_ret
   ld a, $01
   cp b
   jr z, +
@@ -13018,7 +13132,7 @@ LABEL_6054_:
   xor a
   ld (_RAM_DCF7_), a
   ld (_RAM_DE92_EngineVelocity), a
-LABEL_609C_:
+_LABEL_609C_ret:
   ret
 
 LABEL_609D_:
@@ -13035,16 +13149,16 @@ LABEL_60AE_:
   ld bc, $0000
   ld a, (_RAM_DD42_)
   cp $01
-  jp nz, LABEL_618F_
+  JpNzRet _LABEL_618F_ret
   ld a, (_RAM_DE8C_)
   or a
-  jp nz, LABEL_618F_
+  JpNzRet _LABEL_618F_ret
   ld a, (_RAM_DF58_)
   or a
-  jp nz, LABEL_618F_
+  JpNzRet _LABEL_618F_ret
   ld a, (_RAM_DD5B_)
   or a
-  jp nz, LABEL_618F_
+  JpNzRet _LABEL_618F_ret
   ld a, (_RAM_DD3F_)
   ld l, a
   ld a, (_RAM_DBA5_)
@@ -13054,7 +13168,7 @@ LABEL_60AE_:
   ld b, $01
 +:
   cp $10
-  jp nc, LABEL_618F_
+  JpNcRet _LABEL_618F_ret
   ld a, (_RAM_DD3E_)
   ld l, a
   ld a, (_RAM_DBA4_)
@@ -13064,7 +13178,7 @@ LABEL_60AE_:
   ld c, $01
 +:
   cp $10
-  jp nc, LABEL_618F_
+  JpNcRet _LABEL_618F_ret
   ld a, $01
   cp b
   jr z, +
@@ -13145,7 +13259,7 @@ LABEL_60AE_:
   xor a
   ld (_RAM_DD38_), a
   ld (_RAM_DE92_EngineVelocity), a
-LABEL_618F_:
+_LABEL_618F_ret:
   ret
 
 +++:
@@ -13280,16 +13394,16 @@ LABEL_629A_:
   ld bc, $0000
   ld a, (_RAM_DCC0_)
   cp $01
-  jp nz, LABEL_6393_
+  JpNzRet _LABEL_6393_ret
   ld a, (_RAM_DD42_)
   cp $01
-  jp nz, LABEL_6393_
+  JpNzRet _LABEL_6393_ret
   ld a, (_RAM_DCD9_)
   or a
-  jp nz, LABEL_6393_
+  JpNzRet _LABEL_6393_ret
   ld a, (_RAM_DD5B_)
   or a
-  jp nz, LABEL_6393_
+  JpNzRet _LABEL_6393_ret
   ld a, (_RAM_DCBD_)
   ld l, a
   ld a, (_RAM_DD3F_)
@@ -13299,7 +13413,7 @@ LABEL_629A_:
   ld b, $01
 +:
   cp $10
-  jp nc, LABEL_6393_
+  JpNcRet _LABEL_6393_ret
   ld a, (_RAM_DCBC_)
   ld l, a
   ld a, (_RAM_DD3E_)
@@ -13309,7 +13423,7 @@ LABEL_629A_:
   ld c, $01
 +:
   cp $10
-  jp nc, LABEL_6393_
+  JpNcRet _LABEL_6393_ret
   ld a, $01
   cp b
   jr z, +
@@ -13391,23 +13505,23 @@ LABEL_629A_:
   xor a
   ld (_RAM_DCB6_), a
   ld (_RAM_DD38_), a
-LABEL_6393_:
+_LABEL_6393_ret:
   ret
 
 LABEL_6394_:
   ld bc, $0000
   ld a, (_RAM_DD01_)
   cp $01
-  jp nz, LABEL_648D_
+  JpNzRet _LABEL_648D_ret
   ld a, (_RAM_DD42_)
   cp $01
-  jp nz, LABEL_648D_
+  JpNzRet _LABEL_648D_ret
   ld a, (_RAM_DD1A_)
   or a
-  jp nz, LABEL_648D_
+  JpNzRet _LABEL_648D_ret
   ld a, (_RAM_DD5B_)
   or a
-  jp nz, LABEL_648D_
+  JpNzRet _LABEL_648D_ret
   ld a, (_RAM_DCFE_)
   ld l, a
   ld a, (_RAM_DD3F_)
@@ -13417,7 +13531,7 @@ LABEL_6394_:
   ld b, $01
 +:
   cp $10
-  jp nc, LABEL_648D_
+  JpNcRet _LABEL_648D_ret
   ld a, (_RAM_DCFD_)
   ld l, a
   ld a, (_RAM_DD3E_)
@@ -13427,7 +13541,7 @@ LABEL_6394_:
   ld c, $01
 +:
   cp $10
-  jp nc, LABEL_648D_
+  JpNcRet _LABEL_648D_ret
   ld a, $01
   cp b
   jr z, +
@@ -13509,7 +13623,7 @@ LABEL_6394_:
   xor a
   ld (_RAM_DCF7_), a
   ld (_RAM_DD38_), a
-LABEL_648D_:
+_LABEL_648D_ret:
   ret
 
 LABEL_648E_:
@@ -13540,12 +13654,10 @@ LABEL_64C9_:
   jr c, +
   ld a, (_RAM_DBA5_)
   cp $E8
-  jr c, ++
+  JrCRet ++
   cp $F0
-  jr nc, ++
-; Executed in RAM at d946
-+:
-  ld a, $01
+  JrNcRet ++
++:ld a, $01
   ld (_RAM_D946_), a
 ++:ret
 
@@ -13613,7 +13725,7 @@ LABEL_6540_:
 LABEL_6571_:
   ld a, (_RAM_D948_)
   cp $08
-  jr c, +
+  JrCRet +
   xor a
   ld (_RAM_D948_), a
   ld a, SFX_0D
@@ -13623,7 +13735,7 @@ LABEL_6571_:
 LABEL_6582_:
   ld a, (_RAM_D949_)
   cp $08
-  jr c, +
+  JrCRet +
   xor a
   ld (_RAM_D949_), a
   ld a, SFX_0D
@@ -13633,16 +13745,16 @@ LABEL_6582_:
 LABEL_6593_:
   ld a, (_RAM_D94A_)
   cp $04
-  jr c, LABEL_65C2_ret
+  JrCRet _LABEL_65C2_ret
   ld a, (_RAM_DF00_)
   or a
-  jr nz, LABEL_65C2_ret
+  JrNzRet _LABEL_65C2_ret
   ld a, (_RAM_DE92_EngineVelocity)
   cp $06
-  jr c, LABEL_65C2_ret
+  JrCRet _LABEL_65C2_ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr z, LABEL_65C2_ret
+  JrZRet _LABEL_65C2_ret
 --:
   xor a
   ld (_RAM_D94A_), a
@@ -13654,7 +13766,7 @@ LABEL_6593_:
   ld a, SFX_0F_Skid1
 -:
   ld (_RAM_D963_SFXTrigger_Player1), a
-LABEL_65C2_ret:
+_LABEL_65C2_ret:
   ret
 
 +:
@@ -13664,16 +13776,16 @@ LABEL_65C2_ret:
 LABEL_65C7_:
   ld a, (_RAM_D94A_)
   cp $04
-  jr c, LABEL_65C2_ret
+  JrCRet _LABEL_65C2_ret
   jr --
 
 LABEL_65D0_BehaviourE:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF58_)
   or a
-  jr nz, +
+  JrNzRet +
   ld hl, 1000 ; $03E8
   ld (_RAM_D95B_), hl
   xor a
@@ -13840,7 +13952,7 @@ LABEL_6677_:
 LABEL_6704_LoadHUDTiles:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr z, LABEL_6755_ret
+  JrZRet LABEL_6755_ret
   ; Normal cars only
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -13899,19 +14011,19 @@ LABEL_6756_:
   jr z, LABEL_67AB_
   ld a, (_RAM_D5C5_)
   cp $02
-  jp z, LABEL_6895_ret
+  JpZRet LABEL_6895_ret
   ld a, (_RAM_DE8C_)
   or a
   jr z, +
   ld a, (_RAM_DD1F_)
   or a
-  jp z, LABEL_6895_ret
+  JpZRet LABEL_6895_ret
   ld a, (_RAM_DF59_CarState)
   or a
-  jp nz, LABEL_6895_ret
+  JpNzRet LABEL_6895_ret
   ld a, (_RAM_DF5B_)
   or a
-  jp nz, LABEL_6895_ret
+  JpNzRet LABEL_6895_ret
   ld a, $01
   ld (_RAM_D5C5_), a
   ld hl, $0000
@@ -13922,12 +14034,12 @@ LABEL_6756_:
   ld a, (_RAM_DD1F_)
   or a
   jr z, +
-  jp LABEL_6895_ret
+  JpRet LABEL_6895_ret
 
 +:
   ld a, (_RAM_D945_)
   cp $02
-  jp z, LABEL_6895_ret
+  JpZRet LABEL_6895_ret
   ld a, (_RAM_DF81_)
   or a
   jr nz, ++
@@ -13943,11 +14055,11 @@ LABEL_67AB_:
 +:
   ld a, (_RAM_DF59_CarState)
   cp CarState_ff
-  jp nz, LABEL_6895_ret
+  JpNzRet LABEL_6895_ret
   ld a, (_RAM_DF5B_)
   cp $FF
   jr z, ++
-  jp LABEL_6895_ret
+  JpRet LABEL_6895_ret
 
 ++:
   ld a, (_RAM_DBAA_)
@@ -14038,10 +14150,10 @@ LABEL_67AB_:
 ++++++:
   ld a, (_RAM_DEBA_)
   or a
-  jr nz, LABEL_6895_ret
+  JrNzRet LABEL_6895_ret
   ld a, (_RAM_DEBB_)
   or a
-  jr nz, LABEL_6895_ret
+  JrNzRet LABEL_6895_ret
   ld a, (_RAM_DE8C_)
   cp $01
   jp z, LABEL_69DB_
@@ -14144,9 +14256,9 @@ LABEL_6895_ret:
 LABEL_693F_:
   ld a, (_RAM_DF7F_)
   cp $05
-  jp nz, LABEL_6895_ret
+  JpNzRet LABEL_6895_ret
 
-  LABEL_6947_:
+LABEL_6947_:
   xor a
   ld (_RAM_D945_), a
   ld (_RAM_D940_), a
@@ -14210,7 +14322,7 @@ LABEL_69DB_:
   jr z, LABEL_6A11_
   ld a, (_RAM_D5C5_)
   cp $02
-  jp z, LABEL_6A6B_
+  JpZRet _LABEL_6A6B_ret
   ld a, (_RAM_D5C6_)
   or a
   jr z, +
@@ -14231,7 +14343,7 @@ LABEL_69DB_:
   ld a, $10
   ld (_RAM_D5C7_), a
   call LABEL_6A4F_
-  jr LABEL_6A6B_
+  JrRet _LABEL_6A6B_ret
 
 LABEL_6A11_:
   xor a
@@ -14271,16 +14383,16 @@ LABEL_6A4F_:
   ld (_RAM_DBA7_), a
   ld (_RAM_DF07_), a
   ld (_RAM_DF05_), a
-LABEL_6A6B_:
+_LABEL_6A6B_ret:
   ret
 
 LABEL_6A6C_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, (_RAM_D5C5_)
   cp $02
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5C7_)
   cp $01
   jr z, ++
@@ -14305,7 +14417,7 @@ LABEL_6A97_:
   jp z, LABEL_6B60_
   ld a, (_RAM_DE8C_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5C5_)
   or a
   jr z, ++
@@ -14446,10 +14558,10 @@ LABEL_6B60_:
 LABEL_6BC2_:
   ld a, (_RAM_DD5B_)
   or a
-  jp z, +
+  JpZRet +
   ld a, (_RAM_DF5C_)
   or a
-  jp nz, +
+  JpNzRet +
   ld a, (_RAM_DD60_)
   or a
   jr nz, ++
@@ -14743,7 +14855,7 @@ LABEL_6DDB_:
 LABEL_6E00_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jp z, LABEL_7171_ret
+  JpZRet LABEL_7171_ret
   ld a, (_RAM_DCC5_)
   cp $00
   jp nz, LABEL_6F10_
@@ -15340,10 +15452,10 @@ LABEL_71C7_:
   jp z, ++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld a, (_RAM_D5DE_)
   ld (_RAM_DF4F_), a
   ld (_RAM_D587_), a
@@ -15460,7 +15572,7 @@ LABEL_7367_:
   add hl, bc
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld bc, $0004
   or a
   sbc hl, bc
@@ -15488,7 +15600,7 @@ LABEL_7393_:
   add hl, bc
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld bc, $0004
   or a
   sbc hl, bc
@@ -16268,7 +16380,7 @@ LABEL_79C8_:
 +:
   ld a, (_RAM_DCD9_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, CarState_4_Submerged
   ld (_RAM_DF5A_CarState3), a
   ld a, $01
@@ -16284,7 +16396,7 @@ LABEL_79C8_:
 ++:
   ld a, (_RAM_DD1A_)
   cp $00
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -16315,7 +16427,7 @@ LABEL_79C8_:
 LABEL_7A38_:
   ld a, (_RAM_DD5B_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, $04
   ld (_RAM_DF5C_), a
   ld a, $01
@@ -16407,13 +16519,12 @@ LABEL_7AC4_:
   ld (_RAM_DF7F_), a
   ld (_RAM_DF80_TwoPlayerWinPhase), a
   ld (_RAM_DF81_), a
--:
-  ret
+-:ret
 
 LABEL_7AF2_:
   ld a, (_RAM_D5CB_)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, $01
   ld (_RAM_D5CB_), a
   ld (_RAM_D5CC_PlayoffTileLoadFlag), a
@@ -16425,7 +16536,7 @@ LABEL_7AF2_:
 LABEL_7B0B_:
   ld a, (_RAM_D581_)
   cp $A0
-  jr nc, +
+  JrNcRet +
   ld a, (_RAM_D5CB_)
   inc a
   ld (_RAM_D5CB_), a
@@ -19076,7 +19187,7 @@ LABEL_90FF_ReadControllers:
 
   ld a, (_RAM_DC3C_IsGameGear)
   or a
-  jr nz, + ; ret
+  JrNzRet + ; ret
 
   in a, (PORT_CONTROL_B) ; Read controller 2
   sla a
@@ -19158,7 +19269,7 @@ LABEL_9170_BlankTilemap_BlankControlsRAM:
 LABEL_918B_:
   ld a, (_RAM_D694_)
   or a
-  jr z, LABEL_91E7_ret
+  JrZRet LABEL_91E7_ret
   ld a, (_RAM_D690_)
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, (_RAM_D691_TrackType)
@@ -19330,7 +19441,7 @@ LABEL_9276_:
   CallRamCode LABEL_3BC6A_EmitText
   ld a, (_RAM_D691_TrackType)
   or a
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ld a, $01
   ld (_RAM_D6CB_MenuScreenState), a
 +:ret
@@ -19338,10 +19449,10 @@ LABEL_9276_:
 LABEL_92CB_:
   ld a, (_RAM_D6D4_)
   cp $01
-  jr z, LABEL_9316_
+  JrZRet +
   ld a, (_RAM_D693_)
   or a
-  jr z, LABEL_9316_
+  JrZRet +
   ld a, (_RAM_D68C_)
   ld h, a
   ld a, (_RAM_D68D_)
@@ -19364,16 +19475,15 @@ LABEL_92CB_:
   inc hl
   ld (_RAM_D695_), hl
   dec h
-  jr nz, LABEL_9316_
+  JrNzRet +
   ld a, l
   cp $40
-  jr nz, LABEL_9316_
+  JrNzRet +
   xor a
   ld (_RAM_D693_), a
   ld a, $01
   ld (_RAM_D694_), a
-LABEL_9316_:
-  ret
++:ret
 
 LABEL_9317_InitialiseHandSprites:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -19555,7 +19665,7 @@ LABEL_9448_LoadHeaderTiles:
   call LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
-  jr z, + ; ret z
+  JrZRet + ; ret z
   ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, LABEL_949B_LoadHeadToHeadTextTiles
@@ -19576,7 +19686,9 @@ LABEL_949B_LoadHeadToHeadTextTiles:
   ld de, 14 * 8 ; 14 tiles
   jp LABEL_AFA8_Emit3bppTileDataFromDecompressionBufferToVRAM
 
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_94AD_DrawHeaderTilemap:
   ld a, :DATA_13F38_Tilemap_SmallLogo
@@ -19712,7 +19824,7 @@ LABEL_959C_LoadPunctuationTiles:
 LABEL_95AF_DrawHorizontalLineIfSMS:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
-  jr z, + ; ret if GG
+  JrZRet + ; ret if GG
   ; SMS
   ld e, $20 ; Counter: 32 tiles
 -:ld a, $B7 ; Tile index: horizontal bar
@@ -19726,13 +19838,13 @@ LABEL_95AF_DrawHorizontalLineIfSMS:
 LABEL_95C3_:
   ld a, (_RAM_D6B4_)
   cp $01
-  jr z, +
+  JrZRet +
   ld a, (_RAM_D6BA_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D6B0_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D6AB_)
   cp $00
   jr z, ++
@@ -20133,7 +20245,7 @@ LABEL_996E_:
 +:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, LABEL_99D2_ret
+  JrZRet LABEL_99D2_ret
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   ; Flash every 8 frames
@@ -20255,7 +20367,7 @@ LABEL_9A6D_:
 +:
   ld hl, TEXT_9B5E_ToRace
   call LABEL_A5B0_EmitToVDP_Text
-  jp LABEL_99D2_ret
+  JpRet LABEL_99D2_ret
 
 ++:
   ld hl, TEXT_9B56_ToBe
@@ -20356,19 +20468,19 @@ TEXT_9B7E_Handicap:
 LABEL_9B87_:
   ld a, (_RAM_D6BA_)
   cp $00
-  jp nz, LABEL_9C5D_
+  JpNzRet LABEL_9C5D_ret
   ld a, (_RAM_D6A3_)
   cp $00
-  jp nz, LABEL_9C5D_
+  JpNzRet LABEL_9C5D_ret
   ld a, (_RAM_D6AB_)
   cp $08
-  jp z, LABEL_9C5D_
+  JpZRet LABEL_9C5D_ret
   ld a, (_RAM_D6B0_)
   cp $01
   jp z, LABEL_9C64_
   ld a, (_RAM_D6B4_)
   cp $01
-  jp z, LABEL_9C5D_
+  JpZRet LABEL_9C5D_ret
   ld a, (_RAM_D6C6_)
   cp $01
   jr z, +
@@ -20390,7 +20502,7 @@ LABEL_9B87_:
   ld a, (_RAM_D681_Player2Controls_Menus)
 ++:
   and BUTTON_1_MASK ; $10
-  jp nz, LABEL_9C5D_
+  JpNzRet LABEL_9C5D_ret
 +++:
   ld a, (_RAM_D6C4_)
   cp $FF
@@ -20424,9 +20536,9 @@ LABEL_9B87_:
   add hl, bc
   ld a, (hl)
   cp $58
-  jr z, LABEL_9C5D_
+  JrZRet LABEL_9C5D_ret
   cp $5A
-  jr z, LABEL_9C5D_
+  JrZRet LABEL_9C5D_ret
   ld a, $58
   ld (hl), a
   ld (_RAM_D6AA_), a
@@ -20461,8 +20573,10 @@ LABEL_9B87_:
   call z, LABEL_B30E_
   jp LABEL_9C64_
 
-LABEL_9C5D_:
+.ifdef JUMP_TO_RET
+LABEL_9C5D_ret:
   ret
+.endif
 
 LABEL_9C5E_:
   ld a, $01
@@ -20540,7 +20654,7 @@ DATA_9D37_RacerPortraitsPages:
 LABEL_9D4E_:
   ld a, (_RAM_D6B1_)
   cp $00
-  jr z, ++
+  JrZRet ++
   sub $01
   cp $01
   jr nz, +
@@ -20587,17 +20701,23 @@ LABEL_9D4E_:
   call LABEL_9FAB_DrawOrBlank15PortraitTiles
   ld a, (_RAM_D6BA_)
   cp $00
-  jr z, +
+  JrZRet +
   call LABEL_9E29_
 +:ret
 
 ; Data from 9DAD to 9DB4 (8 bytes)
 DATA_9DAD_TileVRAMAddresses:
-.dw $4480 $4840 $4C00 $4FC0 ; Tiles $24, $42, $60, 7e
+  TileWriteAddressData $24
+  TileWriteAddressData $42
+  TileWriteAddressData $60
+  TileWriteAddressData $7e
 
 ; Data from 9DB5 to 9DBC (8 bytes)
 DATA_9DB5_TileVRAMAddresses:
-.dw $4660 $4A20 $4DE0 $51A0 ; Tiles $33, $51, $6f, $8d
+  TileWriteAddressData $33
+  TileWriteAddressData $51
+  TileWriteAddressData $6f
+  TileWriteAddressData $8d
 
 LABEL_9DBD_:
   ld a, (_RAM_DBD3_)
@@ -20632,20 +20752,20 @@ LABEL_9DBD_:
   ld (_RAM_D6B8_), a
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerSelectCharacter
-  jr z, +
+  JrZRet +
   cp $0E
   jr z, ++
   ld a, $00
   ld (_RAM_D6B4_), a
   ld a, (_RAM_D6B9_)
   cp $04
-  jr z, +
+  JrZRet +
   add a, $01
   ld (_RAM_D6B9_), a
 +:ret
 
 ; Data from 9E13 to 9E28 (22 bytes)
-DATA_9E13_:
+DATA_9E13_: ; Indexed by _RAM_D6B7_ + _RAM_D6B5_
 .db $04 $02 $04 $02 $04 $00 $FF $FF $FF $FF $FF $06 $05 $06 $05 $06
 .db $05 $06 $05 $06 $01 $FF
 
@@ -20677,8 +20797,12 @@ LABEL_9E52_:
   ld a, (_RAM_D6B9_)
   add a, $01
   ld (_RAM_D6B9_), a
+.ifdef TAIL_CALL
   call LABEL_A5BE_
   ret
+.else
+  jp LABEL_A5BE_
+.endif
 
 +:
   ld a, $01
@@ -20690,13 +20814,13 @@ LABEL_9E52_:
 LABEL_9E70_:
   ld a, (_RAM_D6B4_)
   cp $01
-  jp z, LABEL_9F3F_ret
+  JpZRet LABEL_9F3F_ret
   ld a, (_RAM_D6A3_)
   cp $00
-  jp nz, LABEL_9F3F_ret
+  JpNzRet LABEL_9F3F_ret
   ld a, (_RAM_D6AB_)
   cp $08
-  jp z, LABEL_9F3F_ret
+  JpZRet LABEL_9F3F_ret
   ld a, (_RAM_D6B0_)
   cp $01
   jp z, LABEL_9C64_
@@ -20705,11 +20829,11 @@ LABEL_9E70_:
   jr z, +
   ld a, (_RAM_D6B9_)
   cp $01
-  jp z, LABEL_9F3F_ret
+  JpZRet LABEL_9F3F_ret
 +:
   ld a, (_RAM_D6B9_)
   cp $00
-  jp z, LABEL_9F3F_ret
+  JpZRet LABEL_9F3F_ret
   ld a, (_RAM_D6C4_)
   cp $FF
   jr z, +
@@ -20717,20 +20841,20 @@ LABEL_9E70_:
   ld c, a
   ld a, (_RAM_D6B9_)
   cp c
-  jp z, LABEL_9F3F_ret
+  JpZRet LABEL_9F3F_ret
 +:
   ld a, (_RAM_D697_)
   cp $00
   jr z, +
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_2_MASK ; $20
-  jr z, LABEL_9F3F_ret
+  JrZRet LABEL_9F3F_ret
   ld a, $00
   ld (_RAM_D697_), a
 +:
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_2_MASK ; $20
-  jr nz, LABEL_9F3F_ret
+  JrNzRet LABEL_9F3F_ret
   ld a, $01
   ld (_RAM_D697_), a
   ld a, (_RAM_D6B9_)
@@ -20757,7 +20881,7 @@ LABEL_9E70_:
   ld a, (hl)
   ld (_RAM_D6BB_), a
   cp e
-  jr nz, LABEL_9F3F_ret
+  JrNzRet LABEL_9F3F_ret
   ld hl, _RAM_DBFE_
   add hl, bc
   add a, $01
@@ -20939,48 +21063,44 @@ DATA_A02E_:
 .db $FF $01 $81 $03 $43 $08 $07 $05 $02 $04 $06
 
 LABEL_A039_:
-  ld de, $0000
+  ld de, 0 ; Tilemap offset to apply (SMS)
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld e, $40
-+:
-  ld a, (_RAM_D6AF_FlashingCounter)
+  ld e, TILEMAP_ROW_SIZE ; 1 row down for GG
++:ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, LABEL_A0A3_
+  JrZRet LABEL_A0A3_ret
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
   sra a
   sra a
-  and $01
+  and $01 ; Flash every 16 frames (8 on, 8 off)
   jp nz, +++
+  ; Draw text
   TilemapWriteAddressToHL 8, 14
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld bc, $0008
+  ld bc, 8
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr z, +
   ld hl, TEXT_A0AC_Loser
   jp ++
-
-+:
-  ld hl, TEXT_A0A4_Winner
++:ld hl, TEXT_A0A4_Winner
 ++:
   call LABEL_A5B0_EmitToVDP_Text
   TilemapWriteAddressToHL 17, 14
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld bc, $0008
+  ld bc, 8
   ld a, (_RAM_DBD0_HeadToHeadLost2)
   or a
   jr z, +
   ld hl, TEXT_A0AC_Loser
   jp ++
-
-+:
-  ld hl, TEXT_A0A4_Winner
++:ld hl, TEXT_A0A4_Winner
 ++:
   jp LABEL_A5B0_EmitToVDP_Text
 
@@ -20988,11 +21108,11 @@ LABEL_A039_:
   TilemapWriteAddressToHL 8, 14
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld bc, $0019
+  ld bc, $0019 ; Covers both strings
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
-LABEL_A0A3_:
+LABEL_A0A3_ret:
   ret
 
 ; Data from A0A4 to A0AB (8 bytes)
@@ -21054,7 +21174,7 @@ LABEL_A0F0_BlankTilemapRectangle:
   dec de
   ld a, e
   or a
-  jr z, +
+  JrZRet +
   ld a, l
   add a, TILEMAP_ROW_SIZE ; $40 ; Add a row
   ld l, a
@@ -21062,8 +21182,9 @@ LABEL_A0F0_BlankTilemapRectangle:
   adc a, $00
   ld h, a
   jp --
-
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_A129_:
   ld de, (_RAM_D6A8_DisplayCaseTileAddress)
@@ -21144,12 +21265,17 @@ LABEL_A14F_:
   add hl, bc
   ld a, (hl)
   or a
+.ifdef TAIL_CALL
   jr z, +
   call LABEL_A1CA_PrintHandicap
   ret
 
 +:call LABEL_A1D3_PrintOrdinary
   ret
+.else
+  jp z, LABEL_A1D3_PrintOrdinary
+  ; fall through
+.endif
 
 LABEL_A1CA_PrintHandicap:
   ld bc, $0008
@@ -21530,10 +21656,10 @@ LABEL_A4B7_:
   call LABEL_A500_DrawSelectGameText
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_OnePlayerMode
-  jr z, +
+  JrZRet +
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
-  jr z, +
+  JrZRet +
   TilemapWriteAddressToHL 3, 16
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $001A
@@ -21741,7 +21867,7 @@ LABEL_A67C_:
 LABEL_A692_:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, ++
+  JrZRet ++
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
@@ -21860,15 +21986,36 @@ LABEL_A7B3_:
 
 ; Data from A7BB to A7EC (50 bytes)
 DATA_A7BB_:
-.db $E7 $DB $D9 $DB $E5 $DB $DC $DB $EB $DB $DA $DB $E9 $DB $E6 $DB
-.db $E0 $DB $E7 $DB $EF $DB $EA $DB $DB $DB $DE $DB $DD $DB $E4 $DB
-.db $EB $DB $ED $DB $DF $DB $E1 $DB $EE $DB $EF $DB $E2 $DB $E3 $DB
-.db $E1 $DB
+.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 
+.dw _RAM_DBD9_DisplayCaseData+ 0 ; $DBD9 
+.dw _RAM_DBD9_DisplayCaseData+12 ; $DBE5 
+.dw _RAM_DBD9_DisplayCaseData+ 3 ; $DBDC 
+.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB 
+.dw _RAM_DBD9_DisplayCaseData+ 1 ; $DBDA 
+.dw _RAM_DBD9_DisplayCaseData+16 ; $DBE9 
+.dw _RAM_DBD9_DisplayCaseData+13 ; $DBE6
+.dw _RAM_DBD9_DisplayCaseData+ 7 ; $DBE0 
+.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 
+.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF 
+.dw _RAM_DBD9_DisplayCaseData+17 ; $DBEA 
+.dw _RAM_DBD9_DisplayCaseData+ 2 ; $DBDB 
+.dw _RAM_DBD9_DisplayCaseData+ 5 ; $DBDE 
+.dw _RAM_DBD9_DisplayCaseData+ 4 ; $DBDD 
+.dw _RAM_DBD9_DisplayCaseData+11 ; $DBE4
+.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB 
+.dw _RAM_DBD9_DisplayCaseData+20 ; $DBED 
+.dw _RAM_DBD9_DisplayCaseData+ 6 ; $DBDF 
+.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1 
+.dw _RAM_DBD9_DisplayCaseData+21 ; $DBEE 
+.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF 
+.dw _RAM_DBD9_DisplayCaseData+ 9 ; $DBE2 
+.dw _RAM_DBD9_DisplayCaseData+10 ; $DBE3
+.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1
 
 LABEL_A7ED_:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, +++
+  JrZRet +++
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
@@ -22161,7 +22308,7 @@ LABEL_A9C6_:
 LABEL_A9EB_:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, LABEL_AA5D_ret ; ret
+  JrZRet LABEL_AA5D_ret ; ret
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
@@ -22527,7 +22674,7 @@ LABEL_AC1E_:
   call LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, (_RAM_DC3F_GameMode)
   dec a
-  jr z, +++
+  JrZRet +++
   TileWriteAddressToHL $7e
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD7_)
@@ -23203,7 +23350,7 @@ LABEL_B1F4_Trampoline_StopMenuMusic:
 LABEL_B1FC_:
   ld a, (_RAM_DC34_IsTournament)
   dec a
-  jr z, +
+  JrZRet +
   ld hl, DATA_B219_
   ld a, (_RAM_D6CC_)
   sub $01
@@ -23315,7 +23462,7 @@ LABEL_B2BB_DrawMenuScreenBase_WithLine:
   call LABEL_959C_LoadPunctuationTiles
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
-  jr z, +
+  JrZRet +
   call LABEL_9448_LoadHeaderTiles
   call LABEL_94AD_DrawHeaderTilemap
   call LABEL_B305_DrawHorizontalLine_Top
@@ -23436,7 +23583,7 @@ LABEL_B389_:
   TilemapWriteAddressToHL 22, 16 ; SMS
   call LABEL_B35A_VRAMAddressToHL
   ld hl, TEXT_B1DD_No
-  jr ++
+  JrRet ++
 +:TilemapWriteAddressToHL 21, 21 ; GG
   call LABEL_B35A_VRAMAddressToHL
   ld hl, TEXT_B1E2_No
@@ -23556,7 +23703,7 @@ LABEL_B44E_BlankMenuRAM:
 LABEL_B45D_:
   ld a, (_RAM_D6D4_) ; Only if 1
   or a
-  jp z, +
+  JpZRet +
   ld a, (_RAM_D691_TrackType)
   call LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
@@ -23579,14 +23726,14 @@ LABEL_B478_SelectPortraitPage:
 LABEL_B484_CheckTitleScreenCheatCodes:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr nz, ++ ; ret
+  JrNzRet ++ ; ret
   ; We wait for a "no buttons pressed" state between each button press.
   ld a, (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen)
   or a
   jr z, +
   ld a, (_RAM_D680_Player1Controls_Menus) ; We just saw one, wait for the buttons to lift
   cp NO_BUTTONS_PRESSED ; $3F
-  jr nz, ++ ; ret
+  JrNzRet ++ ; ret
   xor a
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a ; Clear the flag
   ret
@@ -23594,7 +23741,7 @@ LABEL_B484_CheckTitleScreenCheatCodes:
 +:; We are ready to check. Was anything pressed?
   ld a, (_RAM_D680_Player1Controls_Menus)
   cp NO_BUTTONS_PRESSED ; $3F
-  jr z, ++ ; ret
+  JrZRet ++ ; ret
   ; We saw something - check it
   ld e, a
   call _CheckForCheatCode_HardMode
@@ -24380,7 +24527,7 @@ LABEL_BA4F_LoadMediumNumberTiles:
 LABEL_BA63_:
   ld a, (_RAM_D6AF_FlashingCounter)
   cp $00
-  jr z, +
+  JrZRet +
   sub $01
   ld (_RAM_D6AF_FlashingCounter), a
   sra a
@@ -24678,7 +24825,7 @@ LABEL_BC0C_:
   call LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
-  jr z, LABEL_BCCE_ret
+  JrZRet LABEL_BCCE_ret
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -24740,8 +24887,8 @@ LABEL_BCCF_EmitTilemapRectangleSequence:
   sub $01
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   or a
-  jr z, +
-  ld de, $0040
+  JrZRet +
+  ld de, TILEMAP_ROW_SIZE
   add hl, de
   jp LABEL_BCCF_EmitTilemapRectangleSequence
 
@@ -24879,7 +25026,7 @@ LABEL_BDA6_:
 LABEL_BDB8_:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
-  jr z, +
+  JrZRet +
   ld a, :DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
@@ -25925,7 +26072,7 @@ DATA_1B987_GG:
 LABEL_1BAB3_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, ++
+  JrZRet ++
   ld a, (_RAM_DBD4_)
   srl a
   srl a
@@ -25952,7 +26099,7 @@ LABEL_1BAB3_:
   add hl, de
   ld a, (hl)
   or a
-  jr z, ++
+  JrZRet ++
   ld hl, DATA_1BAF2_
   add hl, de
   ld a, (hl)
@@ -25966,29 +26113,32 @@ DATA_1BAF2_:
 LABEL_1BAFD_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
+.ifdef JUMP_TO_RET
   jr nz, +
--:
-  ret
-
+-:ret
 +:
+.else
+  ret z
+.endif
+
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DF58_)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DD1A_)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DF00_)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DD00_)
   or a
-  jr nz, -
+  JrNzRet -
   ld b, $01
   ld a, (_RAM_DCFD_)
   ld l, a
@@ -26249,11 +26399,11 @@ LABEL_1BC3F_:
 LABEL_1BCCB_DelayIfPlayer2:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr z, ++ ; ret
+  JrZRet ++ ; ret
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
   jr z, +
-  jr ++ ; ret
+  JrRet ++ ; ret
 +:; Player 2
   ld hl, $0000 ; Waste some time
 -:dec hl
@@ -26265,7 +26415,7 @@ LABEL_1BCCB_DelayIfPlayer2:
 LABEL_1BCE2_:
   ld a, (iy+1)
   or a
-  jr nz, +
+  jr nz, + ; Better to ret z
   ret
 
 +:
@@ -26479,7 +26629,7 @@ LABEL_1BDF3_:
   ld a, (_RAM_DEB1_VScrollDelta)
   sub l
   ld (_RAM_DEB1_VScrollDelta), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -26490,7 +26640,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF0E_)
   ld (_RAM_DEB2_), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -26504,7 +26654,7 @@ LABEL_1BDF3_:
   cp $07
   jr nc, +
   ld (_RAM_DEB1_VScrollDelta), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -26513,7 +26663,7 @@ LABEL_1BDF3_:
 +:
   ld a, $07
   ld (_RAM_DEB1_VScrollDelta), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -26553,7 +26703,7 @@ LABEL_1BEB1_ChangePoolTableColour:
   ; to change the colour of the cloth
   ld a, (_RAM_DB97_TrackType)
   cp TT_4_FormulaOne
-  jr nz, LABEL_1BEF2_ret ; Only for F1 tracks
+  JrNzRet LABEL_1BEF2_ret ; Only for F1 tracks
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, ++
@@ -26561,7 +26711,7 @@ LABEL_1BEB1_ChangePoolTableColour:
   SetPaletteAddressImmediateGG 1
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
-  jr z, LABEL_1BEF2_ret
+  JrZRet LABEL_1BEF2_ret
   cp $01
   jr z, +
   ; Track 2
@@ -26581,7 +26731,7 @@ LABEL_1BEF2_ret:
   SetPaletteAddressImmediateSMS 1
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
-  jr z, LABEL_1BEF2_ret
+  JrZRet LABEL_1BEF2_ret
   cp $01
   jr z, +
   ; Track 2
@@ -26598,11 +26748,11 @@ LABEL_1BF17_:
   or a
   jr z, +
   cp $06
-  jr nz, ++ ; ret
+  JrNzRet ++ ; ret
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, ++ ; ret
+  JrNzRet ++ ; ret
   ld l, (ix+47)
   ld h, (ix+48)
   xor a
@@ -26611,8 +26761,15 @@ LABEL_1BF17_:
   jp LABEL_2961_
 
 ; Data from 1BF35 to 1BF43 (15 bytes)
-; Dead code?
-.db $DD $7E $0C $6F $DD $BE $0D $3E $00 $20 $01 $3C $DD $77 $0B
+.ifdef UNREACHABLE_CODE
+  ld a, (ix+$0c)
+  ld l, a
+  cp (ix+$0d)
+  ld a, $00
+  jr nz, +
+  inc a
++:ld (ix+$0b), a
+.endif
 
 ++: ret
 
@@ -26793,7 +26950,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
 +:
   ld a, (_RAM_DC4E_Cheat_SuperSkids)
   or a
-  jr nz, LABEL_1F996_ret
+  JrNzRet LABEL_1F996_ret
   ; (Tile 6, 6 = honey pool OR
   ; tile c, 5 = honey pool) AND
   ; buttons 1+2 (others may be held)
@@ -26806,7 +26963,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
 -:
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
-  jr nz, LABEL_1F996_ret
+  JrNzRet LABEL_1F996_ret
   ld a, SFX_12_WinOrCheat
   ld (_RAM_D974_SFXTrigger_Player2), a ; Play sound effect
   ld a, $01
@@ -26817,7 +26974,7 @@ LABEL_1F996_ret:
 +:
   ld a, (_RAM_D5C8_MetatileX) ; Or c, 5 = matching orange juice - new info!
   cp $0C
-  jr nz, LABEL_1F996_ret
+  JrNzRet LABEL_1F996_ret
   ld a, (_RAM_D5C9_MetatileY)
   cp $05
   jr z, -
@@ -26826,20 +26983,20 @@ LABEL_1F996_ret:
 ++:
   ld a, (_RAM_DC4F_Cheat_EasierOpponents)
   or a
-  jr nz, +
+  JrNzRet +
   ; Tile 16, 1 = top right and falling and reversing
   ld a, (_RAM_D5C8_MetatileX) ; 16, 1
   cp $10
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5C9_MetatileY)
   cp $01
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF59_CarState) ; Falling
   cp CarState_3_Falling
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5A4_IsReversing) ; Reversing
   or a
-  jr z, +
+  JrZRet +
   ld a, SFX_12_WinOrCheat
   ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
@@ -26849,21 +27006,21 @@ LABEL_1F996_ret:
 LABEL_1F9D4_Cheats_SportsCars:
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
-  jr nz, + ; ret
+  JrNzRet +
   ; Sports Cars 0 = Desktop Drop-off
   ld a, (_RAM_DC4A_Cheat_ExtraLives) ; Laps done?
   or a
-  jr nz, +
+  JrNzRet +
   ; Tile 5, 24 = bottom half of pencil far to the left of the start position, and 4 laps remaining
   ld a, (_RAM_D5C8_MetatileX) ; 5, 24
   cp $05
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5C9_MetatileY)
   cp $18
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF24_LapsRemaining) ; Haven't crossed the start line yet
   cp $04
-  jr nz, +
+  JrNzRet +
   ld a, SFX_12_WinOrCheat
   ld (_RAM_D974_SFXTrigger_Player2), a
   ld a, $01
@@ -26875,15 +27032,15 @@ LABEL_1F9D4_Cheats_SportsCars:
 LABEL_1FA05_NoSkidCheatCheck:
   ld a, (_RAM_DC4D_Cheat_NoSkidding)
   or a
-  jr nz, + ; ret
+  JrNzRet +
   ; U+1+2 while driving into/on milk on any Four by Four track
   ; -> cars don't skid (new!)
   ld a, (_RAM_D5CD_CarIsSkidding)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_U_MASK | BUTTON_1_MASK | BUTTON_2_MASK ; $31
-  jr nz, +
+  JrNzRet +
   ld a, SFX_12_WinOrCheat
   ld (_RAM_D963_SFXTrigger_Player1), a
   ld a, $01
@@ -26895,7 +27052,7 @@ LABEL_1FA23_ApplyFasterVehiclesCheat:
   ; Can go up to 15, 16 glitches sound, higher glitches out everything
   ld a, (_RAM_DC50_Cheat_FasterVehicles)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
@@ -26909,16 +27066,16 @@ LABEL_1FA23_ApplyFasterVehiclesCheat:
 LABEL_1FA3D_:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_1FA95_
+  JrNzRet LABEL_1FA95_ret
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_1FA95_
+  JrNzRet LABEL_1FA95_ret
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_1FA95_
+  JrNzRet LABEL_1FA95_ret
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   or a
-  jr nz, LABEL_1FA95_
+  JrNzRet LABEL_1FA95_ret
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
@@ -26949,13 +27106,13 @@ LABEL_1FA3D_:
   dec (hl)
 +:ld a, (_RAM_DE99_)
   or a
-  jr nz, LABEL_1FA95_
+  JrNzRet LABEL_1FA95_ret
   ld hl, _RAM_DEA0_
   ld a, (hl)
   or a
-  jr z, LABEL_1FA95_
+  JrZRet LABEL_1FA95_ret
   dec (hl)
-LABEL_1FA95_:
+LABEL_1FA95_ret:
   ret
 
 +++:
@@ -27054,9 +27211,9 @@ LABEL_1FB35_:
   jr z, ++++
   ld a, (ix+11)
   or a
-  jr z, +++
+  JrZRet +++
   cp $01
-  jr z, +++
+  JrZRet +++
   cp $02
   jr z, +
   sub $02
@@ -27068,7 +27225,7 @@ LABEL_1FB35_:
   ld (ix+11), a
   ld a, (ix+21)
   or a
-  jr z, +++
+  JrZRet +++
   ld a, SFX_07_EnterSticky
   ld (_RAM_D974_SFXTrigger_Player2), a
 +++:ret
@@ -27076,7 +27233,7 @@ LABEL_1FB35_:
 ++++:
   ld a, (ix+11)
   cp $03
-  jr c, +++
+  JrCRet +++
   cp $04
   jr z, +
   sub $02
@@ -27088,7 +27245,7 @@ LABEL_1FB35_:
   ld (ix+11), a
   ld a, (ix+21)
   or a
-  jr z, +++
+  JrZRet +++
   ld a, SFX_07_EnterSticky
   ld (_RAM_D974_SFXTrigger_Player2), a
 +++:ret
@@ -27359,13 +27516,13 @@ DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to 
 LABEL_239C6_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5B9_)
   or a
   jr nz, ++
@@ -27442,7 +27599,7 @@ LABEL_239C6_:
   ld a, (_RAM_DCFC_)
   sub l
   ld (_RAM_DCFC_), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -27453,7 +27610,7 @@ LABEL_239C6_:
   ld (_RAM_DCFC_), a
   ld a, (_RAM_DF85_)
   ld (_RAM_DD0C_), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -27467,7 +27624,7 @@ LABEL_239C6_:
   cp $07
   jr nc, +
   ld (_RAM_DCFC_), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -27476,7 +27633,7 @@ LABEL_239C6_:
 +:
   ld a, $07
   ld (_RAM_DCFC_), a
-  jp +++
+  JpRet +++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -27726,7 +27883,7 @@ LABEL_23BF1_:
   ld (_RAM_DD2F_), hl
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld (_RAM_DCEE_), hl
 +:ret
 
@@ -27751,7 +27908,7 @@ LABEL_23BF1_:
   ld (_RAM_DD2F_), hl
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +
+  JrZRet +
   ld (_RAM_DCEE_), hl
 +:ret
 
@@ -27759,13 +27916,12 @@ LABEL_23C68_:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr nz, +
--:
-  ret
+-:ret
 
 +:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
@@ -27778,8 +27934,7 @@ LABEL_23C68_:
   sla a
   jp ++
 
-+:
-  in a, (PORT_GG_START)
++:in a, (PORT_GG_START)
 ++:
   ld (_RAM_D59C_GGStartButtonValue), a
   ld a, (_RAM_D599_IsPaused)
@@ -27811,7 +27966,7 @@ LABEL_23C68_:
   jr z, ++
   ld a, (_RAM_D59C_GGStartButtonValue)
   and $80
-  jr z, +
+  JrZRet +
   xor a
   ld (_RAM_D59A_), a
 +:ret
@@ -27822,7 +27977,7 @@ LABEL_23C68_:
   jr z, ++
   ld a, (_RAM_D59B_)
   or a
-  jr z, +
+  JrZRet +
   xor a
   ld (_RAM_D599_IsPaused), a
   ld (_RAM_D59B_), a
@@ -28624,7 +28779,7 @@ LABEL_2B7A1_SoundFunction:
     add a, a
     ld e, a
     ld d, $00
-    ld hl, DATA_2B87B_
+    ld hl, DATA_2B87B_PSGNotes
     add hl, de
     ld e, (hl)
     ld a, e
@@ -28689,17 +28844,8 @@ LABEL_2B7A1_SoundFunction:
   ret
 
 ; Data from 2B87B to 2B910 (150 bytes)
-DATA_2B87B_:
-.db $00 $00 $F9 $03 $C0 $03 $8A $03 $57 $03 $27 $03 $FA $02 $CF $02
-.db $A7 $02 $81 $02 $5D $02 $3B $02 $1B $02 $FC $01 $E0 $01 $C5 $01
-.db $AC $01 $94 $01 $7D $01 $68 $01 $53 $01 $40 $01 $2E $01 $1D $01
-.db $0D $01 $FE $00 $F0 $00 $E2 $00 $D6 $00 $CA $00 $BE $00 $B4 $00
-.db $AA $00 $A0 $00 $97 $00 $8F $00 $87 $00 $7F $00 $78 $00 $71 $00
-.db $6B $00 $65 $00 $5F $00 $5A $00 $55 $00 $50 $00 $4C $00 $47 $00
-.db $43 $00 $40 $00 $3C $00 $39 $00 $35 $00 $32 $00 $30 $00 $2D $00
-.db $2A $00 $28 $00 $26 $00 $24 $00 $22 $00 $20 $00 $1E $00 $1C $00
-.db $1B $00 $19 $00 $18 $00 $16 $00 $15 $00 $14 $00 $13 $00 $12 $00
-.db $11 $00 $10 $00 $0F $00
+DATA_2B87B_PSGNotes:
+.include "PSGNotes.inc"
 
 ; Data from 2B911 to 2BFFF (1775 bytes)
 DATA_2B911_SoundData_:
@@ -29696,17 +29842,7 @@ DATA_3136E_: .db $01 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF
 
 ; Data from 3137A to 3141B (162 bytes)
 DATA_3137A_PSGNotes:
-; SN76489 frequency counter values
-; A4 = ~440Hz
-;   A     A#    B     C     C#    D     D#    E     F     F#    G     G#  
-.dw $0000 
-.dw $03F9 $03C0 $038A $0357 $0327 $02FA $02CF $02A7 $0281 $025D $023B $021B ; octave 4
-.dw $01FC $01E0 $01C5 $01AC $0194 $017D $0168 $0153 $0140 $012E $011D $010D ; octave 5
-.dw $00FE $00F0 $00E2 $00D6 $00CA $00BE $00B4 $00AA $00A0 $0097 $008F $0087 ; octave 6
-.dw $007F $0078 $0071 $006B $0065 $005F $005A $0055 $0050 $004C $0047 $0043 ; octave 7
-.dw $0040 $003C $0039 $0035 $0032 $0030 $002D $002A $0028 $0026 $0024 $0022 ; octave 8
-.dw $0020 $001E $001C $001B $0019 $0018 $0016 $0015 $0014 $0013 $0012 $0011 ; octave 9
-.dw $0010 $000F 
+.include "PSGNotes.inc"
 
  DATA_31410_MusicIndirection:
 .db -10, -5, -2, -6, -6, -4, -4, -5, -3, -3, -4, -2
@@ -29938,19 +30074,19 @@ DATA_33B5E_:
   jr nz, ++
   ld a, (_RAM_D5AB_)
   cp $a0
-  jr nz, LABEL_33BEE_ret
+  JrNzRet LABEL_33BEE_ret
 +: ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; Both buttons pressed
-  jr nz, LABEL_33BEE_ret
+  JrNzRet LABEL_33BEE_ret
 ++: ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_33BEE_ret
+  JrNzRet LABEL_33BEE_ret
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_33BEE_ret
+  JrNzRet LABEL_33BEE_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_33BEE_ret
+  JrNzRet LABEL_33BEE_ret
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_D5A7_), a
   ld a, (_RAM_DE92_EngineVelocity)
@@ -30212,34 +30348,34 @@ LABEL_34D9C_:
 ++:
   ld a, (_RAM_DB21_Player2Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; Both buttons pressed
-  jp nz, LABEL_33E61_ret
+  JpNzRet LABEL_33E61_ret
 +:ld a, (_RAM_DE4F_)
   cp $80
-  jp nz, LABEL_33E61_ret
+  JpNzRet LABEL_33E61_ret
   ld a, (ix+$15)
   or a
-  jp z, LABEL_33E61_ret
+  JpZRet LABEL_33E61_ret
   ld a, (ix+$2e)
   or a
-  jp nz, LABEL_33E61_ret
+  JpNzRet LABEL_33E61_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, LABEL_33DF4_
   ld a, (ix+$11)
   cp $e0
-  jp nc, LABEL_33E61_ret
+  JpNcRet LABEL_33E61_ret
   cp $20
-  jp c, LABEL_33E61_ret
+  JpCRet LABEL_33E61_ret
   ld a, (ix+$12)
   cp $20
-  jp c, LABEL_33E61_ret
+  JpCRet LABEL_33E61_ret
   cp $e0
-  jp nc, LABEL_33E61_ret
+  JpNcRet LABEL_33E61_ret
   jr +
 LABEL_33DF4_:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_33E61_ret
+  JrNzRet LABEL_33E61_ret
 +:ld a, (ix+$0d)
   ld (ix+$3e), a
   ld a, (ix+$0b)
@@ -30334,21 +30470,21 @@ LABEL_33E81_:
 +++:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_33F10_ret
+  JrNzRet LABEL_33F10_ret
   ld a, (_RAM_DBA4_)
   ld l, a
   ld a, (de)
   sub l
-  jr c, LABEL_33F10_ret
+  JrCRet LABEL_33F10_ret
   cp $18
-  jr nc, LABEL_33F10_ret
+  JrNcRet LABEL_33F10_ret
   ld a, (_RAM_DBA5_)
   ld l, a
   ld a, (bc)
   sub l
-  jr c, LABEL_33F10_ret
+  JrCRet LABEL_33F10_ret
   cp $18
-  jr nc, LABEL_33F10_ret
+  JrNcRet LABEL_33F10_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -30371,21 +30507,21 @@ LABEL_33F10_ret:
 LABEL_33F11_:
   ld a, (ix+$15)
   or a
-  jr z, LABEL_33F39_ret
+  JrZRet LABEL_33F39_ret
   ld a, (ix+$11)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.59.x)
   sub l
-  jr c, LABEL_33F39_ret
+  JrCRet LABEL_33F39_ret
   cp $18
-  jr nc, LABEL_33F39_ret
+  JrNcRet LABEL_33F39_ret
   ld a, (ix+$12)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.59)
   sub l
-  jr c, LABEL_33F39_ret
+  JrCRet LABEL_33F39_ret
   cp $18
-  jr nc, LABEL_33F39_ret
+  JrNcRet LABEL_33F39_ret
   call LABEL_2961_
   jp LABEL_33D49_
 LABEL_33F39_ret:
@@ -30394,24 +30530,24 @@ LABEL_33F39_ret:
 LABEL_33F3A_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_33F68_ret
+  JrNzRet LABEL_33F68_ret
   ld a, (ix+$15)
   or a
-  jr z, LABEL_33F68_ret
+  JrZRet LABEL_33F68_ret
   ld a, (ix+$11)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.61.x)
   sub l
-  jr c, LABEL_33F68_ret
+  JrCRet LABEL_33F68_ret
   cp $18
-  jr nc, LABEL_33F68_ret
+  JrNcRet LABEL_33F68_ret
   ld a, (ix+$12)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.61)
   sub l
-  jr c, LABEL_33F68_ret
+  JrCRet LABEL_33F68_ret
   cp $18
-  jr nc, LABEL_33F68_ret
+  JrNcRet LABEL_33F68_ret
   call LABEL_2961_
   jp LABEL_33D49_
 LABEL_33F68_ret:
@@ -30445,31 +30581,31 @@ LABEL_33F92_:
   call +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_33FF7_ret
+  JrNzRet LABEL_33FF7_ret
   ld ix, _RAM_DCAB_
   call +
   ld ix, _RAM_DD2D_
 +:
   ld a, (ix+$2e)
   or a
-  jr nz, LABEL_33FF7_ret
+  JrNzRet LABEL_33FF7_ret
   ld a, (ix+$15)
   or a
-  jr z, LABEL_33FF7_ret
+  JrZRet LABEL_33FF7_ret
   ld a, (ix+$11)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.57.x)
   sub l
-  jr c, LABEL_33FF7_ret
+  JrCRet LABEL_33FF7_ret
   cp $18
-  jr nc, LABEL_33FF7_ret
+  JrNcRet LABEL_33FF7_ret
   ld a, (ix+$12)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.57)
   sub l
-  jr c, LABEL_33FF7_ret
+  JrCRet LABEL_33FF7_ret
   cp $18
-  jr nc, LABEL_33FF7_ret
+  JrNcRet LABEL_33FF7_ret
   ld a, (ix+$2d)
   cp $01
   jr nz, +
@@ -30711,7 +30847,7 @@ LABEL_358D9_vflip:
   ld de, $0300
   or a
   sbc hl, de
-    call LABEL_3598D_emitThreeTilesVFlipped
+  call LABEL_3598D_emitThreeTilesVFlipped
   ret
 
 LABEL_3591C_noflip:
@@ -31187,19 +31323,19 @@ LABEL_35F41_:
 LABEL_35F8A_:
   ld a, (_RAM_DC3F_GameMode)
   or a
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld a, (_RAM_DD1A_)
   or a
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
@@ -31231,13 +31367,13 @@ LABEL_35F8A_:
 +:
   ld a, (_RAM_DE9B_)
   or a
-  jr nz, LABEL_35FEB_
+  JrNzRet LABEL_35FEB_ret
   ld hl, _RAM_DEA2_
   ld a, (hl)
   or a
-  jr z, LABEL_35FEB_
+  JrZRet LABEL_35FEB_ret
   dec (hl)
-LABEL_35FEB_:
+LABEL_35FEB_ret:
   ret
 
 +++:
@@ -31348,7 +31484,7 @@ LABEL_3608C_:
   jr nz, +
   ld a, $01
   ld (_RAM_DE9D_), a
-  jp ++
+  JpRet ++
 
 .ifdef UNREACHABLE_CODE
   ret
@@ -31359,19 +31495,18 @@ LABEL_3608C_:
   ld (_RAM_DE9D_), a
 ++:ret
 
--:
-  ret
+-:ret
 
 LABEL_360B9_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, -
+  JrNzRet -
   ld a, (_RAM_D5C5_)
   cp $01
-  jr z, -
+  JrZRet -
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, -
+  JrNzRet -
   call LABEL_36152_
   ld a, (_RAM_DF0D_)
   ld l, a
@@ -31564,16 +31699,16 @@ LABEL_36209_:
 +:
   ld a, (_RAM_DC3F_GameMode)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DCF7_)
   or a
   jr z, ++
   ld a, (_RAM_DE9B_)
   or a
-  jr z, +
+  JrZRet +
   cp $01
   jr z, +++
   jp LABEL_36287_
@@ -31592,10 +31727,10 @@ LABEL_36209_:
 +++:
   ld a, (_RAM_DD00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5B7_)
   or a
-  jr nz, LABEL_3625F_
+  JrNzRet LABEL_3625F_ret
   ld a, (_RAM_DEA2_)
   cp $00
   jr z, ++
@@ -31603,7 +31738,7 @@ LABEL_36209_:
   ld (_RAM_DEA2_), a
 +:ret
 
-LABEL_3625F_:
+LABEL_3625F_ret:
   ret
 
 ++:
@@ -31630,10 +31765,10 @@ LABEL_3625F_:
 LABEL_36287_:
   ld a, (_RAM_DD00_)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_D5B7_)
   or a
-  jr nz, LABEL_3625F_
+  JrNzRet LABEL_3625F_ret
   ld a, (_RAM_DEA2_)
   cp $00
   jr z, ++
@@ -31728,9 +31863,9 @@ LABEL_362D3_:
 +:
   ld a, (_RAM_DF52_)
   cp b
-  jr c, +
+  JrCRet +
   cp c
-  jr nc, +
+  JrNcRet +
   ld a, $03
   ld (_RAM_DD38_), a
 +:ret
@@ -31763,9 +31898,9 @@ LABEL_36343_:
 +:
   ld a, (_RAM_DF52_)
   cp b
-  jr c, +
+  JrCRet +
   cp c
-  jr nc, +
+  JrNcRet +
   ld a, $0C
   ld (_RAM_DD38_), a
 +:ret
@@ -31801,16 +31936,16 @@ LABEL_3636E_:
 LABEL_3639C_:
   ld a, (_RAM_D5BC_)
   cp $04
-  jr c, LABEL_363CB_ret
+  JrCRet LABEL_363CB_ret
   ld a, (_RAM_DD00_)
   or a
-  jr nz, LABEL_363CB_ret
+  JrNzRet LABEL_363CB_ret
   ld a, (_RAM_DCF7_)
   cp $06
-  jr c, LABEL_363CB_ret
+  JrCRet LABEL_363CB_ret
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr z, LABEL_363CB_ret
+  JrZRet LABEL_363CB_ret
 --:
   xor a
   ld (_RAM_D5BC_), a
@@ -31831,19 +31966,19 @@ LABEL_363CB_ret:
 LABEL_363D0_:
   ld a, (_RAM_D5BC_)
   cp $04
-  jr c, LABEL_363CB_ret
+  JrCRet LABEL_363CB_ret
   jr --
 
 LABEL_363D9_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr nz, LABEL_36454_
+  JrNzRet LABEL_36454_ret
   ld a, (_RAM_DD00_)
   or a
   jr z, +
   ld a, (_RAM_DD12_)
   cp $02
-  jr z, LABEL_36454_
+  JrZRet LABEL_36454_ret
 +:
   ld a, (_RAM_DEA4_)
   or a
@@ -31876,7 +32011,7 @@ LABEL_363D9_:
   jr z, +
   ld a, l
   and BUTTON_R_MASK ; $08
-  jr nz, LABEL_36454_
+  JrNzRet LABEL_36454_ret
 +:
   ld a, $01
   ld (_RAM_DEAA_), a
@@ -31900,7 +32035,7 @@ LABEL_3643D_:
   jr nz, +
   ld a, l
   ld (_RAM_DE57_), a
-LABEL_36454_:
+LABEL_36454_ret:
   ret
 
 +:
@@ -32420,7 +32555,7 @@ LABEL_3682E_:
 ++:
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr z, +
+  JrZRet +
   ld de, $0028
   ld hl, (_RAM_DCEE_)
   or a
@@ -32441,25 +32576,25 @@ DATA_36917_:
 LABEL_36937_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr z, +++
+  JrZRet +++
   ld a, (_RAM_DB97_TrackType)
   cp TT_4_FormulaOne
-  jr nz, +++
+  JrNzRet +++
   ld a, (_RAM_D5C5_)
   or a
-  jr nz, +++
+  JrNzRet +++
   ld a, (_RAM_DE8C_)
   or a
   jr z, +
   ld a, (_RAM_DD1F_)
   or a
-  jr nz, +++
+  JrNzRet +++
   jp ++
 
 +:
   ld a, (_RAM_DD1F_)
   or a
-  jr z, +++
+  JrZRet +++
 ++:
   ld hl, (_RAM_DF56_)
   xor a
@@ -32477,16 +32612,16 @@ LABEL_36937_:
 LABEL_36971_:
   ld a, (_RAM_DE4F_)
   cp $80
-  jp nz, LABEL_369ED_
+  JpNzRet LABEL_369ED_ret
   ld a, (_RAM_D5C5_)
   or a
-  jp nz, LABEL_369ED_
+  JpNzRet LABEL_369ED_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   cp $00
-  jp nz, LABEL_369ED_
+  JpNzRet LABEL_369ED_ret
   ld a, (_RAM_DF7F_)
   cp $00
-  jp nz, LABEL_369ED_
+  JpNzRet LABEL_369ED_ret
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
@@ -32509,7 +32644,7 @@ LABEL_36971_:
   cp $12
   jr c, LABEL_369EE_
   cp $AA
-  jp c, LABEL_369ED_
+  JpCRet LABEL_369ED_ret
   jp LABEL_369EE_
 
 +:
@@ -32528,10 +32663,10 @@ LABEL_36971_:
   jr c, LABEL_369EE_
   ld a, (_RAM_DCFE_)
   cp $C6
-  jr c, LABEL_369ED_
+  JrCRet LABEL_369ED_ret
   jp LABEL_369EE_
 
-LABEL_369ED_:
+LABEL_369ED_ret:
   ret
 
 LABEL_369EE_:
@@ -32579,14 +32714,14 @@ LABEL_36A2C_:
 LABEL_36A3F_:
   ld a, (_RAM_DD1A_)
   cp $00
-  jr nz, +
+  JrNzRet +
 -:
   ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   jp LABEL_2A08_
-
+.ifdef JUMP_TO_RET
 +:ret
-
+.endif
 LABEL_36A4F_:
   xor a
   ld (_RAM_D945_), a
@@ -32910,7 +33045,7 @@ LABEL_36C72_:
 LABEL_36CA5_:
   ld a, (_RAM_DF59_CarState)
   or a
-  jr nz, LABEL_36D06_
+  JrNzRet LABEL_36D06_ret
   ld a, (_RAM_D5C3_)
   ld (_RAM_DEB0_), a
   ld a, (_RAM_D5C4_)
@@ -32947,17 +33082,17 @@ LABEL_36CA5_:
 ++:
   ld a, (_RAM_DEAF_)
   cp $00
-  jr nz, LABEL_36D06_
+  JrNzRet LABEL_36D06_ret
   ld a, (_RAM_DEB1_VScrollDelta)
   cp $00
-  jr nz, LABEL_36D06_
+  JrNzRet LABEL_36D06_ret
   ld a, $00
   ld (_RAM_D945_), a
   ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   ld a, SFX_16_Respawn
   ld (_RAM_D963_SFXTrigger_Player1), a
-LABEL_36D06_:
+LABEL_36D06_ret:
   ret
 
 LABEL_36D07_:
@@ -32993,10 +33128,10 @@ LABEL_36D07_:
 ++:
   ld a, (_RAM_DCFB_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, (_RAM_DCFC_)
   cp $00
-  jr nz, +
+  JrNzRet +
   ld a, $00
   ld (_RAM_D940_), a
   ld a, $02
@@ -33084,20 +33219,20 @@ DATA_36DAF_TimerDigitTilesData: ; 1bpp data. This is written into the right bitp
 LABEL_36DFF_RuffTrux_DecrementTimer:
   ld a, (_RAM_D599_IsPaused)
   or a
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
   ld a, (_RAM_DF65_)
   cp $01
-  jr z, LABEL_36E6A_ret
+  JrZRet LABEL_36E6A_ret
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
 
   ; Increment frame counter
   ld a, (_RAM_DF72_RuffTruxTimer_Frames)
   add a, $01
   ld (_RAM_DF72_RuffTruxTimer_Frames), a
   cp $0A ; BUG: should be 5 or 6 for 50 or 60Hz!
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
 
   ; Reached target, decrement tenths
   ld a, $00
@@ -33106,7 +33241,7 @@ LABEL_36DFF_RuffTrux_DecrementTimer:
   sub $01
   ld (_RAM_DF71_RuffTruxTimer_Tenths), a
   cp $FF
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
 
   ; Decrement seconds
   ld a, $09
@@ -33115,7 +33250,7 @@ LABEL_36DFF_RuffTrux_DecrementTimer:
   sub $01
   ld (_RAM_DF70_RuffTruxTimer_Seconds), a
   cp $FF
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
 
   ; Decrement tens of seconds
   ld a, $09
@@ -33124,7 +33259,7 @@ LABEL_36DFF_RuffTrux_DecrementTimer:
   sub $01
   ld (_RAM_DF6F_RuffTruxTimer_TensOfSeconds), a
   cp $FF
-  jr nz, LABEL_36E6A_ret
+  JrNzRet LABEL_36E6A_ret
 
   ; Ran out of time!
   ld a, $01
@@ -33545,7 +33680,7 @@ LABEL_372D3_:
   ld l, a
   ld a, (_RAM_D95B_)
   cp l
-  jr z, +
+  JrZRet +
   jr c, LABEL_372D3_
   jp -
 
@@ -33561,13 +33696,12 @@ LABEL_372D3_:
   or a
   sbc hl, de
   ld (_RAM_D95B_), hl
--:
-  ret
+-:ret
 
 +:
   ld a, (_RAM_D95B_)
   cp $90
-  jr c, -
+  JrCRet -
   jp --
 
 LABEL_3730C_GameVBlankPart3:
@@ -33784,7 +33918,7 @@ LABEL_37466_:
   ld l, a
   ld a, (_RAM_D96C_)
   cp l
-  jr z, +
+  JrZRet +
   jr c, LABEL_37466_
   jp -
 
@@ -33793,7 +33927,7 @@ LABEL_37466_:
 ++:
   ld a, (_RAM_DF7F_)
   or a
-  jr nz, LABEL_3749A_
+  JrNzRet LABEL_3749A_ret
   ld a, (_RAM_D96D_)
   cp $01
   jr z, +
@@ -33803,13 +33937,13 @@ LABEL_37466_:
   or a
   sbc hl, de
   ld (_RAM_D96C_), hl
-LABEL_3749A_:
+LABEL_3749A_ret:
   ret
 
 +:
   ld a, (_RAM_D96C_)
   cp $90
-  jr c, LABEL_3749A_
+  JrCRet LABEL_3749A_ret
   jp -
 
 ; Data from 374A5 to 3751D (121 bytes)
@@ -33881,7 +34015,7 @@ DATA_37590_:
 LABEL_375A0_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DC54_IsGameGear)
   cp $01
   jr z, +
@@ -33890,15 +34024,15 @@ LABEL_375A0_:
 +:
   ld a, (_RAM_D5A4_IsReversing)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DF6A_)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, $00
   ld (_RAM_DEB8_), a
   ld a, (_RAM_DF58_)
   cp $00
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DE90_CarDirection)
   ld l, a
   ld c, a
@@ -33951,7 +34085,7 @@ LABEL_375A0_:
   add a, $01
   ld (_RAM_DEB1_VScrollDelta), a
   cp $01
-  jr nz, +
+  JrNzRet +
   ld (_RAM_DEB8_), a
   ld a, $00
   ld (_RAM_DEB2_), a
@@ -33989,7 +34123,7 @@ LABEL_3762B_:
   add a, $01
   ld (_RAM_DEB1_VScrollDelta), a
   cp $01
-  jr nz, +
+  JrNzRet +
   ld (_RAM_DEB8_), a
   ld a, $01
   ld (_RAM_DEB2_), a
@@ -33998,7 +34132,7 @@ LABEL_3762B_:
 LABEL_3766F_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DC54_IsGameGear)
   cp $01
   jr z, +
@@ -34007,15 +34141,15 @@ LABEL_3766F_:
 +:
   ld a, (_RAM_D5A4_IsReversing)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DF6A_)
   or a
-  jr nz, ++
+  JrNzRet ++
   ld a, $00
   ld (_RAM_DEB9_), a
   ld a, (_RAM_DF58_)
   cp $00
-  jr nz, ++
+  JrNzRet ++
   ld a, (_RAM_DE90_CarDirection)
   ld l, a
   ld c, a
@@ -34068,7 +34202,7 @@ LABEL_3766F_:
   add a, $01
   ld (_RAM_DEAF_), a
   cp $01
-  jr nz, +
+  JrNzRet +
   ld (_RAM_DEB9_), a
   ld a, $00
   ld (_RAM_DEB0_), a
@@ -34106,7 +34240,7 @@ LABEL_376FA_:
   add a, $01
   ld (_RAM_DEAF_), a
   cp $01
-  jr nz, +
+  JrNzRet +
   ld (_RAM_DEB9_), a
   ld (_RAM_DEB0_), a
 +:ret
@@ -34122,7 +34256,7 @@ LABEL_3773B_ReadControls:
   ld (_RAM_DB20_Player1Controls), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr nz, + ; ret
+  JrNzRet + ; ret
   ; Read player 2 controls
   in a, (PORT_CONTROL_B)
   sla a
@@ -34163,15 +34297,16 @@ LABEL_3773B_ReadControls:
 +:; I am player 2
   ld a, (_RAM_DC47_GearToGear_OtherPlayerControls1)
   or a
-  jr z, + ; ret
+  JrZRet + ; ret
   ld (_RAM_DB20_Player1Controls), a
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
   ld (_RAM_DB21_Player2Controls), a
   ld a, $00
   ld (_RAM_DC47_GearToGear_OtherPlayerControls1), a
   ret
-
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_3779F_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -34686,21 +34821,21 @@ LABEL_37B6B_:
   jr nz, ++
   ld a, (_RAM_D5AB_)
   cp $A0
-  jr nz, LABEL_37BEE_
+  JrNzRet LABEL_37BEE_ret
 +:
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
-  jr nz, LABEL_37BEE_
+  JrNzRet LABEL_37BEE_ret
 ++:
   ld a, (_RAM_DE4F_)
   cp $80
-  jr nz, LABEL_37BEE_
+  JrNzRet LABEL_37BEE_ret
   ld a, (_RAM_DF58_)
   or a
-  jr nz, LABEL_37BEE_
+  JrNzRet LABEL_37BEE_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_37BEE_
+  JrNzRet LABEL_37BEE_ret
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_D5A7_), a
   ld a, (_RAM_DE92_EngineVelocity)
@@ -34732,7 +34867,7 @@ LABEL_37B6B_:
   ld a, (_RAM_DBA5_)
   add a, l
   ld (iy+0), a
-LABEL_37BEE_:
+LABEL_37BEE_ret:
   ret
 
 LABEL_37BEF_:
@@ -34976,36 +35111,36 @@ LABEL_37D9C_:
 +:
   ld a, (_RAM_DB21_Player2Controls) ; If 1+2 are pressed, skip the rest
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
-  jp nz, LABEL_37E61_ret
+  JpNzRet LABEL_37E61_ret
 ++:
   ld a, (_RAM_DE4F_)
   cp $80
-  jp nz, LABEL_37E61_ret
+  JpNzRet LABEL_37E61_ret
   ld a, (ix+21)
   or a
-  jp z, LABEL_37E61_ret
+  JpZRet LABEL_37E61_ret
   ld a, (ix+46)
   or a
-  jp nz, LABEL_37E61_ret
+  JpNzRet LABEL_37E61_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
   ld a, (ix+17)
   cp $E0
-  jp nc, LABEL_37E61_ret
+  JpNcRet LABEL_37E61_ret
   cp $20
-  jp c, LABEL_37E61_ret
+  JpCRet LABEL_37E61_ret
   ld a, (ix+18)
   cp $20
-  jp c, LABEL_37E61_ret
+  JpCRet LABEL_37E61_ret
   cp $E0
-  jp nc, LABEL_37E61_ret
+  JpNcRet LABEL_37E61_ret
   jr ++
 
 +:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
-  jr nz, LABEL_37E61_ret
+  JrNzRet LABEL_37E61_ret
 ++:
   ld a, (ix+13)
   ld (ix+62), a
@@ -35109,21 +35244,21 @@ LABEL_37E81_:
 +++:
   ld a, (_RAM_DF58_)
   or a
-  jr nz, +++
+  JrNzRet +++
   ld a, (_RAM_DBA4_)
   ld l, a
   ld a, (de)
   sub l
-  jr c, +++
+  JrCRet +++
   cp $18
-  jr nc, +++
+  JrNcRet +++
   ld a, (_RAM_DBA5_)
   ld l, a
   ld a, (bc)
   sub l
-  jr c, +++
+  JrCRet +++
   cp $18
-  jr nc, +++
+  JrNcRet +++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -35146,105 +35281,111 @@ LABEL_37E81_:
 LABEL_37F11_:
   ld a, (ix+21)
   or a
-  jr z, +
+  JrZRet +
   ld a, (ix+17)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.59.x)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   ld a, (ix+18)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.59.y)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   call LABEL_2961_
   jp LABEL_37D49_
 
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_37F3A_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, +
+  JrNzRet +
   ld a, (ix+21)
   or a
-  jr z, +
+  JrZRet +
   ld a, (ix+17)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.61.x)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   ld a, (ix+18)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.61.y)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   call LABEL_2961_
   jp LABEL_37D49_
 
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_37F69_:
   ld a, (ix+21)
   or a
-  jr z, +
+  JrZRet +
   ld a, (ix+17)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.63.x)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   ld a, (ix+18)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.63.y)
   sub l
-  jr c, +
+  JrCRet +
   cp $18
-  jr nc, +
+  JrNcRet +
   call LABEL_2961_
   jp LABEL_37D49_
 
+.ifdef JUMP_TO_RET
 +:ret
+.endif
 
 LABEL_37F92_:
   ld ix, _RAM_DCEC_
   call +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_37FF7_ret
+  JrNzRet LABEL_37FF7_ret
   ld ix, _RAM_DCAB_
   call +
   ld ix, _RAM_DD2D_
 +:
   ld a, (ix+46)
   or a
-  jr nz, LABEL_37FF7_ret
+  JrNzRet LABEL_37FF7_ret
   ld a, (ix+21)
   or a
-  jr z, LABEL_37FF7_ret
+  JrZRet LABEL_37FF7_ret
   ld a, (ix+17)
   ld l, a
   ld a, (_RAM_DA60_SpriteTableXNs.57.x)
   sub l
-  jr c, LABEL_37FF7_ret
+  JrCRet LABEL_37FF7_ret
   cp $18
-  jr nc, LABEL_37FF7_ret
+  JrNcRet LABEL_37FF7_ret
   ld a, (ix+18)
   ld l, a
   ld a, (_RAM_DAE0_SpriteTableYs.57.y)
   sub l
-  jr c, LABEL_37FF7_ret
+  JrCRet LABEL_37FF7_ret
   cp $18
-  jr nc, LABEL_37FF7_ret
+  JrNcRet LABEL_37FF7_ret
   ld a, (ix+45)
   cp $01
   jr nz, +
