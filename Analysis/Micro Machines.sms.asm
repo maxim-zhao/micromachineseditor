@@ -4,7 +4,7 @@
 .define JUMP_TO_RET ; disable to use conditional rets
 .define TAIL_CALL ; disable to optimise calls followed by rets to jumps - INCOMPLETE
 .define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - TODO
-.define IS_GAMEGEAR ; Only applies when GAME_GEAR_CHECKS is disabled - TODO
+.define IS_GAME_GEAR ; Only applies when GAME_GEAR_CHECKS is disabled - TODO
 
 ; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
@@ -105,12 +105,12 @@ CarState_4_Submerged db ; ???
 .define BUTTON_2_ONLY BUTTON_2_MASK ~ NO_BUTTONS_PRESSED
 
 .enum 0
-MenuScreen_None               db ; 0 Do-nothing
+MenuScreen_Initialise         db ; 0 Do-nothing + initialisation
 MenuScreen_Title              db ; 1 Title screen with credits, image slideshow, etc
 MenuScreen_SelectPlayerCount  db ; 2 Select Game - One Player, Two Player
 MenuScreen_OnePlayerSelectCharacter db ; 3 One-player Who Do You Want To Be?
 MenuScreen_RaceName           db ; 4 Qualifying Race
-MenuScreen_Unused5            db ; 5 Uused, same as 0?
+MenuScreen_Unused5            db ; 5 Unused, same as 0?
 MenuScreen_Qualify            db ; 6 Qualified for challenge!, Failed to qualify!
 MenuScreen_WhoDoYouWantToRace db ; 7 Who do you want to race?
 MenuScreen_StorageBox         db ; 8 Car storage box
@@ -392,6 +392,19 @@ map "?" = $B6
 .undef x
 .endm
 
+; Tail call optimisation is often possible - and often used in the original code.
+.macro TailCall args label retlabel
+.ifdef TAIL_CALL
+  call label
+  .if nargs == 2
+  jp retlabel
+  .else
+  ret
+  .endif
+.else
+  jp label
+.endif
+.endm
 
 
 ; Structs for RAM arrays
@@ -828,7 +841,7 @@ _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
 _RAM_DBFD_ db
-_RAM_DBFE_ dsb 11
+_RAM_DBFE_8TimesTable dsb 11
 _RAM_DC09_Lives db
 _RAM_DC0A_ db
 _RAM_DC0B_ db
@@ -845,18 +858,10 @@ _RAM_DC18_Player1_LostCount db
 .ende
 
 .enum $DC21 export
-_RAM_DC21_ db
-.ende
+_RAM_DC21_ dsb 11
 
-.enum $DC2C export
-_RAM_DC2C_ db
-.ende
+_RAM_DC2C_ dsb 8
 
-.enum $DC31 export
-_RAM_DC31_ db
-.ende
-
-.enum $DC34 export
 _RAM_DC34_IsTournament db
 _RAM_DC35_TournamentRaceNumber db
 _RAM_DC36_ db
@@ -869,7 +874,7 @@ _RAM_DC3C_IsGameGear db ; Most code is common with the GG game
 _RAM_DC3D_IsHeadToHead db
 _RAM_DC3E_InMenus db ; 1 in menus, 0 otherwise
 _RAM_DC3F_GameMode db
-_RAM_DC40_ db
+_RAM_DC40_IsGameGear db ; Seems to be a copy of _RAM_DC3C_IsGameGear?
 _RAM_DC41_GearToGearActive db
 _RAM_DC42_GearToGear_IAmPlayer1 db
 .ende
@@ -879,6 +884,7 @@ _RAM_DC45_TitleScreenCheatCodeCounter_HardMode db ; Counts up correct keypresses
 _RAM_DC46_Cheat_HardMode db ; 0 = normal 1 = hard 2 = rock hard
 _RAM_DC47_GearToGear_OtherPlayerControls1 db
 _RAM_DC48_GearToGear_OtherPlayerControls2 db
+_RAM_DC49_CheatsStart .db
 _RAM_DC49_Cheat_ExplosiveOpponents db
 _RAM_DC4A_Cheat_ExtraLives db
 _RAM_DC4B_Cheat_InfiniteLives db
@@ -887,6 +893,7 @@ _RAM_DC4D_Cheat_NoSkidding db
 _RAM_DC4E_Cheat_SuperSkids db
 _RAM_DC4F_Cheat_EasierOpponents db
 _RAM_DC50_Cheat_FasterVehicles db
+_RAM_DC51_CheatsEnd .db
 _RAM_DC51_PreviousCombinedByte db
 _RAM_DC52_PreviousCombinedByte2 db
 _RAM_DC52_ db ; unused?
@@ -1668,10 +1675,18 @@ LABEL_38_:
 .section "Pause/Gear To Gear handler" force
 LABEL_66_NMI:
   push af
+.ifdef GAME_GEAR_CHECKS 
     ld a, (_RAM_DC3C_IsGameGear)
     or a
     jp nz, LABEL_9BF_NMI_GG
     jp LABEL_517F_NMI_SMS
+.else
+.ifdef IS_GAME_GEAR
+    jp LABEL_9BF_NMI_GG
+.else
+    jp LABEL_517F_NMI_SMS
+.endif
+.endif
 
 .ifdef BLANK_FILL_ORIGINAL
 .db "9),A" ; Source code left in RAM
@@ -1693,7 +1708,7 @@ LABEL_75_EnterGameTrampolineImpl:
 ; Copied to $dbcd onwards
 ; This initialises a bunch of stuff...
 ; _RAM_DBCD_MenuIndex onwards
-.db $00 ; _RAM_DBCD_MenuIndex
+.db MenuScreen_Initialise ; _RAM_DBCD_MenuIndex
 .db $01 ; _RAM_DBCE_
 .db $01 ; _RAM_DBCF_LastRacePosition 
 .db $00 ; _RAM_DBD0_HeadToHeadLost2
@@ -2819,12 +2834,7 @@ LABEL_92D_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrNzRet _LABEL_97B_ret
-.ifdef TAIL_CALL  
-  call LABEL_6632_
-  jp _LABEL_97B_ret
-.else
-  jp LABEL_6632_
-.endif
+  TailCall LABEL_6632_ _LABEL_97B_ret
 
 +:
   ld a, (_RAM_DC54_IsGameGear)
@@ -4451,8 +4461,7 @@ LABEL_1593_:
   inc (hl)
 +:
   call LABEL_77CD_
-  call LABEL_1801_
-  ret
+  TailCall LABEL_1801_
 
 LABEL_162D_:
   ld a, (_RAM_DEB8_)
@@ -4526,8 +4535,7 @@ LABEL_162D_:
   dec (hl)
 +:
   call LABEL_780D_
-  call LABEL_17E6_
-  ret
+  TailCall LABEL_17E6_
 
 LABEL_16C0_:
   xor a
@@ -4602,8 +4610,7 @@ LABEL_16C0_:
   dec (hl)
 +:
   call LABEL_17D0_
-  call LABEL_18E6_
-  ret
+  TailCall LABEL_18E6_
 
 LABEL_174E_:
   ld a, (_RAM_DEB9_)
@@ -4673,8 +4680,7 @@ LABEL_174E_:
   inc (hl)
 +:
   call LABEL_17D0_
-  call LABEL_18FD_
-  ret
+  TailCall LABEL_18FD_
 
 LABEL_17D0_:
   call LABEL_784D_
@@ -4763,8 +4769,13 @@ LABEL_1801_:
   and $1F
   or b
   ld (_RAM_DED1_), a
+  
+.ifdef JUMP_TO_RET
   call LABEL_795E_
 +:ret
+.else
+  TailCall LABEL_795E_
+.endif
 
 LABEL_188E_:
   ld a, $22
@@ -4880,9 +4891,13 @@ LABEL_18FD_:
   adc a, $00
   and $C3
   ld (_RAM_DED2_), a
+.ifdef JUMP_TO_RET
   call LABEL_4F1B_
 _LABEL_1989_ret:
   ret
+.else
+  TailCall LABEL_4F1B
+.endif
 
 LABEL_198A_:
   ld a, $42
@@ -11210,8 +11225,7 @@ LABEL_51DA_:
   call LABEL_5304_
   call LABEL_5764_
   call LABEL_5451_
-  call LABEL_5872_
-  ret
+  TailCall LABEL_5872_
 
 +:
   xor a
@@ -14345,9 +14359,13 @@ LABEL_69DB_:
   jr z, LABEL_6A11_
   ld a, $10
   ld (_RAM_D5C7_), a
+.ifdef JUMP_TO_RET
   call LABEL_6A4F_
   JrRet _LABEL_6A6B_ret
-
+.else
+  TailCall LABEL_6A4F_
+.endif
+  
 LABEL_6A11_:
   xor a
   ld (_RAM_DF58_), a
@@ -15612,8 +15630,7 @@ LABEL_7393_:
 -:
   call LABEL_6C39_
   CallPagedFunction2 LABEL_35F0D_
-  call +
-  ret
+  TailCall +
 
 LABEL_73D4_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -17135,8 +17152,10 @@ LABEL_8000_Main:
   di
   ld hl, STACK_TOP
   ld sp, hl
+.ifdef GAME_GEAR_CHECKS
   ld a, $00
   ld (_RAM_DC3C_IsGameGear), a
+.endif
   call LABEL_AFAE_RamCodeLoader
   ld a, :DATA_3ED49_SplashScreenCompressed ; $0F
   ld (_RAM_D741_RequestedPageIndex), a
@@ -17160,20 +17179,27 @@ LABEL_8021_MenuScreenEntryPoint:
   call LABEL_B44E_BlankMenuRAM
   call LABEL_BB5B_SetBackdropToColour0
   call LABEL_BF2E_LoadMenuPalette_SMS
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
   ld a, $38
   out (PORT_GG_LinkStatus), a
+.else
+.if IS_GAME_GEAR
+  ld a, $38
+  out (PORT_GG_LinkStatus), a
+.endif
+.endif
   ; Call the relevant menu initialiser
 +:ld a, (_RAM_DBCD_MenuIndex)
   or a
   jr nz, +
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_82DF_Menu1
+  call LABEL_82DF_MenuScreen_Title_Initialise
   jp ++
 +:dec a
   jr nz, +
@@ -17193,7 +17219,7 @@ LABEL_8021_MenuScreenEntryPoint:
   ld a, (_RAM_DBD8_CourseSelectIndex)
   or a
   jr nz, +
-  call LABEL_82DF_Menu1
+  call LABEL_82DF_MenuScreen_Title_Initialise
   jp ++
 +:call LABEL_84AA_Menu5
 ++:
@@ -17230,12 +17256,12 @@ LABEL_8021_MenuScreenEntryPoint:
 
 ; Jump Table from 80BE to 80E5 (20 entries, indexed by _RAM_D699_MenuScreenIndex)
 DATA_80BE_MenuScreenHandlers:
-.dw LABEL_80FC_Handler_MenuScreen_None
+.dw LABEL_80FC_Handler_MenuScreen_Initialise
 .dw LABEL_8BAB_Handler_MenuScreen_Title 
 .dw LABEL_8C35_Handler_MenuScreen_SelectPlayerCount 
 .dw LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter
 .dw LABEL_8D2B_Handler_MenuScreen_RaceName
-.dw LABEL_80FC_Handler_MenuScreen_None ; Unused5
+.dw LABEL_80FC_Handler_MenuScreen_Initialise ; Unused5
 .dw LABEL_8D79_Handler_MenuScreen_Qualify
 .dw LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace
 .dw LABEL_8E15_Handler_MenuScreen_StorageBox
@@ -17266,18 +17292,26 @@ LABEL_80E6_CallMenuScreenHandler:
   call + ; Invoke looked-up function
 
 ; 1st entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_80FC_Handler_MenuScreen_None:
+LABEL_80FC_Handler_MenuScreen_Initialise:
 LABEL_80FC_EndMenuScreenHandler:
-  call LABEL_915E_ScreenOn ; turn screen back on
-  ret
+  TailCall LABEL_915E_ScreenOn ; turn screen back on
 
 +:jp (hl)
 
 ; Data from 8101 to 8113 (19 bytes) - dead code?
-.db $3A $80 $D6 $E6 $30 $20 $0B $CD $F4 $B1 $3E $8E $32 $41 $D7 $C3
-.db $2F $DB $C9
+.ifdef UNREACHABLE_CODE
+LABEL_8101_Unknown: ; unreachable?
+  ld a,(_RAM_D680_Player1Controls_Menus)
+  and BUTTON_1_MASK | BUTTON_2_MASK
+  JrNzRet +
+  call LABEL_B1F4_Trampoline_StopMenuMusic
+  ld a, $8e ; Page $e
+  ld (_RAM_D741_RequestedPageIndex), a
+  JumpToRamCode LABEL_3BCEF_Trampoline_Unknown
++:ret
+.endif
 
-LABEL_8114_Menu0: ; init functions, need renaming
+LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   call LABEL_BB85_ScreenOffAtLineFF
   call LABEL_B44E_BlankMenuRAM
   ld a, MenuScreen_Title
@@ -17290,16 +17324,19 @@ LABEL_8114_Menu0: ; init functions, need renaming
   call LABEL_BAFF_LoadFontTiles
   call LABEL_BAD5_LoadMenuLogoTiles
   call LABEL_BDED_LoadMenuLogoTilemap
-  call LABEL_BB13_
-  call LABEL_B323_Populate_RAM_DBFE_
-  call LABEL_8CDB_
+  call LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow
+  call LABEL_B323_Populate_RAM_DBFE_8TimesTable
+  call LABEL_8CDB_ResetCheats
+  
   ld a, $59
   ld (_RAM_DBD4_), a
   ld (_RAM_DBD5_), a
   ld (_RAM_DBD6_), a
   ld (_RAM_DBD7_), a
+  
   ld a, $02
   ld (_RAM_DC3A_), a
+  
   xor a
   ld (_RAM_D7B7_), a
   ld (_RAM_D7B8_), a
@@ -17318,33 +17355,42 @@ LABEL_8114_Menu0: ; init functions, need renaming
   ld (_RAM_DC34_IsTournament), a
   ld (_RAM_DC36_), a
   ld (_RAM_DC37_), a
-  call LABEL_A778_InitDisplayCaseData
-  call LABEL_B9B3_
-  ld hl, _RAM_DC21_
-  ld bc, $000B
--:
-  ld a, $00
+  
+  call LABEL_A778_InitialiseDisplayCaseData
+  call LABEL_B9B3_Initialise_RAM_DC2C_
+  
+  ld hl, _RAM_DC21_ ; Blank this
+  ld bc, 11
+-:ld a, $00
   ld (hl), a
   inc hl
   dec bc
   ld a, c
   or a
   jr nz, -
+  
   ld a, $FF
   ld (_RAM_D6C4_), a
+  
   ld a, $18
   ld (_RAM_D6AB_), a
+  
   ld a, $01
   ld (_RAM_DC35_TournamentRaceNumber), a
+  
   ld a, $1A
   ld (_RAM_DC39_), a
+  
   call LABEL_BF2E_LoadMenuPalette_SMS
+
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
-  ld (_RAM_DC40_), a
+  ld (_RAM_DC40_IsGameGear), a
+.endif
+
   ld c, Music_01_TitleScreen
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_81C1_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17370,8 +17416,7 @@ LABEL_81C1_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call LABEL_A673_SelectLowSpriteTiles
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8205_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17395,11 +17440,13 @@ LABEL_8205_:
   call LABEL_9F40_
 
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   TilemapWriteAddressToHL 13, 8 ; for GG
   jr ++
+.endif
 +:TilemapWriteAddressToHL 9, 9 ; for SMS
 ++:call LABEL_BCCF_EmitTilemapRectangleSequence
 
@@ -17415,8 +17462,7 @@ LABEL_8205_:
   call LABEL_A67C_
   call LABEL_97EA_DrawDriverPortraitColumn
   call LABEL_B3AE_
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8272_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17461,10 +17507,9 @@ LABEL_8272_:
   ld (_RAM_D6AB_), hl
   xor a
   ld (_RAM_D6C1_), a
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_82DF_Menu1:
+LABEL_82DF_MenuScreen_Title_Initialise:
   ld a, MenuScreen_Qualify
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $FF
@@ -17501,22 +17546,20 @@ LABEL_82DF_Menu1:
   call LABEL_A5B0_EmitToVDP_Text
   ld c, Music_08_GameOver
   call LABEL_B1EC_Trampoline_PlayMenuMusic
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld hl, $01C4
   jr ++
-
-+:
-  ld hl, $0200
+.endif
++:ld hl, $0200
 ++:
   ld (_RAM_D6AB_), hl
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-; Data from 834E to 835F (18 bytes)
 TEXT_834E_FailedToQualify:
-.asc "FAILED TO QUALIFY!" ; $05 $00 $08 $0B $04 $03 $0E $13 $1A $0E $10 $14 $00 $0B $08 $05 $18 $B4
+.asc "FAILED TO QUALIFY!"
 
 LABEL_8360_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17571,24 +17614,12 @@ LABEL_8360_:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   ld hl, $0190
   ld (_RAM_D6AB_), hl
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-; Data from 83ED to 83F5 (9 bytes)
-TEXT_83ED_Qualified:
-.asc "QUALIFIED" ; $10 $14 $00 $0B $08 $05 $08 $04 $03
-
-; Data from 83F6 to 8403 (14 bytes)
-TEXT_83F6_ForChallenge:
-.asc "FOR CHALLENGE!" ; $05 $1A $11 $0E $02 $07 $00 $0B $0B $04 $0D $06 $04 $B4
-
-; Data from 8404 to 8415 (18 bytes)
-TEXT_8404_ForHeadToHead:
-.asc "FOR HEAD TO HEAD !" ; $05 $1A $11 $0E $07 $04 $00 $03 $0E $13 $1A $0E $07 $04 $00 $03 $0E $B4
-
-; Data from 8416 to 841B (6 bytes)
-TEXT_8416_Lives:
-.asc "LIVES " ; $0B $08 $15 $04 $12 $0E
+TEXT_83ED_Qualified:      .asc "QUALIFIED"
+TEXT_83F6_ForChallenge:   .asc "FOR CHALLENGE!"
+TEXT_8404_ForHeadToHead:  .asc "FOR HEAD TO HEAD !"
+TEXT_8416_Lives:          .asc "LIVES "
 
 LABEL_841C_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17629,8 +17660,7 @@ LABEL_841C_:
   ld c, a
   ld b, $00
   call LABEL_97EA_DrawDriverPortraitColumn
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8486_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17645,8 +17675,7 @@ LABEL_8486_:
   xor a
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_84AA_Menu5:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17687,8 +17716,7 @@ LABEL_84C7_:
   ld (_RAM_D6AC_), a
   ld c, Music_05_RaceStart
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8507_Menu2:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17701,13 +17729,23 @@ LABEL_8507_Menu2:
   call LABEL_BAFF_LoadFontTiles
   call LABEL_959C_LoadPunctuationTiles
   call LABEL_9448_LoadHeaderTiles
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
+  ; SMS
   call LABEL_94AD_DrawHeaderTilemap
   jr ++
+  ; GG
 +:call LABEL_94F0_DrawHeaderTextTilemap
 ++:
+.else
+.ifdef IS_GAME_GEAR
+  call LABEL_94F0_DrawHeaderTextTilemap
+.else
+  call LABEL_94AD_DrawHeaderTilemap
+.endif
+.endif
   call LABEL_B305_DrawHorizontalLine_Top
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
@@ -17800,12 +17838,9 @@ LABEL_8507_Menu2:
   xor a
   ld (_RAM_DC0A_), a
 ++:
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-; Data from 85EC to 85F3 (8 bytes)
-TEXT_85EC_Results:
-.asc "RESULTS-" ; $11 $04 $12 $14 $0B $13 $12 $B5
+TEXT_85EC_Results: .asc "RESULTS-"
 
 LABEL_85F4_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17844,7 +17879,7 @@ LABEL_85F4_:
   srl a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   ld a, $5A
   ld (hl), a
@@ -17858,8 +17893,7 @@ LABEL_85F4_:
   ld (_RAM_D6AC_), a
   ld c, Music_09_PlayerOut
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_866C_Menu3:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -17897,6 +17931,7 @@ LABEL_866C_Menu3:
   ld bc, $000E
   ld hl, TEXT_882E_OneLifeLost
   call LABEL_A5B0_EmitToVDP_Text
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -17904,6 +17939,13 @@ LABEL_866C_Menu3:
   jr ++
 +:TilemapWriteAddressToHL 12, 21 ; GG
 ++:
+.else
+.ifdef IS_GAME_GEAR
+  TilemapWriteAddressToHL 12, 21 ; GG
+.else
+  TilemapWriteAddressToHL 12, 22 ; SMS
+.endif
+.endif
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0006
   ld hl, TEXT_884A_Lives
@@ -17917,21 +17959,36 @@ LABEL_866C_Menu3:
   ld a, (_RAM_DC09_Lives)
   add a, $1B
   ld (_RAM_D701_SpriteN), a
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
+  ; SMS
   ld a, $96
   ld (_RAM_D6E1_SpriteX), a
   ld a, $B0
   ld (_RAM_D721_SpriteY), a
   jr ++
 
-+:
++:; GG
   ld a, $90
   ld (_RAM_D6E1_SpriteX), a
   ld a, $A8
   ld (_RAM_D721_SpriteY), a
 ++:
+.else
+.if IS_GAME_GEAR
+  ld a, $90
+  ld (_RAM_D6E1_SpriteX), a
+  ld a, $A8
+  ld (_RAM_D721_SpriteY), a
+.else
+  ld a, $96
+  ld (_RAM_D6E1_SpriteX), a
+  ld a, $B0
+  ld (_RAM_D721_SpriteY), a
+.endif
+.endif
   call LABEL_93CE_UpdateSpriteTable
   ld c, Music_0A_LostLife
   call LABEL_B1EC_Trampoline_PlayMenuMusic
@@ -18066,36 +18123,15 @@ LABEL_87E9_:
 LABEL_8826_:
   xor a
   ld (_RAM_D6AC_), a
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-; Data from 882E to 883B (14 bytes)
-TEXT_882E_OneLifeLost:
-.asc "ONE LIFE LOST!" ; $1A $0D $04 $0E $0B $08 $05 $04 $0E $0B $1A $12 $13 $B4
-
-; Data from 883C to 8849 (14 bytes)
-TEXT_883C_GameOver:
-.asc "  GAME OVER!  " ; $0E $0E $06 $00 $0C $04 $0E $1A $15 $04 $11 $B4 $0E $0E
-
-; Data from 884A to 884F (6 bytes)
-TEXT_884A_Lives:
-.asc "LIVES " ; $0B $08 $15 $04 $12 $0E
-
-; Data from 8850 to 8855 (6 bytes)
-TEXT_8850_Level:
-.asc "LEVEL " ; $0B $04 $15 $04 $0B $0E
-
-; Data from 8856 to 8861 (12 bytes)
-TEXT_8856_YouMadeIt:
-.asc "YOU MADE IT!" ; $18 $1A $14 $0E $0C $00 $03 $04 $0E $08 $13 $B4
-
-; Data from 8862 to 886D (12 bytes)
-TEXT_8862_ExtraLife:
-.asc " EXTRA LIFE " ; $0E $04 $17 $13 $11 $00 $0E $0B $08 $05 $04 $0E
-
-; Data from 886E to 8876 (9 bytes)
-TEXT_886E_NoBonus:
-.asc "NO  BONUS" ; $0D $1A $0E $0E $01 $1A $0D $14 $12
+TEXT_882E_OneLifeLost:  .asc "ONE LIFE LOST!"
+TEXT_883C_GameOver:     .asc "  GAME OVER!  "
+TEXT_884A_Lives:        .asc "LIVES "
+TEXT_8850_Level:        .asc "LEVEL "
+TEXT_8856_YouMadeIt:    .asc "YOU MADE IT!"
+TEXT_8862_ExtraLife:    .asc " EXTRA LIFE "
+TEXT_886E_NoBonus:      .asc "NO  BONUS"
 
 LABEL_8877_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -18171,20 +18207,11 @@ LABEL_8877_:
   ld (_RAM_D6C1_), a
   ld c, Music_05_RaceStart
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
-; Data from 8929 to 8936 (14 bytes)
-TEXT_8929_TripleWin:
-.asc "TRIPLE WIN !!!" ; $13 $11 $08 $0F $0B $04 $0E $16 $08 $0D $0E $B4 $B4 $B4
-
-; Data from 8937 to 8944 (14 bytes)
-TEXT_8937_BonusRace:
-.asc "  BONUS RACE  " ; $0E $0E $01 $1A $0D $14 $12 $0E $11 $00 $02 $04 $0E $0E
-
-; Data from 8945 to 8952 (14 bytes)
-TEXT_8945_BeatTheClock:
-.asc "BEAT THE CLOCK" ; $01 $04 $00 $13 $0E $13 $07 $04 $0E $02 $0B $1A $02 $0A
+TEXT_8929_TripleWin:    .asc "TRIPLE WIN !!!"
+TEXT_8937_BonusRace:    .asc "  BONUS RACE  "
+TEXT_8945_BeatTheClock: .asc "BEAT THE CLOCK"
 
 LABEL_8953_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -18240,8 +18267,7 @@ LABEL_8953_:
   call LABEL_B3AE_
   ld c, Music_02_CharacterSelect
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_89E2_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -18271,8 +18297,7 @@ LABEL_89E2_:
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AC_), a
   call LABEL_A673_SelectLowSpriteTiles
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8A30_:
   call LABEL_BB85_ScreenOffAtLineFF
@@ -18447,8 +18472,7 @@ LABEL_8B9D_:
   xor a
   ld (_RAM_D6CB_MenuScreenState), a
   call LABEL_BF2E_LoadMenuPalette_SMS
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 ; 2nd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_8BAB_Handler_MenuScreen_Title:
@@ -18540,7 +18564,7 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   cp $03
   jr nz, +
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
@@ -18619,10 +18643,10 @@ LABEL_8CA2_:
   ld (_RAM_D6A0_MenuSelection), a
   ret
 
-LABEL_8CDB_:
-  ld hl, _RAM_DC49_Cheat_ExplosiveOpponents
+LABEL_8CDB_ResetCheats:
+  ld hl, _RAM_DC49_CheatsStart
   xor a
-  ld c, $08
+  ld c, _RAM_DC51_CheatsEnd-_RAM_DC49_CheatsStart
 -:
   ld (hl), a
   inc hl
@@ -18749,7 +18773,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   or a
   jr nz, +
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
 +:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -19098,7 +19122,7 @@ LABEL_902E_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 ++:
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
 +++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -19174,8 +19198,7 @@ LABEL_90E7_:
   ld (_RAM_D694_), a
   ld a, $24
   ld (_RAM_D690_), a
-  call LABEL_918B_
-  ret
+  TailCall LABEL_918B_
 
 LABEL_90FF_ReadControllers:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -19266,8 +19289,7 @@ LABEL_9170_BlankTilemap_BlankControlsRAM:
   ld a, b
   or c
   jr nz, -
-  call LABEL_AF5D_BlankControlsRAM ; could jp
-  ret
+  TailCall LABEL_AF5D_BlankControlsRAM
 
 LABEL_918B_:
   ld a, (_RAM_D694_)
@@ -20004,8 +20026,7 @@ LABEL_96EC_:
   ld b, $00
   ld a, (_RAM_D6A2_)
   ld c, a
-  call LABEL_97EA_DrawDriverPortraitColumn
-  ret
+  TailCall LABEL_97EA_DrawDriverPortraitColumn
 
 LABEL_96F6_:
   ld a, (_RAM_D6A4_)
@@ -20058,8 +20079,7 @@ LABEL_973C_DrawPortrait_RightTwoColumns:
   ld a, (_RAM_D6A4_)
   sub $01
   ld (_RAM_D6A4_), a
-  call LABEL_AECD_
-  ret
+  TailCall LABEL_AECD_
 
 ; Data from 975B to 9766 (12 bytes)
 DATA_975B_TileWriteAddresses_SMS:
@@ -20105,7 +20125,7 @@ LABEL_977F_:
   ld (_RAM_D6AD_), a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
@@ -20132,7 +20152,7 @@ LABEL_97AF_:
   ld (_RAM_D6AE_), a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
@@ -20276,14 +20296,12 @@ LABEL_996E_:
 +:
   ld bc, $0018
   ld hl, TEXT_9A3D_WhoDoYouWantToRace
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 ++:
   ld bc, $0018
   ld hl, TEXT_9A25_WhoDoYouWantToBe
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 +++:
   ld bc, $0018
@@ -20316,8 +20334,7 @@ _LABEL_99D2_ret:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0009
   ld hl, TEXT_9B7E_Handicap
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_9A0E_:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -20327,20 +20344,11 @@ LABEL_9A0E_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0018
   ld hl, TEXT_AAAE_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
-; Data from 9A25 to 9A3C (24 bytes)
-TEXT_9A25_WhoDoYouWantToBe:
-.asc " WHO DO YOU WANT TO BE? " ; $0E $16 $07 $1A $0E $03 $1A $0E $18 $1A $14 $0E $16 $00 $0D $13 $0E $13 $1A $0E $01 $04 $B6 $0E
-
-; Data from 9A3D to 9A54 (24 bytes)
-TEXT_9A3D_WhoDoYouWantToRace:
-.asc "WHO DO YOU WANT TO RACE?" ; $16 $07 $1A $0E $03 $1A $0E $18 $1A $14 $0E $16 $00 $0D $13 $0E $13 $1A $0E $11 $00 $02 $04 $B6
-
-; Data from 9A55 to 9A6C (24 bytes)
-TEXT_9A55_PushStartToContinue:
-.asc " PUSH START TO CONTINUE " ; $0E $0F $14 $12 $07 $0E $12 $13 $00 $11 $13 $0E $13 $1A $0E $02 $1A $0D $13 $08 $0D $14 $04 $0E
+TEXT_9A25_WhoDoYouWantToBe:     .asc " WHO DO YOU WANT TO BE? "
+TEXT_9A3D_WhoDoYouWantToRace:   .asc "WHO DO YOU WANT TO RACE?"
+TEXT_9A55_PushStartToContinue:  .asc " PUSH START TO CONTINUE "
 
 LABEL_9A6D_:
   ld a, (_RAM_D6C0_)
@@ -20374,8 +20382,7 @@ LABEL_9A6D_:
 
 ++:
   ld hl, TEXT_9B56_ToBe
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_9ABB_:
   TilemapWriteAddressToHL 18, 17
@@ -20392,8 +20399,7 @@ LABEL_9ABB_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, TEXT_9B76_Continue
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_9AE9_:
   TilemapWriteAddressToHL 18, 17
@@ -20433,40 +20439,16 @@ LABEL_9B18_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, TEXT_AAAE_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
-; Data from 9B46 to 9B4D (8 bytes)
-TEXT_9B46_WhoDo:
-.asc "WHO DO  " ; $16 $07 $1A $0E $03 $1A $0E $0E
-
-; Data from 9B4E to 9B55 (8 bytes)
-TEXT_9B4E_YouWant:
-.asc "YOU WANT" ; $18 $1A $14 $0E $16 $00 $0D $13
-
-; Data from 9B56 to 9B5D (8 bytes)
-TEXT_9B56_ToBe:
-.asc "TO BE ? " ; $13 $1A $0E $01 $04 $0E $B6 $0E
-
-; Data from 9B5E to 9B65 (8 bytes)
-TEXT_9B5E_ToRace:
-.asc "TO RACE?" ; $13 $1A $0E $11 $00 $02 $04 $B6
-
-; Data from 9B66 to 9B6D (8 bytes)
-TEXT_9B66_Push:
-.asc "PUSH    " ; $0F $14 $12 $07 $0E $0E $0E $0E
-
-; Data from 9B6E to 9B75 (8 bytes)
-TEXT_9B6E_StartTo:
-.asc "START TO" ; $12 $13 $00 $11 $13 $0E $13 $1A
-
-; Data from 9B76 to 9B7D (8 bytes)
-TEXT_9B76_Continue:
-.asc "CONTINUE" ; $02 $1A $0D $13 $08 $0D $14 $04
-
-; Data from 9B7E to 9B86 (9 bytes)
-TEXT_9B7E_Handicap:
-.asc "HANDICAP " ; $07 $00 $0D $03 $08 $02 $00 $0F $0E
+TEXT_9B46_WhoDo:    .asc "WHO DO  "
+TEXT_9B4E_YouWant:  .asc "YOU WANT"
+TEXT_9B56_ToBe:     .asc "TO BE ? "
+TEXT_9B5E_ToRace:   .asc "TO RACE?"
+TEXT_9B66_Push:     .asc "PUSH    "
+TEXT_9B6E_StartTo:  .asc "START TO"
+TEXT_9B76_Continue: .asc "CONTINUE"
+TEXT_9B7E_Handicap: .asc "HANDICAP "
 
 LABEL_9B87_:
   ld a, (_RAM_D6BA_)
@@ -20535,7 +20517,7 @@ LABEL_9B87_:
 +:
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   ld a, (hl)
   cp $58
@@ -20800,12 +20782,7 @@ LABEL_9E52_:
   ld a, (_RAM_D6B9_)
   add a, $01
   ld (_RAM_D6B9_), a
-.ifdef TAIL_CALL
-  call LABEL_A5BE_
-  ret
-.else
-  jp LABEL_A5BE_
-.endif
+  TailCall LABEL_A5BE_
 
 +:
   ld a, $01
@@ -20885,7 +20862,7 @@ LABEL_9E70_:
   ld (_RAM_D6BB_), a
   cp e
   JrNzRet _LABEL_9F3F_ret
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   add a, $01
   ld (hl), a
@@ -21044,9 +21021,7 @@ LABEL_9FC5_:
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from A019 to A01B (3 bytes)
-TEXT_A019_Pro:
-.asc "PRO" ; $0F $11 $1A
+TEXT_A019_Pro:  .asc "PRO"
 
 LABEL_A01C_:
   ld c, a
@@ -21118,13 +21093,8 @@ LABEL_A039_:
 _LABEL_A0A3_ret:
   ret
 
-; Data from A0A4 to A0AB (8 bytes)
-TEXT_A0A4_Winner:
-.asc "WINNER!!" ; $16 $08 $0D $0D $04 $11 $B4 $B4
-
-; Data from A0AC to A0B3 (8 bytes)
-TEXT_A0AC_Loser:
-.asc " LOSER! " ; $0E $0B $1A $12 $04 $11 $B4 $0E
+TEXT_A0A4_Winner: .asc "WINNER!!"
+TEXT_A0AC_Loser:  .asc " LOSER! "
 
 LABEL_A0B4_:
   TilemapWriteAddressToHL 12, 10
@@ -21144,13 +21114,8 @@ LABEL_A0B4_:
 +:
   jp LABEL_A302_
 
-; Data from A0DB to A0E1 (7 bytes)
-TEXT_A0DB_Results:
-.asc "RESULTS" ; $11 $04 $12 $14 $0B $13 $12
-
-; Data from A0E2 to A0EF (14 bytes)
-TEXT_A0E2_SingleRace:
-.asc "   SINGLE RACE" ; $0E $0E $0E $12 $08 $0D $06 $0B $04 $0E $11 $00 $02 $04
+TEXT_A0DB_Results:    .asc "RESULTS"
+TEXT_A0E2_SingleRace: .asc "   SINGLE RACE"
 
 LABEL_A0F0_BlankTilemapRectangle:
   ld bc, $0000
@@ -21277,7 +21242,7 @@ LABEL_A14F_:
   ret
 .else
   jp z, LABEL_A1D3_PrintOrdinary
-  ; fall through
+  ; else fall through
 .endif
 
 LABEL_A1CA_PrintHandicap:
@@ -21290,13 +21255,8 @@ LABEL_A1D3_PrintOrdinary:
   ld hl, TEXT_A1E4_Ordinary
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from A1DC to A1E3 (8 bytes)
-TEXT_A1DC_Handicap:
-.asc "HANDICAP" ; $07 $00 $0D $03 $08 $02 $00 $0F
-
-; Data from A1E4 to A1EB (8 bytes)
-TEXT_A1E4_Ordinary:
-.asc "ORDINARY" ; $1A $11 $03 $08 $0D $00 $11 $18
+TEXT_A1DC_Handicap: .asc "HANDICAP"
+TEXT_A1E4_Ordinary: .asc "ORDINARY"
 
 LABEL_A1EC_:
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -21324,8 +21284,7 @@ LABEL_A1EC_:
   call LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC16_
   add hl, bc
-  call LABEL_A272_PrintBCDNumberWithLeadingHyphen
-  ret
+  TailCall LABEL_A272_PrintBCDNumberWithLeadingHyphen
 
 LABEL_A225_:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -21366,8 +21325,7 @@ LABEL_A225_:
   call LABEL_B35A_VRAMAddressToHL
   ld hl, _RAM_DC16_
   add hl, bc
-  call LABEL_A272_PrintBCDNumberWithLeadingHyphen
-  ret
+  TailCall LABEL_A272_PrintBCDNumberWithLeadingHyphen
 
 LABEL_A272_PrintBCDNumberWithLeadingHyphen:
   ld a, (hl) ; Get byte
@@ -21468,17 +21426,9 @@ LABEL_A302_:
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from A325 to A334 (16 bytes)
-TEXT_A325_SelectVehicle:
-.asc "  SELECT VEHICLE" ; $0E $0E $12 $04 $0B $04 $02 $13 $0E $15 $04 $07 $08 $02 $0B $04
-
-; Data from A335 to A344 (16 bytes)
-TEXT_A335_TournamentRace:
-.asc "TOURNAMENT RACE " ; $13 $1A $14 $11 $0D $00 $0C $04 $0D $13 $0E $11 $00 $02 $04 $0E
-
-; Data from A345 to A354 (16 bytes)
-TEXT_A345_SelectATrack:
-.asc "  SELECT A TRACK" ; $0E $0E $12 $04 $0B $04 $02 $13 $0E $00 $0E $13 $11 $00 $02 $0A
+TEXT_A325_SelectVehicle:  .asc "  SELECT VEHICLE"
+TEXT_A335_TournamentRace: .asc "TOURNAMENT RACE "
+TEXT_A345_SelectATrack:   .asc "  SELECT A TRACK"
 
 LABEL_A355_:
   ld a, (_RAM_DBD4_)
@@ -21576,19 +21526,10 @@ LABEL_A402_:
   ld hl, TEXT_A41C_L
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from A41A to A41D (4 bytes)
-TEXT_A41A_W:
-.asc "W-" ; $16 $B5
-TEXT_A41C_L:
-.asc "L-" ; $0B $B5
-
-; Data from A41E to A422 (5 bytes)
-TEXT_A41E_Won:
-.asc "WON- " ; $16 $1A $0D $B5 $0E
-
-; Data from A423 to A4B6 (148 bytes)
-TEXT_A423_Lost:
-.asc "LOST-" ; $0B $1A $12 $13 $B5
+TEXT_A41A_W:    .asc "W-"
+TEXT_A41C_L:    .asc "L-"
+TEXT_A41E_Won:  .asc "WON- "
+TEXT_A423_Lost: .asc "LOST-"
 
 ; Unused code (?)
 .ifdef UNREACHABLE_CODE
@@ -21641,17 +21582,12 @@ LABEL_A428_DrawPlayerOpponentTypeSelectText:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, 8
   ld hl, TEXT_A4AD_Computer
-  call LABEL_A5B0_EmitToVDP_Text           
-  ret                    
+  TailCall LABEL_A5B0_EmitToVDP_Text           
 
-TEXT_A49D_Player1:
-.asc "PLAYER 1"
-TEXT_A4A5_Player2:
-.asc "PLAYER 2"
-TEXT_A4AD_Computer:
-.asc "COMPUTER"
-TEXT_A4B5_Vs:
-.asc "VS"
+TEXT_A49D_Player1:  .asc "PLAYER 1"
+TEXT_A4A5_Player2:  .asc "PLAYER 2"
+TEXT_A4AD_Computer: .asc "COMPUTER"
+TEXT_A4B5_Vs:       .asc "VS"
 .endif
 
 LABEL_A4B7_:
@@ -21670,13 +21606,8 @@ LABEL_A4B7_:
   call LABEL_A5B0_EmitToVDP_Text
 +:ret
 
-; Data from A4DA to A4E5 (12 bytes)
-TEXT_A4DA_SelectGame:
-.asc "SELECT  GAME" ; $12 $04 $0B $04 $02 $13 $0E $0E $06 $00 $0C $04
-
-; Data from A4E6 to A4FF (26 bytes)
-TEXT_A4E6_OnePlayerTwoPlayer:
-.asc "ONE PLAYER      TWO PLAYER" ; $1A $0D $04 $0E $0F $0B $00 $18 $04 $11 $0E $0E $0E $0E $0E $0E $13 $16 $1A $0E $0F $0B $00 $18 $04 $11
+TEXT_A4DA_SelectGame:         .asc "SELECT  GAME"
+TEXT_A4E6_OnePlayerTwoPlayer: .asc "ONE PLAYER      TWO PLAYER"
 
 LABEL_A500_DrawSelectGameText:
   call LABEL_B35A_VRAMAddressToHL
@@ -21693,9 +21624,7 @@ LABEL_A50C_DrawOnePlayerSelectGameText:
   TilemapWriteAddressToHL 10, 12
   jp LABEL_A500_DrawSelectGameText
 
-; Data from A521 to A52F (15 bytes)
-TEXT_A521_OnePlayerGame:
-.asc "ONE PLAYER GAME" ; $1A $0D $04 $0E $0F $0B $00 $18 $04 $11 $0E $06 $00 $0C $04
+TEXT_A521_OnePlayerGame:  .asc "ONE PLAYER GAME"
 
 LABEL_A530_DrawChooseGameText:
   TilemapWriteAddressToHL 10, 11
@@ -21710,8 +21639,7 @@ LABEL_A530_DrawChooseGameText:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $001A
   ld hl, TEXT_A580_TournamentSingleRace
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 +:
   TilemapWriteAddressToHL 6, 21
@@ -21723,24 +21651,12 @@ LABEL_A530_DrawChooseGameText:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0004
   ld hl, TEXT_A5AC_Race
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
-; Data from A574 to A57F (12 bytes)
-TEXT_A574_ChooseGame:
-.asc "CHOOSE GAME!" ; .db $02 $07 $1A $1A $12 $04 $0E $06 $00 $0C $04 $B4
-
-; Data from A580 to A599 (26 bytes)
-TEXT_A580_TournamentSingleRace:
-.asc "TOURNAMENT     SINGLE RACE"; .db $13 $1A $14 $11 $0D $00 $0C $04 $0D $13 $0E $0E $0E $0E $0E $12 $08 $0D $06 $0B $04 $0E $11 $00 $02 $04
-
-; Data from A59A to A5AB (18 bytes)
-TEXT_A59A_TournamentSingle:
-.asc "TOURNAMENT  SINGLE" ; .db $13 $1A $14 $11 $0D $00 $0C $04 $0D $13 $0E $0E $12 $08 $0D $06 $0B $04
-
-; Data from A5AC to A5AF (4 bytes)
-TEXT_A5AC_Race:
-.asc "RACE" ; .db $11 $00 $02 $04
+TEXT_A574_ChooseGame:           .asc "CHOOSE GAME!"
+TEXT_A580_TournamentSingleRace: .asc "TOURNAMENT     SINGLE RACE"
+TEXT_A59A_TournamentSingle:     .asc "TOURNAMENT  SINGLE"
+TEXT_A5AC_Race:                 .asc "RACE"
 
 LABEL_A5B0_EmitToVDP_Text:
   ; Emits tile data from hl to the VDP data port, synthesising the high byte as it goes
@@ -21782,8 +21698,7 @@ LABEL_A5C9_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, TEXT_A66D_One
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_A5F9_:
   TilemapWriteAddressToHL 3, 10
@@ -21795,8 +21710,7 @@ LABEL_A5F9_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, TEXT_AAAE_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_A618_:
   ld de, $79AE
@@ -21817,8 +21731,7 @@ LABEL_A618_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, TEXT_A670_Two
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_A645_:
   TilemapWriteAddressToHL 23, 10
@@ -21830,24 +21743,12 @@ LABEL_A645_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
   ld hl, TEXT_AAAE_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
-; Data from A664 to A669 (6 bytes)
-TEXT_A664_Player:
-.asc "PLAYER" ; $0F $0B $00 $18 $04 $11
-
-; Data from A66A to A66C (3 bytes)
-TEXT_A66A_Plr:
-.asc "PLR" ; $0F $0B $11
-
-; Data from A66D to A66F (3 bytes)
-TEXT_A66D_One:
-.asc "ONE" ; $1A $0D $04
-
-; Data from A670 to A672 (3 bytes)
-TEXT_A670_Two:
-.asc "TWO" ; $13 $16 $1A
+TEXT_A664_Player: .asc "PLAYER"
+TEXT_A66A_Plr:    .asc "PLR"
+TEXT_A66D_One:    .asc "ONE"
+TEXT_A670_Two:    .asc "TWO"
 
 LABEL_A673_SelectLowSpriteTiles:
   ld a, VDP_REGISTER_SPRITESET_LOW
@@ -21908,10 +21809,8 @@ LABEL_A692_:
   call LABEL_A5B0_EmitToVDP_Text
   ld bc, $0008
   ld hl, TEXT_AAAE_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
-; Data from A6EF to A746 (88 bytes)
 TEXT_A6EF_OpponentNames:
 .asc 0, "  CHEN "
 .asc 1, "SPIDER "
@@ -21925,9 +21824,7 @@ TEXT_A6EF_OpponentNames:
 .asc 0, "  ANNE "
 .asc 1, "CHERRY "
 
-; Data from A747 to A74E (8 bytes)
-TEXT_A747_IsOut:
-.asc "IS OUT! " ; $08 $12 $0E $1A $14 $13 $B4 $0E
+TEXT_A747_IsOut: .asc "IS OUT! "
 
 LABEL_A74F_:
   ld a, (_RAM_DBD8_CourseSelectIndex)
@@ -21943,7 +21840,7 @@ LABEL_A74F_:
 DATA_A75E_:
 .db $FF $FF $FF $00 $FF $FF $01 $FF $FF $02 $FF $FF $FF $00 $FF $FF $01 $FF $FF $FF $02 $FF $FF $FF $00 $FF
 
-LABEL_A778_InitDisplayCaseData:
+LABEL_A778_InitialiseDisplayCaseData:
   ld bc, $0018
   ld hl, _RAM_DBD9_DisplayCaseData
 -:xor a
@@ -22092,8 +21989,7 @@ LABEL_A859_SetTilemapLocationForLastRacePosition:
   ld e, (hl)
   inc hl
   ld d, (hl)
-  call LABEL_B361_VRAMAddressToDE
-  ret
+  TailCall LABEL_B361_VRAMAddressToDE
 
 LABEL_A877_:
   ld a, :DATA_13C42_Tiles_BigNumbers
@@ -22144,8 +22040,7 @@ LABEL_A877_:
   add hl, bc ; Add 22 ros for SMS -> 24, 18
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
-  call LABEL_BCCF_EmitTilemapRectangleSequence
-  ret
+  TailCall LABEL_BCCF_EmitTilemapRectangleSequence
 
 LABEL_A8ED_:
   ld c, $00
@@ -22405,9 +22300,7 @@ LABEL_AA8B_:
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from AAAE to AACD (32 bytes)
-TEXT_AAAE_Blanks:
-.asc "                                "
+TEXT_AAAE_Blanks: .asc "                                "
 
 ; Data from AACE to AB05 (56 bytes)
 DATA_AACE_TrackNamePointers:
@@ -22441,7 +22334,6 @@ DATA_AACE_TrackNamePointers:
 .dw DATA_FFBF_TrackName_25
 
 
-; Data from AB06 to AB2B (38 bytes)
 DATA_AB06_TrackNumberText:
 .asc " 1"
 .asc " 2"
@@ -22462,8 +22354,6 @@ DATA_AB06_TrackNumberText:
 .db 0,0 ; Helicopter track
 .asc "16"
 .asc "17"
-; Data from AB2C to AB3D (18 bytes)
-DATA_AB2C_:
 .asc "18"
 .asc "19"
 .db 0,0 ; Helicopter track
@@ -22549,8 +22439,7 @@ LABEL_ABB3_:
   ld a, $60
   ld (_RAM_D690_), a
 +:
-  call +
-  ret
+  TailCall +
 
 +:
   ld a, (_RAM_D690_)
@@ -22591,8 +22480,7 @@ LABEL_ABB3_:
   jp --
 
 +:
-  call LABEL_9276_
-  ret
+  TailCall LABEL_9276_
 
 LABEL_AC1E_:
   ld a, (_RAM_DC3F_GameMode)
@@ -23030,9 +22918,7 @@ LABEL_AF92_:
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
-; Data from AFA0 to AFA4 (5 bytes)
-TEXT_AFA0_Link:
-.asc "LINK " ; $0B $08 $0D $0A $0E
+TEXT_AFA0_Link: .asc "LINK "
 
 LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL:
   call LABEL_B35A_VRAMAddressToHL
@@ -23086,8 +22972,7 @@ LABEL_AFCD_:
   ld (_RAM_D6AB_), a
   ld (_RAM_D6AC_), a
   call LABEL_A673_SelectLowSpriteTiles
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_B01D_SquinkyTennisHook:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -23127,8 +23012,7 @@ LABEL_B01D_SquinkyTennisHook:
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
-  call LABEL_BCCF_EmitTilemapRectangleSequence
-  ret
+  TailCall LABEL_BCCF_EmitTilemapRectangleSequence
 
 ; 20th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B06C_MenuScreen_OnePlayerMode:
@@ -23329,16 +23213,9 @@ _Right:
   call LABEL_A5B0_EmitToVDP_Text
   jp LABEL_80FC_EndMenuScreenHandler
 
-; Data from B1DD to B1E6 (10 bytes)
-TEXT_B1DD_No:
-.asc "-NO- " ; $B5 $0D $1A $B5 $0E
-
-TEXT_B1E2_No:
-.asc " -NO-" ; $0E $B5 $0D $1A $B5
-
-; Data from B1E7 to B1EB (5 bytes)
-TEXT_B1E7_Yes:
-.asc "-YES-" ; $B5 $18 $04 $12 $B5
+TEXT_B1DD_No:   .asc "-NO- "
+TEXT_B1E2_No:   .asc " -NO-"
+TEXT_B1E7_Yes:  .asc "-YES-"
 
 LABEL_B1EC_Trampoline_PlayMenuMusic:
   ld a, :LABEL_30CE8_PlayMenuMusic
@@ -23509,10 +23386,10 @@ LABEL_B31C_:
   ld (_RAM_D6C0_), a
   jp -
 
-LABEL_B323_Populate_RAM_DBFE_:
-  ; Copies data from DATA_97DF_8TimesTable to _RAM_DBFE_
+LABEL_B323_Populate_RAM_DBFE_8TimesTable:
+  ; Copies data from DATA_97DF_8TimesTable to _RAM_DBFE_8TimesTable
   ld hl, DATA_97DF_8TimesTable
-  ld de, _RAM_DBFE_
+  ld de, _RAM_DBFE_8TimesTable
   ld bc, $0000
 -:ld a, (hl)
   ld (de), a
@@ -23595,8 +23472,7 @@ LABEL_B389_:
 LABEL_B3A4_EmitToVDPAtDE_Text:
   call LABEL_B361_VRAMAddressToDE
   ld bc, $000E
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_B3AE_:
   ld a, $06
@@ -23623,7 +23499,7 @@ LABEL_B3C4_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
-  ld hl, _RAM_DBFE_
+  ld hl, _RAM_DBFE_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BC_DisplayCase_IndexBackup), bc
@@ -23866,21 +23742,24 @@ LABEL_B505_UpdateHardModeText:
   jp LABEL_A5B0_EmitToVDP_Text ; and ret
 
 +++:
+-:
   ld c, $0E
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text ; and ret
 
-; Data from B541 to B54C (12 bytes)
-TEXT_B541_HardMode:
-.asc "  HARD  MODE" ; .db $0E $0E $07 $00 $11 $03 $0E $0E $0C $1A $03 $04
+TEXT_B541_HardMode:     .asc "  HARD  MODE"
+TEXT_B54D_RockHardMode: .asc "ROCK HARD MODE"
 
-; Data from B54D to B56C (32 bytes)
-TEXT_B54D_RockHardMode:
-.asc "ROCK HARD MODE" ; .db $11 $1A $02 $0A $0E $07 $00 $11 $03 $0E $0C $1A $03 $04
-
-; Unknown data
-.db $AF $32
-.db $46 $DC $32 $D0 $D6 $32 $45 $DC $21 $52 $7A $CD $5A $B3 $18 $CC
+.ifdef UNREACHABLE_CODE
+  ; Turns off the cheats and blanks any text shown
+  xor a
+  ld (_RAM_DC46_Cheat_HardMode), a
+  ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
+  ld (_RAM_DC45_TitleScreenCheatCodeCounter_HardMode), a
+  TilemapWriteAddressToHL 9, 13
+  call LABEL_B35A_VRAMAddressToHL
+  jr -
+.endif
 
 ; 17th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B56D_MenuScreen_TrackSelect:
@@ -24070,7 +23949,7 @@ LABEL_B6B1_MenuScreen_TwoPlayerResult:
   ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +++
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -24133,8 +24012,7 @@ LABEL_B70B_:
   ld hl, DATA_2B356_SpriteNs_HandLeft
   CallRamCode LABEL_3BBB5_PopulateSpriteNs
   call LABEL_BF2E_LoadMenuPalette_SMS
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_B77C_:
   ld hl, _RAM_DC36_
@@ -24276,7 +24154,7 @@ LABEL_B84D_MenuScreen_TournamentChampion:
   jr nz, ++
 +:
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_Menu0
+  call LABEL_8114_MenuScreen_Initialise_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -24316,8 +24194,7 @@ LABEL_B877_:
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   xor a
   ld (_RAM_D6AB_), a
-  call LABEL_BB75_ScreenOnAtLineFF
-  ret
+  TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_B8C9_EmitTilemapRectangle_5x6_24:
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
@@ -24393,15 +24270,15 @@ LABEL_B911_:
 
 ; Data from B966 to B979 (20 bytes)
 TEXT_B966_TournamentChampion:
-.asc "TOURNAMENT CHAMPION!" ; $13 $1A $14 $11 $0D $00 $0C $04 $0D $13 $0E $02 $07 $00 $0C $0F $08 $1A $0D $B4
+.asc "TOURNAMENT CHAMPION!"
 
 ; Data from B97A to B983 (10 bytes)
 TEXT_B97A_Challenge:
-.asc "CHALLENGE " ; $02 $07 $00 $0B $0B $04 $0D $06 $04 $0E
+.asc "CHALLENGE "
 
 ; Data from B984 to B98D (10 bytes)
 TEXT_B984_Champion:
-.asc "CHAMPION !" ; $02 $07 $00 $0C $0F $08 $1A $0D $0E $B4
+.asc "CHAMPION !"
 
 LABEL_B98E_:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -24425,7 +24302,7 @@ LABEL_B9A3_:
   ld (_RAM_D6C9_ControllingPlayersLR1Buttons), a
   ret
 
-LABEL_B9B3_:
+LABEL_B9B3_Initialise_RAM_DC2C_:
   ld hl, _RAM_DC2C_
   ld c, $08
 -:
@@ -24435,7 +24312,7 @@ LABEL_B9B3_:
   dec c
   jr nz, -
   ld a, $01
-  ld (_RAM_DC31_), a
+  ld (_RAM_DC2C_+5), a
   ret
 
 LABEL_B9C4_:
@@ -24562,20 +24439,19 @@ LABEL_BA63_:
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $000A
   ld hl, TEXT_BACB_Blanks
-  call LABEL_A5B0_EmitToVDP_Text
-  ret
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 ; Data from BAB7 to BAC0 (10 bytes)
 TEXT_BAB7_Qualifying:
-.asc "QUALIFYING" ; $10 $14 $00 $0B $08 $05 $18 $08 $0D $06
+.asc "QUALIFYING"
 
 ; Data from BAC1 to BACA (10 bytes)
 TEXT_BAC1_Race:
-.asc "   RACE   " ; $0E $0E $0E $11 $00 $02 $04 $0E $0E $0E
+.asc "   RACE   "
 
 ; Data from BACB to BAD4 (10 bytes)
 TEXT_BACB_Blanks:
-.asc "          " ; $0E $0E $0E $0E $0E $0E $0E $0E $0E $0E
+.asc "          "
 
 LABEL_BAD5_LoadMenuLogoTiles:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -24608,7 +24484,7 @@ LABEL_BAFF_LoadFontTiles:
   ld de, 36 * 8 ; 36 tiles
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
-LABEL_BB13_:
+LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -24638,8 +24514,7 @@ LABEL_BB13_:
 ++:
   ld a, $01
   ld (_RAM_D6CB_MenuScreenState), a
-  call LABEL_90E7_
-  ret
+  TailCall LABEL_90E7_
 
 LABEL_BB49_SetMenuHScroll:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -25109,27 +24984,27 @@ LABEL_BE1A_DrawCopyrightText:
 
 ; Data from BE77 to BE90 (26 bytes)
 TEXT_BE77_CopyrightCodemasters:
-.asc "     COPYRIGHT CODEMASTERS" ; $0E $0E $0E $0E $0E $02 $1A $0F $18 $11 $08 $06 $07 $13 $0E $02 $1A $03 $04 $0C $00 $12 $13 $04 $11 $12
+.asc "     COPYRIGHT CODEMASTERS"
 
 ; Data from BE91 to BEAC (28 bytes)
 TEXT_BE91_SoftwareCompanyLtd1993:
-.asc "   SOFTWARE COMPANY LTD 1993" ; $0E $0E $0E $12 $1A $05 $13 $16 $00 $11 $04 $0E $02 $1A $0C $0F $00 $0D $18 $0E $0B $13 $03 $0E $1B $23 $23 $1D
+.asc "   SOFTWARE COMPANY LTD 1993"
 
 ; Data from BEAD to BEC4 (24 bytes)
 TEXT_BEAD_MasterSystemVersionBy:
-.asc "MASTER SYSTEM VERSION BY" ; $0C $00 $12 $13 $04 $11 $0E $12 $18 $12 $13 $04 $0C $0E $15 $04 $11 $12 $08 $1A $0D $0E $01 $18
+.asc "MASTER SYSTEM VERSION BY"
 
 ; Data from BEC5 to BED8 (20 bytes)
 TEXT_BEC5_AshleyRoutledge:
-.asc "  ASHLEY ROUTLEDGE  " ; $0E $0E $00 $12 $07 $0B $04 $18 $0E $11 $1A $14 $13 $0B $04 $03 $06 $04 $0E $0E
+.asc "  ASHLEY ROUTLEDGE  "
 
 ; Data from BED9 to BEE3 (11 bytes)
 TEXT_BED9_And:
-.asc "        AND" ; $0E $0E $0E $0E $0E $0E $0E $0E $00 $0D $03
+.asc "        AND"
 
 ; Data from BEE4 to BEF4 (17 bytes)
 TEXT_BEE4_DavidSaunders:
-.asc "   DAVID SAUNDERS" ; $0E $0E $0E $03 $00 $15 $08 $03 $0E $12 $00 $14 $0D $03 $04 $11 $12
+.asc "   DAVID SAUNDERS"
 
 LABEL_BEF5_:
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -29609,13 +29484,15 @@ LABEL_310CE_:
   jr nz, +
   ld a, c
 +:
+.ifdef GAME_GEAR_CHECKS
   ld c, a
-  ld a, (_RAM_DC40_)
+  ld a, (_RAM_DC40_IsGameGear)
   or a
   jr z, +
   inc c
 +:
   ld a, c
+.endif
   ld (_RAM_D92B_MenuSound_), a
   ld (_RAM_D92C_MenuSound_), a
   jp LABEL_310A0_
@@ -30805,8 +30682,7 @@ _hflip:
   pop hl
   ld de, $0300
   add hl, de
-  call LABEL_359C0_emitThreeTilesHFlipped
-  ret
+  TailCall LABEL_359C0_emitThreeTilesHFlipped
 
 LABEL_358D9_vflip:
   ld a, (_RAM_DB75_CarTileLoaderDataIndex) ; Index into table of pointers, read into bc
@@ -30851,8 +30727,7 @@ LABEL_358D9_vflip:
   ld de, $0300
   or a
   sbc hl, de
-  call LABEL_3598D_emitThreeTilesVFlipped
-  ret
+  TailCall LABEL_3598D_emitThreeTilesVFlipped
 
 LABEL_3591C_noflip:
   ld a, (_RAM_DB75_CarTileLoaderDataIndex) ; Index into table of pointers, read into bc
@@ -35847,9 +35722,9 @@ LABEL_3BCE6_Trampoline_StopMenuMusic:
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
 .ifdef UNREACHABLE_CODE
-LABEL_3BCEF_: ; unused?
+LABEL_3BCEF_Trampoline_Unknown: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
-  jp $a003 ; Don't know which page
+  jp $a003 ; Bad destination at $3a003
 .endif
 
 ; Executed in RAM at db35

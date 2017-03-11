@@ -615,13 +615,14 @@
 02:8021 LABEL_8021_MenuScreenEntryPoint
 02:80be DATA_80BE_MenuScreenHandlers
 02:80e6 LABEL_80E6_CallMenuScreenHandler
-02:80fc LABEL_80FC_Handler_MenuScreen_None
+02:80fc LABEL_80FC_Handler_MenuScreen_Initialise
 02:80fc LABEL_80FC_EndMenuScreenHandler
-02:8114 LABEL_8114_Menu0
+02:8101 LABEL_8101_Unknown
+02:8114 LABEL_8114_MenuScreen_Initialise_Initialise
 02:81c1 LABEL_81C1_
 02:8205 LABEL_8205_
 02:8272 LABEL_8272_
-02:82df LABEL_82DF_Menu1
+02:82df LABEL_82DF_MenuScreen_Title_Initialise
 02:834e TEXT_834E_FailedToQualify
 02:8360 LABEL_8360_
 02:83ed TEXT_83ED_Qualified
@@ -663,7 +664,7 @@
 02:8c2c LABEL_8C2C_
 02:8c35 LABEL_8C35_Handler_MenuScreen_SelectPlayerCount
 02:8ca2 LABEL_8CA2_
-02:8cdb LABEL_8CDB_
+02:8cdb LABEL_8CDB_ResetCheats
 02:8ce7 LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter
 02:8d28 LABEL_8D28_MenuScreenHandlerDone
 02:8d2b LABEL_8D2B_Handler_MenuScreen_RaceName
@@ -834,7 +835,7 @@
 02:a747 TEXT_A747_IsOut
 02:a74f LABEL_A74F_
 02:a75e DATA_A75E_
-02:a778 LABEL_A778_InitDisplayCaseData
+02:a778 LABEL_A778_InitialiseDisplayCaseData
 02:a787 LABEL_A787_
 02:a7b3 LABEL_A7B3_
 02:a7bb DATA_A7BB_
@@ -863,7 +864,6 @@
 02:aaae TEXT_AAAE_Blanks
 02:aace DATA_AACE_TrackNamePointers
 02:ab06 DATA_AB06_TrackNumberText
-02:ab2c DATA_AB2C_
 02:ab3e DATA_AB3E_CourseSelect_TrackTypes
 02:ab5b LABEL_AB5B_GetPortraitSource_CourseSelect
 02:ab68 LABEL_AB68_GetPortraitSource_TrackType
@@ -925,7 +925,7 @@
 02:b305 LABEL_B305_DrawHorizontalLine_Top
 02:b30e LABEL_B30E_
 02:b31c LABEL_B31C_
-02:b323 LABEL_B323_Populate_RAM_DBFE_
+02:b323 LABEL_B323_Populate_RAM_DBFE_8TimesTable
 02:b337 LABEL_B337_BlankTiles
 02:b35a LABEL_B35A_VRAMAddressToHL
 02:b361 LABEL_B361_VRAMAddressToDE
@@ -974,7 +974,7 @@
 02:b984 TEXT_B984_Champion
 02:b98e LABEL_B98E_
 02:b9a3 LABEL_B9A3_
-02:b9b3 LABEL_B9B3_
+02:b9b3 LABEL_B9B3_Initialise_RAM_DC2C_
 02:b9c4 LABEL_B9C4_
 02:b9ed LABEL_B9ED_
 02:ba3c LABEL_BA3C_LoadColouredCirclesTilesToIndex150
@@ -986,7 +986,7 @@
 02:bacb TEXT_BACB_Blanks
 02:bad5 LABEL_BAD5_LoadMenuLogoTiles
 02:baff LABEL_BAFF_LoadFontTiles
-02:bb13 LABEL_BB13_
+02:bb13 LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow
 02:bb49 LABEL_BB49_SetMenuHScroll
 02:bb5b LABEL_BB5B_SetBackdropToColour0
 02:bb63 LABEL_BB63_ScreenOn
@@ -1797,7 +1797,7 @@
 0e:bcd5 LABEL_3BCD5_ReadPagedByte_bc
 0e:bcdc LABEL_3BCDC_Trampoline2_PlayMenuMusic
 0e:bce6 LABEL_3BCE6_Trampoline_StopMenuMusic
-0e:bcef LABEL_3BCEF_
+0e:bcef LABEL_3BCEF_Trampoline_Unknown
 0e:bcf5 LABEL_3BCF5_RestorePagingFromD741
 0e:bcfc LABEL_3BCFC_RestorePagingPreserveA
 0e:bd08 LABEL_3BD08_BackToSlot2
@@ -2767,7 +2767,7 @@
 0000dbfb _RAM_DBFB_
 0000dbfc _RAM_DBFC_
 0000dbfd _RAM_DBFD_
-0000dbfe _RAM_DBFE_
+0000dbfe _RAM_DBFE_8TimesTable
 0000dc09 _RAM_DC09_Lives
 0000dc0a _RAM_DC0A_
 0000dc0b _RAM_DC0B_
@@ -2780,7 +2780,6 @@
 0000dc18 _RAM_DC18_Player1_LostCount
 0000dc21 _RAM_DC21_
 0000dc2c _RAM_DC2C_
-0000dc31 _RAM_DC31_
 0000dc34 _RAM_DC34_IsTournament
 0000dc35 _RAM_DC35_TournamentRaceNumber
 0000dc36 _RAM_DC36_
@@ -2793,13 +2792,14 @@
 0000dc3d _RAM_DC3D_IsHeadToHead
 0000dc3e _RAM_DC3E_InMenus
 0000dc3f _RAM_DC3F_GameMode
-0000dc40 _RAM_DC40_
+0000dc40 _RAM_DC40_IsGameGear
 0000dc41 _RAM_DC41_GearToGearActive
 0000dc42 _RAM_DC42_GearToGear_IAmPlayer1
 0000dc45 _RAM_DC45_TitleScreenCheatCodeCounter_HardMode
 0000dc46 _RAM_DC46_Cheat_HardMode
 0000dc47 _RAM_DC47_GearToGear_OtherPlayerControls1
 0000dc48 _RAM_DC48_GearToGear_OtherPlayerControls2
+0000dc49 _RAM_DC49_CheatsStart
 0000dc49 _RAM_DC49_Cheat_ExplosiveOpponents
 0000dc4a _RAM_DC4A_Cheat_ExtraLives
 0000dc4b _RAM_DC4B_Cheat_InfiniteLives
@@ -2808,6 +2808,7 @@
 0000dc4e _RAM_DC4E_Cheat_SuperSkids
 0000dc4f _RAM_DC4F_Cheat_EasierOpponents
 0000dc50 _RAM_DC50_Cheat_FasterVehicles
+0000dc51 _RAM_DC51_CheatsEnd
 0000dc51 _RAM_DC51_PreviousCombinedByte
 0000dc52 _RAM_DC52_PreviousCombinedByte2
 0000dc53 _RAM_DC52_
