@@ -90,6 +90,39 @@ CarState_3_Falling db ; Falling?
 CarState_4_Submerged db ; ???
 .ende
 
+; Track names to indices
+.enum 0
+Track_00_QualifyingRace           db
+Track_01_TheBreakfastBends        db
+Track_02_DesktopDropOff           db
+Track_03_OilcanAlley              db
+Track_04_SandyStraights           db
+Track_05_OatmealInOverdrive       db
+Track_06_TheCueBallCircuit        db
+Track_07_HandymansCurve           db
+Track_08_BermudaBathtub           db
+Track_09_SaharaSandpit            db
+Track_0A_ThePottedPassage         db ; Helicopter!
+Track_0B_FruitJuiceFollies        db
+Track_0C_FoamyFjords              db
+Track_0D_BedroomBattlefield       db
+Track_0E_PitfallPockets           db
+Track_0F_PencilPlateaux           db
+Track_10_TheDareDevilDunes        db
+Track_11_TheShrubberyTwist        db ; Helicopter!
+Track_12_PerilousPitStop          db
+Track_13_WideAwakeWarZone         db
+Track_14_CrayonCanyons            db
+Track_15_SoapLakeCity!            db
+Track_16_TheLeafyBends            db ; Helicopter!
+Track_17_ChalkDustChicane         db
+Track_18_GoForIt                  db
+Track_19_WinThisRaceToBeChampion  db
+Track_1A_RuffTrux1                db
+Track_1B_RuffTrux2                db
+Track_1C_RuffTrux3                db
+.ende
+
 .define BUTTON_U_MASK %00000001
 .define BUTTON_D_MASK %00000010
 .define BUTTON_L_MASK %00000100
@@ -593,7 +626,7 @@ _RAM_D6C8_HeaderTilesIndexOffset db
 _RAM_D6C9_ControllingPlayersLR1Buttons db ; Combination of player 1 and 2 when applicable, else player 1
 _RAM_D6CA_ db
 _RAM_D6CB_MenuScreenState db ; Meaning depends on which menu screen we are on?
-_RAM_D6CC_ db
+_RAM_D6CC_TwoPlayerTrackSelectIndex db
 _RAM_D6CD_ db
 _RAM_D6CE_ db
 _RAM_D6CF_ db
@@ -821,7 +854,7 @@ _RAM_DBBE_ db
 _RAM_DBBF_ db ; unused?
 ; Block initialised from ROM ------>
 _RAM_DBC0_EnterGameTrampoline dsb 13
-_RAM_DBCD_MenuIndex db
+_RAM_DBCD_MenuIndex db ; Not the same as the menu screen index!
 _RAM_DBCE_ db
 _RAM_DBCF_LastRacePosition db
 _RAM_DBD0_HeadToHeadLost2 db
@@ -832,10 +865,10 @@ _RAM_DBD4_ db
 _RAM_DBD5_ db
 _RAM_DBD6_ db
 _RAM_DBD7_ db
-_RAM_DBD8_CourseSelectIndex db
-_RAM_DBD9_DisplayCaseData dsb $18 ; includes the following three labels; 0 = blank, 1 = filled, 2 = flashing
+_RAM_DBD8_NextTrackIndex db
+_RAM_DBD9_DisplayCaseData dsb 24 ; 0 = blank, 1 = filled, 2 = flashing
 _RAM_DBF1_RaceNumberText dsb 8 ; "RACE xx-", xx is replaced at runtime
-; ------> End block initialised from ROM 
+; ------> End block initialised from ROM
 _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
@@ -866,7 +899,7 @@ _RAM_DC35_TournamentRaceNumber db
 _RAM_DC36_ db
 _RAM_DC37_ db
 _RAM_DC38_ db
-_RAM_DC39_ db
+_RAM_DC39_NextRuffTruxTrack db
 _RAM_DC3A_ db
 _RAM_DC3B_IsTrackSelect db
 _RAM_DC3C_IsGameGear db ; Most code is common with the GG game
@@ -1630,7 +1663,7 @@ LABEL_14_EnterMenus:
   ld sp, hl
   jp LABEL_8021_MenuScreenEntryPoint
 
-.ifdef BLANK_FILL_ORIGINAL  
+.ifdef BLANK_FILL_ORIGINAL
 ; Data from 26 to 37 (18 bytes)
 .db "P HL", 13, 10, 9, "INC HL", 13, 10, 9, "LD" ; Source code left in RAM
 .endif
@@ -1674,7 +1707,7 @@ LABEL_38_:
 .section "Pause/Gear To Gear handler" force
 LABEL_66_NMI:
   push af
-.ifdef GAME_GEAR_CHECKS 
+.ifdef GAME_GEAR_CHECKS
     ld a, (_RAM_DC3C_IsGameGear)
     or a
     jp nz, LABEL_9BF_NMI_GG
@@ -1709,7 +1742,7 @@ LABEL_75_EnterGameTrampolineImpl:
 ; _RAM_DBCD_MenuIndex onwards
 .db MenuScreen_Initialise ; _RAM_DBCD_MenuIndex
 .db $01 ; _RAM_DBCE_
-.db $01 ; _RAM_DBCF_LastRacePosition 
+.db $01 ; _RAM_DBCF_LastRacePosition
 .db $00 ; _RAM_DBD0_HeadToHeadLost2
 .db $03 ; _RAM_DBD1_
 .db $02 ; _RAM_DBD2_
@@ -1718,7 +1751,7 @@ LABEL_75_EnterGameTrampolineImpl:
 .db $00 ; _RAM_DBD5_
 .db $00 ; _RAM_DBD6_
 .db $00 ; _RAM_DBD7_
-.db $00 ; _RAM_DBD8_CourseSelectIndex
+.db $00 ; _RAM_DBD8_NextTrackIndex
 .dsb 24 0 ; _RAM_DBD9_DisplayCaseData
 .asc "RACE 01-" ; _RAM_DBF1_RaceNumberText
 LABEL_75_MenuRAMSectionEnd:
@@ -1800,8 +1833,8 @@ LABEL_100_Startup:
   ld (_RAM_DB62_), hl
   ld hl, _RAM_DB42_
   ld (_RAM_DB64_), hl
-  ld a, $1A
-  ld (_RAM_DC39_), a
+  ld a, Track_1A_RuffTrux1
+  ld (_RAM_DC39_NextRuffTruxTrack), a
 LABEL_156_:
   ld a, $00
   ld (_RAM_DC54_IsGameGear), a ; Set to SMS mode
@@ -2210,7 +2243,7 @@ LABEL_4B2_:
 +:
   ld a, (DATA_4B1_) ; Constant!
   ld (iy+24), a
-  
+
   ld a, (iy+25)
   ld e, a
   ld d, $00
@@ -2360,7 +2393,7 @@ LABEL_4B2_:
   xor a
   jp -
 
-.ifdef JUMP_TO_RET  
+.ifdef JUMP_TO_RET
 _LABEL_5C8_ret:
   ret
 .endif
@@ -3099,9 +3132,9 @@ _LABEL_BAC_ret:
 
 ; Data from BAD to BC4 (24 bytes)
 DATA_BAD_WinnerSpriteData: ; Sprite X, N for "WINNER"
-.db $70 $9C 
-.db $78 $9D 
-.db $80 $9E 
+.db $70 $9C
+.db $78 $9D
+.db $80 $9E
 .db $88 $9F
 .db $90 $A4
 .db $98 $A5
@@ -4768,7 +4801,7 @@ LABEL_1801_:
   and $1F
   or b
   ld (_RAM_DED1_), a
-  
+
 .ifdef JUMP_TO_RET
   call LABEL_795E_
 +:ret
@@ -9514,7 +9547,7 @@ LABEL_3F22_ScreenOff:
 
 LABEL_3F2B_:
   JumpToPagedFunction LABEL_23B98_
-  
+
 LABEL_3F36_ScreenOn:
   ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
@@ -9611,7 +9644,7 @@ DATA_3FD3_:
 .db :CADDR
 .section "Bank 1"
 
-; Metatile tilemaps are stored from $0080 in each track data bank 
+; Metatile tilemaps are stored from $0080 in each track data bank
 ; Each metatile is 12 * 12 = 144 bytes of tile indices
 ; There are up to $41(?) for each track type
 ; So we use our "times table" macro to generate the split pointers
@@ -14364,7 +14397,7 @@ LABEL_69DB_:
 .else
   TailCall LABEL_6A4F_
 .endif
-  
+
 LABEL_6A11_:
   xor a
   ld (_RAM_DF58_), a
@@ -15793,9 +15826,10 @@ LABEL_7519_:
   jp LABEL_14_EnterMenus
 
 LABEL_7520_:
-  ld a, (_RAM_DC39_)
+  ; Next track next time
+  ld a, (_RAM_DC39_NextRuffTruxTrack)
   add a, $01
-  ld (_RAM_DC39_), a
+  ld (_RAM_DC39_NextRuffTruxTrack), a
   xor a
   ld (_RAM_DC0A_WinsInARow), a
   ld a, $03
@@ -15874,11 +15908,11 @@ LABEL_7573_EnterGame:
   and $0F
   cp $03
   jr nz, +
-  ld a, (_RAM_DC39_)
+  ld a, (_RAM_DC39_NextRuffTruxTrack)
   jp ++
 
 +:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
 ++:
   ld (_RAM_DC55_CourseIndex), a
    ; Look up track type
@@ -17194,33 +17228,33 @@ LABEL_8021_MenuScreenEntryPoint:
 +:ld a, (_RAM_DBCD_MenuIndex)
   or a
   jr nz, +
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_82DF_MenuScreen_Title_Initialise
+  call LABEL_82DF_MenuIndex1_Initialise
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_8507_Menu2
+  call LABEL_8507_MenuIndex2_Initialise
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_866C_Menu3
+  call LABEL_866C_Menu3_Initialise
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_8A38_Menu4
+  call LABEL_8A38_Menu4_Initialise
   jp ++
 +:dec a
   jr nz, ++
   ; Menu 5 only if course select > 0
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   or a
   jr nz, +
-  call LABEL_82DF_MenuScreen_Title_Initialise
+  call LABEL_82DF_MenuIndex1_Initialise
   jp ++
-+:call LABEL_84AA_Menu5
++:call LABEL_84AA_Menu5_Initialise
 ++:
   im 1
   ei
@@ -17256,8 +17290,8 @@ LABEL_8021_MenuScreenEntryPoint:
 ; Jump Table from 80BE to 80E5 (20 entries, indexed by _RAM_D699_MenuScreenIndex)
 DATA_80BE_MenuScreenHandlers:
 .dw LABEL_80FC_Handler_MenuScreen_Initialise
-.dw LABEL_8BAB_Handler_MenuScreen_Title 
-.dw LABEL_8C35_Handler_MenuScreen_SelectPlayerCount 
+.dw LABEL_8BAB_Handler_MenuScreen_Title
+.dw LABEL_8C35_Handler_MenuScreen_SelectPlayerCount
 .dw LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter
 .dw LABEL_8D2B_Handler_MenuScreen_RaceName
 .dw LABEL_80FC_Handler_MenuScreen_Initialise ; Unused5
@@ -17310,7 +17344,7 @@ LABEL_8101_Unknown: ; unreachable?
 +:ret
 .endif
 
-LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
+LABEL_8114_MenuIndex0_Initialise: ; init functions, need renaming
   call LABEL_BB85_ScreenOffAtLineFF
   call LABEL_B44E_BlankMenuRAM
   ; Next menu screen is title
@@ -17327,16 +17361,16 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   call LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow
   call LABEL_B323_Populate_RAM_DBFE_8TimesTable
   call LABEL_8CDB_ResetCheats
-  
+
   ld a, $59
   ld (_RAM_DBD4_), a
   ld (_RAM_DBD5_), a
   ld (_RAM_DBD6_), a
   ld (_RAM_DBD7_), a
-  
+
   ld a, $02
   ld (_RAM_DC3A_), a
-  
+
   xor a
   ld (_RAM_D7B7_), a
   ld (_RAM_D7B8_), a
@@ -17344,7 +17378,7 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   ld (_RAM_D7B4_IsHeadToHead), a
   ld (_RAM_DC3F_GameMode), a
   ld (_RAM_DC3D_IsHeadToHead), a
-  ld (_RAM_DBD8_CourseSelectIndex), a
+  ld (_RAM_DBD8_NextTrackIndex), a
   ld (_RAM_DC3B_IsTrackSelect), a
   ld (_RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen), a
   ld (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect), a
@@ -17355,10 +17389,10 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   ld (_RAM_DC34_IsTournament), a
   ld (_RAM_DC36_), a
   ld (_RAM_DC37_), a
-  
+
   call LABEL_A778_InitialiseDisplayCaseData
   call LABEL_B9B3_Initialise_RAM_DC2C_
-  
+
   ld hl, _RAM_DC21_ ; Blank this
   ld bc, 11
 -:ld a, $00
@@ -17368,19 +17402,19 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   ld a, c
   or a
   jr nz, -
-  
+
   ld a, $FF
   ld (_RAM_D6C4_), a
-  
-  ld a, 0.48 * 50 ; 0.48s @ 50Hz, 0.4s @ 60Hz Not sure what the purpose of this is... it seems to delay entering the game on the title screen?
+
+  ld a, 0.48 * 50 ; 0.48s @ 50Hz, 0.4s @ 60Hz Delay before allowing user to enter the game on the title screen
   ld (_RAM_D6AB_MenuTimer.Lo), a
-  
+
   ld a, $01
   ld (_RAM_DC35_TournamentRaceNumber), a
-  
-  ld a, $1A
-  ld (_RAM_DC39_), a
-  
+
+  ld a, Track_1A_RuffTrux1
+  ld (_RAM_DC39_NextRuffTruxTrack), a
+
   call LABEL_BF2E_LoadMenuPalette_SMS
 
 .ifdef GAME_GEAR_CHECKS
@@ -17509,7 +17543,7 @@ LABEL_8272_:
   ld (_RAM_D6C1_), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_82DF_MenuScreen_Title_Initialise:
+LABEL_82DF_MenuIndex1_Initialise:
   ld a, MenuScreen_Qualify
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $FF
@@ -17572,9 +17606,10 @@ LABEL_8360_:
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ; Next track
+  ld a, (_RAM_DBD8_NextTrackIndex)
   add a, $01
-  ld (_RAM_DBD8_CourseSelectIndex), a
+  ld (_RAM_DBD8_NextTrackIndex), a
 +:TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_)
@@ -17677,16 +17712,16 @@ LABEL_8486_:
   ld (_RAM_D6AB_MenuTimer.Hi), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_84AA_Menu5:
+LABEL_84AA_Menu5_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, LABEL_84C7_
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
-  jp nz, LABEL_8F73_
-  call LABEL_B269_
-  cp $1A
+  jp nz, LABEL_8F73_LoseALife
+  call LABEL_B269_IncrementCourseSelectIndex
+  cp Track_1A_RuffTrux1
   jr nz, LABEL_84C7_
   call LABEL_B877_
   jp LABEL_80FC_EndMenuScreenHandler
@@ -17718,7 +17753,7 @@ LABEL_84C7_:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_8507_Menu2:
+LABEL_8507_MenuIndex2_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerTournamentResults
   ld (_RAM_D699_MenuScreenIndex), a
@@ -17827,10 +17862,10 @@ LABEL_8507_Menu2:
   or a
   jr nz, +
   ; First place
-  ld a, (_RAM_DC39_)
-  cp $1D
+  ld a, (_RAM_DC39_NextRuffTruxTrack)
+  cp Track_1C_RuffTrux3 + 1
   jr z, +
-  ; Stop incrementing wins in a row after this point?
+  ; Stop incrementing wins in a row because we ran out of RuffTrux tracks
   ld a, (_RAM_DC0A_WinsInARow)
   add a, $01
   ld (_RAM_DC0A_WinsInARow), a
@@ -17897,7 +17932,7 @@ LABEL_85F4_:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_866C_Menu3:
+LABEL_866C_Menu3_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_LifeList
   ld (_RAM_D699_MenuScreenIndex), a
@@ -18306,7 +18341,7 @@ LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu:
   ld a, MenuScreen_TrackSelect
   jp +
 
-LABEL_8A38_Menu4:
+LABEL_8A38_Menu4_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerResult
 +:ld (_RAM_D699_MenuScreenIndex), a
@@ -18401,7 +18436,7 @@ LABEL_8A38_Menu4:
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld (_RAM_D693_), a
-  ld (_RAM_D6CC_), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
   ld (_RAM_D6CE_), a
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
@@ -18559,9 +18594,9 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr z, +
-  
+
   call LABEL_B433_ResetMenuTimerOnControlPress
-  
+
   ; Increment timer
   ld hl, (_RAM_D6AB_MenuTimer)
   inc hl
@@ -18569,10 +18604,10 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   ld a, h
   cp $03 ; i.e. we reached $300 = 15.36s @ 50Hz, 12.8s @ 60Hz
   jr nz, +
-  
+
   ; Reset to the start
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
@@ -18781,7 +18816,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +++:
-  call LABEL_84AA_Menu5
+  call LABEL_84AA_Menu5_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 ++++:
@@ -18796,7 +18831,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   jr nz, +
   ; Timer reached 0, reset to title screen
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
 +:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -18903,7 +18938,7 @@ LABEL_8E54_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:; Initialise bonus race screen
-  call LABEL_84AA_Menu5
+  call LABEL_84AA_Menu5_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -18989,11 +19024,12 @@ LABEL_8F10_:
   call LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   cp $02
-  jr nc, LABEL_8F73_
-  call LABEL_B269_
-  cp $19
+  jr nc, LABEL_8F73_LoseALife
+  ; 1st or 2nd place
+  call LABEL_B269_IncrementCourseSelectIndex
+  cp Track_19_WinThisRaceToBeChampion
   jr z, +++
-  cp $1A
+  cp Track_1A_RuffTrux1
   jr z, ++++
   call LABEL_A74F_
   cp $FF
@@ -19009,23 +19045,24 @@ LABEL_8F10_:
 +++:
   ld a, $01
   ld (_RAM_DC3A_), a
-  call LABEL_84AA_Menu5
+  call LABEL_84AA_Menu5_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 ++++:
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr z, +
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ; Have to play the same track again if you don't win
+  ld a, (_RAM_DBD8_NextTrackIndex)
   sub $01
-  ld (_RAM_DBD8_CourseSelectIndex), a
-  jp LABEL_8F73_
+  ld (_RAM_DBD8_NextTrackIndex), a
+  jp LABEL_8F73_LoseALife
 
 +:
   call LABEL_B877_
   jp LABEL_80FC_EndMenuScreenHandler
 
-LABEL_8F73_:
+LABEL_8F73_LoseALife:
   ld a, (_RAM_DC09_Lives)
   sub $01
   ld (_RAM_DC09_Lives), a
@@ -19033,13 +19070,13 @@ LABEL_8F73_:
   jr z, +
   xor a
   ld (_RAM_DC38_), a
-  call LABEL_866C_Menu3
+  call LABEL_866C_Menu3_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
   ld a, $01
   ld (_RAM_DC38_), a
-  call LABEL_866C_Menu3
+  call LABEL_866C_Menu3_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 ; 12th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
@@ -19161,7 +19198,7 @@ LABEL_902E_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 ++:
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
 +++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -19604,32 +19641,32 @@ LABEL_9317_InitialiseHandSprites:
 
 ; Data from 936E to 9385 (24 bytes)
 DATA_936E_TitleScreenHandXs_GG:
-.db $6E $76 $7E $86 $8E $96 
-.db $6E $76 $7E $86 $8E $96 
-.db $6E $76 $7E $86 $8E $96 
-.db $6E $76 $7E $86 $8E $96 
+.db $6E $76 $7E $86 $8E $96
+.db $6E $76 $7E $86 $8E $96
+.db $6E $76 $7E $86 $8E $96
+.db $6E $76 $7E $86 $8E $96
 
 ; Data from 9386 to 939D (24 bytes)
 DATA_9386_TitleScreenHandYs_GG:
-.db $90 $90 $90 $90 $90 $90 
-.db $98 $98 $98 $98 $98 $98 
-.db $A0 $A0 $A0 $A0 $A0 $A0 
+.db $90 $90 $90 $90 $90 $90
+.db $98 $98 $98 $98 $98 $98
+.db $A0 $A0 $A0 $A0 $A0 $A0
 .db $A8 $A8 $A8 $A8 $A8 $A8
 
 ; Data from 939E to 93B5 (24 bytes)
 DATA_939E_TitleScreenHandXs_SMS:
 ; X coordinates of sprites on title screen
-.db $65 $6D $75 $7D $85 $8D 
-.db $65 $6D $75 $7D $85 $8D 
-.db $65 $6D $75 $7D $85 $8D 
+.db $65 $6D $75 $7D $85 $8D
+.db $65 $6D $75 $7D $85 $8D
+.db $65 $6D $75 $7D $85 $8D
 .db $65 $6D $75 $7D $85 $8D
 
 ; Data from 93B6 to 93CD (24 bytes)
 DATA_93B6_TitleScreenHandYs_SMS:
 ; Y coordinates of sprites on title screen
-.db $78 $78 $78 $78 $78 $78 
-.db $80 $80 $80 $80 $80 $80 
-.db $88 $88 $88 $88 $88 $88 
+.db $78 $78 $78 $78 $78 $78
+.db $80 $80 $80 $80 $80 $80
+.db $88 $88 $88 $88 $88 $88
 .db $90 $90 $90 $90 $90 $90
 
 LABEL_93CE_UpdateSpriteTable:
@@ -19734,7 +19771,7 @@ LABEL_9448_LoadHeaderTiles:
   ld a, (_RAM_D7B4_IsHeadToHead)
   or a
   jr nz, LABEL_949B_LoadHeadToHeadTextTiles
-  
+
 LABEL_948A_LoadChallengeTextTiles:
   ld a, :DATA_2B386_Tiles_ChallengeText
   ld (_RAM_D741_RequestedPageIndex), a
@@ -19809,7 +19846,7 @@ LABEL_94F0_DrawHeaderTextTilemap:
   cp MenuScreen_OnePlayerTournamentResults
   jr nz, +++
   TilemapWriteAddressToDE 6, 5
-  
+
 +++:; Both
   call LABEL_B361_VRAMAddressToDE
   ld hl, DATA_13F50_Tilemap_MicroMachinesText
@@ -19851,7 +19888,7 @@ LABEL_94F0_DrawHeaderTextTilemap:
   jp +++
 ++:
   TilemapWriteAddressToDE 15, 7
-  
+
 +++:; Both
   call LABEL_B361_VRAMAddressToDE
   ld a, (_RAM_D7B4_IsHeadToHead)
@@ -20653,29 +20690,29 @@ DATA_9C7F_RacerPortraitsLocations:
 ; Data from 9D37 to 9D4D (23 bytes)
 ; Page numbers for the racer portraits (previous table)
 DATA_9D37_RacerPortraitsPages:
-.db :DATA_Tiles_Chen_Happy  
-.db :DATA_Tiles_Chen_Happy  
+.db :DATA_Tiles_Chen_Happy
+.db :DATA_Tiles_Chen_Happy
 .db :DATA_Tiles_Spider_Happy
 .db :DATA_Tiles_Spider_Happy
 .db :DATA_Tiles_Walter_Happy
 .db :DATA_Tiles_Walter_Happy
 .db :DATA_Tiles_Dwayne_Happy
 .db :DATA_Tiles_Dwayne_Happy
-.db :DATA_Tiles_Joel_Happy  
-.db :DATA_Tiles_Joel_Happy  
+.db :DATA_Tiles_Joel_Happy
+.db :DATA_Tiles_Joel_Happy
 .db :DATA_Tiles_Bonnie_Happy
 .db :DATA_Tiles_Bonnie_Happy
-.db :DATA_Tiles_Mike_Happy  
-.db :DATA_Tiles_Mike_Happy  
+.db :DATA_Tiles_Mike_Happy
+.db :DATA_Tiles_Mike_Happy
 .db :DATA_Tiles_Emilio_Happy
 .db :DATA_Tiles_Emilio_Happy
 .db :DATA_Tiles_Jethro_Happy
 .db :DATA_Tiles_Jethro_Happy
-.db :DATA_Tiles_Anne_Happy  
-.db :DATA_Tiles_Anne_Happy  
+.db :DATA_Tiles_Anne_Happy
+.db :DATA_Tiles_Anne_Happy
 .db :DATA_Tiles_Cherry_Happy
 .db :DATA_Tiles_Cherry_Happy
-.db :DATA_Tiles_OutOfGame   
+.db :DATA_Tiles_OutOfGame
 
 LABEL_9D4E_:
   ld a, (_RAM_D6B1_)
@@ -21005,7 +21042,7 @@ LABEL_9F81_DrawPortrait_ThreeColumns:
   ld h, a
   ld l, c
   ; fall through
-  
+
 LABEL_9FAB_DrawOrBlank15PortraitTiles:
   ld de, 15 * 2 ; to blank 15 tiles
   ld a, (_RAM_D6A1_PortraitIndex)
@@ -21219,7 +21256,7 @@ LABEL_A14F_:
   rrca
   ld e, a
   ld d, $00
-  
+
   ld a, (_RAM_DBD4_)
   srl a
   srl a
@@ -21588,17 +21625,17 @@ LABEL_A428_DrawPlayerOpponentTypeSelectText:
 
   ld hl, $0046 ; down and right a bit
   add hl, de
-  call LABEL_B35A_VRAMAddressToHL          
+  call LABEL_B35A_VRAMAddressToHL
   ld bc, 2
   ld hl, TEXT_A4B5_Vs
-  call LABEL_A5B0_EmitToVDP_Text           
+  call LABEL_A5B0_EmitToVDP_Text
 
   ld hl, $0080 ; down a bit
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
   ld bc, 8
   ld hl, TEXT_A4A5_Player2
-  call LABEL_A5B0_EmitToVDP_Text           
+  call LABEL_A5B0_EmitToVDP_Text
 
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -21606,24 +21643,24 @@ LABEL_A428_DrawPlayerOpponentTypeSelectText:
   TilemapWriteAddressToDE 20, 24 ; SMS
   jr ++
 +:TilemapWriteAddressToDE 18, 20 ; GG
-++:call LABEL_B361_VRAMAddressToDE           
+++:call LABEL_B361_VRAMAddressToDE
   ld bc, 8
   ld hl, TEXT_A49D_Player1
   call LABEL_A5B0_EmitToVDP_Text
 
   ld hl, $0046 ; down and right a bit
   add hl, de
-  call LABEL_B35A_VRAMAddressToHL          
+  call LABEL_B35A_VRAMAddressToHL
   ld bc, 2
   ld hl, TEXT_A4B5_Vs
-  call LABEL_A5B0_EmitToVDP_Text           
+  call LABEL_A5B0_EmitToVDP_Text
 
   ld hl, $0080 ; down a bit
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
   ld bc, 8
   ld hl, TEXT_A4AD_Computer
-  TailCall LABEL_A5B0_EmitToVDP_Text           
+  TailCall LABEL_A5B0_EmitToVDP_Text
 
 TEXT_A49D_Player1:  .asc "PLAYER 1"
 TEXT_A4A5_Player2:  .asc "PLAYER 2"
@@ -21734,7 +21771,7 @@ LABEL_A5C9_:
 ++:
   call LABEL_B361_VRAMAddressToDE
   call LABEL_A5B0_EmitToVDP_Text
-  
+
   TilemapWriteAddressToHL 6, 12
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0003
@@ -21868,7 +21905,7 @@ TEXT_A6EF_OpponentNames:
 TEXT_A747_IsOut: .asc "IS OUT! "
 
 LABEL_A74F_:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   ld c, a
   ld b, $00
   ld hl, DATA_A75E_
@@ -21904,7 +21941,7 @@ LABEL_A787_:
   ret
 
 +:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   sub $01
   sla a
   ld c, a
@@ -21926,32 +21963,33 @@ LABEL_A7B3_:
   ret
 
 ; Data from A7BB to A7EC (50 bytes)
+; Display case locations per track index (except qualifying race)
 DATA_A7BB_:
-.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 
-.dw _RAM_DBD9_DisplayCaseData+ 0 ; $DBD9 
-.dw _RAM_DBD9_DisplayCaseData+12 ; $DBE5 
-.dw _RAM_DBD9_DisplayCaseData+ 3 ; $DBDC 
-.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB 
-.dw _RAM_DBD9_DisplayCaseData+ 1 ; $DBDA 
-.dw _RAM_DBD9_DisplayCaseData+16 ; $DBE9 
-.dw _RAM_DBD9_DisplayCaseData+13 ; $DBE6
-.dw _RAM_DBD9_DisplayCaseData+ 7 ; $DBE0 
-.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 
-.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF 
-.dw _RAM_DBD9_DisplayCaseData+17 ; $DBEA 
-.dw _RAM_DBD9_DisplayCaseData+ 2 ; $DBDB 
-.dw _RAM_DBD9_DisplayCaseData+ 5 ; $DBDE 
-.dw _RAM_DBD9_DisplayCaseData+ 4 ; $DBDD 
-.dw _RAM_DBD9_DisplayCaseData+11 ; $DBE4
-.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB 
-.dw _RAM_DBD9_DisplayCaseData+20 ; $DBED 
-.dw _RAM_DBD9_DisplayCaseData+ 6 ; $DBDF 
-.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1 
-.dw _RAM_DBD9_DisplayCaseData+21 ; $DBEE 
-.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF 
-.dw _RAM_DBD9_DisplayCaseData+ 9 ; $DBE2 
-.dw _RAM_DBD9_DisplayCaseData+10 ; $DBE3
-.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1
+.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 TheBreakfastBends
+.dw _RAM_DBD9_DisplayCaseData+ 0 ; $DBD9 DesktopDropOff
+.dw _RAM_DBD9_DisplayCaseData+12 ; $DBE5 OilcanAlley
+.dw _RAM_DBD9_DisplayCaseData+ 3 ; $DBDC SandyStraights
+.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB OatmealInOverdrive
+.dw _RAM_DBD9_DisplayCaseData+ 1 ; $DBDA TheCueBallCircuit
+.dw _RAM_DBD9_DisplayCaseData+16 ; $DBE9 HandymansCurve
+.dw _RAM_DBD9_DisplayCaseData+13 ; $DBE6 BermudaBathtub
+.dw _RAM_DBD9_DisplayCaseData+ 7 ; $DBE0 SaharaSandpit
+.dw _RAM_DBD9_DisplayCaseData+14 ; $DBE7 ThePottedPassage - helicopter!
+.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF FruitJuiceFollies
+.dw _RAM_DBD9_DisplayCaseData+17 ; $DBEA FoamyFjords
+.dw _RAM_DBD9_DisplayCaseData+ 2 ; $DBDB BedroomBattlefield
+.dw _RAM_DBD9_DisplayCaseData+ 5 ; $DBDE PitfallPockets
+.dw _RAM_DBD9_DisplayCaseData+ 4 ; $DBDD PencilPlateaux
+.dw _RAM_DBD9_DisplayCaseData+11 ; $DBE4 TheDareDevilDunes
+.dw _RAM_DBD9_DisplayCaseData+18 ; $DBEB TheShrubberyTwist - helicopter!
+.dw _RAM_DBD9_DisplayCaseData+20 ; $DBED PerilousPitStop
+.dw _RAM_DBD9_DisplayCaseData+ 6 ; $DBDF WideAwakeWarZone
+.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1 CrayonCanyons
+.dw _RAM_DBD9_DisplayCaseData+21 ; $DBEE SoapLakeCity!
+.dw _RAM_DBD9_DisplayCaseData+22 ; $DBEF TheLeafyBends - helicopter!
+.dw _RAM_DBD9_DisplayCaseData+ 9 ; $DBE2 ChalkDustChicane
+.dw _RAM_DBD9_DisplayCaseData+10 ; $DBE3 GoForIt
+.dw _RAM_DBD9_DisplayCaseData+ 8 ; $DBE1 WinThisRaceToBeChampion
 
 LABEL_A7ED_:
   ld a, (_RAM_D6AF_FlashingCounter)
@@ -22256,7 +22294,7 @@ LABEL_A9EB_:
   and $01
   jp nz, LABEL_AA8B_
 LABEL_AA02_:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   sub $01
   sla a
   ld c, a
@@ -22277,8 +22315,8 @@ LABEL_AA02_:
   ld l, c
   ld a, :DATA_FDC1_TrackNames
   ld (_RAM_D741_RequestedPageIndex), a
-  ld a, (_RAM_DBD8_CourseSelectIndex)
-  cp $19 ; Final race
+  ld a, (_RAM_DBD8_NextTrackIndex)
+  cp Track_19_WinThisRaceToBeChampion ; Final race
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -22409,16 +22447,10 @@ DATA_AB06_TrackNumberText:
 ; Data from AB3E to AB4C (15 bytes)
 DATA_AB3E_CourseSelect_TrackTypes:
 ; Maps the course select index to a track type
-; (???)
-.db TT_4_FormulaOne TT_1_FourByFour TT_5_Warriors TT_7_RuffTrux TT_4_FormulaOne
-.db TT_3_TurboWheels TT_5_Warriors TT_2_Powerboats TT_7_RuffTrux TT_6_Tanks
-.db TT_4_FormulaOne TT_2_Powerboats TT_8_Helicopters TT_3_TurboWheels TT_1_FourByFour
-.db TT_7_RuffTrux TT_6_Tanks TT_5_Warriors TT_8_Helicopters TT_1_FourByFour TT_2_Powerboats
-.db TT_6_Tanks TT_3_TurboWheels TT_8_Helicopters TT_1_FourByFour TT_9_Unknown TT_9_Unknown
-.db TT_9_Unknown TT_2_Powerboats
+.db TT_4_FormulaOne TT_1_FourByFour TT_5_Warriors TT_7_RuffTrux TT_4_FormulaOne TT_3_TurboWheels TT_5_Warriors TT_2_Powerboats TT_7_RuffTrux TT_6_Tanks TT_4_FormulaOne TT_2_Powerboats TT_8_Helicopters TT_3_TurboWheels TT_1_FourByFour TT_7_RuffTrux TT_6_Tanks TT_5_Warriors TT_8_Helicopters TT_1_FourByFour TT_2_Powerboats TT_6_Tanks TT_3_TurboWheels TT_8_Helicopters TT_1_FourByFour TT_9_Unknown TT_9_Unknown TT_9_Unknown TT_2_Powerboats
 
 LABEL_AB5B_GetPortraitSource_CourseSelect:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   sub $01
   ld c, a
   ld b, $00
@@ -23126,7 +23158,7 @@ LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+  ld a, (_RAM_DBD8_NextTrackIndex)
   or a
   jr nz, +
   ld (_RAM_D6AB_MenuTimer.Lo), a
@@ -23138,7 +23170,7 @@ LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  jp LABEL_84AA_Menu5
+  jp LABEL_84AA_Menu5_Initialise
 
 LABEL_B110_:
   ld a, (_RAM_D6CD_)
@@ -23273,14 +23305,14 @@ LABEL_B1FC_:
   dec a
   JrZRet +
   ld hl, DATA_B219_
-  ld a, (_RAM_D6CC_)
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   sub $01
 -:
   ld e, a
   ld d, $00
   add hl, de
   ld a, (hl)
-  ld (_RAM_DBD8_CourseSelectIndex), a
+  ld (_RAM_DBD8_NextTrackIndex), a
 +:ret
 
 LABEL_B213_:
@@ -23289,6 +23321,7 @@ LABEL_B213_:
 
 ; Data from B219 to B221 (9 bytes)
 DATA_B219_:
+; Track indices for two-player mode?
 .db $02 $14 $0E $17 $0D $04 $07 $15 $05
 
 ; Data from B222 to B229 (8 bytes)
@@ -23322,48 +23355,54 @@ LABEL_B254_DisplayCase_RestoreRuffTrux:
   call LABEL_AE94_DisplayCase_RestoreRectangle
   jp LABEL_8E54_
 
-LABEL_B269_:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+LABEL_B269_IncrementCourseSelectIndex:
+  ld a, (_RAM_DBD8_NextTrackIndex)
   add a, $01
-  ld (_RAM_DBD8_CourseSelectIndex), a
-  cp $0A
-  jr z, LABEL_B269_
-  cp $11
-  jr z, LABEL_B269_
-  cp $16
-  jr z, LABEL_B269_
+  ld (_RAM_DBD8_NextTrackIndex), a
+  ; Skip helicopters by recursing (!)
+  cp Track_0A_ThePottedPassage
+  jr z, LABEL_B269_IncrementCourseSelectIndex
+  cp Track_11_TheShrubberyTwist
+  jr z, LABEL_B269_IncrementCourseSelectIndex
+  cp Track_16_TheLeafyBends
+  jr z, LABEL_B269_IncrementCourseSelectIndex
+  ; Does not attempt to wrap
   ret
 
-LABEL_B27E_:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+LABEL_B27E_DecrementCourseSelectIndex:
+  ld a, (_RAM_DBD8_NextTrackIndex)
   sub $01
   or a
   jr nz, +
-  ld a, $1C
+  ; Wrap from $01 to $1c
+  ld a, Track_1C_RuffTrux3
 +:
-  ld (_RAM_DBD8_CourseSelectIndex), a
-  cp $0A
-  jr z, LABEL_B27E_
-  cp $11
-  jr z, LABEL_B27E_
-  cp $16
-  jr z, LABEL_B27E_
+  ld (_RAM_DBD8_NextTrackIndex), a
+  ; Skip helicopters
+  cp Track_0A_ThePottedPassage
+  jr z, LABEL_B27E_DecrementCourseSelectIndex
+  cp Track_11_TheShrubberyTwist
+  jr z, LABEL_B27E_DecrementCourseSelectIndex
+  cp Track_16_TheLeafyBends
+  jr z, LABEL_B27E_DecrementCourseSelectIndex
   ret
 
-LABEL_B298_:
-  ld a, (_RAM_DBD8_CourseSelectIndex)
+LABEL_B298_IncrementCourseSelectIndex:
+  ld a, (_RAM_DBD8_NextTrackIndex)
   add a, $01
-  cp $1D
+  cp Track_1C_RuffTrux3+1
   jr nz, +
+  ; Wrap from $1c to $01
   ld a, $01
 +:
-  ld (_RAM_DBD8_CourseSelectIndex), a
-  cp $0A
-  jr z, LABEL_B298_
-  cp $11
-  jr z, LABEL_B298_
-  cp $16
-  jr z, LABEL_B298_
+  ld (_RAM_DBD8_NextTrackIndex), a
+  ; Skip helicopters
+  cp Track_0A_ThePottedPassage
+  jr z, LABEL_B298_IncrementCourseSelectIndex
+  cp Track_11_TheShrubberyTwist
+  jr z, LABEL_B298_IncrementCourseSelectIndex
+  cp Track_16_TheLeafyBends
+  jr z, LABEL_B298_IncrementCourseSelectIndex
   ret
 
 LABEL_B2B3_:
@@ -23407,7 +23446,7 @@ LABEL_B2F3_DrawHorizontalLines_CharacterSelect:
   call LABEL_B35A_VRAMAddressToHL
   call LABEL_95AF_DrawHorizontalLineIfSMS
   ; fall through
-  
+
 LABEL_B305_DrawHorizontalLine_Top:
   TilemapWriteAddressToHL 0, 5
   call LABEL_B35A_VRAMAddressToHL
@@ -23847,7 +23886,7 @@ LABEL_B56D_MenuScreen_TrackSelect:
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_R_MASK ; $08
   jp z, LABEL_B666_
-  ld a, (_RAM_D6CC_)
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   cp $00
   jr z, LABEL_B618_
 +++:
@@ -23911,7 +23950,7 @@ LABEL_B640_:
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +++
-  ld a, (_RAM_D6CC_)
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   sub $01
   cp $FF
   jr z, +
@@ -23920,11 +23959,11 @@ LABEL_B640_:
 +:
   ld a, $09
 ++:
-  ld (_RAM_D6CC_), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
   jp ++++
 
 +++:
-  call LABEL_B27E_
+  call LABEL_B27E_DecrementCourseSelectIndex
   call LABEL_AB5B_GetPortraitSource_CourseSelect
   call LABEL_AA8B_
   jp +++++
@@ -23933,17 +23972,17 @@ LABEL_B666_:
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, ++
-  ld a, (_RAM_D6CC_)
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   add a, $01
   cp $0A
   jr nz, +
   ld a, $01
 +:
-  ld (_RAM_D6CC_), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
   jp ++++
 
 ++:
-  call LABEL_B298_
+  call LABEL_B298_IncrementCourseSelectIndex
   call LABEL_AB5B_GetPortraitSource_CourseSelect
   call LABEL_AA8B_
   jp +++++
@@ -23991,7 +24030,7 @@ LABEL_B6B1_MenuScreen_TwoPlayerResult:
   ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +++
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -24027,8 +24066,8 @@ LABEL_B70B_:
   call LABEL_A296_LoadHandTiles
   ld a, $01
   ld (_RAM_DC3B_IsTrackSelect), a
-  ld (_RAM_D6CC_), a
-  ld (_RAM_DBD8_CourseSelectIndex), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
+  ld (_RAM_DBD8_NextTrackIndex), a
   ld a, $B2
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call LABEL_9448_LoadHeaderTiles
@@ -24197,7 +24236,7 @@ LABEL_B84D_MenuScreen_TournamentChampion:
   jr nz, ++
 +:
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuScreen_Initialise_Initialise
+  call LABEL_8114_MenuIndex0_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -24631,7 +24670,7 @@ LABEL_BB95_LoadIconMenuGraphics:
   ld a, (_RAM_D6C7_IsTwoPlayer)
   dec a
   jr z, LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
-  
+
   ; _RAM_D6C7_IsTwoPlayer != 1
   ld a, :DATA_26C52_Tiles_Challenge_Icon
   ld (_RAM_D741_RequestedPageIndex), a
@@ -24640,7 +24679,7 @@ LABEL_BB95_LoadIconMenuGraphics:
   TileWriteAddressToHL $24
   ld de, 60 * 8 ; 60 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  
+
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
@@ -24670,14 +24709,14 @@ LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
   ; _RAM_D6C7_IsTwoPlayer == 1
   ; Load tournament icon
   ld a, :DATA_27391_Tiles_Tournament_Icon
-  
+
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_27391_Tiles_Tournament_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $24
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  
+
   ld hl, DATA_27674_Tiles_SingleRace_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   TileWriteAddressToHL $74
@@ -24720,7 +24759,7 @@ LABEL_BC0C_:
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
-  
+
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -24822,27 +24861,27 @@ LABEL_BD00_InitialiseVDPRegisters:
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL1
   out (PORT_VDP_REGISTER), a
-  
+
   ld a, VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_NAMETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  
+
   ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
   out (PORT_VDP_REGISTER), a
-  
+
   ld a, VDP_REGISTER_SPRITESET_HIGH
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_SPRITESET
   out (PORT_VDP_REGISTER), a
-  
+
   xor a
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
-  
+
   xor a
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_YSCROLL
@@ -25443,7 +25482,7 @@ DATA_13F50_Tilemap_MicroMachinesText:
 .ORG $0000
 .section "Bank 5" force
 
-.dstruct DATA_14000_TrackData_Powerboats instanceof TrackData data DATA_9D30_Powerboats_BehaviourData DATA_9FE3_Powerboats_WallData DATA_A03C_Powerboats_Track0Layout DATA_A134_Powerboats_Track1Layout DATA_A352_Powerboats_Track2Layout DATA_A5B1_Powerboats_Track3Layout DATA_A7A0_Powerboats_GGPalette DATA_A7E0_Powerboats_DecoratorTiles DATA_A860_PowerboatsDATA DATA_A8A0_Powerboats_EffectsTiles 
+.dstruct DATA_14000_TrackData_Powerboats instanceof TrackData data DATA_9D30_Powerboats_BehaviourData DATA_9FE3_Powerboats_WallData DATA_A03C_Powerboats_Track0Layout DATA_A134_Powerboats_Track1Layout DATA_A352_Powerboats_Track2Layout DATA_A5B1_Powerboats_Track3Layout DATA_A7A0_Powerboats_GGPalette DATA_A7E0_Powerboats_DecoratorTiles DATA_A860_PowerboatsDATA DATA_A8A0_Powerboats_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $CF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF
@@ -25604,7 +25643,7 @@ DATA_17ED2_SMSPalette_SportsCars:
   SMSCOLOUR $000000
   SMSCOLOUR $000000
   SMSCOLOUR $000000
-  
+
   SMSCOLOUR $000000
   SMSCOLOUR $FF5555
   SMSCOLOUR $55FF00
@@ -25895,7 +25934,7 @@ DATA_17FB2_SMSPalette_RuffTrux:
 .ORG $0000
 .section "Bank 6" force
 
-.dstruct DATA_18000_TrackData_TurboWheels instanceof TrackData data DATA_A480_TurboWheels_BehaviourData DATA_A7B6_TurboWheels_WallData DATA_A838_TurboWheels_Track0Layout DATA_AACF_TurboWheels_Track1Layout DATA_AD10_TurboWheels_Track2Layout DATA_AD10_TurboWheels_Track3Layout DATA_AF9A_TurboWheels_GGPalette DATA_AFDA_TurboWheels_DecoratorTiles DATA_B05A_TurboWheelsDATA DATA_B09A_TurboWheels_EffectsTiles 
+.dstruct DATA_18000_TrackData_TurboWheels instanceof TrackData data DATA_A480_TurboWheels_BehaviourData DATA_A7B6_TurboWheels_WallData DATA_A838_TurboWheels_Track0Layout DATA_AACF_TurboWheels_Track1Layout DATA_AD10_TurboWheels_Track2Layout DATA_AD10_TurboWheels_Track3Layout DATA_AF9A_TurboWheels_GGPalette DATA_AFDA_TurboWheels_DecoratorTiles DATA_B05A_TurboWheelsDATA DATA_B09A_TurboWheels_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FE $FF $FF $FF $BF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $BF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $ED $45 $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $EE $FF $FF $FF $EF $FF $FF $EF $ED $45 $FF $FF $EF $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $FB $FF $FF
@@ -25979,8 +26018,8 @@ DATA_1B232_SinTable:
 ; Holds a sine curve, padded with an extra 0 at the start and 15 extra at the end
 ; It curves from 0 to 127 to 0 again in the remaining space
 ; Hard to exactly reproduce, it seems to round weirdly
-.db $00 
-.db $00 $03 $06 $09 $0C $0F $12 $15 $18 $1C $1F $22 $25 $28 $2B $2E $30 $33 $36 $39 $3C $3F $41 $44 $47 $49 $4C $4E $51 $53 $55 $58 $5A $5C $5E $60 $62 $64 $66 $68 $6A $6C $6D $6F $70 $72 $73 $75 $76 $77 $78 $79 $7A $7B $7C $7C $7D $7E $7E $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7E $7E $7D $7C $7C $7B $7A $79 $78 $77 $76 $75 $73 $72 $70 $6F $6D $6C $6A $68 $66 $64 $62 $60 $5E $5C $5A $58 $55 $53 $51 $4E $4C $49 $47 $44 $41 $3F $3C $39 $36 $33 $30 $2E $2B $28 $25 $22 $1F $1C $18 $15 $12 $0F $0C $09 $06 $03 $00 
+.db $00
+.db $00 $03 $06 $09 $0C $0F $12 $15 $18 $1C $1F $22 $25 $28 $2B $2E $30 $33 $36 $39 $3C $3F $41 $44 $47 $49 $4C $4E $51 $53 $55 $58 $5A $5C $5E $60 $62 $64 $66 $68 $6A $6C $6D $6F $70 $72 $73 $75 $76 $77 $78 $79 $7A $7B $7C $7C $7D $7E $7E $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7F $7E $7E $7D $7C $7C $7B $7A $79 $78 $77 $76 $75 $73 $72 $70 $6F $6D $6C $6A $68 $66 $64 $62 $60 $5E $5C $5A $58 $55 $53 $51 $4E $4C $49 $47 $44 $41 $3F $3C $39 $36 $33 $30 $2E $2B $28 $25 $22 $1F $1C $18 $15 $12 $0F $0C $09 $06 $03 $00
 .dsb 15 $00
 
 DATA_1B2C3_Tiles_Trophy:
@@ -27293,11 +27332,11 @@ LABEL_237E2_:
   ld (_RAM_DD1B_), hl
   ld hl, _RAM_DE38_
   ld (_RAM_DD5C_), hl
-  
+
   ld a, (_RAM_DC55_CourseIndex)
   sla a
   ld b, a
-  
+
   ; Index *2
   ld e, a
   ld d, $00
@@ -27308,7 +27347,7 @@ LABEL_237E2_:
   inc hl
   ld a, (hl)
   ld (_RAM_DB67_), a
-  
+
   ; Index *6
   ld a, b
   sla a
@@ -27339,7 +27378,7 @@ LABEL_237E2_:
   jr c, +
   ld a, $0D ; Maximum $d
 +:ld (de), a
-  
+
   inc de
   ; Low nibble + adjustment -> _RAM_DB69_
   ld a, (hl)
@@ -27402,7 +27441,7 @@ DATA_238DE_: ; indexed by _RAM_DC55_CourseIndex*2 and copied to _RAM_DB66_, _RAM
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
-.db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02 
+.db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to _RAM_DB68_HandlingData+
 ;    ,,--,,-- End up in _RAM_DB68_
 ;    ||  ||  ,,--,,-- End up in _RAM_DD1D_
@@ -27435,7 +27474,7 @@ DATA_23918_: ; indexed by _RAM_DC55_CourseIndex*6, split to nibbles and sent to 
 .db $CC $CC $CC $BA $CB $A9 ; Final
 .db $66 $66 $66 $66 $66 $66 ; Bonus
 .db $66 $66 $66 $66 $66 $66
-.db $66 $66 $66 $66 $66 $66 
+.db $66 $66 $66 $66 $66 $66
 
 LABEL_239C6_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -28249,7 +28288,7 @@ DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .ORG $0000
 .section "Bank 10" force
 
-.dstruct DATA_28000_TrackData_RuffTrux instanceof TrackData data  DATA_A1B0_RuffTrux_BehaviourData DATA_A396_RuffTrux_WallData DATA_A420_RuffTrux_Track0Layout DATA_A5F0_RuffTrux_Track1Layout DATA_A7A8_RuffTrux_Track2Layout DATA_A7A8_RuffTrux_Track3Layout DATA_A9C5_RuffTrux_GGPalette DATA_A9C5_RuffTrux_DecoratorTiles DATA_AA05_RuffTruxDATA DATA_AA45_RuffTrux_EffectsTiles 
+.dstruct DATA_28000_TrackData_RuffTrux instanceof TrackData data  DATA_A1B0_RuffTrux_BehaviourData DATA_A396_RuffTrux_WallData DATA_A420_RuffTrux_Track0Layout DATA_A5F0_RuffTrux_Track1Layout DATA_A7A8_RuffTrux_Track2Layout DATA_A7A8_RuffTrux_Track3Layout DATA_A9C5_RuffTrux_GGPalette DATA_A9C5_RuffTrux_DecoratorTiles DATA_AA05_RuffTruxDATA DATA_AA45_RuffTrux_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
@@ -28323,17 +28362,17 @@ DATA_2B151_Tiles_Hand:
 
 DATA_2B33E_SpriteNs_Hand:
 DATA_2B33E_SpriteNs_HandFist:
-.db  -1,  -1,  -1,  -1,  -1,  -1 
-.db  -1, $00, $01, $02, $03,  -1 
-.db  -1, $04, $05, $06, $07,  -1 
+.db  -1,  -1,  -1,  -1,  -1,  -1
+.db  -1, $00, $01, $02, $03,  -1
+.db  -1, $04, $05, $06, $07,  -1
 .db  -1,  -1, $08, $09, $0A,  -1
-       
+
 DATA_2B356_SpriteNs_HandLeft:
 .db  -1,  -1,  -1,  -1,  -1,  -1
 .db $0B, $0C, $0D, $02, $03,  -1
 .db $0E, $0F, $05, $06, $07,  -1
 .db  -1,  -1, $08, $09, $0A,  -1
-       
+
 DATA_2B36E_SpriteNs_HandRight:
 .db  -1,  -1, $10, $11, $12, $13
 .db  -1, $14, $15, $16, $17,  -1
@@ -28369,39 +28408,39 @@ LABEL_2B5D5_SilencePSG:
 
 .ifdef UNREACHABLE_CODE
 LABEL_2B5E6_Player1SFX_Unused:
-  ld a, (_RAM_D97E_Player1SFX_Unused) 
-  ld (_RAM_D963_SFXTrigger_Player1), a 
-  ret 
-  
+  ld a, (_RAM_D97E_Player1SFX_Unused)
+  ld (_RAM_D963_SFXTrigger_Player1), a
+  ret
+
 LABEL_2B5ED_Player2SFX_Unused:
-  ld a, (_RAM_D97F_Player2SFX_Unused) 
-  ld (_RAM_D974_SFXTrigger_Player2), a 
-  ret 
-  
+  ld a, (_RAM_D97F_Player2SFX_Unused)
+  ld (_RAM_D974_SFXTrigger_Player2), a
+  ret
+
 LABEL_2B5F4_:
   ; _RAM_D95B_ -= 4
-  ld hl, (_RAM_D95B_) 
+  ld hl, (_RAM_D95B_)
   ld bc, 4
-  and a 
-  sbc hl, bc 
-  ld (_RAM_D95B_), hl 
-  ret 
-  
+  and a
+  sbc hl, bc
+  ld (_RAM_D95B_), hl
+  ret
+
 LABEL_2B601_:
   ; _RAM_D96C_ += 4
-  ld hl, (_RAM_D96C_) 
+  ld hl, (_RAM_D96C_)
   ld bc, 4
-  and a 
-  sbc hl, bc 
-  ld (_RAM_D96C_), hl 
-  ret 
-  
+  and a
+  sbc hl, bc
+  ld (_RAM_D96C_), hl
+  ret
+
 LABEL_2B60E_:
   ; _RAM_D95B_ += 1
-  ld hl, (_RAM_D95B_) 
-  inc hl 
-  ld (_RAM_D95B_), hl 
-  ret 
+  ld hl, (_RAM_D95B_)
+  inc hl
+  ld (_RAM_D95B_), hl
+  ret
 .endif
 
 LABEL_2B616_Sound:
@@ -28800,21 +28839,21 @@ DATA_2B911_SoundData_:
 .dw DATA_2BE61_SoundData_ DATA_2BE6F_SoundData_ DATA_2BE7D_SoundData_
 
 ; Most data seems terminated by a $00 or $ff, bt not all
-DATA_2B995_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $00 
+DATA_2B995_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $00
 DATA_2B99D_SoundData_: .db $18 $18 $18 $18 $18 $18 $18 $FF
 DATA_2B9A5_SoundData_: .db $0F $0C $09 $06 $03 $00
-DATA_2B9AB_SoundData_: .db $01 $05 $01 $05 $00 $FF 
-DATA_2B9B1_SoundData_: .db $07 $06 $00 $00 $FF 
-DATA_2B9B6_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $00 
-DATA_2B9BE_SoundData_: .db $06 $05 $04 $03 $02 $01 $00 $FF 
-DATA_2B9C6_SoundData_: .db $06 $00 $04 $00 $07 $00 $00 $FF 
-DATA_2B9CE_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $08 $07 $00 
-DATA_2B9D8_SoundData_: .db $05 $00 $00 $04 $00 $03 $00 $00 $FF 
-DATA_2B9E1_SoundData_: .db $05 $00 $00 $06 $00 $07 $00 $00 $FF 
-DATA_2B9EA_SoundData_: .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B $0A $0A $09 $09 $09 $08 $08 $08 $00 
+DATA_2B9AB_SoundData_: .db $01 $05 $01 $05 $00 $FF
+DATA_2B9B1_SoundData_: .db $07 $06 $00 $00 $FF
+DATA_2B9B6_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $00
+DATA_2B9BE_SoundData_: .db $06 $05 $04 $03 $02 $01 $00 $FF
+DATA_2B9C6_SoundData_: .db $06 $00 $04 $00 $07 $00 $00 $FF
+DATA_2B9CE_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $08 $07 $00
+DATA_2B9D8_SoundData_: .db $05 $00 $00 $04 $00 $03 $00 $00 $FF
+DATA_2B9E1_SoundData_: .db $05 $00 $00 $06 $00 $07 $00 $00 $FF
+DATA_2B9EA_SoundData_: .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B $0A $0A $09 $09 $09 $08 $08 $08 $00
 DATA_2BA00_SoundData_: .db $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $FF
 DATA_2BA15_SoundData_: .db $05 $00 $00 $00 $06 $00 $00 $00 $00 $04 $00 $00 $00 $00 $07 $00 $00 $00 $00 $FF
-DATA_2BA29_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00 
+DATA_2BA29_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
 DATA_2BA33_SoundData_: .db $1E $0A $0A $0C $0E $10 $12 $14 $00 $FF
 DATA_2BA3D_SoundData_: .db $06 $00 $05 $00 $04 $00 $07 $00 $FF
 DATA_2BA46_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
@@ -29648,7 +29687,7 @@ LABEL_311A2_:
   ld (ix+$24), a
   inc hl
   jp LABEL_310A0_
-  
+
 LABEL_311B3_:
   ld a, $01
   ld (_RAM_D92F_), a
@@ -29723,25 +29762,25 @@ LABEL_311F3_:
 ; Pointer Table from 31229 to 3124C (18 entries, indexed by unknown)
 DATA_31229_PointerTable:
 ; Points to pointers + data?
-.dw DATA_31249_ DATA_31279_ DATA_3128B_ DATA_31267_ 
+.dw DATA_31249_ DATA_31279_ DATA_3128B_ DATA_31267_
 .dw DATA_31273_ DATA_31255_ DATA_31261_ DATA_3124F_
 .dw DATA_31261_ DATA_31261_ DATA_3127F_ DATA_31261_
 .dw DATA_3125B_ DATA_3126D_ DATA_3124F_ DATA_3124F_
 ; Pointed-to from above
-DATA_31249_: .dw DATA_31291_ DATA_312F2_ $FFFF 
-DATA_3124F_: .dw DATA_312E9_ DATA_31307_ $FFFF 
+DATA_31249_: .dw DATA_31291_ DATA_312F2_ $FFFF
+DATA_3124F_: .dw DATA_312E9_ DATA_31307_ $FFFF
 DATA_31255_: .dw DATA_31295_ DATA_31340_ $FFFF
-DATA_3125B_: .dw DATA_3129F_ DATA_3135C_ $1E02 
+DATA_3125B_: .dw DATA_3129F_ DATA_3135C_ $1E02
 DATA_31261_: .dw $FF00 DATA_312F8_ $FFFF
 DATA_31267_: .dw DATA_312B1_ DATA_31307_ $FFFF
 DATA_3126D_: .dw DATA_312BD_ DATA_31351_ $FFFF
-DATA_31273_: .dw DATA_312C4_ DATA_31351_ $FFFF 
-DATA_31279_: .dw DATA_312D9_ DATA_3136E_ $0604 
+DATA_31273_: .dw DATA_312C4_ DATA_31351_ $FFFF
+DATA_31279_: .dw DATA_312D9_ DATA_3136E_ $0604
 DATA_3127F_: .dw DATA_312E1_ DATA_31340_ $FFFF
 .dw DATA_31295_ DATA_31316_ $0605 ; Unreferenced?
-DATA_3128B_: .dw DATA_312CB_ DATA_31316_ $0605 
+DATA_3128B_: .dw DATA_312CB_ DATA_31316_ $0605
 ; Pointed-to from above
-DATA_31291_: .db $00 $01 $00 $FF 
+DATA_31291_: .db $00 $01 $00 $FF
 DATA_31295_: .db $01 $01 $00 $02 $00 $04 $00 $02 $00 $FF
 DATA_3129F_: .db $00 $01 $00 $0C $00 $00 $00 $00 $00 $FF
 .db $00 $01 $00 $0C $00 $0C $00 $FF
@@ -29755,11 +29794,11 @@ DATA_312E9_: .db $00 $01 $00 $0C $18 $00 $0C $18 $FF
 DATA_312F2_: .db $0F $00 $03 $00 $00 $FF
 DATA_312F8_: .db $06 $02 $01 $01 $06 $00 $00 $0F $05 $01 $00 $03 $00 $00 $FF
 DATA_31307_: .db $00 $06 $00 $00 $0F $04 $01 $0F $04 $01 $00 $03 $00 $00 $FF
-DATA_31316_: .db $00 $04 $00 $00 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF 
-.db $0F $0C $01 $02 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF 
+DATA_31316_: .db $00 $04 $00 $00 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF
+.db $0F $0C $01 $02 $0F $05 $01 $0F $05 $01 $00 $03 $00 $00 $FF
 .db $00 $08 $00 $00 $0F $04 $02 $00 $03 $00 $00 $FF
 DATA_31340_: .db $00 $0A $04 $01 $00 $03 $00 $00 $FF
-.db  $00 $FE 
+.db  $00 $FE
 .db $00 $00 $03 $00 $00 $FF
 DATA_31351_: .db $06 $06 $01 $01 $FE
 .db  $00 $00 $03 $00 $00 $FF
@@ -29776,7 +29815,7 @@ DATA_3137A_PSGNotes:
 
 ; Data from 3141C to 3150E (243 bytes)
 DATA_3141C_:
-.dw DATA_3147C_ DATA_31483_ DATA_31489_ DATA_3147C_ 
+.dw DATA_3147C_ DATA_31483_ DATA_31489_ DATA_3147C_
 .dw DATA_31483_ DATA_31489_ DATA_3147C_ DATA_31483_
 .dw DATA_31489_ DATA_3147C_ DATA_31483_ DATA_31489_
 .dw DATA_3147C_ DATA_31483_ DATA_31489_ DATA_314A2_
@@ -29790,7 +29829,7 @@ DATA_3141C_:
 .dw DATA_31489_ DATA_3147C_ DATA_31483_ DATA_31489_
 
 DATA_3147C_: .db $0A $09 $08 $07 $06 $05 $FF
-DATA_31483_: .db $08 $08 $08 $08 $08 $08 
+DATA_31483_: .db $08 $08 $08 $08 $08 $08
 DATA_31489_: .db $00 $00 $00 $00 $00 $0F
 DATA_3148F_: .db $16 $14 $12 $10 $0E $0C $FF
 DATA_31496_: .db $06 $05 $04 $07 $07 $07
@@ -29800,7 +29839,7 @@ DATA_314A7_: .db $04 $03 $07 $07
 DATA_314AB_: .db $00 $02 $04 $0F
 
 DATA_314AF_MenuMusicStopData: ; 15 bytes, menu sound engine init?
-.db $00 $00 $00 $00 $00 $00 $07 $0F $0F $0F $0F $00 $00 $00 $00 
+.db $00 $00 $00 $00 $00 $00 $07 $0F $0F $0F $0F $00 $00 $00 $00
 DATA_314AF_MenuMusicStopData_End:
 
 ; Data pointed into by following table
@@ -29982,7 +30021,7 @@ LABEL_44B49_:
   ld a, $ac
   ld (ix+$03), a
   jp LABEL_33B25_
-  
+
 DATA_33B5E_:
 .db $A0 $A0 $A0 $A1 $A1 $A1 $A2 $A2 $A2 $A3 $A3 $A3 $AC
 
@@ -30047,7 +30086,7 @@ DATA_33B5E_:
 _LABEL_33BEE_ret:
   ret
 
-LABEL_33BEF_: 
+LABEL_33BEF_:
   ld a, (_RAM_D5A6_)
   ld e, a
   ld d, $00
@@ -30062,11 +30101,11 @@ LABEL_33BEF_:
   add a, l
   ld (iy+$01), a
   ret
-    
+
 DATA_33C0A_:
-.db $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 $00 $03 $05 $08 
+.db $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 $00 $03 $05 $08
 DATA_33C1A_:
-.db $00 $03 $05 $08 $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 
+.db $00 $03 $05 $08 $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03
 DATA_33C2A_:
 .db $00 $07 $08 $09 $0A $0B $0C $0D $0E $0F $10 $0F $0E $0D $0C $0B $0A $09 $08 $07 $06 $05 $04 $03 $02 $01 $00
 
@@ -30152,7 +30191,7 @@ DATA_33C2A_:
   cp $f8
   jr nc, LABEL_33D49_ ; Offscreen?
   ld (_RAM_D5A9_), iy
-  
+
   ; Selects which sprite to move
   ld a, (ix+$2d)
   cp $01
@@ -30257,7 +30296,7 @@ LABEL_34D87_:
   ld a, $ac
   ld (iy+$03), a
   jp LABEL_33D33
-  
+
 LABEL_34D9C_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -30429,7 +30468,7 @@ LABEL_33E81_:
   ld (_RAM_DAE0_SpriteTableYs.62), a
 _LABEL_33F10_ret:
   ret
-  
+
 LABEL_33F11_:
   ld a, (ix+$15)
   or a
@@ -30452,7 +30491,7 @@ LABEL_33F11_:
   jp LABEL_33D49_
 _LABEL_33F39_ret:
   ret
-  
+
 LABEL_33F3A_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -30501,7 +30540,7 @@ LABEL_33F69_:
   jp LABEL_33D49_
 LABEL_33D91_:
   ret
-  
+
 LABEL_33F92_:
   ld ix, _RAM_DCEC_
   call +
@@ -30552,7 +30591,7 @@ _LABEL_33FF7_ret:
   ret
 
 .ifdef BLANK_FILL_ORIGINAL
-.db $ff $00 $00 $ff $ff $00 $00 
+.db $ff $00 $00 $ff $ff $00 $00
 .endif
 .ends
 
@@ -31413,7 +31452,7 @@ LABEL_3608C_:
 .ifdef UNREACHABLE_CODE
   ret
 .endif
-  
+
 +:
   ld a, $00
   ld (_RAM_DE9D_), a

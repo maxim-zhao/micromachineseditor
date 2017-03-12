@@ -618,11 +618,11 @@
 02:80fc LABEL_80FC_Handler_MenuScreen_Initialise
 02:80fc LABEL_80FC_EndMenuScreenHandler
 02:8101 LABEL_8101_Unknown
-02:8114 LABEL_8114_MenuScreen_Initialise_Initialise
+02:8114 LABEL_8114_MenuIndex0_Initialise
 02:81c1 LABEL_81C1_
 02:8205 LABEL_8205_
 02:8272 LABEL_8272_
-02:82df LABEL_82DF_MenuScreen_Title_Initialise
+02:82df LABEL_82DF_MenuIndex1_Initialise
 02:834e TEXT_834E_FailedToQualify
 02:8360 LABEL_8360_
 02:83ed TEXT_83ED_Qualified
@@ -631,12 +631,12 @@
 02:8416 TEXT_8416_Lives
 02:841c LABEL_841C_
 02:8486 LABEL_8486_
-02:84aa LABEL_84AA_Menu5
+02:84aa LABEL_84AA_Menu5_Initialise
 02:84c7 LABEL_84C7_
-02:8507 LABEL_8507_Menu2
+02:8507 LABEL_8507_MenuIndex2_Initialise
 02:85ec TEXT_85EC_Results
 02:85f4 LABEL_85F4_
-02:866c LABEL_866C_Menu3
+02:866c LABEL_866C_Menu3_Initialise
 02:8717 LABEL_8717_
 02:876b LABEL_876B_
 02:87e9 LABEL_87E9_
@@ -655,7 +655,7 @@
 02:8953 LABEL_8953_InitialiseTwoPlayersMenu
 02:89e2 LABEL_89E2_
 02:8a30 LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
-02:8a38 LABEL_8A38_Menu4
+02:8a38 LABEL_8A38_Menu4_Initialise
 02:8b55 LABEL_8B55_
 02:8b89 LABEL_8B89_
 02:8b9d LABEL_8B9D_
@@ -676,7 +676,7 @@
 02:8e97 LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro
 02:8ef0 LABEL_8EF0_Handler_MenuScreen_OnePlayerTournamentResults
 02:8f10 LABEL_8F10_
-02:8f73 LABEL_8F73_
+02:8f73 LABEL_8F73_LoseALife
 02:8f93 LABEL_8F93_Handler_MenuScreen_UnknownB
 02:8fc4 LABEL_8FC4_Handler_MenuScreen_LifeList
 02:902e LABEL_902E_
@@ -916,9 +916,9 @@
 02:b22a LABEL_B22A_DisplayCase_BlankRuffTrux
 02:b230 LABEL_B230_DisplayCase_BlankRuffTrux
 02:b254 LABEL_B254_DisplayCase_RestoreRuffTrux
-02:b269 LABEL_B269_
-02:b27e LABEL_B27E_
-02:b298 LABEL_B298_
+02:b269 LABEL_B269_IncrementCourseSelectIndex
+02:b27e LABEL_B27E_DecrementCourseSelectIndex
+02:b298 LABEL_B298_IncrementCourseSelectIndex
 02:b2b3 LABEL_B2B3_
 02:b2bb LABEL_B2BB_DrawMenuScreenBase_WithLine
 02:b2dc LABEL_B2DC_DrawMenuScreenBase_NoLine
@@ -2242,7 +2242,7 @@
 0000d6c9 _RAM_D6C9_ControllingPlayersLR1Buttons
 0000d6ca _RAM_D6CA_
 0000d6cb _RAM_D6CB_MenuScreenState
-0000d6cc _RAM_D6CC_
+0000d6cc _RAM_D6CC_TwoPlayerTrackSelectIndex
 0000d6cd _RAM_D6CD_
 0000d6ce _RAM_D6CE_
 0000d6cf _RAM_D6CF_
@@ -2762,7 +2762,7 @@
 0000dbd5 _RAM_DBD5_
 0000dbd6 _RAM_DBD6_
 0000dbd7 _RAM_DBD7_
-0000dbd8 _RAM_DBD8_CourseSelectIndex
+0000dbd8 _RAM_DBD8_NextTrackIndex
 0000dbd9 _RAM_DBD9_DisplayCaseData
 0000dbf1 _RAM_DBF1_RaceNumberText
 0000dbf9 _RAM_DBF9_
@@ -2787,7 +2787,7 @@
 0000dc36 _RAM_DC36_
 0000dc37 _RAM_DC37_
 0000dc38 _RAM_DC38_
-0000dc39 _RAM_DC39_
+0000dc39 _RAM_DC39_NextRuffTruxTrack
 0000dc3a _RAM_DC3A_
 0000dc3b _RAM_DC3B_IsTrackSelect
 0000dc3c _RAM_DC3C_IsGameGear
