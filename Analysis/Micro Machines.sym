@@ -909,10 +909,10 @@
 02:b1e7 TEXT_B1E7_Yes
 02:b1ec LABEL_B1EC_Trampoline_PlayMenuMusic
 02:b1f4 LABEL_B1F4_Trampoline_StopMenuMusic
-02:b1fc LABEL_B1FC_
-02:b213 LABEL_B213_
-02:b219 DATA_B219_
-02:b222 DATA_B222_
+02:b1fc LABEL_B1FC_TwoPlayerTrackSelect_GetIndex
+02:b213 LABEL_B213_GearToGearTrackSelect_GetIndex
+02:b219 DATA_B219_TwoPlayerTrackSelectIndices
+02:b222 DATA_B222_GearToGearTrackSelectIndices
 02:b22a LABEL_B22A_DisplayCase_BlankRuffTrux
 02:b230 LABEL_B230_DisplayCase_BlankRuffTrux
 02:b254 LABEL_B254_DisplayCase_RestoreRuffTrux
@@ -2245,7 +2245,7 @@
 0000d6cc _RAM_D6CC_TwoPlayerTrackSelectIndex
 0000d6cd _RAM_D6CD_
 0000d6ce _RAM_D6CE_
-0000d6cf _RAM_D6CF_
+0000d6cf _RAM_D6CF_GearToGearTrackSelectIndex
 0000d6d0 _RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect
 0000d6d1 _RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen
 0000d6d2 _RAM_D6D2_Unused

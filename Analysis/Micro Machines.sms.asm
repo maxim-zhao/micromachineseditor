@@ -113,7 +113,7 @@ Track_11_TheShrubberyTwist        db ; Helicopter!
 Track_12_PerilousPitStop          db
 Track_13_WideAwakeWarZone         db
 Track_14_CrayonCanyons            db
-Track_15_SoapLakeCity!            db
+Track_15_SoapLakeCity             db
 Track_16_TheLeafyBends            db ; Helicopter!
 Track_17_ChalkDustChicane         db
 Track_18_GoForIt                  db
@@ -629,7 +629,7 @@ _RAM_D6CB_MenuScreenState db ; Meaning depends on which menu screen we are on?
 _RAM_D6CC_TwoPlayerTrackSelectIndex db
 _RAM_D6CD_ db
 _RAM_D6CE_ db
-_RAM_D6CF_ db
+_RAM_D6CF_GearToGearTrackSelectIndex db
 _RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect db
 _RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen db ; Used for "debouncing"
 _RAM_D6D2_Unused db
@@ -7880,8 +7880,7 @@ LABEL_31B6_InitialiseFloorTiles:
   out (PORT_VDP_ADDRESS), a
   ld bc, $0080 ; 32*4 bytes
 -:
-  ld a, $00    ; Blank it out
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 0 ; Blank it out
   dec bc
   ld a, b
   or c
@@ -16908,8 +16907,7 @@ LABEL_7C7D_LoadTrack:
     ld b, $03
     ld c, PORT_VDP_DATA
     otir
-    ld a, $00
-    out (PORT_VDP_DATA), a
+    EmitDataToVDPImmediate8 0
   pop bc
   dec bc
   ld a, b
@@ -16934,8 +16932,7 @@ LABEL_7C7D_LoadTrack:
     ld b, $03
     ld c, PORT_VDP_DATA
     otir
-    ld a, $00
-    out (PORT_VDP_DATA), a
+    EmitDataToVDPImmediate8 0
   pop bc
   dec bc
   ld a, b
@@ -17134,8 +17131,7 @@ LABEL_7FC9_EmitTileData3bpp:
     ld b, $03 ; 3 bytes data
     ld c, PORT_VDP_DATA
     otir
-    ld a, $00 ; 1 byte padding
-    out (PORT_VDP_DATA), a
+    EmitDataToVDPImmediate8 0 ; 1 byte padding
   pop bc
   dec bc
   ld a, b
@@ -17641,7 +17637,7 @@ LABEL_8360_:
   ld hl, TEXT_8416_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -17988,13 +17984,13 @@ LABEL_866C_Menu3_Initialise:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
   call LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
-  add a, $1B
+  add a, ZERO_DIGIT_TILE_INDEX + 1
   ld (_RAM_D701_SpriteN), a
 .ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
@@ -18051,7 +18047,7 @@ LABEL_8717_:
   ld hl, TEXT_8850_Level
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DBF1_RaceNumberText + 5)
-  cp $0E ; '0'?
+  cp $0E ; Omit leading '0'
   jr z, +
   out (PORT_VDP_DATA), a
   xor a
@@ -18098,19 +18094,20 @@ LABEL_876B_:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
   ld a, (_RAM_DC09_Lives)
   cp $09
   jr z, +
+  ; Increase up to maximum 9
   add a, $01
 +:
   ld (_RAM_DC09_Lives), a
   call LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   ld (_RAM_D701_SpriteN), a
   ld a, (_RAM_DC3C_IsGameGear)
   or a
@@ -18149,7 +18146,7 @@ LABEL_87E9_:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -18466,18 +18463,18 @@ LABEL_8A38_Menu4_Initialise:
   ld a, (_RAM_DC47_GearToGear_OtherPlayerControls1)
   cp $3F
   jr z, -
-  ld (_RAM_D6CF_), a
+  ld (_RAM_D6CF_GearToGearTrackSelectIndex), a
   jr +
 
 LABEL_8B55_:
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
   cp $CC
   jr nz, LABEL_8B55_
-  ld a, (_RAM_D6CF_)
+  ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   out (PORT_GG_LinkSend), a
 +:
   call LABEL_AF5D_BlankControlsRAM
-  ld a, (_RAM_D6CF_)
+  ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   ld c, a
   ld b, $00
   ld hl, _RAM_DC2C_
@@ -18485,7 +18482,7 @@ LABEL_8B55_:
   ld a, $01
   ld (hl), a
   ld a, c
-  call LABEL_B213_
+  call LABEL_B213_GearToGearTrackSelect_GetIndex
   ld a, c
   add a, $01
   call LABEL_AB68_GetPortraitSource_TrackType
@@ -19155,7 +19152,7 @@ LABEL_8FC4_Handler_MenuScreen_LifeList:
 ++:
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC09_Lives)
-  add a, $1A
+  add a, ZERO_DIGIT_TILE_INDEX
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -19252,7 +19249,7 @@ LABEL_90CA_BlankTiles_BlankControls:
   ; Blank tiles
   TileWriteAddressToHL $00
   call LABEL_B35A_VRAMAddressToHL
-  ld de, $3700
+  ld de, $3700 ; Size of tile area
 -:xor a
   out (PORT_VDP_DATA), a
   dec de
@@ -19360,8 +19357,7 @@ LABEL_9170_BlankTilemap_BlankControlsRAM:
   ld bc, 32*28 ; $0380 ; Size of tilemap
 -:ld a, e
   out (PORT_VDP_DATA), a
-  ld a, $00
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 0
   dec bc
   ld a, b
   or c
@@ -19929,10 +19925,7 @@ LABEL_95AF_DrawHorizontalLineIfSMS:
   JrZRet + ; ret if GG
   ; SMS
   ld e, $20 ; Counter: 32 tiles
--:ld a, $B7 ; Tile index: horizontal bar
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+-:EmitDataToVDPImmediate16 $1B7 ; Tile index: horizontal bar
   dec e
   jr nz, -
 +:ret
@@ -20398,10 +20391,7 @@ _LABEL_99D2_ret:
   add hl, bc
   ld bc, $0007
   call LABEL_A5B0_EmitToVDP_Text
-  ld a, $B6
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $1b6 ; TIle index: ???
   ld a, (_RAM_DBD3_)
   cp $10
   jr z, +
@@ -20495,10 +20485,7 @@ LABEL_9AE9_:
   inc hl
   ld bc, $0006
   call LABEL_A5B0_EmitToVDP_Text
-  ld a, $B6
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $1b6 ; TIle index: ???
   ret
 
 LABEL_9B18_:
@@ -22278,8 +22265,7 @@ LABEL_A9C6_:
   ld a, b
   add a, $18
   out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 $01
   ret
 
 LABEL_A9EB_:
@@ -22534,8 +22520,7 @@ LABEL_ABB3_:
 -:
   ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
   out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 1 ; High byte
   ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
   add a, $01
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
@@ -22675,31 +22660,19 @@ LABEL_ACEE_:
   jr ++
 
 ++:
-  ld a, $50
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $150
   ld a, (_RAM_DC3F_GameMode)
   dec a
   jr z, +
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $51
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $151
   ld h, b
   ld l, c
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $52
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $152
 +:
   call LABEL_B361_VRAMAddressToDE
-  ld a, $53
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $153
   ret
 
 LABEL_AD42_DrawDisplayCase:
@@ -23300,13 +23273,13 @@ LABEL_B1F4_Trampoline_StopMenuMusic:
   ld (_RAM_D741_RequestedPageIndex), a
   JumpToRamCode LABEL_3BCE6_Trampoline_StopMenuMusic
 
-LABEL_B1FC_:
+LABEL_B1FC_TwoPlayerTrackSelect_GetIndex:
   ld a, (_RAM_DC34_IsTournament)
   dec a
   JrZRet +
-  ld hl, DATA_B219_
+  ld hl, DATA_B219_TwoPlayerTrackSelectIndices
   ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
-  sub $01
+  sub $01 ; Make 0-based
 -:
   ld e, a
   ld d, $00
@@ -23315,18 +23288,35 @@ LABEL_B1FC_:
   ld (_RAM_DBD8_NextTrackIndex), a
 +:ret
 
-LABEL_B213_:
-  ld hl, DATA_B222_
+LABEL_B213_GearToGearTrackSelect_GetIndex:
+  ld hl, DATA_B222_GearToGearTrackSelectIndices
   jp -
 
-; Data from B219 to B221 (9 bytes)
-DATA_B219_:
-; Track indices for two-player mode?
-.db $02 $14 $0E $17 $0D $04 $07 $15 $05
+DATA_B219_TwoPlayerTrackSelectIndices:
+.db Track_02_DesktopDropOff
+.db Track_14_CrayonCanyons
+.db Track_0E_PitfallPockets
+.db Track_17_ChalkDustChicane
+.db Track_0D_BedroomBattlefield
+.db Track_04_SandyStraights
+.db Track_07_HandymansCurve
+.db Track_15_SoapLakeCity
+.db Track_05_OatmealInOverdrive
 
 ; Data from B222 to B229 (8 bytes)
-DATA_B222_:
-.db $02 $15 $0E $05 $07 $00 $04 $0D
+; Gear to Gear track select options? Nearly the same as SMS, except:
+; - pro ones are gone
+; - qualifying race is in (!)
+; - order is changed
+DATA_B222_GearToGearTrackSelectIndices:
+.db Track_02_DesktopDropOff
+.db Track_15_SoapLakeCity
+.db Track_0E_PitfallPockets
+.db Track_05_OatmealInOverdrive
+.db Track_07_HandymansCurve
+.db Track_00_QualifyingRace
+.db Track_04_SandyStraights
+.db Track_0D_BedroomBattlefield
 
 LABEL_B22A_DisplayCase_BlankRuffTrux:
   call LABEL_B230_DisplayCase_BlankRuffTrux
@@ -23917,7 +23907,7 @@ LABEL_B5E7_:
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +
-  call LABEL_B1FC_
+  call LABEL_B1FC_TwoPlayerTrackSelect_GetIndex
   ld a, $01
   ld (_RAM_DC3D_IsHeadToHead), a
   ld (_RAM_D6D5_InGame), a
@@ -23952,12 +23942,12 @@ LABEL_B640_:
   jr z, +++
   ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   sub $01
-  cp $FF
+  cp -1
   jr z, +
   or a
   jr nz, ++
 +:
-  ld a, $09
+  ld a, $09 ; number of tracks in table
 ++:
   ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
   jp ++++
@@ -23974,7 +23964,7 @@ LABEL_B666_:
   jr z, ++
   ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
   add a, $01
-  cp $0A
+  cp $0A ; count + 1
   jr nz, +
   ld a, $01
 +:
@@ -24402,10 +24392,10 @@ LABEL_B9B3_Initialise_RAM_DC2C_:
 LABEL_B9C4_:
   ld e, $08
 -:
-  ld a, (_RAM_D6CF_)
+  ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   add a, $01
   and $07
-  ld (_RAM_D6CF_), a
+  ld (_RAM_D6CF_GearToGearTrackSelectIndex), a
   ld c, a
   ld b, $00
   ld hl, _RAM_DC2C_
@@ -24426,6 +24416,7 @@ LABEL_B9C4_:
   ret
 
 LABEL_B9ED_:
+  ; Offset location for GG by $40 = 2 rows?
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01
   rrca
@@ -24438,34 +24429,22 @@ LABEL_B9ED_:
   TilemapWriteAddressToHL 8, 10
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $50 ; Tile $150
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $150 ; Tile $150
   TilemapWriteAddressToHL 23, 10
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $53 ; Tile $153
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $153 ; Tile $153
   ret
 
 +:
   TilemapWriteAddressToHL 8, 20
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $50 ; Tile $150
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $150 ; Tile $150
   TilemapWriteAddressToHL 23, 20
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  ld a, $53 ; Tile $153
-  out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate16 $153 ; Tile $153
   ret
 
 LABEL_BA3C_LoadColouredCirclesTilesToIndex150:
@@ -25110,9 +25089,7 @@ LABEL_BEF5_:
 +:
   call LABEL_B35A_VRAMAddressToHL
   ld c, $07
--:
-  ld a, BLANK_TILE_INDEX
-  out (PORT_VDP_DATA), a
+-:EmitDataToVDPImmediate8 BLANK_TILE_INDEX
   xor a
   out (PORT_VDP_DATA), a
   dec c
@@ -25168,8 +25145,7 @@ LABEL_BF5E_: ; GG-only code, misaligned here
   jr + ; Weird
 +:call $B358 ; not a function
   ld c, $05
--:ld a, $0e
-  out (PORT_VDP_DATA), a
+-:EmitDataToVDPImmediate8 $0e
   xor a
   out (PORT_VDP_DATA), a
   dec c
