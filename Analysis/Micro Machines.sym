@@ -180,10 +180,7 @@
 00:1b50 LABEL_1B50_
 00:1b73 LABEL_1B73_
 00:1b94 LABEL_1B94_
-00:1c22 DATA_1C22_TileData_ShadowTopLeft
-00:1c3a DATA_1C3A_TileData_ShadowTopRight
-00:1c52 DATA_1C52_TileData_ShadowBottomLeft
-00:1c6a DATA_1C6A_TileData_ShadowBottomRight
+00:1c22 DATA_1C22_TileData_Shadow
 00:1c82 DATA_1c82_TileVRAMAddresses
 00:1c98 LABEL_1C98_
 00:1cbd LABEL_1CBD_

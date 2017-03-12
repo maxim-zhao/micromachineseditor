@@ -4981,7 +4981,6 @@ LABEL_19CE_:
   ld d, a
   ret
 
-; Data from 19E2 to 19ED (12 bytes)
 DATA_19E2_MultiplesOf12:
   TimesTableLo 0 12 12
 
@@ -5294,31 +5293,10 @@ LABEL_1B94_:
   ld (_RAM_DEF1_), hl
   ret
 
-; Data from 1C22 to 1C39 (24 bytes)
-DATA_1C22_TileData_ShadowTopLeft: ; 3bpp -> 24bytes
-.db $03 $03 $00 $0F $0F $00 $1F $1F
-.db $00 $3F $3F $00 $3F $3F $00 $7F
-.db $7F $00 $7F $7F $00 $7F $7F $00
+DATA_1C22_TileData_Shadow: ; 4 tiles @ 3bpp
+.incbin "Assets/Car shadow.3bpp"
 
-; Data from 1C3A to 1C51 (24 bytes)
-DATA_1C3A_TileData_ShadowTopRight:
-.db $C0 $C0 $00 $F0 $F0 $00 $F8 $F8
-.db $00 $FC $FC $00 $FC $FC $00 $FE
-.db $FE $00 $FE $FE $00 $FE $FE $00
-
-; Data from 1C52 to 1C69 (24 bytes)
-DATA_1C52_TileData_ShadowBottomLeft:
-.db $7F $7F $00 $7F $7F $00 $7F $7F
-.db $00 $3F $3F $00 $3F $3F $00 $1F
-.db $1F $00 $0F $0F $00 $03 $03 $00
-
-; Data from 1C6A to 1C81 (24 bytes)
-DATA_1C6A_TileData_ShadowBottomRight:
-.db $FE $FE $00 $FE $FE $00 $FE $FE
-.db $00 $FC $FC $00 $FC $FC $00 $F8
-.db $F8 $00 $F0 $F0 $00 $C0 $C0 $00
-
-DATA_1c82_TileVRAMAddresses: ; VRAM addresses
+DATA_1c82_TileVRAMAddresses: ; VRAM addresses for ???
 .dw $4D00 $4D60 $4F00 $4F60 ; Tiles $68, $6b, $78, $7b
 .dw $5160 $5300 $5360 $5D00 ; $8b, $98, $9b, $e8
 .dw $5D60 $5F00 $5F60 ; $eb, $f8, $fb
@@ -17102,7 +17080,7 @@ LABEL_7F4E_CarAndShadowSpriteTilesToVRAM:
   ; VRAM address - tile $1a8 = shadow tile
   SetTileAddressImmediate $1a8
   ld bc, 8*4 ; four tiles
-  ld hl, DATA_1C22_TileData_ShadowTopLeft
+  ld hl, DATA_1C22_TileData_Shadow
   call LABEL_7FC9_EmitTileData3bpp
 
   ; VRAM address - tile $1ac = empty (not for RuffTrux)
@@ -17121,19 +17099,19 @@ LABEL_7F4E_CarAndShadowSpriteTilesToVRAM:
   ; We squeeze the shadow into unused spaces in the car sprites
   SetTileAddressImmediate $0b
   ld bc, 8
-  ld hl, DATA_1C22_TileData_ShadowTopLeft
+  ld hl, DATA_1C22_TileData_Shadow + 3 * 8 * 0 ; Tile 0
   call LABEL_7FC9_EmitTileData3bpp
   SetTileAddressImmediate $18
   ld bc, 8
-  ld hl, DATA_1C3A_TileData_ShadowTopRight
+  ld hl, DATA_1C22_TileData_Shadow + 3 * 8 * 1 ; Tile 1
   call LABEL_7FC9_EmitTileData3bpp
   SetTileAddressImmediate $1b
   ld bc, 8
-  ld hl, DATA_1C52_TileData_ShadowBottomLeft
+  ld hl, DATA_1C22_TileData_Shadow + 3 * 8 * 2 ; Tile 2
   call LABEL_7FC9_EmitTileData3bpp
   SetTileAddressImmediate $88
   ld bc, 8
-  ld hl, DATA_1C6A_TileData_ShadowBottomRight
+  ld hl, DATA_1C22_TileData_Shadow + 3 * 8 * 3 ; Tile 3
   ; fall through and return
 LABEL_7FC9_EmitTileData3bpp:
   ; Emits bc rows of 3bpp data to the VDP
