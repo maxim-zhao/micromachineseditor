@@ -113,7 +113,7 @@ MenuScreen_RaceName           db ; 4 Qualifying Race
 MenuScreen_Unused5            db ; 5 Unused, same as 0?
 MenuScreen_Qualify            db ; 6 Qualified for challenge!, Failed to qualify!
 MenuScreen_WhoDoYouWantToRace db ; 7 Who do you want to race?
-MenuScreen_StorageBox         db ; 8 Car storage box
+MenuScreen_DisplayCase         db ; 8 Car storage box
 MenuScreen_OnePlayerTrackIntro db ; 9 1-player pre-track
 MenuScreen_OnePlayerTournamentResults db ; a 1-player tournament results
 MenuScreen_UnknownB           db ; b
@@ -564,8 +564,7 @@ _RAM_D6A5_ db
 _RAM_D6A6_DisplayCase_Source dw
 _RAM_D6A8_DisplayCaseTileAddress dw
 _RAM_D6AA_ db
-_RAM_D6AB_ db
-_RAM_D6AC_ db
+_RAM_D6AB_MenuTimer instanceof Word ; Used as a byte by some screens; may count up or down
 _RAM_D6AD_ db
 _RAM_D6AE_ db
 _RAM_D6AF_FlashingCounter db
@@ -843,7 +842,7 @@ _RAM_DBFC_ db
 _RAM_DBFD_ db
 _RAM_DBFE_8TimesTable dsb 11
 _RAM_DC09_Lives db
-_RAM_DC0A_ db
+_RAM_DC0A_WinsInARow db ; 3 wins in a row -> RuffTrux
 _RAM_DC0B_ db
 _RAM_DC0C_Player2_WonCount db
 _RAM_DC0D_Player1_WonCount db
@@ -15798,7 +15797,7 @@ LABEL_7520_:
   add a, $01
   ld (_RAM_DC39_), a
   xor a
-  ld (_RAM_DC0A_), a
+  ld (_RAM_DC0A_WinsInARow), a
   ld a, $03
   ld (_RAM_DBCD_MenuIndex), a
   ld a, (_RAM_DF8C_)
@@ -15871,7 +15870,7 @@ LABEL_7573_EnterGame:
   ld a, $01
   ld (_RAM_DC3D_IsHeadToHead), a
 +:
-  ld a, (_RAM_DC0A_)
+  ld a, (_RAM_DC0A_WinsInARow)
   and $0F
   cp $03
   jr nz, +
@@ -17264,7 +17263,7 @@ DATA_80BE_MenuScreenHandlers:
 .dw LABEL_80FC_Handler_MenuScreen_Initialise ; Unused5
 .dw LABEL_8D79_Handler_MenuScreen_Qualify
 .dw LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace
-.dw LABEL_8E15_Handler_MenuScreen_StorageBox
+.dw LABEL_8E15_Handler_MenuScreen_DisplayCase
 .dw LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro
 .dw LABEL_8EF0_Handler_MenuScreen_OnePlayerTournamentResults
 .dw LABEL_8F93_Handler_MenuScreen_UnknownB
@@ -17314,6 +17313,7 @@ LABEL_8101_Unknown: ; unreachable?
 LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   call LABEL_BB85_ScreenOffAtLineFF
   call LABEL_B44E_BlankMenuRAM
+  ; Next menu screen is title
   ld a, MenuScreen_Title
   ld (_RAM_D699_MenuScreenIndex), a
   ld (_RAM_D7B3_), a
@@ -17351,7 +17351,7 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   ld (_RAM_D6C6_), a
   ld (_RAM_D6C0_), a
-  ld (_RAM_DC0A_), a
+  ld (_RAM_DC0A_WinsInARow), a
   ld (_RAM_DC34_IsTournament), a
   ld (_RAM_DC36_), a
   ld (_RAM_DC37_), a
@@ -17372,8 +17372,8 @@ LABEL_8114_MenuScreen_Initialise_Initialise: ; init functions, need renaming
   ld a, $FF
   ld (_RAM_D6C4_), a
   
-  ld a, $18
-  ld (_RAM_D6AB_), a
+  ld a, 0.48 * 50 ; 0.48s @ 50Hz, 0.4s @ 60Hz Not sure what the purpose of this is... it seems to delay entering the game on the title screen?
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   
   ld a, $01
   ld (_RAM_DC35_TournamentRaceNumber), a
@@ -17413,8 +17413,8 @@ LABEL_81C1_:
   call LABEL_BDB8_
   ld a, $00
   ld (_RAM_D6A0_MenuSelection), a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   call LABEL_A673_SelectLowSpriteTiles
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
@@ -17503,8 +17503,8 @@ LABEL_8272_:
   CallRamCode LABEL_3BC6A_EmitText
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
-  ld hl, $0170
-  ld (_RAM_D6AB_), hl
+  ld hl, 7.36 * 50 ; 7.36s @ 50Hz, 6.13s @ 60Hz
+  ld (_RAM_D6AB_MenuTimer), hl
   xor a
   ld (_RAM_D6C1_), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
@@ -17550,12 +17550,12 @@ LABEL_82DF_MenuScreen_Title_Initialise:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, $01C4
+  ld hl, 9.04 * 50 ; 9.04s @ 50Hz
   jr ++
 .endif
-+:ld hl, $0200
++:ld hl, 8.534 * 60 ; 8.53333333333333s @ 60Hz
 ++:
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 TEXT_834E_FailedToQualify:
@@ -17612,8 +17612,8 @@ LABEL_8360_:
   out (PORT_VDP_DATA), a
   ld c, Music_06_Results
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld hl, $0190
-  ld (_RAM_D6AB_), hl
+  ld hl, 8 * 50 ; 8s @ 50Hz, 6.66666666666667s @ 60Hz
+  ld (_RAM_D6AB_MenuTimer), hl
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 TEXT_83ED_Qualified:      .asc "QUALIFIED"
@@ -17646,7 +17646,7 @@ LABEL_841C_:
   xor a
   ld (_RAM_D697_), a
   ld (_RAM_D6B4_), a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6B0_), a
   ld a, (_RAM_DBFC_)
   ld (_RAM_D6AD_), a
@@ -17664,7 +17664,7 @@ LABEL_841C_:
 
 LABEL_8486_:
   call LABEL_BB85_ScreenOffAtLineFF
-  ld a, MenuScreen_StorageBox
+  ld a, MenuScreen_DisplayCase
   ld (_RAM_D699_MenuScreenIndex), a
   call LABEL_B2BB_DrawMenuScreenBase_WithLine
   ld c, Music_07_Menus
@@ -17673,8 +17673,8 @@ LABEL_8486_:
   call LABEL_AD42_DrawDisplayCase
   call LABEL_B230_DisplayCase_BlankRuffTrux
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_84AA_Menu5:
@@ -17712,8 +17712,8 @@ LABEL_84C7_:
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6C1_), a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld c, Music_05_RaceStart
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   TailCall LABEL_BB75_ScreenOnAtLineFF
@@ -17819,24 +17819,26 @@ LABEL_8507_Menu2:
   call LABEL_A5B0_EmitToVDP_Text
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6C1_), a
   ld c, Music_06_Results
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr nz, +
+  ; First place
   ld a, (_RAM_DC39_)
   cp $1D
   jr z, +
-  ld a, (_RAM_DC0A_)
+  ; Stop incrementing wins in a row after this point?
+  ld a, (_RAM_DC0A_WinsInARow)
   add a, $01
-  ld (_RAM_DC0A_), a
+  ld (_RAM_DC0A_WinsInARow), a
   jr ++
 
-+:
++:; Not first place, reset wins counter
   xor a
-  ld (_RAM_DC0A_), a
+  ld (_RAM_DC0A_WinsInARow), a
 ++:
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
@@ -17889,8 +17891,8 @@ LABEL_85F4_:
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld c, Music_09_PlayerOut
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   TailCall LABEL_BB75_ScreenOnAtLineFF
@@ -17992,8 +17994,8 @@ LABEL_866C_Menu3:
   call LABEL_93CE_UpdateSpriteTable
   ld c, Music_0A_LostLife
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, $80
-  ld (_RAM_D6AB_), a
+  ld a, 2.56 * 50 ; 2.56s @ 50Hz, 2.13333333333333s @ 60Hz
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   jp LABEL_8826_
 
 LABEL_8717_:
@@ -18029,13 +18031,13 @@ LABEL_8717_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, $E2
+  ld a, 4.52 * 50 ; 4.52s @ 50Hz
   jr ++
 
 +:
-  ld a, $FF
+  ld a, 4.25 * 60 ; 4.25s @ 60Hz
 ++:
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   jp LABEL_8826_
 
 LABEL_876B_:
@@ -18090,8 +18092,8 @@ LABEL_876B_:
   call LABEL_93CE_UpdateSpriteTable
   ld c, Music_06_Results
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, $C8
-  ld (_RAM_D6AB_), a
+  ld a, 4 * 50 ; 4s @ 50Hz, 3.33333333333333s @ 60Hz
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   jp LABEL_8826_
 
 LABEL_87E9_:
@@ -18118,11 +18120,11 @@ LABEL_87E9_:
   out (PORT_VDP_DATA), a
   ld c, Music_0A_LostLife
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, $80
-  ld (_RAM_D6AB_), a
+  ld a, 2.56 * 50 ; 2.56s @ 50Hz, 2.13333333333333s @ 60Hz
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 LABEL_8826_:
   xor a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 TEXT_882E_OneLifeLost:  .asc "ONE LIFE LOST!"
@@ -18202,8 +18204,8 @@ LABEL_8877_:
   ld a, $40
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld c, Music_05_RaceStart
   call LABEL_B1EC_Trampoline_PlayMenuMusic
@@ -18213,7 +18215,7 @@ TEXT_8929_TripleWin:    .asc "TRIPLE WIN !!!"
 TEXT_8937_BonusRace:    .asc "  BONUS RACE  "
 TEXT_8945_BeatTheClock: .asc "BEAT THE CLOCK"
 
-LABEL_8953_:
+LABEL_8953_InitialiseTwoPlayersMenu:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
@@ -18248,7 +18250,7 @@ LABEL_8953_:
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
   ld (_RAM_D6CD_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C6_), a
   ld (_RAM_D6B9_), a
   ld (_RAM_D697_), a
@@ -18295,11 +18297,11 @@ LABEL_89E2_:
   call LABEL_9317_InitialiseHandSprites
   xor a
   ld (_RAM_D6A0_MenuSelection), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   call LABEL_A673_SelectLowSpriteTiles
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_8A30_:
+LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TrackSelect
   jp +
@@ -18395,8 +18397,8 @@ LABEL_8A38_Menu4:
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld (_RAM_D693_), a
   ld (_RAM_D6CC_), a
@@ -18502,15 +18504,16 @@ LABEL_8BAB_Handler_MenuScreen_Title:
 ++:
   call LABEL_B505_UpdateHardModeText
 
-  ld a, (_RAM_D6AB_)
+  ; Decrement timer
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   or a
   jr z, +
   sub $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 
   jp +++
 
-+:; No hard mode, or _RAM_D6AB_ = 0
++:; _RAM_D6AB_MenuTimer expired
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK
   jr z, ++
@@ -18547,7 +18550,7 @@ LABEL_8C23_StartCourseSelect:
 
 LABEL_8C2C_:
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8953_
+  call LABEL_8953_InitialiseTwoPlayersMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
 ; 3rd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
@@ -18556,72 +18559,85 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr z, +
-  call LABEL_B433_
-  ld hl, (_RAM_D6AB_)
+  
+  call LABEL_B433_ResetMenuTimerOnControlPress
+  
+  ; Increment timer
+  ld hl, (_RAM_D6AB_MenuTimer)
   inc hl
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   ld a, h
-  cp $03
+  cp $03 ; i.e. we reached $300 = 15.36s @ 50Hz, 12.8s @ 60Hz
   jr nz, +
+  
+  ; Reset to the start
   call LABEL_B1F4_Trampoline_StopMenuMusic
   call LABEL_8114_MenuScreen_Initialise_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_8CA2_
+  call LABEL_8CA2_ProcessMenuControls_Player1Priority
   jp +
 
-; Data from 8C5D to 8C5F (3 bytes)
-.db $CD $B1 $8C
+.ifdef UNREACHABLE_CODE
+  call LABEL_8CB1_
+.endif
 
 +:
   ld a, (_RAM_D6A0_MenuSelection)
   or a
   jp z, LABEL_80FC_EndMenuScreenHandler
+  ; Something is currently selected
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_1_MASK ; $10
   jp nz, LABEL_80FC_EndMenuScreenHandler
-  ; Select
+  ; And a button was pressed
   call LABEL_B1F4_Trampoline_StopMenuMusic
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr z, ++
+  ; Must be one/two players
   ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
-  call LABEL_AFCD_
+  ; One player
+  call LABEL_AFCD_InitialiseOnePlayerMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
-+:
-  call LABEL_8953_
++:; Two players
+  call LABEL_8953_InitialiseTwoPlayersMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
-++:
+++:; Two player game type
   ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
+  ; Two player tournament
   ld a, $01
   ld (_RAM_DC34_IsTournament), a
-  call LABEL_8A30_
+  call LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
-+:
-  call LABEL_8A30_
++:; Two player single race
+  call LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
-LABEL_8CA2_:
+LABEL_8CA2_ProcessMenuControls_Player1Priority:
   ld a, (_RAM_D680_Player1Controls_Menus) ; Check if any buttons we care about are pressed
   and BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
   cp BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
   jr nz, +
-  ; None pressed
-  call LABEL_B9A3_
+  ; None pressed (active low)
+  ; We allow player 2 to influence things
+  call LABEL_B9A3_CombinePlayerMenuControlButtons
   jp ++
 
-+:; No - copy buttons
+LABEL_8CB1_:
++:; Yes - copy buttons to shared place and analyse
   ld a, (_RAM_D680_Player1Controls_Menus)
   ld (_RAM_D6C9_ControllingPlayersLR1Buttons), a
 ++:
+  ; Now we act on the menu controls
   and BUTTON_L_MASK ; $04
   jr z, +
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
@@ -18629,14 +18645,14 @@ LABEL_8CA2_:
   jr z, ++
   ret
 
-+:
++: ; Hand points left, selection = 1
   ld hl, DATA_2B356_SpriteNs_HandLeft
   CallRamCode LABEL_3BBB5_PopulateSpriteNs
   ld a, $01
   ld (_RAM_D6A0_MenuSelection), a
   ret
 
-++:
+++: ; Hand points right, selection = 2
   ld hl, DATA_2B36E_SpriteNs_HandRight
   CallRamCode LABEL_3BBB5_PopulateSpriteNs
   ld a, $02
@@ -18691,9 +18707,10 @@ LABEL_8D2B_Handler_MenuScreen_RaceName:
   dec a
   jr z, ++
   call LABEL_BA63_
-  ld hl, (_RAM_D6AB_)
+  ; Decrement timer
+  ld hl, (_RAM_D6AB_MenuTimer)
   dec hl
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   ld a, h
   or a
   jr nz, +++
@@ -18702,19 +18719,22 @@ LABEL_8D2B_Handler_MenuScreen_RaceName:
   jr z, +
   cp $FF
   jr nc, +++
+  ; Counter reached $ff
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
   jr nz, +++
-+:
++:; Timer reached zero, or button 1 was pressed at timer = $ff
   call LABEL_B368_
 ++:
-  ld a, (_RAM_D6AB_)
+  ; Increment timer
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   cp $04
   jr nz, +++
+  ; Wait for timer to reach 4
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
@@ -18733,9 +18753,10 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   ld a, (_RAM_DBCE_)
   or a
   jr z, ++++
-  ld hl, (_RAM_D6AB_)
+  ; Decrement timer
+  ld hl, (_RAM_D6AB_MenuTimer)
   dec hl
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   ld a, h
   or a
   jr nz, ++
@@ -18748,7 +18769,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
   jr nz, ++
-+:
++:; Timer expired, or button press expired it early
   ld a, $01
   ld (_RAM_D6B9_), a
   call LABEL_B1F4_Trampoline_StopMenuMusic
@@ -18765,13 +18786,15 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
 
 ++++:
   call LABEL_9D4E_
-  ld hl, (_RAM_D6AB_)
+  ; Decrement timer
+  ld hl, (_RAM_D6AB_MenuTimer)
   dec hl
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   ld a, l
   or h
   or a
   jr nz, +
+  ; Timer reached 0, reset to title screen
   call LABEL_B1F4_Trampoline_StopMenuMusic
   call LABEL_8114_MenuScreen_Initialise_Initialise
 +:
@@ -18811,33 +18834,39 @@ LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace:
   jp LABEL_80FC_EndMenuScreenHandler
 
 ; 9th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_8E15_Handler_MenuScreen_StorageBox:
+LABEL_8E15_Handler_MenuScreen_DisplayCase:
+  ; bc = car index
   ld b, $00
   ld a, (_RAM_D6C2_DisplayCase_FlashingCarIndex)
   ld c, a
-  ld a, (_RAM_D6AC_)
+  ; Flip bit
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   xor $01
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   dec a
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; Bit is 1 -> increment timer
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
-+:
-  ld a, (_RAM_D6AB_)
+  ld (_RAM_D6AB_MenuTimer.Lo), a
++:; See where the value is
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $37
   jr nc, +
+  ; More than $37
+  ; Filter to bit 2 -> change every 4 increments = 8 frames
   and $04
   cp $04
   jr z, +
-  ld a, (_RAM_DC0A_)
+  ; Bit 2 is 0 -> blank car
+  ld a, (_RAM_DC0A_WinsInARow)
   cp $03
-  jp z, LABEL_B22A_
+  jp z, LABEL_B22A_DisplayCase_BlankRuffTrux
   call LABEL_AE46_DisplayCase_BlankCar
   jp LABEL_8E54_
 
-+:
-  ld a, (_RAM_DC0A_)
++:; Bit 2 is 1 -> draw car
+  ld a, (_RAM_DC0A_WinsInARow)
   cp $03
   jp z, LABEL_B254_DisplayCase_RestoreRuffTrux
   call LABEL_AE94_DisplayCase_RestoreRectangle
@@ -18846,24 +18875,26 @@ LABEL_8E54_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld c, $60
+  ld c, $60 ; 3.84s @ 50Hz (double length, see above)
   jp ++
-+:ld c, $72
-++:ld a, (_RAM_D6AB_)
++:ld c, $72 ; 3.8s @ 60Hz
+++:ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp c
   jr z, +
-  cp $37
+  cp $37 ; 2.2s @ 50Hz, 1.8333s @ 60Hz for early finish if button is pressed
   jr c, ++
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
   jr nz, ++
+  ; End screen
   ld a, $01
   ld (_RAM_D697_), a
 +:
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  ld a, (_RAM_DC0A_)
+  ld a, (_RAM_DC0A_WinsInARow)
   cp $03
   jr nz, +
+  ; Blank out the RuffTrux part, you don't get to "keep" it
   xor a
   ld (_RAM_DBD9_DisplayCaseData + 15), a
   ld (_RAM_DBD9_DisplayCaseData + 19), a
@@ -18871,7 +18902,7 @@ LABEL_8E54_:
   call LABEL_8877_
   jp LABEL_80FC_EndMenuScreenHandler
 
-+:
++:; Initialise bonus race screen
   call LABEL_84AA_Menu5
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -18882,19 +18913,22 @@ LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro:
   dec a
   jr z, ++
   call LABEL_A9EB_
-  ld a, (_RAM_D6AC_)
+
+  ; Flip bit in the high byte
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   xor $01
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   dec a
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; And increment the low one
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:
-  ld a, (_RAM_D6AB_)
-  cp $B8
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $B8 ; 7.36s @ 50Hz, 6.13333333333333s @ 60Hz (half rate)
   jr z, +
-  cp $30
+  cp $30 ; 1.92s @ 50Hz, 1.6s @ 60Hz (half rate) for button to proceed
   jr c, +++
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
@@ -18902,13 +18936,14 @@ LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro:
 +:
   call LABEL_B368_
 ++:
-  ld a, (_RAM_D6AB_)
+  ; Then increment to 4 before proceeding
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   cp $04
   jr nz, +++
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
@@ -18924,24 +18959,24 @@ LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro:
 
 ; 11th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_8EF0_Handler_MenuScreen_OnePlayerTournamentResults:
-  ld a, (_RAM_D6AB_)
-  cp $A0
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $A0 ; 3.2s @ 50Hz, 2.66666666666667s @ 60Hz
   jr z, +
   add a, $01
-  ld (_RAM_D6AB_), a
-  cp $08
-  jp z, LABEL_A8ED_
-  cp $28
-  jp z, LABEL_A8F2_
-  cp $48
-  jp z, LABEL_A8F7_
-  cp $68
-  jp z, LABEL_A8FC_
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  cp $08 ; 0.16s @ 50Hz, 0.133333333333333s @ 60Hz -> first place
+  jp z, _LABEL_A8ED_TournamentResults_FirstPlace
+  cp $28 ; 0.8s @ 50Hz, 0.666666666666667s @ 60Hz -> second place
+  jp z, _LABEL_A8F2_TournamentResults_SecondPlace
+  cp $48 ; 1.44s @ 50Hz, 1.2s @ 60Hz
+  jp z, _LABEL_A8F7_TournamentResults_ThirdPlace
+  cp $68 ; 2.08s @ 50Hz, 1.73333333333333s @ 60Hz
+  jp z, LABEL_A8FC_TournamentResults_FourthPlace
 LABEL_8F10_:
   call LABEL_A7ED_
   jp LABEL_80FC_EndMenuScreenHandler
 
-+:
++:; Timer expired
   ld a, (_RAM_D6C1_)
   add a, $01
   ld (_RAM_D6C1_), a
@@ -19010,19 +19045,21 @@ LABEL_8F73_:
 ; 12th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_8F93_Handler_MenuScreen_UnknownB:
   call LABEL_A692_
-  ld a, (_RAM_D6AC_)
+  ; Flip bit in high byte
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   xor $01
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   dec a
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; Increment counter
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:
-  ld a, (_RAM_D6AB_)
-  cp $90
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $90 ; 2.88s @ 50Hz, 2.4s @ 60Hz
   jr z, +
-  cp $37
+  cp $37 ; 1.1s @ 50Hz, 0.916666666666667s @ 60Hz
   jr c, ++
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
@@ -19089,19 +19126,21 @@ LABEL_8FC4_Handler_MenuScreen_LifeList:
   ld (_RAM_D721_SpriteY), a
   call LABEL_93CE_UpdateSpriteTable
 LABEL_902E_:
-  ld a, (_RAM_D6AC_)
+  ; Flip timer high bit
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   xor $01
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   dec a
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; Decrement counter
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   sub $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $00
   jr z, +
-  cp $60
+  cp $60 ; TODO where did it start?
   jr nc, +++
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
@@ -19131,19 +19170,20 @@ LABEL_9074_Handler_MenuScreen_UnknownD:
   ld a, (_RAM_D6C1_)
   dec a
   jr z, ++
-  ld a, (_RAM_D6AC_)
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   xor $01
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   dec a
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; Increment every second frame
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:
-  ld a, (_RAM_D6AB_)
-  cp $B8
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $B8 ; 3.68s @ 50Hz, 3.06666666666667s @ 60Hz
   jr z, +
-  cp $37
+  cp $37 ; 1.1s @ 50Hz, 0.916666666666667s @ 60Hz
   jr c, +++
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK ; $10
@@ -19151,13 +19191,13 @@ LABEL_9074_Handler_MenuScreen_UnknownD:
 +:
   call LABEL_B368_
 ++:
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   cp $04
   jr nz, +++
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
@@ -19870,11 +19910,12 @@ LABEL_95C3_:
   ld a, (_RAM_D6B0_)
   cp $00
   JrNzRet +
-  ld a, (_RAM_D6AB_)
+  ; Decrement timer, wait for it to hit 0
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $00
   jr z, ++
   sub $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:ret
 
 ++:
@@ -19962,7 +20003,7 @@ LABEL_9636_: ; Left
   xor a
   ld (_RAM_D6A3_), a
   ld a, $08
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
@@ -20021,7 +20062,7 @@ LABEL_96A3_:
   xor a
   ld (_RAM_D6A3_), a
   ld a, $08
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 LABEL_96EC_:
   ld b, $00
   ld a, (_RAM_D6A2_)
@@ -20457,7 +20498,7 @@ LABEL_9B87_:
   ld a, (_RAM_D6A3_)
   cp $00
   JpNzRet _LABEL_9C5D_ret
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $08
   JpZRet _LABEL_9C5D_ret
   ld a, (_RAM_D6B0_)
@@ -20798,7 +20839,7 @@ LABEL_9E70_:
   ld a, (_RAM_D6A3_)
   cp $00
   JpNzRet _LABEL_9F3F_ret
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $08
   JpZRet _LABEL_9F3F_ret
   ld a, (_RAM_D6B0_)
@@ -21853,7 +21894,7 @@ LABEL_A778_InitialiseDisplayCaseData:
   ret
 
 LABEL_A787_:
-  ld a, (_RAM_DC0A_)
+  ld a, (_RAM_DC0A_WinsInARow)
   cp $03
   jr nz, +
   ld a, $02
@@ -22042,19 +22083,19 @@ LABEL_A877_:
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   TailCall LABEL_BCCF_EmitTilemapRectangleSequence
 
-LABEL_A8ED_:
+_LABEL_A8ED_TournamentResults_FirstPlace:
   ld c, $00
   jp +
 
-LABEL_A8F2_:
+_LABEL_A8F2_TournamentResults_SecondPlace:
   ld c, $01
   jp +
 
-LABEL_A8F7_:
+_LABEL_A8F7_TournamentResults_ThirdPlace:
   ld c, $02
   jp +
 
-LABEL_A8FC_:
+LABEL_A8FC_TournamentResults_FourthPlace:
   ld c, $03
   jp +
 
@@ -22943,7 +22984,7 @@ LABEL_AFAE_RamCodeLoader:
   ld (PAGING_REGISTER), a
   ret
 
-LABEL_AFCD_:
+LABEL_AFCD_InitialiseOnePlayerMenu:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerMode
   ld (_RAM_D699_MenuScreenIndex), a
@@ -22969,8 +23010,8 @@ LABEL_AFCD_:
   call LABEL_9317_InitialiseHandSprites
   xor a
   ld (_RAM_D6A0_MenuSelection), a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   call LABEL_A673_SelectLowSpriteTiles
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
@@ -23017,7 +23058,7 @@ LABEL_B01D_SquinkyTennisHook:
 ; 20th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B06C_MenuScreen_OnePlayerMode:
   call LABEL_B9C4_
-  call LABEL_8CA2_
+  call LABEL_8CA2_ProcessMenuControls_Player1Priority
   ld a, (_RAM_D6A0_MenuSelection)
   or a
   jp z, LABEL_80FC_EndMenuScreenHandler
@@ -23036,7 +23077,7 @@ LABEL_B06C_MenuScreen_OnePlayerMode:
 +:
   ld a, $01
   ld (_RAM_DC3F_GameMode), a
-  call LABEL_8953_
+  call LABEL_8953_InitialiseTwoPlayersMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
 ; 15th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
@@ -23067,10 +23108,10 @@ LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  ld a, (_RAM_D6AC_)
+  ld a, (_RAM_D6AB_MenuTimer.Hi)
   add a, $01
-  ld (_RAM_D6AC_), a
-  cp $30
+  ld (_RAM_D6AB_MenuTimer.Hi), a
+  cp $30 ; 0.96s @ 50Hz, 0.8s @ 60Hz
   jr z, +
   dec a
   call z, LABEL_A645_
@@ -23088,7 +23129,7 @@ LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   ld a, (_RAM_DBD8_CourseSelectIndex)
   or a
   jr nz, +
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, MenuScreen_OnePlayerTrackIntro
   ld (_RAM_D699_MenuScreenIndex), a
   ld a, $01
@@ -23254,7 +23295,7 @@ DATA_B219_:
 DATA_B222_:
 .db $02 $15 $0E $05 $07 $00 $04 $0D
 
-LABEL_B22A_:
+LABEL_B22A_DisplayCase_BlankRuffTrux:
   call LABEL_B230_DisplayCase_BlankRuffTrux
   jp LABEL_8E54_
 
@@ -23440,7 +23481,7 @@ LABEL_B368_:
   ld a, $01
   ld (_RAM_D6C1_), a
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6C5_PaletteFadeIndex), a
   ret
 
@@ -23476,7 +23517,7 @@ LABEL_B3A4_EmitToVDPAtDE_Text:
 
 LABEL_B3AE_:
   ld a, $06
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_D6AD_)
   sub $01
   cp $FF
@@ -23521,9 +23562,9 @@ LABEL_B3C4_:
   xor a
 +:
   ld c, a
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   sub $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   or a
   jr nz, LABEL_B3C4_
   ret
@@ -23550,7 +23591,7 @@ LABEL_B412_:
   ld d, $00
   ret
 
-LABEL_B433_:
+LABEL_B433_ResetMenuTimerOnControlPress:
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
   cp BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
@@ -23563,8 +23604,8 @@ LABEL_B433_:
 
 +:
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ret
 
 LABEL_B44E_BlankMenuRAM:
@@ -23772,20 +23813,21 @@ LABEL_B56D_MenuScreen_TrackSelect:
   ld a, (_RAM_DC34_IsTournament)
   cp $01
   jr nz, ++
-  call LABEL_B9A3_
+  call LABEL_B9A3_CombinePlayerMenuControlButtons
   ld a, (_RAM_D6CB_MenuScreenState)
   xor $01
   ld (_RAM_D6CB_MenuScreenState), a
   cp $01
   jr z, +
-  ld a, (_RAM_D6AB_)
+  ; Increment counter
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
 +:
-  ld a, (_RAM_D6AB_)
-  cp $B8
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $B8 ; 3.68s @ 50Hz, 3.06666666666667s @ 60Hz
   jr z, ++++
-  cp $40
+  cp $40 ; 1.28s @ 50Hz, 1.06666666666667s @ 60Hz
   jr nc, +++
   jp LABEL_B618_
 
@@ -23795,7 +23837,7 @@ LABEL_B56D_MenuScreen_TrackSelect:
   jp z, LABEL_B6AB_
   cp $00
   jp nz, LABEL_A129_
-  call LABEL_B98E_
+  call LABEL_B98E_GetMenuControls
   ld a, (_RAM_D697_)
   cp $01
   jr z, LABEL_B623_
@@ -23818,13 +23860,13 @@ LABEL_B56D_MenuScreen_TrackSelect:
   jp LABEL_B618_
 
 LABEL_B5E7_:
-  ld a, (_RAM_D6AB_)
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
   add a, $01
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   cp $04
   jr nz, LABEL_B618_
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld a, (_RAM_D6C5_PaletteFadeIndex)
   cp $FF
   jr z, +
@@ -23929,9 +23971,9 @@ LABEL_B6AB_:
 LABEL_B6B1_MenuScreen_TwoPlayerResult:
   call LABEL_B9C4_
   call LABEL_A039_
-  ld hl, (_RAM_D6AB_)
+  ld hl, (_RAM_D6AB_MenuTimer)
   inc hl
-  ld (_RAM_D6AB_), hl
+  ld (_RAM_D6AB_MenuTimer), hl
   ld a, h
   cp $01
   jr z, +
@@ -23965,7 +24007,7 @@ LABEL_B6B1_MenuScreen_TwoPlayerResult:
   jr z, +
   add a, $01
   ld (_RAM_DC35_TournamentRaceNumber), a
-  call LABEL_8A30_
+  call LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
@@ -23997,8 +24039,8 @@ LABEL_B70B_:
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
-  ld (_RAM_D6AB_), a
-  ld (_RAM_D6AC_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld (_RAM_D693_), a
   ld (_RAM_D6CE_), a
@@ -24138,12 +24180,13 @@ LABEL_B7FF_:
 ; 19th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B84D_MenuScreen_TournamentChampion:
   call LABEL_B911_
-  ld a, (_RAM_D6AB_)
-  cp $FF
+  ld a, (_RAM_D6AB_MenuTimer.Lo)
+  cp $FF ; 5.1s @ 50Hz, 4.25s @ 60Hz
   jr z, +
   add a, $01
-  ld (_RAM_D6AB_), a
-  cp $80
+  ld (_RAM_D6AB_MenuTimer.Lo), a
+  cp $80 ; 2.56s @ 50Hz, 2.13333333333333s @ 60Hz
+
   jr c, ++
 +:
   ld a, (_RAM_D680_Player1Controls_Menus)
@@ -24193,7 +24236,7 @@ LABEL_B877_:
   TilemapWriteAddressToHL 19, 16
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   xor a
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_B8C9_EmitTilemapRectangle_5x6_24:
@@ -24280,19 +24323,21 @@ TEXT_B97A_Challenge:
 TEXT_B984_Champion:
 .asc "CHAMPION !"
 
-LABEL_B98E_:
+LABEL_B98E_GetMenuControls:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
-  jr z, LABEL_B9A3_
+  jr z, LABEL_B9A3_CombinePlayerMenuControlButtons
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr nz, LABEL_B9A3_
+  jr nz, LABEL_B9A3_CombinePlayerMenuControlButtons
+
+  ; If GG and not Gear-to-Gear, only use player 1
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
   ld (_RAM_D6C9_ControllingPlayersLR1Buttons), a
   ret
 
-LABEL_B9A3_:
+LABEL_B9A3_CombinePlayerMenuControlButtons:
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_L_MASK | BUTTON_R_MASK | BUTTON_1_MASK ; $1C
   ld c, a
@@ -24893,7 +24938,7 @@ LABEL_BD94_Emit4bppTileDataToVRAMAddressHL:
   ret
 
 LABEL_BDA6_:
-  ld (_RAM_D6AB_), a
+  ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6A3_), a
   ld a, NO_BUTTONS_PRESSED ; $3F
   ld (_RAM_D680_Player1Controls_Menus), a
