@@ -30629,8 +30629,7 @@ LABEL_357F8_CarTilesToVRAM:
     ld b, $03
     ld c, PORT_VDP_DATA
     otir          ; 3 bytes data
-    ld a, $00
-    out (PORT_VDP_DATA), a  ; 1 byte padding
+    EmitDataToVDPImmediate8 0 ; 1 byte padding
   pop bc
   dec bc
   ld a, b
@@ -30857,8 +30856,7 @@ LABEL_35977_Emit3bppTileData:
   ld a, (bc)
   out (PORT_VDP_DATA), a
   inc bc
-  ld a, $00
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 0 ; padding
   dec de
   ld a, d
   or e
@@ -30886,8 +30884,7 @@ LABEL_3598D_emitThreeTilesVFlipped:
   ld a, (bc)
   out (PORT_VDP_DATA), a
   inc bc
-  ld a, $00   ; Last bitplane is 0
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 0 ; Last bitplane is 0
   push de
     ld de, $0004 ; Subtract 4 from VRAM address -> one row up
     or a
@@ -30932,8 +30929,7 @@ LABEL_359C0_emitThreeTilesHFlipped:
     call _hflipByte_usingHL
     out (PORT_VDP_DATA), a
     inc bc
-    ld a, $00 ; last bitplane is 0
-    out (PORT_VDP_DATA), a
+    EmitDataToVDPImmediate8 0 ; last bitplane is 0
   pop hl
   dec d
   ld a, d
@@ -35605,8 +35601,7 @@ LABEL_3BBF8_EmitTilemapUnknown:
   CallRamCode LABEL_3BCC0_VRAMAddressToDE
 -:ld a, (hl)
   out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 1 ; High tileset
   inc hl
   inc de
   inc de
@@ -35697,8 +35692,7 @@ LABEL_3BC7D_DisplayCase_RestoreRectangle:
   ld c, $05   ; Width
 -:ld a, (hl) ; Emit a byte from (hl), high tileset
   out (PORT_VDP_DATA), a
-  ld a, $01
-  out (PORT_VDP_DATA), a
+  EmitDataToVDPImmediate8 1 ; high tileset
   inc hl
   dec c
   jr nz, - ; Loop over row
