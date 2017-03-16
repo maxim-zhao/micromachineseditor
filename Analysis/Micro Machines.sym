@@ -817,7 +817,7 @@
 02:9e52 LABEL_9E52_
 02:9e70 LABEL_9E70_
 02:9f3f _LABEL_9F3F_ret
-02:9f40 LABEL_9F40_
+02:9f40 LABEL_9F40_LoadPortraitTiles
 02:9f74 LABEL_9F74_BlankVRAMRegion
 02:9f81 LABEL_9F81_DrawPortrait_ThreeColumns
 02:9fab LABEL_9FAB_DrawOrBlank15PortraitTiles
@@ -898,7 +898,7 @@
 02:a842 DATA_A842_TilemapLocations_SMS
 02:a84a TEXT_A84A_QualifyFailed
 02:a859 LABEL_A859_SetTilemapLocationForLastRacePosition
-02:a877 LABEL_A877_
+02:a877 LABEL_A877_LoadPositionGraphicsAndDrawPositionPortraitTilemaps
 02:a8ed _LABEL_A8ED_TournamentResults_FirstPlace
 02:a8f2 _LABEL_A8F2_TournamentResults_SecondPlace
 02:a8f7 _LABEL_A8F7_TournamentResults_ThirdPlace
@@ -979,7 +979,7 @@
 02:b305 LABEL_B305_DrawHorizontalLine_Top
 02:b30e LABEL_B30E_
 02:b31c LABEL_B31C_
-02:b323 LABEL_B323_Populate_RAM_DBFE_8TimesTable
+02:b323 LABEL_B323_Populate_RAM_DBFE_PlayerPortraitValues
 02:b337 LABEL_B337_BlankTiles
 02:b35a LABEL_B35A_VRAMAddressToHL
 02:b361 LABEL_B361_VRAMAddressToDE
@@ -2813,10 +2813,10 @@
 0000dbd1 _RAM_DBD1_
 0000dbd2 _RAM_DBD2_
 0000dbd3 _RAM_DBD3_
-0000dbd4 _RAM_DBD4_
-0000dbd5 _RAM_DBD5_
-0000dbd6 _RAM_DBD6_
-0000dbd7 _RAM_DBD7_
+0000dbd4 _RAM_DBD4_Player1Character
+0000dbd5 _RAM_DBD5_Player2Character
+0000dbd6 _RAM_DBD6_Player3Character
+0000dbd7 _RAM_DBD7_Player4Character
 0000dbd8 _RAM_DBD8_NextTrackIndex
 0000dbd9 _RAM_DBD9_DisplayCaseData
 0000dbf1 _RAM_DBF1_RaceNumberText
@@ -2824,7 +2824,7 @@
 0000dbfb _RAM_DBFB_
 0000dbfc _RAM_DBFC_
 0000dbfd _RAM_DBFD_
-0000dbfe _RAM_DBFE_8TimesTable
+0000dbfe _RAM_DBFE_PlayerPortraitValues
 0000dc09 _RAM_DC09_Lives
 0000dc0a _RAM_DC0A_WinsInARow
 0000dc0b _RAM_DC0B_

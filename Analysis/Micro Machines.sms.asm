@@ -230,7 +230,6 @@ SpriteIndex_FallingCar2         db    ; $b7 1x1 tiles
 .ende
 
 ; The RuffTrux truck is 4x4 sprites, with 16 positions all held in VRAM. This would use all 256 sprite tiles, but at 45 degree angles the corner tiles are blank; so 13 of them are used for additional sprites (HUD, shadow, smoke, splash).
-; TODO: is the splash unused?
 ; The sprites are laid out in VRAM in this shape (space means blank tile):
 ; 00001111 22 333344445555 66 7777
 ; 00001111222233334444555566667777
@@ -257,6 +256,33 @@ SpriteIndex_FallingCar2         db    ; $b7 1x1 tiles
 .define SpriteIndex_RuffTrux_Water2  248 ; F8
 .define SpriteIndex_RuffTrux_Blank2  251 ; FB
 
+.struct PlayerPortraits
+Happy1  db
+Sad1    db
+Happy2  db
+Unused1 db
+Happy3  db
+Sad2    db
+Sad3    db ; Some of these may have specific scenarios...
+Unused2 db
+.endst
+
+.enum 0
+PlayerPortrait_Chen       instanceof PlayerPortraits ; $00
+PlayerPortrait_Spider     instanceof PlayerPortraits ; $08
+PlayerPortrait_Walter     instanceof PlayerPortraits ; $10
+PlayerPortrait_Dwayne     instanceof PlayerPortraits ; $18
+PlayerPortrait_Joel       instanceof PlayerPortraits ; $20
+PlayerPortrait_Bonnie     instanceof PlayerPortraits ; $28
+PlayerPortrait_Mike       instanceof PlayerPortraits ; $30
+PlayerPortrait_Emilio     instanceof PlayerPortraits ; $38
+PlayerPortrait_Jethro     instanceof PlayerPortraits ; $40
+PlayerPortrait_Anne       instanceof PlayerPortraits ; $48
+PlayerPortrait_Cherry     instanceof PlayerPortraits ; $50
+PlayerPortrait_OutOfGame  db ; $58
+PlayerPortrait_MrQuestion db ; $59
+PlayerPortrait_OutOfGame2 db ; $5a
+.ende
 
 ; ASCII mapping for menu screen text
 .define BLANK_TILE_INDEX = $0e
@@ -940,10 +966,10 @@ _RAM_DBD0_HeadToHeadLost2 db
 _RAM_DBD1_ db
 _RAM_DBD2_ db
 _RAM_DBD3_ db
-_RAM_DBD4_ db
-_RAM_DBD5_ db
-_RAM_DBD6_ db
-_RAM_DBD7_ db
+_RAM_DBD4_Player1Character db
+_RAM_DBD5_Player2Character db
+_RAM_DBD6_Player3Character db
+_RAM_DBD7_Player4Character db
 _RAM_DBD8_NextTrackIndex db
 _RAM_DBD9_DisplayCaseData dsb 24 ; 0 = blank, 1 = filled, 2 = flashing
 _RAM_DBF1_RaceNumberText dsb 8 ; "RACE xx-", xx is replaced at runtime
@@ -952,7 +978,7 @@ _RAM_DBF9_ dw
 _RAM_DBFB_ db
 _RAM_DBFC_ db
 _RAM_DBFD_ db
-_RAM_DBFE_8TimesTable dsb 11
+_RAM_DBFE_PlayerPortraitValues dsb 11
 _RAM_DC09_Lives db
 _RAM_DC0A_WinsInARow db ; 3 wins in a row -> RuffTrux
 _RAM_DC0B_ db
@@ -1824,10 +1850,10 @@ LABEL_75_EnterGameTrampolineImpl:
 .db $03 ; _RAM_DBD1_
 .db $02 ; _RAM_DBD2_
 .db $50 ; _RAM_DBD3_
-.db $50 ; _RAM_DBD4_
-.db $00 ; _RAM_DBD5_
-.db $00 ; _RAM_DBD6_
-.db $00 ; _RAM_DBD7_
+.db PlayerPortrait_Cherry ; _RAM_DBD4_Player1Character ; all 4 changed shortly
+.db PlayerPortrait_Chen ; _RAM_DBD5_Player2Character
+.db PlayerPortrait_Chen; _RAM_DBD6_Player3Character
+.db PlayerPortrait_Chen ; _RAM_DBD7_Player4Character
 .db $00 ; _RAM_DBD8_NextTrackIndex
 .dsb 24 0 ; _RAM_DBD9_DisplayCaseData
 .asc "RACE 01-" ; _RAM_DBF1_RaceNumberText
@@ -17212,14 +17238,14 @@ LABEL_8114_MenuIndex0_Initialise: ; init functions, need renaming
   call LABEL_BAD5_LoadMenuLogoTiles
   call LABEL_BDED_LoadMenuLogoTilemap
   call LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow
-  call LABEL_B323_Populate_RAM_DBFE_8TimesTable
+  call LABEL_B323_Populate_RAM_DBFE_PlayerPortraitValues
   call LABEL_8CDB_ResetCheats
 
-  ld a, $59
-  ld (_RAM_DBD4_), a
-  ld (_RAM_DBD5_), a
-  ld (_RAM_DBD6_), a
-  ld (_RAM_DBD7_), a
+  ld a, PlayerPortrait_MrQuestion
+  ld (_RAM_DBD4_Player1Character), a
+  ld (_RAM_DBD5_Player2Character), a
+  ld (_RAM_DBD6_Player3Character), a
+  ld (_RAM_DBD7_Player4Character), a
 
   ld a, $02
   ld (_RAM_DC3A_), a
@@ -17323,8 +17349,8 @@ LABEL_8205_:
   ld (_RAM_D6B9_), a
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD4_Player1Character)
+  call LABEL_9F40_LoadPortraitTiles
 
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
 .ifdef GAME_GEAR_CHECKS
@@ -17420,10 +17446,10 @@ LABEL_82DF_MenuIndex1_Initialise:
   ld (_RAM_D6B1_), a
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   ld (_RAM_DBD3_), a
   add a, $01
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   ld hl, $7A1A
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   TilemapWriteAddressToHL 7, 20
@@ -17465,8 +17491,8 @@ LABEL_8360_:
   ld (_RAM_DBD8_NextTrackIndex), a
 +:TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD4_Player1Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld hl, $7A9A
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   TilemapWriteAddressToHL 11, 10
@@ -17635,6 +17661,8 @@ LABEL_8507_MenuIndex2_Initialise:
 .endif
 .endif
   call LABEL_B305_DrawHorizontalLine_Top
+
+  ; Load player tiles
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
@@ -17644,13 +17672,11 @@ LABEL_8507_MenuIndex2_Initialise:
   jr nc, +
   ld c, $00
   jp ++
-
-+:
-  ld c, $01
-++:
-  ld a, (_RAM_DBD4_)
++:ld c, $01
+++:ld a, (_RAM_DBD4_Player1Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
+
   TileWriteAddressToHL $42
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
@@ -17660,13 +17686,11 @@ LABEL_8507_MenuIndex2_Initialise:
   jr nc, +
   ld c, $00
   jp ++
-
-+:
-  ld c, $01
-++:
-  ld a, (_RAM_DBD5_)
++:ld c, $01
+++:ld a, (_RAM_DBD5_Player2Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
+  
   TileWriteAddressToHL $60
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
@@ -17676,13 +17700,11 @@ LABEL_8507_MenuIndex2_Initialise:
   jr nc, +
   ld c, $00
   jp ++
-
-+:
-  ld c, $01
-++:
-  ld a, (_RAM_DBD6_)
++:ld c, $01
+++:ld a, (_RAM_DBD6_Player3Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
+
   TileWriteAddressToHL $7e
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_)
@@ -17692,25 +17714,32 @@ LABEL_8507_MenuIndex2_Initialise:
   jr nc, +
   ld c, $00
   jp ++
-
-+:
-  ld c, $01
-++:
-  ld a, (_RAM_DBD7_)
++:ld c, $01
+++:ld a, (_RAM_DBD7_Player4Character)
   add a, c
-  call LABEL_9F40_
-  call LABEL_A877_
+  call LABEL_9F40_LoadPortraitTiles
+  ; Show the portraits, prepare the remaining graphics
+  ; (could be inlined)
+  call LABEL_A877_LoadPositionGraphicsAndDrawPositionPortraitTilemaps
+
+  ; Draw "results" text
   TilemapWriteAddressToHL 12, 7
   call LABEL_B35A_VRAMAddressToHL
   ld bc, $0008
   ld hl, TEXT_85EC_Results
   call LABEL_A5B0_EmitToVDP_Text
+  
+  ; Reset stuff
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6C1_), a
+  
+  ; Play music
   ld c, Music_06_Results
   call LABEL_B1EC_Trampoline_PlayMenuMusic
+  
+  ; Check if we won that one
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr nz, +
@@ -17728,6 +17757,7 @@ LABEL_8507_MenuIndex2_Initialise:
   xor a
   ld (_RAM_DC0A_WinsInARow), a
 ++:
+  ; Done
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 TEXT_85EC_Results: .asc "RESULTS-"
@@ -17752,7 +17782,7 @@ LABEL_85F4_:
   ld a, (_RAM_D6C4_)
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBD5_
+  ld hl, _RAM_DBD5_Player2Character
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_), a
@@ -17760,7 +17790,7 @@ LABEL_85F4_:
   ld (hl), a
   ld a, (_RAM_DBD3_)
   add a, $01
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   ld hl, $7A1A
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   ld a, (_RAM_DBD3_)
@@ -17769,7 +17799,7 @@ LABEL_85F4_:
   srl a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, $5A
   ld (hl), a
@@ -17804,9 +17834,9 @@ LABEL_866C_Menu3_Initialise:
 +:
   ld c, $01
 ++:
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   ld hl, $7A9A
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   ld a, (_RAM_DC38_)
@@ -18121,10 +18151,10 @@ LABEL_8953_InitialiseTwoPlayersMenu:
 
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
-  call LABEL_9F40_
-  ld a, (_RAM_DBD5_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD4_Player1Character)
+  call LABEL_9F40_LoadPortraitTiles
+  ld a, (_RAM_DBD5_Player2Character)
+  call LABEL_9F40_LoadPortraitTiles
 
   TilemapWriteAddressToHL 10, 9
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
@@ -18228,23 +18258,23 @@ LABEL_8A38_Menu4_Initialise:
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBCF_LastRacePosition)
   ld c, a
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   ld a, (_RAM_DBD0_HeadToHeadLost2)
   ld c, a
-  ld a, (_RAM_DBD5_)
+  ld a, (_RAM_DBD5_Player2Character)
   add a, c
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   jp ++
 
 +:
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
-  call LABEL_9F40_
-  ld a, (_RAM_DBD5_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD4_Player1Character)
+  call LABEL_9F40_LoadPortraitTiles
+  ld a, (_RAM_DBD5_Player2Character)
+  call LABEL_9F40_LoadPortraitTiles
 ++:
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -20053,7 +20083,7 @@ LABEL_977F_:
   ld (_RAM_D6AD_), a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
@@ -20080,7 +20110,7 @@ LABEL_97AF_:
   ld (_RAM_D6AE_), a
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6AA_), a
@@ -20436,27 +20466,35 @@ LABEL_9B87_:
   cp $0B
   jr c, +
   sub $0B
-+:
++:; Look up x8
   ld c, a
   ld b, $00
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, (hl)
-  cp $58
+  
+  ; some of these are impossible?
+  cp PlayerPortrait_OutOfGame
   JrZRet _LABEL_9C5D_ret
-  cp $5A
+  cp PlayerPortrait_OutOfGame2
   JrZRet _LABEL_9C5D_ret
-  ld a, $58
+  
+  ; Save value in there
+  ld a, PlayerPortrait_OutOfGame
   ld (hl), a
+  
   ld (_RAM_D6AA_), a
   ld hl, DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_), a
   ld (_RAM_D6BB_), a
-  ld hl, _RAM_DBD4_
+
+  ; Set current character
+  ld hl, _RAM_DBD4_Player1Character
   add hl, de
   ld (hl), a
+
   ld a, $01
   ld (_RAM_D6B4_), a
   ld (_RAM_D6B0_), a
@@ -20533,29 +20571,30 @@ DATA_9C7F_RacerPortraitsLocations:
 
 ; Data from 9D37 to 9D4D (23 bytes)
 ; Page numbers for the racer portraits (previous table)
+; Two entries per character -> one entry per 4 entries above
 DATA_9D37_RacerPortraitsPages:
 .db :DATA_Tiles_Chen_Happy
-.db :DATA_Tiles_Chen_Happy
+.db :DATA_Tiles_Chen_Sad
 .db :DATA_Tiles_Spider_Happy
-.db :DATA_Tiles_Spider_Happy
+.db :DATA_Tiles_Spider_Sad
 .db :DATA_Tiles_Walter_Happy
-.db :DATA_Tiles_Walter_Happy
+.db :DATA_Tiles_Walter_Sad
 .db :DATA_Tiles_Dwayne_Happy
-.db :DATA_Tiles_Dwayne_Happy
+.db :DATA_Tiles_Dwayne_Sad
 .db :DATA_Tiles_Joel_Happy
-.db :DATA_Tiles_Joel_Happy
+.db :DATA_Tiles_Joel_Sad
 .db :DATA_Tiles_Bonnie_Happy
-.db :DATA_Tiles_Bonnie_Happy
+.db :DATA_Tiles_Bonnie_Sad
 .db :DATA_Tiles_Mike_Happy
-.db :DATA_Tiles_Mike_Happy
+.db :DATA_Tiles_Mike_Sad
 .db :DATA_Tiles_Emilio_Happy
-.db :DATA_Tiles_Emilio_Happy
+.db :DATA_Tiles_Emilio_Sad
 .db :DATA_Tiles_Jethro_Happy
-.db :DATA_Tiles_Jethro_Happy
+.db :DATA_Tiles_Jethro_Sad
 .db :DATA_Tiles_Anne_Happy
-.db :DATA_Tiles_Anne_Happy
+.db :DATA_Tiles_Anne_Sad
 .db :DATA_Tiles_Cherry_Happy
-.db :DATA_Tiles_Cherry_Happy
+.db :DATA_Tiles_Cherry_Sad
 .db :DATA_Tiles_OutOfGame
 
 LABEL_9D4E_:
@@ -20763,7 +20802,7 @@ LABEL_9E70_:
   sub $01
   ld e, a
   ld d, $00
-  ld hl, _RAM_DBD4_
+  ld hl, _RAM_DBD4_Player1Character
   add hl, de
   ld e, (hl)
   ld a, (_RAM_DC3C_IsGameGear)
@@ -20784,7 +20823,7 @@ LABEL_9E70_:
   ld (_RAM_D6BB_), a
   cp e
   JrNzRet _LABEL_9F3F_ret
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   add a, $01
   ld (hl), a
@@ -20815,7 +20854,7 @@ LABEL_9E70_:
 _LABEL_9F3F_ret:
   ret
 
-LABEL_9F40_:
+LABEL_9F40_LoadPortraitTiles:
 ; a = portrait index
   ld (_RAM_D6A1_PortraitIndex), a ; Save
 
@@ -20844,7 +20883,7 @@ LABEL_9F40_:
 
   ld de, 30 * 2 ; for blanking
   ld a, (_RAM_D6A1_PortraitIndex)
-  cp $58
+  cp PlayerPortrait_OutOfGame
   jr z, LABEL_9F74_BlankVRAMRegion
   JumpToRamCode LABEL_3BC27_EmitThirty3bppTiles
 
@@ -20890,14 +20929,14 @@ LABEL_9F81_DrawPortrait_ThreeColumns:
 LABEL_9FAB_DrawOrBlank15PortraitTiles:
   ld de, 15 * 2 ; to blank 15 tiles
   ld a, (_RAM_D6A1_PortraitIndex)
-  cp $58
+  cp PlayerPortrait_OutOfGame
   jr z, LABEL_9F74_BlankVRAMRegion
   JumpToRamCode LABEL_3BC3C_EmitFifteen3bppTiles
 
 LABEL_9FB8_DrawOrBlank10PortraitTiles:
   ld de, 10 * 2 ; to blank 10 tiles
   ld a, (_RAM_D6A1_PortraitIndex)
-  cp $58
+  cp PlayerPortrait_OutOfGame
   jr z, LABEL_9F74_BlankVRAMRegion
   JumpToRamCode LABEL_3BC53_EmitTen3bppTiles
 
@@ -21101,7 +21140,8 @@ LABEL_A14F_:
   ld e, a
   ld d, $00
 
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
+  ; Divide by 8 to make a character index
   srl a
   srl a
   srl a
@@ -21129,7 +21169,7 @@ LABEL_A14F_:
   jp ++
 +:call LABEL_A1D3_PrintOrdinary
 ++:
-  ld a, (_RAM_DBD5_)
+  ld a, (_RAM_DBD5_Player2Character)
   srl a
   srl a
   srl a
@@ -21353,7 +21393,8 @@ TEXT_A335_TournamentRace: .asc "TOURNAMENT RACE "
 TEXT_A345_SelectATrack:   .asc "  SELECT A TRACK"
 
 LABEL_A355_:
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
+  ; Divide by 8 to make a character index
   srl a
   srl a
   srl a
@@ -21914,7 +21955,8 @@ LABEL_A859_SetTilemapLocationForLastRacePosition:
   ld d, (hl)
   TailCall LABEL_B361_VRAMAddressToDE
 
-LABEL_A877_:
+LABEL_A877_LoadPositionGraphicsAndDrawPositionPortraitTilemaps:
+  ; Load big numbers
   ld a, :DATA_13C42_Tiles_BigNumbers
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_13C42_Tiles_BigNumbers
@@ -21923,10 +21965,13 @@ LABEL_A877_:
   TileWriteAddressToHL $100
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   call LABEL_BA42_LoadColouredCirclesTiles
+
+  ; Draw portrait tiles
+  ; #1
   ld a, (_RAM_DC3C_IsGameGear)
-  xor $01
-  rrca
-  ld c, a
+  xor $01 ; 1 for SMS
+  rrca ; $80 for SMS = 2 rows
+  ld c, a ; -> bc
   ld b, $00
   xor a
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
@@ -21939,6 +21984,8 @@ LABEL_A877_:
   ld a, $01
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
+
+  ; #2
   ld a, $06
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   TilemapWriteAddressToHL 24, 8
@@ -21946,6 +21993,8 @@ LABEL_A877_:
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
+
+  ; #3
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01
   ld b, a
@@ -21957,10 +22006,12 @@ LABEL_A877_:
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
+  
+  ; #4
   ld a, $12
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   TilemapWriteAddressToHL 24, 16
-  add hl, bc ; Add 22 ros for SMS -> 24, 18
+  add hl, bc ; Add 2 rows for SMS -> 24, 18
   ld a, $03
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   TailCall LABEL_BCCF_EmitTilemapRectangleSequence
@@ -22403,9 +22454,9 @@ LABEL_AC1E_:
   jr z, +++
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   ld (_RAM_D6BB_), a
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   call _LABEL_B375_ConfigureTilemapRect_5x6_24
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -22424,14 +22475,14 @@ LABEL_AC1E_:
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
-  ld a, (_RAM_DBD4_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD4_Player1Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld de, $0004
   jp ++
 
 +:
-  ld a, (_RAM_DBD5_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD5_Player2Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld de, $0000
 ++:
   ld a, $42
@@ -22454,14 +22505,14 @@ LABEL_AC1E_:
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +
-  ld a, (_RAM_DBD5_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD5_Player2Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld de, $0004
   jp ++
 
 +:
-  ld a, (_RAM_DBD6_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD6_Player3Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld de, $0000
 ++:
   ld a, $60
@@ -22483,8 +22534,8 @@ LABEL_AC1E_:
   JrZRet +++
   TileWriteAddressToHL $7e
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DBD7_)
-  call LABEL_9F40_
+  ld a, (_RAM_DBD7_Player4Character)
+  call LABEL_9F40_LoadPortraitTiles
   ld a, $7E
   call _LABEL_B377_ConfigureTilemapRect_5x6_rega
   ld a, (_RAM_DC3C_IsGameGear)
@@ -22731,9 +22782,10 @@ LABEL_AECD_:
   ld a, (hl)
   ld h, a
   ld l, c
-  ld bc, $0258
+  
+  ld bc, 3 * 8 * 25 ; $0258 ; Skip 25 tiles @ 3bpp
   add hl, bc
-  ld e, $28 ; 5 tiles
+  ld e, 8 * 5 ; $28 ; Emit 5 tiles * 8 rows
   CallRamCode LABEL_03BCAF_Emit3bppTiles
   ld a, $00
   ld (_RAM_D6A4_), a
@@ -23313,10 +23365,11 @@ LABEL_B31C_:
   ld (_RAM_D6C0_), a
   jp -
 
-LABEL_B323_Populate_RAM_DBFE_8TimesTable:
-  ; Copies data from DATA_97DF_8TimesTable to _RAM_DBFE_8TimesTable
+LABEL_B323_Populate_RAM_DBFE_PlayerPortraitValues:
+  ; Copies data from DATA_97DF_8TimesTable to _RAM_DBFE_PlayerPortraitValues
+  ; This selects the first portrait of each player
   ld hl, DATA_97DF_8TimesTable
-  ld de, _RAM_DBFE_8TimesTable
+  ld de, _RAM_DBFE_PlayerPortraitValues
   ld bc, $0000
 -:ld a, (hl)
   ld (de), a
@@ -23426,11 +23479,11 @@ LABEL_B3C4_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
-  ld hl, _RAM_DBFE_8TimesTable
+  ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BC_DisplayCase_IndexBackup), bc
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   call LABEL_AECD_
   ld bc, (_RAM_D6BC_DisplayCase_IndexBackup)
   ld de, (_RAM_D6BE_)
@@ -24013,12 +24066,12 @@ LABEL_B7F9_:
 
 LABEL_B7FF_:
   ld de, $0000
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   ld c, a
   ld a, (_RAM_DBCF_LastRacePosition)
   call +
   ld de, $0001
-  ld a, (_RAM_DBD5_)
+  ld a, (_RAM_DBD5_Player2Character)
   ld c, a
   ld a, (_RAM_DBD0_HeadToHeadLost2)
   jp +
@@ -24112,13 +24165,13 @@ LABEL_B877_:
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr z, ++
-  ld a, (_RAM_DBD5_)
+  ld a, (_RAM_DBD5_Player2Character)
   jp +++
 
 ++:
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
 +++:
-  call LABEL_9F40_
+  call LABEL_9F40_LoadPortraitTiles
   TilemapWriteAddressToHL 19, 16
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
   xor a
@@ -25868,7 +25921,7 @@ LABEL_1BAB3_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrZRet ++
-  ld a, (_RAM_DBD4_)
+  ld a, (_RAM_DBD4_Player1Character)
   srl a
   srl a
   srl a
@@ -25884,7 +25937,7 @@ LABEL_1BAB3_:
   ld a, (hl)
   ld (_RAM_D5CF_), a
 +:
-  ld a, (_RAM_DBD5_)
+  ld a, (_RAM_DBD5_Player2Character)
   srl a
   srl a
   srl a
