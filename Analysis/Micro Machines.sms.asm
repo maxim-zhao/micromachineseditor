@@ -257,8 +257,8 @@ SpriteIndex_FallingCar2         db    ; $b7 1x1 tiles
 .define SpriteIndex_RuffTrux_Blank2  251 ; FB
 
 .struct PlayerPortraits
-Happy1  db
-Sad1    db
+Happy1  db ; default; high enough position
+Sad1    db ; position too low
 Happy2  db
 Unused1 db
 Happy3  db
@@ -962,9 +962,9 @@ _RAM_DBC0_EnterGameTrampoline dsb 13
 _RAM_DBCD_MenuIndex db ; Not the same as the menu screen index!
 _RAM_DBCE_ db
 _RAM_DBCF_LastRacePosition db
-_RAM_DBD0_HeadToHeadLost2 db
-_RAM_DBD1_ db
-_RAM_DBD2_ db
+_RAM_DBD0_LastRacePosition_Player2 db
+_RAM_DBD1_LastRacePosition_Player3 db
+_RAM_DBD2_LastRacePosition_Player4 db
 _RAM_DBD3_ db
 _RAM_DBD4_Player1Character db
 _RAM_DBD5_Player2Character db
@@ -1005,7 +1005,7 @@ _RAM_DC36_ db
 _RAM_DC37_ db
 _RAM_DC38_ db
 _RAM_DC39_NextRuffTruxTrack db
-_RAM_DC3A_ db
+_RAM_DC3A_RequiredPositionForNextRace db
 _RAM_DC3B_IsTrackSelect db
 _RAM_DC3C_IsGameGear db ; Most code is common with the GG game
 _RAM_DC3D_IsHeadToHead db
@@ -1846,9 +1846,9 @@ LABEL_75_EnterGameTrampolineImpl:
 .db MenuScreen_Initialise ; _RAM_DBCD_MenuIndex
 .db $01 ; _RAM_DBCE_
 .db $01 ; _RAM_DBCF_LastRacePosition
-.db $00 ; _RAM_DBD0_HeadToHeadLost2
-.db $03 ; _RAM_DBD1_
-.db $02 ; _RAM_DBD2_
+.db $00 ; _RAM_DBD0_LastRacePosition_Player2
+.db $03 ; _RAM_DBD1_LastRacePosition_Player3
+.db $02 ; _RAM_DBD2_LastRacePosition_Player4
 .db $50 ; _RAM_DBD3_
 .db PlayerPortrait_Cherry ; _RAM_DBD4_Player1Character ; all 4 changed shortly
 .db PlayerPortrait_Chen ; _RAM_DBD5_Player2Character
@@ -2212,7 +2212,7 @@ LABEL_383_:
   call LABEL_1E4_
   ld a, (_RAM_D5D6_)
   or a
-  jp nz, LABEL_7476_
+  jp nz, LABEL_7476_PrepareResultsScreen
   ld a, $01
   ld (_RAM_D580_WaitingForGameVBlank), a
   ld (_RAM_D5B5_EnableGameVBlank), a
@@ -2228,7 +2228,7 @@ LABEL_383_:
 --:
   ld a, (_RAM_D5D6_)
   or a
-  jp nz, LABEL_7476_
+  jp nz, LABEL_7476_PrepareResultsScreen
   ld a, (_RAM_D5D8_)
   or a
   jr z, --
@@ -15614,57 +15614,69 @@ LABEL_7427_UpdateHUDSprites_RuffTrux:
 LABEL_746B_RuffTrux_UpdatePerFrameTiles:
   JumpToPagedFunction LABEL_36D52_RuffTrux_UpdateTimer
 
-LABEL_7476_:
+LABEL_7476_PrepareResultsScreen:
   di
   CallPagedFunction2 LABEL_2B5D5_SilencePSG
   call LABEL_7564_SetControlsToNoButtons
+  
+  ; If track select is active, no results, just back to title screen
   ld a, (_RAM_DC3B_IsTrackSelect)
   cp $01
-  jp z, LABEL_7519_
+  jp z, LABEL_7519_BackToTitleSreen
+  
+  ; Head to head or challenge?
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  jr z, LABEL_74E6_
+  jr z, LABEL_74E6_HeadToHeadResults
+  
+  ; Challenge
+  ; Check the index for special cases
   ld a, (_RAM_DC55_CourseIndex)
-  cp $00
-  jp z, LABEL_7545_
-  cp $1A
-  jp z, LABEL_7520_
-  cp $1B
-  jp z, LABEL_7520_
-  cp $1C
-  jp z, LABEL_7520_
+  cp Track_00_QualifyingRace
+  jp z, LABEL_7545_QualifyingResults
+  cp Track_1A_RuffTrux1
+  jp z, LABEL_7520_RuffTruxResults
+  cp Track_1B_RuffTrux2
+  jp z, LABEL_7520_RuffTruxResults
+  cp Track_1C_RuffTrux3
+  jp z, LABEL_7520_RuffTruxResults
+  
+  ; Cheat or not?
   ld a, (_RAM_DC4C_Cheat_AlwaysFirstPlace)
   or a
   jr nz, +
-  ld a, (_RAM_DF2A_Positions.Player1)
+  
+  ; Real positions
+  ld a, (_RAM_DF2A_Positions.Red)
   ld (_RAM_DBCF_LastRacePosition), a
-  ld a, (_RAM_DF2A_Positions.Player2)
-  ld (_RAM_DBD0_HeadToHeadLost2), a
+  ld a, (_RAM_DF2A_Positions.Green)
+  ld (_RAM_DBD0_LastRacePosition_Player2), a
   ld a, (_RAM_DF2A_Positions.Blue)
-  ld (_RAM_DBD2_), a
+  ld (_RAM_DBD2_LastRacePosition_Player4), a
   ld a, (_RAM_DF2A_Positions.Yellow)
-  ld (_RAM_DBD1_), a
+  ld (_RAM_DBD1_LastRacePosition_Player3), a
 -:
-  ld a, $02
+  ld a, $02 ; Four player results
   ld (_RAM_DBCD_MenuIndex), a
   jp LABEL_14_EnterMenus
 
-+:
++:; Always first place cheat
+  ; Actually always 1st, 2nd, 3rd, 4th this way
   xor a
   ld (_RAM_DBCF_LastRacePosition), a
   inc a
-  ld (_RAM_DBD0_HeadToHeadLost2), a
+  ld (_RAM_DBD0_LastRacePosition_Player2), a
   inc a
-  ld (_RAM_DBD1_), a
+  ld (_RAM_DBD1_LastRacePosition_Player3), a
   inc a
-  ld (_RAM_DBD2_), a
+  ld (_RAM_DBD2_LastRacePosition_Player4), a
   jr -
 
-LABEL_74E6_:
+LABEL_74E6_HeadToHeadResults:
   ld a, (_RAM_DF2A_Positions.Player1)
   ld (_RAM_DBCF_LastRacePosition), a
   ld a, (_RAM_DF2A_Positions.Player2)
-  ld (_RAM_DBD0_HeadToHeadLost2), a
+  ld (_RAM_DBD0_LastRacePosition_Player2), a
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr z, +++
@@ -15691,12 +15703,12 @@ LABEL_74E6_:
   ld (_RAM_DBCD_MenuIndex), a
   jp LABEL_14_EnterMenus
 
-LABEL_7519_:
+LABEL_7519_BackToTitleSreen:
   xor a
   ld (_RAM_DBCD_MenuIndex), a
   jp LABEL_14_EnterMenus
 
-LABEL_7520_:
+LABEL_7520_RuffTruxResults:
   ; Next track next time
   ld a, (_RAM_DC39_NextRuffTruxTrack)
   add a, $01
@@ -15717,7 +15729,7 @@ LABEL_7520_:
   ld (_RAM_DC38_), a
   jp LABEL_14_EnterMenus
 
-LABEL_7545_:
+LABEL_7545_QualifyingResults:
   ld a, $01
   ld (_RAM_DBCD_MenuIndex), a
   ld a, (_RAM_DF2A_Positions.Red)
@@ -17107,7 +17119,7 @@ LABEL_8021_MenuScreenEntryPoint:
 +:ld a, (_RAM_DBCD_MenuIndex)
   or a
   jr nz, +
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
   jp ++
 +:dec a
   jr nz, +
@@ -17115,7 +17127,7 @@ LABEL_8021_MenuScreenEntryPoint:
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_8507_MenuIndex2_Initialise
+  call LABEL_8507_MenuIndex2_FourPlayerResults_Initialise
   jp ++
 +:dec a
   jr nz, +
@@ -17223,7 +17235,7 @@ LABEL_8101_Unknown: ; unreachable?
 +:ret
 .endif
 
-LABEL_8114_MenuIndex0_Initialise: ; init functions, need renaming
+LABEL_8114_MenuIndex0_TitleScreen_Initialise: ; init functions, need renaming
   call LABEL_BB85_ScreenOffAtLineFF
   call LABEL_B44E_BlankMenuRAM
   ; Next menu screen is title
@@ -17248,7 +17260,7 @@ LABEL_8114_MenuIndex0_Initialise: ; init functions, need renaming
   ld (_RAM_DBD7_Player4Character), a
 
   ld a, $02
-  ld (_RAM_DC3A_), a
+  ld (_RAM_DC3A_RequiredPositionForNextRace), a
 
   xor a
   ld (_RAM_D7B7_), a
@@ -17632,7 +17644,7 @@ LABEL_84C7_:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_8507_MenuIndex2_Initialise:
+LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerChallengeResults
   ld (_RAM_D699_MenuScreenIndex), a
@@ -17665,23 +17677,23 @@ LABEL_8507_MenuIndex2_Initialise:
   ; Load player tiles
   TileWriteAddressToHL $24
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3A_)
+  ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
   ld a, (_RAM_DBCF_LastRacePosition)
   cp c
   jr nc, +
-  ld c, $00
+  ld c, PlayerPortraits.Happy1 ; $00 ; Won
   jp ++
-+:ld c, $01
++:ld c, PlayerPortraits.Sad1 ; $01 ; Lost
 ++:ld a, (_RAM_DBD4_Player1Character)
   add a, c
   call LABEL_9F40_LoadPortraitTiles
 
   TileWriteAddressToHL $42
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3A_)
+  ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   cp c
   jr nc, +
   ld c, $00
@@ -17693,9 +17705,9 @@ LABEL_8507_MenuIndex2_Initialise:
   
   TileWriteAddressToHL $60
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3A_)
+  ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
-  ld a, (_RAM_DBD1_)
+  ld a, (_RAM_DBD1_LastRacePosition_Player3)
   cp c
   jr nc, +
   ld c, $00
@@ -17707,9 +17719,9 @@ LABEL_8507_MenuIndex2_Initialise:
 
   TileWriteAddressToHL $7e
   call LABEL_B35A_VRAMAddressToHL
-  ld a, (_RAM_DC3A_)
+  ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
-  ld a, (_RAM_DBD2_)
+  ld a, (_RAM_DBD2_LastRacePosition_Player4)
   cp c
   jr nc, +
   ld c, $00
@@ -18261,7 +18273,7 @@ LABEL_8A38_Menu4_Initialise:
   ld a, (_RAM_DBD4_Player1Character)
   add a, c
   call LABEL_9F40_LoadPortraitTiles
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   ld c, a
   ld a, (_RAM_DBD5_Player2Character)
   add a, c
@@ -18491,7 +18503,7 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
 
   ; Reset to the start
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
@@ -18715,7 +18727,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   jr nz, +
   ; Timer reached 0, reset to title screen
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 +:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -18928,7 +18940,7 @@ LABEL_8F10_:
 
 +++:
   ld a, $01
-  ld (_RAM_DC3A_), a
+  ld (_RAM_DC3A_RequiredPositionForNextRace), a
   call LABEL_84AA_Menu5_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -19082,7 +19094,7 @@ LABEL_902E_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 ++:
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 +++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -21034,7 +21046,7 @@ LABEL_A039_:
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
   ld bc, 8
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   or a
   jr z, +
   ld hl, TEXT_A0AC_Loser
@@ -21888,7 +21900,7 @@ LABEL_A7ED_:
   and $01
   jr nz, ++++
   call LABEL_A859_SetTilemapLocationForLastRacePosition
-  ld a, (_RAM_DC3A_)
+  ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   dec a
   jr nz, +
   ld a, (_RAM_DBCF_LastRacePosition)
@@ -22035,13 +22047,13 @@ LABEL_A8FC_TournamentResults_FourthPlace:
 +:ld a, (_RAM_DBCF_LastRacePosition)
   cp c
   jp z, +
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   cp c
   jp z, +++
-  ld a, (_RAM_DBD1_)
+  ld a, (_RAM_DBD1_LastRacePosition_Player3)
   cp c
   jp z, LABEL_A95D_
-  ld a, (_RAM_DBD2_)
+  ld a, (_RAM_DBD2_LastRacePosition_Player4)
   cp c
   jp z, LABEL_A97B_
   ret
@@ -22078,7 +22090,7 @@ LABEL_A8FC_TournamentResults_FourthPlace:
 +:
   ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   jp LABEL_A996_
 
 LABEL_A95D_:
@@ -22095,7 +22107,7 @@ LABEL_A95D_:
 +:
   ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
-  ld a, (_RAM_DBD1_)
+  ld a, (_RAM_DBD1_LastRacePosition_Player3)
   jp LABEL_A996_
 
 LABEL_A97B_:
@@ -22110,7 +22122,7 @@ LABEL_A97B_:
   jr ++
 +:ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
-  ld a, (_RAM_DBD2_)
+  ld a, (_RAM_DBD2_LastRacePosition_Player4)
 LABEL_A996_:
   sla a
   ld c, a
@@ -23930,7 +23942,7 @@ LABEL_B6B1_MenuScreen_TwoPlayerResult:
   ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +++
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -24073,7 +24085,7 @@ LABEL_B7FF_:
   ld de, $0001
   ld a, (_RAM_DBD5_Player2Character)
   ld c, a
-  ld a, (_RAM_DBD0_HeadToHeadLost2)
+  ld a, (_RAM_DBD0_LastRacePosition_Player2)
   jp +
 
 +:
@@ -24136,7 +24148,7 @@ LABEL_B84D_MenuScreen_TournamentChampion:
   jr nz, ++
 +:
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_8114_MenuIndex0_Initialise
+  call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
 
