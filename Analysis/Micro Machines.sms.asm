@@ -210,19 +210,53 @@ Green db
 Blue db
 Yellow db
 .endst
-.enum $90
+
+.enum $190
 SpriteIndex_Decorators          instanceof FourPlayers ; $90
 SpriteIndex_PositionIndicators  instanceof FourPlayers ; $94
 SpriteIndex_Suffixes            dsb 4 ; $98
 SpriteIndex_FinishedIndicators  instanceof FourPlayers ; $9c
 SpriteIndex_Smoke               dsb 4 ; $a0
-SpriteIndex_Digits              dsb 4 ; $a4
+SpriteIndex_Digits              dsb 4 ; $a4 - #2 is for used for head to head track counter
 SpriteIndex_Shadow              dsb 4 ; $a8
-SpriteIndex_Blanks              dsb 4 ; $ac
-SpriteIndex_Dust                dsb 3 ; $b0
+SpriteIndex_Blank               db    ; $ac
+SpriteIndex_Dust                .db   ; $ad..$af for non-tanks
+SpriteIndex_Bullet              db    ; $ad for tanks
+SpriteIndex_BulletShadow        db    ; $ae for tanks
+SpriteIndex_Blank_Unused        db    ; $af for tanks
+SpriteIndex_Splash              dsb 3 ; $b0
 SpriteIndex_FallingCar          dsb 4 ; $b3 2x2 tiles
 SpriteIndex_FallingCar2         db    ; $b7 1x1 tiles
 .ende
+
+; The RuffTrux truck is 4x4 sprites, with 16 positions all held in VRAM. This would use all 256 sprite tiles, but at 45 degree angles the corner tiles are blank; so 13 of them are used for additional sprites (HUD, shadow, smoke, splash).
+; TODO: is the splash unused?
+; The sprites are laid out in VRAM in this shape (space means blank tile):
+; 00001111 22 333344445555 66 7777
+; 00001111222233334444555566667777
+; 00001111222233334444555566667777
+; 00001111 22 333344445555 66 7777
+; 88889999 aa bbbbccccdddd ee ffff
+; 88889999aaaabbbbccccddddeeeeffff
+; 88889999aaaabbbbccccddddeeeeffff
+; 88889999 aa bbbbccccdddd ee ffff
+; It's not worth an enum for this...
+.define SpriteIndex_RuffTrux_Shadow1  11 ; 0B
+.define SpriteIndex_RuffTrux_Shadow2  24 ; 18
+.define SpriteIndex_RuffTrux_Shadow3  27 ; 1B
+.define SpriteIndex_RuffTrux_Blank   104 ; 68
+.define SpriteIndex_RuffTrux_Dust1   107 ; 6B
+.define SpriteIndex_RuffTrux_Dust2   120 ; 78
+.define SpriteIndex_RuffTrux_Dust3   123 ; 7B
+.define SpriteIndex_RuffTrux_Shadow4 136 ; 88
+.define SpriteIndex_RuffTrux_Digit1  139 ; 8B
+.define SpriteIndex_RuffTrux_Digit2  152 ; 98
+.define SpriteIndex_RuffTrux_Colon   155 ; 9B
+.define SpriteIndex_RuffTrux_Digit3  232 ; E8
+.define SpriteIndex_RuffTrux_Water1  235 ; EB
+.define SpriteIndex_RuffTrux_Water2  248 ; F8
+.define SpriteIndex_RuffTrux_Blank2  251 ; FB
+
 
 ; ASCII mapping for menu screen text
 .define BLANK_TILE_INDEX = $0e
@@ -448,6 +482,29 @@ map "?" = $B6
 .undef x
 .endm
 
+.macro DivisionTable args divisor, count
+  .define x 0
+  .repeat count
+    .db x/divisor
+    .redefine x x+1
+  .endr
+  .undefine x
+.endm
+
+; The game stores some numbers as sign and magnitude bytes.
+.macro SignAndMagnitude
+  ; For each arg...
+  .rept nargs
+    ; Emit with high bit set for negative
+    .if \1 < 0
+      .db (-\1) | $80
+    .else
+      .db \1
+    .endif
+    .shift
+  .endr
+.endm
+
 ; Tail call optimisation is often possible - and often used in the original code.
 .macro TailCall args label retlabel
 .ifdef TAIL_CALL
@@ -489,7 +546,7 @@ Hi db
 
 .enum $C000 export
 _RAM_C000_StartOfRam .db
-_RAM_C000_DecompressionTemporaryBuffer .db ; $800?
+_RAM_C000_DecompressionTemporaryBuffer .db
 _RAM_C000_LevelLayout dsb 32 * 32 ; 32x32 metatiles
 _RAM_C400_TrackIndexes dsb 32 * 32 ; 32x32 metatile track indexes
 _RAM_C800_WallData instanceof WallDataMetaTile 64 ; 64 tiles of 12x12 bits
@@ -504,8 +561,7 @@ _RAM_D585_ dw
 _RAM_D587_ db
 _RAM_D588_ db ; unused?
 _RAM_D589_ db
-_RAM_D58A_ db
-_RAM_D58B_ db
+_RAM_D58A_ instanceof Word
 _RAM_D58C_ dw
 _RAM_D58E_ db
 _RAM_D58F_ db
@@ -959,7 +1015,7 @@ _RAM_DC57_ dw
 _RAM_DC59_FloorTiles dsb 32*2 ; 1bpp tile data
 _RAM_DC99_EnterMenuTrampoline dsb 18 ; Code in RAM
 ; Game ram starts here?
-_RAM_DCAB_ dw
+_RAM_DCAB_CarData_Green dw
 _RAM_DCAD_ dw
 _RAM_DCAF_ db
 _RAM_DCB0_ db
@@ -1016,7 +1072,7 @@ _RAM_DCEA_ db
 .ende
 
 .enum $DCEC export
-_RAM_DCEC_ db
+_RAM_DCEC_CarData_Blue db
 _RAM_DCED_ db
 _RAM_DCEE_ db
 _RAM_DCEF_ db
@@ -1080,7 +1136,7 @@ _RAM_DD2B_ db
 .ende
 
 .enum $DD2D export
-_RAM_DD2D_ dw
+_RAM_DD2D_CarData_Yellow dw ; actually a struct?
 _RAM_DD2F_ dw
 _RAM_DD31_ db
 _RAM_DD32_ db
@@ -1661,7 +1717,7 @@ _RAM_DF9A_EndOfRAM .db
 .BANK 0 SLOT 0
 .ORG $0000
 
-.section "Entry" force
+;.section "Entry" force
   di
   ld hl, STACK_TOP
   ld sp, hl
@@ -1671,9 +1727,9 @@ _RAM_DF9A_EndOfRAM .db
   ld a, :LABEL_8000_Main
   ld (PAGING_REGISTER), a
   jp LABEL_8000_Main
-.ends
+;.ends
 
-.section "Transitions"
+;.section "Transitions"
 
 LABEL_14_EnterMenus:
   ; Code jumps here when transitioning from game to menus
@@ -1690,10 +1746,10 @@ LABEL_14_EnterMenus:
 .db "P HL", 13, 10, 9, "INC HL", 13, 10, 9, "LD" ; Source code left in RAM
 .endif
 
-.ends
+;.ends
 
 .org $0038
-.section "VBlank handler" force
+;.section "VBlank handler" force
 LABEL_38_:
   push af
     ld a, (_RAM_DC3E_InMenus)
@@ -1723,10 +1779,10 @@ LABEL_38_:
 .db " (CH2MAP2+9),A", 13, 10, 9, "L" ; Source code left in RAM
 .endif
 
-.ends
+;.ends
 
 .org $0066
-.section "Pause/Gear To Gear handler" force
+;.section "Pause/Gear To Gear handler" force
 LABEL_66_NMI:
   push af
 .ifdef GAME_GEAR_CHECKS
@@ -1746,9 +1802,9 @@ LABEL_66_NMI:
 .db "9),A" ; Source code left in RAM
 .endif
 
-.ends
+;.ends
 
-.section "Enter game trampoline and data"
+;.section "Enter game trampoline and data"
 ; Executed in RAM at dbc0
 LABEL_75_MenuRAMSection:
 LABEL_75_EnterGameTrampolineImpl:
@@ -1777,10 +1833,10 @@ LABEL_75_EnterGameTrampolineImpl:
 .asc "RACE 01-" ; _RAM_DBF1_RaceNumberText
 LABEL_75_MenuRAMSectionEnd:
 ; End stuff copied to RAM
-.ends
+;.ends
 
 .org $00ae
-.section "Enter menu trampoline" force
+;.section "Enter menu trampoline" force
 ; Copied to RAM $dc99..$dcaa
 LABEL_AE_EnterMenuTrampolineImpl:
   di
@@ -1792,17 +1848,17 @@ LABEL_AE_EnterMenuTrampolineImpl:
   ld sp, hl
   jp LABEL_8000_Main
 LABEL_AE_EnterMenuTrampolineImplEnd:
-.ends
+;.ends
 
 .org $00c0
-.section "Floor tiles" force
+;.section "Floor tiles" force
 DATA_C0_FloorTilesRawTileData:
 .incbin "Assets/Formula One/Floor.4bpp"
 DATA_C0_FloorTilesRawTileDataEnd:
-.ends
+;.ends
 
 .org $100
-.section "Startup" force
+;.section "Startup" force
 LABEL_100_Startup:
   ; Blank RAM
   ld hl, _RAM_C000_StartOfRam
@@ -2175,7 +2231,7 @@ LABEL_3ED_:
   call LABEL_3F54_BlankGameRAM
   call LABEL_19EE_
   call LABEL_7C7D_LoadTrack
-  call LABEL_3A2E_
+  call LABEL_3A2E_SetShadowSpriteIndices
   call LABEL_31B6_InitialiseFloorTiles
   call LABEL_3C54_
   call LABEL_458_PatchForLevelTrampoline
@@ -2224,31 +2280,28 @@ LABEL_458_PatchForLevelTrampoline:
   JumpToPagedFunction LABEL_2B5D5_SilencePSG
 
 DATA_46E_: ; 4 bytes per entry * 16 entries
-; Sign and magnitude (would be simpler to store 2's comp)
-; Applied to ???
-.db $04 $17 $0C $17
-.db $81 $13 $06 $16
-.db $84 $0F $02 $15
-.db $86 $0B $83 $12
-.db $87 $04 $87 $0C
-.db $83 $82 $86 $05
-.db $02 $85 $84 $01
-.db $81 $83 $06 $86
-.db $04 $87 $0C $87
-.db $0A $86 $11 $83
-.db $0E $85 $14 $01
-.db $13 $82 $16 $05
-.db $17 $04 $17 $0C
-.db $16 $0B $13 $12
-.db $14 $0F $0E $15
-.db $11 $13 $0A $16
+  SignAndMagnitude  $04,  $17,  $0C,  $17
+  SignAndMagnitude -$01,  $13,  $06,  $16
+  SignAndMagnitude -$04,  $0F,  $02,  $15
+  SignAndMagnitude -$06,  $0B, -$03,  $12
+  SignAndMagnitude -$07,  $04, -$07,  $0C
+  SignAndMagnitude -$03, -$02, -$06,  $05
+  SignAndMagnitude  $02, -$05, -$04,  $01
+  SignAndMagnitude -$01, -$03,  $06, -$06
+  SignAndMagnitude  $04, -$07,  $0C, -$07
+  SignAndMagnitude  $0A, -$06,  $11, -$03
+  SignAndMagnitude  $0E, -$05,  $14,  $01
+  SignAndMagnitude  $13, -$02,  $16,  $05
+  SignAndMagnitude  $17,  $04,  $17,  $0C
+  SignAndMagnitude  $16,  $0B,  $13,  $12
+  SignAndMagnitude  $14,  $0F,  $0E,  $15
+  SignAndMagnitude  $11,  $13,  $0A,  $16
 
-DATA_4AE_:
-.db $00 $06 $0C
+DATA_4AE_SixTimesTable:
+  TimesTableLo 0 6 3 ; 0, 6, 12
 
-; Data from 4B1 to 4B1 (1 bytes)
 DATA_4B1_Constant_3:
-.db $03
+.db 3
 
 LABEL_4B2_:
   ld a, (iy+24)
@@ -2265,7 +2318,7 @@ LABEL_4B2_:
   ld a, (iy+25)
   ld e, a
   ld d, $00
-  ld hl, DATA_4AE_ ; look up DATA_4AE_[iy+25], one of (0, 6, 12)
+  ld hl, DATA_4AE_SixTimesTable ; (iy+25) * 6
   add hl, de
   ld a, (hl)
   ld e, a
@@ -2341,7 +2394,7 @@ LABEL_4B2_:
   add a, c
   ld (ix+3), a
 ++:
-  inc hl    ; Last one: ix+5 = iy+23 )+/-) b + c
+  inc hl    ; Last one: ix+5 = iy+23 (+/-) b + c
   ld a, (hl)
   ld b, a
   and $80
@@ -2439,7 +2492,7 @@ LABEL_5FA_:
   cp $01
   JrZRet _LABEL_5C8_ret ; 7 when nz, 12+10 otherwise; ret z = 5/11 so always better(!)
   ld iy, _RAM_DD9E_
-  ld ix, $DD9E
+  ld ix, _RAM_DD9E_
   ld a, (_RAM_DCB8_)
   ld (iy+21), a
   ld a, (_RAM_DCBC_)
@@ -2457,7 +2510,7 @@ LABEL_5FA_:
 
 LABEL_633_:
   ld iy, _RAM_DDCE_
-  ld ix, $DDCE
+  ld ix, _RAM_DDCE_
   ld a, (_RAM_DCF9_)
   ld (iy+21), a
   ld a, (_RAM_DCFD_)
@@ -2477,8 +2530,10 @@ LABEL_665_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JpZRet _LABEL_5C8_ret
+
+  ; Challenge
   ld iy, _RAM_DDFE_
-  ld ix, $DDFE
+  ld ix, _RAM_DDFE_
   ld a, (_RAM_DD3A_)
   ld (iy+21), a
   ld a, (_RAM_DD3E_)
@@ -2512,7 +2567,7 @@ LABEL_69C_:
   jr z, +
   cp $01
   jr z, LABEL_702_
-  call LABEL_7DD_
+  call LABEL_7DD_SetCarEffectSpriteIndices
   ld a, (iy+12)
   ld (de), a
   inc de
@@ -2533,7 +2588,7 @@ LABEL_69C_:
   ret
 
 +:
-  call LABEL_723_
+  call LABEL_723_SetCarEffectSpriteIndices
   ld a, (iy+0)
   ld (de), a
   inc de
@@ -2554,7 +2609,7 @@ LABEL_69C_:
   ret
 
 LABEL_702_:
-  call LABEL_780_
+  call LABEL_780_SetCarEffectSpriteIndices
   ld a, (iy+6)
   ld (de), a
   inc de
@@ -2574,37 +2629,34 @@ LABEL_702_:
   ld (hl), a
   ret
 
-LABEL_723_:
-  ld a, (iy+19)
+LABEL_723_SetCarEffectSpriteIndices:
+  ld a, (iy+19) ; Enabled 1?
   or a
-  jr z, LABEL_76B_
-  ld a, (iy+26)
+  jr z, LABEL_76B_BlankCarEffects
+  ld a, (iy+26) ; Enabled 2?
   or a
-  jr z, LABEL_76B_
+  jr z, LABEL_76B_BlankCarEffects
   push hl
-    ld a, (iy+27)
-    sla a
+    ld a, (iy+27) ; 0 for dust, 1 for liquid
+    sla a ; -> offset by 4
     sla a
     ld c, a
     ld b, $00
     ld a, (_RAM_DB97_TrackType)
     cp TT_7_RuffTrux
     jr nz, +
-    ld hl, DATA_842_RuffTrux
+    ld hl, DATA_842_EffectTileIndices_RuffTrux
     jp ++
-
-+:
-    ld hl, DATA_83A_NotRuffTrux
-++:
-    add hl, bc
-    ld a, (iy+28)
++:  ld hl, DATA_83A_EffectTileIndices
+++: add hl, bc
+    ld a, (iy+28) ; Animation counter
     ld c, a
     ld b, $00
     add hl, bc
     ld a, (hl)
-    ld (iy+1), a
+    ld (iy+1), a ; Set tile index
     ld (iy+4), a
-    ld a, c
+    ld a, c ; Cycle counter
     cp $03
     jr z, +
     add a, $01
@@ -2612,33 +2664,31 @@ LABEL_723_:
   pop hl
   ret
 
-+:
-    xor a
++:  xor a
     ld (iy+26), a
   pop hl
   ret
 
-LABEL_76B_:
+LABEL_76B_BlankCarEffects:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr nz, +
-  ld a, $68 ; RuffTrux
+  ld a, SpriteIndex_RuffTrux_Blank ; RuffTrux
   jp ++
-
-+:
-  ld a, $AC ; Not RuffTrux
++:ld a, <SpriteIndex_Blank ; Not RuffTrux
 ++:
   ld (iy+1), a
   ld (iy+4), a
   ret
 
-LABEL_780_:
+; Same as LABEL_723_SetCarEffectSpriteIndices except offsets are different
+LABEL_780_SetCarEffectSpriteIndices:
   ld a, (iy+19)
   or a
-  jr z, LABEL_7C8_
+  jr z, _LABEL_7C8_BlankCarEffects
   ld a, (iy+32)
   or a
-  jr z, LABEL_7C8_
+  jr z, _LABEL_7C8_BlankCarEffects
   push hl
     ld a, (iy+33)
     sla a
@@ -2648,13 +2698,10 @@ LABEL_780_:
     ld a, (_RAM_DB97_TrackType)
     cp TT_7_RuffTrux
     jr nz, +
-    ld hl, DATA_842_RuffTrux
+    ld hl, DATA_842_EffectTileIndices_RuffTrux
     jp ++
-
-+:
-    ld hl, DATA_83A_NotRuffTrux
-++:
-    add hl, bc
++:  ld hl, DATA_83A_EffectTileIndices
+++: add hl, bc
     ld a, (iy+34)
     ld c, a
     ld b, $00
@@ -2670,35 +2717,33 @@ LABEL_780_:
   pop hl
   ret
 
-+:
-    xor a
++:  xor a
     ld (iy+32), a
   pop hl
   ret
 
-LABEL_7C8_:
+_LABEL_7C8_BlankCarEffects:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr nz, +
-  ld a, $68 ; RuffTrux
+  ld a, SpriteIndex_RuffTrux_Blank ; RuffTrux
   jp ++
-
-+:
-  ld a, $AC ; Not RuffTrux
++:ld a, <SpriteIndex_Blank ; Not RuffTrux
 ++:
   ld (iy+7), a
   ld (iy+10), a
   ret
 
-LABEL_7DD_:
+; Same as LABEL_723_SetCarEffectSpriteIndices except offsets are different
+LABEL_7DD_SetCarEffectSpriteIndices:
   ld a, (iy+19)
   or a
-  jr z, LABEL_825_
+  jr z, _LABEL_825_BlankCarEffects
   ld a, (iy+38)
   or a
-  jr z, LABEL_825_
+  jr z, _LABEL_825_BlankCarEffects
   push hl
-    ld a, (iy+39)
+    ld a, (iy+39) ; Effect type: 0 = dust, 1 = liquid
     sla a
     sla a
     ld c, a
@@ -2706,18 +2751,18 @@ LABEL_7DD_:
     ld a, (_RAM_DB97_TrackType)
     cp TT_7_RuffTrux
     jr nz, +
-    ld hl, DATA_842_RuffTrux
+    ld hl, DATA_842_EffectTileIndices_RuffTrux
     jp ++
-+:  ld hl, DATA_83A_NotRuffTrux
++:  ld hl, DATA_83A_EffectTileIndices
 ++: add hl, bc
-    ld a, (iy+40)
+    ld a, (iy+40) ; Effect counter
     ld c, a
     ld b, $00
     add hl, bc
     ld a, (hl)
     ld (iy+13), a
     ld (iy+16), a
-    ld a, c
+    ld a, c ; Loop counter 0..3
     cp $03
     jr z, +
     add a, $01
@@ -2730,30 +2775,46 @@ LABEL_7DD_:
   pop hl
   ret
 
-LABEL_825_:
+_LABEL_825_BlankCarEffects:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr nz, +
-  ld a, $68 ; RuffTrux
+  ld a, SpriteIndex_RuffTrux_Blank ; RuffTrux
   jp ++
-+:ld a, $AC ; Not RuffTrux
++:ld a, <SpriteIndex_Blank ; Not RuffTrux
 ++:ld (iy+13), a
   ld (iy+16), a
   ret
 
-; Data from 83A to 841 (8 bytes)
-DATA_83A_NotRuffTrux:
-.db $AD $AE $AF $AC $B2 $B1 $B0 $AC
+; Which tiles to use for dust trails (animated)
+DATA_83A_EffectTileIndices:
+.db <SpriteIndex_Dust + 0
+.db <SpriteIndex_Dust + 1
+.db <SpriteIndex_Dust + 2
+.db <SpriteIndex_Blank
 
-; Data from 842 to 849 (8 bytes)
-DATA_842_RuffTrux:
-.db $EB $F8 $FB $68 $EB $F8 $FB $68
+.db <SpriteIndex_Splash + 2 ; We play these backwards (!)
+.db <SpriteIndex_Splash + 1
+.db <SpriteIndex_Splash + 0
+.db <SpriteIndex_Blank
+
+DATA_842_EffectTileIndices_RuffTrux:
+.db SpriteIndex_RuffTrux_Water1
+.db SpriteIndex_RuffTrux_Water2
+.db SpriteIndex_RuffTrux_Blank2
+.db SpriteIndex_RuffTrux_Blank
+
+.db SpriteIndex_RuffTrux_Water1
+.db SpriteIndex_RuffTrux_Water2
+.db SpriteIndex_RuffTrux_Blank2
+.db SpriteIndex_RuffTrux_Blank
 
 LABEL_84A_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jp z, LABEL_97C_RuffTrux
-  ; RuffTrux
+
+  ; Not RuffTrux
   ld a, (_RAM_DF65_)
   or a
   jr z, +
@@ -2924,10 +2985,10 @@ LABEL_97F_:
 
 ; Pairs of sprite indices for "1st", "2nd" etc indicator
 DATA_9AA_SuffixedPositionSpriteIndices:
-.db SpriteIndex_Digits+0, SpriteIndex_Suffixes+0
-.db SpriteIndex_Digits+1, SpriteIndex_Suffixes+1
-.db SpriteIndex_Digits+2, SpriteIndex_Suffixes+2
-.db SpriteIndex_Digits+3, SpriteIndex_Suffixes+3
+.db <SpriteIndex_Digits+0, <SpriteIndex_Suffixes+0
+.db <SpriteIndex_Digits+1, <SpriteIndex_Suffixes+1
+.db <SpriteIndex_Digits+2, <SpriteIndex_Suffixes+2
+.db <SpriteIndex_Digits+3, <SpriteIndex_Suffixes+3
 
 LABEL_9B2_ConvertMetatileIndexToDataIndex:
   ; Takes metatile index in a and converts it to the data index for this track type
@@ -2993,14 +3054,15 @@ DATA_A2D_TilemapAddressFromRowNumberHi:
 ; Sprite Y locations for tournament HUD sprites (GG)
 .dstruct DATA_A88_GG_TournamentHUDSpriteYs instanceof TournamentHUDSprites data $30 $38 $40 $48 $50 $38 $40 $48 $50
 
-; Nibble encoded time limits in hundredths (!) of seconds
+; Nibble encoded time limits to one DP
+; Last byte is unused
 DATA_A91_RuffTruxTimeLimits:
 .macro RuffTruxTimeLimit args time
-.db time / 10 # 10, time * 1 # 10, time * 10 # 10, time * 100 # 10
+.db time / 10 # 10, time * 1 # 10, time * 10 # 10, 0
 .endm
-  RuffTruxTimeLimit 45.00
-  RuffTruxTimeLimit 48.00
-  RuffTruxTimeLimit 55.00
+  RuffTruxTimeLimit 45.0
+  RuffTruxTimeLimit 48.0
+  RuffTruxTimeLimit 55.0
 
 LABEL_A9D_:
   JrToPagedFunction LABEL_36D07_
@@ -3080,7 +3142,7 @@ LABEL_B2B_:
   ld c, $0C ; Count
 -:ld a, (hl)
   ld (de), a
-  ld a, $50 ; y - writes too many!
+  ld a, $50 ; y - writes too many!?
   ld (ix+0), a
   inc ix
   inc hl
@@ -3135,9 +3197,8 @@ LABEL_B63_:
 _LABEL_BAC_ret:
   ret
 
-; Data from BAD to BC4 (24 bytes)
 DATA_BAD_WinnerSpriteData: ; Sprite X, N for "WINNER"
-.db $70 $9C
+.db $70 $9C ; TODO enum for head to head mode
 .db $78 $9D
 .db $80 $9E
 .db $88 $9F
@@ -3151,7 +3212,7 @@ DATA_BB9_BonusSpriteData: ; Sprite X, N for "BONUS"
 .db $90 $9A
 .db $98 $9B
 
-;.section "Floor tiles updates" force
+;;.section "Floor tiles updates" force
   ; Executed in RAM at da92 - or is it?
 LABEL_BC5_UpdateFloorTiles:
   ld a, (_RAM_DF17_HaveFloorTiles)
@@ -3498,9 +3559,8 @@ LABEL_E3C_MoveFloorTilesRight:
     rr (ix+62)
   pop hl
   ret
-;.ends
+;;.ends
 
-; Data from EA2 to EE5 (68 bytes)
 DATA_EA2_: ; Engine velocity related?
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
@@ -3815,7 +3875,7 @@ LABEL_10C2_:
 LABEL_111E_:
   call LABEL_EF1_
 LABEL_1121_:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_DE96_)
   add a, l
   ld l, a
@@ -3823,7 +3883,7 @@ LABEL_1121_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_DE96_)
   add a, l
   ld l, a
@@ -5296,10 +5356,23 @@ LABEL_1B94_:
 DATA_1C22_TileData_Shadow: ; 4 tiles @ 3bpp
 .incbin "Assets/Car shadow.3bpp"
 
-DATA_1c82_TileVRAMAddresses: ; VRAM addresses for ???
-.dw $4D00 $4D60 $4F00 $4F60 ; Tiles $68, $6b, $78, $7b
-.dw $5160 $5300 $5360 $5D00 ; $8b, $98, $9b, $e8
-.dw $5D60 $5F00 $5F60 ; $eb, $f8, $fb
+DATA_1c82_TileVRAMAddresses: ; VRAM addresses for RuffTrux non-car sprites
+  ; Tiles $68, $6b, $78, $7b - RuffTrux dust animation
+  TileWriteAddressData SpriteIndex_RuffTrux_Blank
+  TileWriteAddressData SpriteIndex_RuffTrux_Dust1
+  TileWriteAddressData SpriteIndex_RuffTrux_Dust2
+  TileWriteAddressData SpriteIndex_RuffTrux_Dust3
+
+  ; $8b, $98, $9b, $e8 - RuffTrux HUD tiles
+  TileWriteAddressData SpriteIndex_RuffTrux_Digit1
+  TileWriteAddressData SpriteIndex_RuffTrux_Digit2
+  TileWriteAddressData SpriteIndex_RuffTrux_Colon
+  TileWriteAddressData SpriteIndex_RuffTrux_Digit3
+
+  ; $eb, $f8, $fb - RuffTrux water splash animation
+  TileWriteAddressData SpriteIndex_RuffTrux_Water1
+  TileWriteAddressData SpriteIndex_RuffTrux_Water2
+  TileWriteAddressData SpriteIndex_RuffTrux_Blank2
 
 LABEL_1C98_:
   ld de, (_RAM_DBA0_)
@@ -5365,7 +5438,6 @@ LABEL_1CFF_:
   ld (_RAM_DF6A_), a
 +:ret
 
-; Data from 1D25 to 1D44 (32 bytes)
 DATA_1D25_HelicoptersAnimatedPalette_GG:
 .rept 2
   GGCOLOUR $0000ee
@@ -5373,6 +5445,7 @@ DATA_1D25_HelicoptersAnimatedPalette_GG:
   GGCOLOUR $8888ee
   GGCOLOUR $eeeeee
 .endr
+
 DATA_1D35_PowerboatsAnimatedPalette_GG:
   GGCOLOUR $440088
   GGCOLOUR $444488
@@ -5381,7 +5454,7 @@ DATA_1D35_PowerboatsAnimatedPalette_GG:
   GGCOLOUR $8888ee
   GGCOLOUR $444488
   GGCOLOUR $440088
-  GGCOLOUR $0000844
+  GGCOLOUR $000844
 
 LABEL_1D45_:
   ld a, $03
@@ -5396,15 +5469,13 @@ LABEL_1D45_:
   call LABEL_50CB_
   jp LABEL_511A_
 
-; Data from 1D65 to 1D75 (17 bytes)
-DATA_1D65_:
-.db $AC $CA $E8 $06 $24 $42 $60 $7E $9C $BA $D8 $F6 $14 $32 $50 $6E
-.db $8C
+; Low bytes
+DATA_1D65__Lo:
+.db <_LABEL_4BAC_ <_LABEL_4BCA_ <_LABEL_4BE8_ <_LABEL_4C06_ <_LABEL_4C24_ <_LABEL_4C42_ <_LABEL_4C60_ <_LABEL_4C7E_ <_LABEL_4C9C_ <_LABEL_4CBA_ <_LABEL_4CD8_ <_LABEL_4CF6_ <_LABEL_4D14_ <_LABEL_4D32_ <_LABEL_4D50_ <_LABEL_4D6E_ <_LABEL_4D8C_ 
 
-; Data from 1D76 to 1D86 (17 bytes)
-DATA_1D76_:
-.db $4B $4B $4B $4C $4C $4C $4C $4C $4C $4C $4C $4C $4D $4D $4D $4D
-.db $4D
+; High bytes
+DATA_1D76__Hi:
+.db >_LABEL_4BAC_ >_LABEL_4BCA_ >_LABEL_4BE8_ >_LABEL_4C06_ >_LABEL_4C24_ >_LABEL_4C42_ >_LABEL_4C60_ >_LABEL_4C7E_ >_LABEL_4C9C_ >_LABEL_4CBA_ >_LABEL_4CD8_ >_LABEL_4CF6_ >_LABEL_4D14_ >_LABEL_4D32_ >_LABEL_4D50_ >_LABEL_4D6E_ >_LABEL_4D8C_ 
 
 ; Data from 1D87 to 1D96 (16 bytes)
 DATA_1D87_:
@@ -5601,9 +5672,9 @@ LABEL_1DF2_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_1_FourByFour
   jr nz, ++
-  ld a, :DATA_37232_
+  ld a, :DATA_37232_FourByFour_
   ld (PAGING_REGISTER), a
-  ld hl, DATA_37232_
+  ld hl, DATA_37232_FourByFour_
   ld d, $00
   ld a, (_RAM_DE7D_)
   and $3F
@@ -5677,7 +5748,7 @@ LABEL_1FDC_:
   ld a, (_RAM_DBA7_)
   ld (_RAM_DBA5_), a
 +:
-  ld hl, DATA_25D0_
+  ld hl, DATA_25D0_TimesTable36Lo
   ld a, (_RAM_DE7D_)
   and $3F
   ld e, a
@@ -5685,7 +5756,7 @@ LABEL_1FDC_:
   add hl, de
   ld a, (hl)
   ld c, a
-  ld hl, DATA_2611_
+  ld hl, DATA_2611_TimesTable36Hi
   add hl, de
   ld a, (hl)
   ld d, a
@@ -6310,20 +6381,16 @@ DATA_251E_:
 .db $14 $15 $16 $17 $18 $19 $1A $1B $20 $21 $22 $23 $24 $25 $26 $27
 .db $28 $29 $2A $2B $30 $31 $32 $33 $34 $35 $36 $37 $38 $39 $3A $3B
 
-; Data from 254E to 258E (65 bytes)
 DATA_254E_TimesTable18Lo:
   TimesTableLo 0, 18, 65
 
-; Data from 258F to 25CF (65 bytes)
 DATA_258F_TimesTable18Hi:
   TimesTableHi 0, 18, 65
 
-; Data from 25D0 to 2610 (65 bytes)
-DATA_25D0_:
+DATA_25D0_TimesTable36Lo:
   TimesTableLo 0, 36, 65
 
-; Data from 2611 to 261F (15 bytes)
-DATA_2611_:
+DATA_2611_TimesTable36Hi:
   TimesTableHi 0, 36, 65
 
 DATA_2652_TimesTable12Lo:
@@ -6451,7 +6518,7 @@ LABEL_26F5_:
 +:ret
 
 LABEL_2724_:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_DF0F_)
   add a, l
   ld l, a
@@ -6459,7 +6526,7 @@ LABEL_2724_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_DF0F_)
   add a, l
   ld l, a
@@ -7277,10 +7344,7 @@ LABEL_2D07_UpdatePalette_RuffTruxSubmerged:
   ld e, a
   ld d, $00
   add hl, de
-  ld a, $26 ; Palette entry $13
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateGG $13 ; Palette entry $13
   ld a, (hl)
   out (PORT_VDP_DATA), a
   inc hl
@@ -7289,7 +7353,6 @@ LABEL_2D07_UpdatePalette_RuffTruxSubmerged:
   call LABEL_3F36_ScreenOn
 +:ret
 
-; Data from 2D36 to 2D3F (10 bytes)
 DATA_2D36_RuffTruxSubmergedPaletteSequence_GG:
   GGCOLOUR $000000
   GGCOLOUR $000088
@@ -7307,10 +7370,7 @@ DATA_2D36_RuffTruxSubmergedPaletteSequence_GG:
   ld e, a
   ld d, $00
   add hl, de
-  ld a, $13 ; Palette index $13
-  out (PORT_VDP_ADDRESS), a
-  ld a, $C0
-  out (PORT_VDP_ADDRESS), a
+  SetPaletteAddressImmediateSMS $13
   ld a, (hl) ; Set colour
   out (PORT_VDP_DATA), a
   call LABEL_3F36_ScreenOn
@@ -7588,11 +7648,9 @@ LABEL_2EF8_:
   ld (_RAM_DD5E_), a
   ret
 
-; Data from 2F27 to 2F66 (64 bytes)
 DATA_2F27_MultiplesOf32:
   TimesTable16 0 32 32
 
-; Data from 2F67 to 2FA6 (64 bytes)
 DATA_2F67_MultiplesOf96:
   TimesTable16 0 96 32
 
@@ -7604,7 +7662,6 @@ DATA_2FA7_:
 DATA_2FAF_:
 .db $20 $00 $40 $20 $40 $00 $20 $00
 
-; Data from 2FB7 to 2FBB (5 bytes)
 DATA_2FB7_RuffTruxSubmergedPaletteSequence_SMS:
   SMSCOLOUR $000000 ; black
   SMSCOLOUR $0000aa ; dark Blue
@@ -7872,19 +7929,13 @@ LABEL_31B6_InitialiseFloorTiles:
 
 LABEL_31F1_UpdateSpriteTable:
   ; Sprite table Y
-  ld a, $00
-  out (PORT_VDP_ADDRESS), a
-  ld a, $7F
-  out (PORT_VDP_ADDRESS), a
+  SetVDPAddressImmediate SPRITE_TABLE_ADDRESS | VRAM_WRITE_MASK
   ld hl, _RAM_DAE0_SpriteTableYs
   ld b, 64*_sizeof_SpriteY
   ld c, PORT_VDP_DATA
   otir
   ; Sprite table XN
-  ld a, $80
-  out (PORT_VDP_ADDRESS), a
-  ld a, $7F
-  out (PORT_VDP_ADDRESS), a
+  SetVDPAddressImmediate SPRITE_TABLE_ADDRESS | VRAM_WRITE_MASK + 128
   ld hl, _RAM_DA60_SpriteTableXNs
   ld b, 64*_sizeof_SpriteXN
   ld c, PORT_VDP_DATA
@@ -7916,11 +7967,8 @@ LABEL_3231_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   JrZRet +
-  ld a, $00
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  ld bc, $0080
+  SetTileAddressImmediate SpriteIndex_Decorators
+  ld bc, TILE_DATA_SIZE * 4
 -:
   xor a
   out (PORT_VDP_DATA), a
@@ -7929,6 +7977,35 @@ LABEL_3231_:
   or c
   jr nz, -
 +:ret
+
+.macro UpdateTileBitplane args TileIndex, Bitplane
+  ; Emits 8 bytes from hl to port c
+  ; while setting the VRAM write address to each bitplane byte 
+  ; for the gicen sprite and bitplane number
+  .define ADDRESS TileIndex * TILE_DATA_SIZE | VRAM_WRITE_MASK + Bitplane
+  .repeat 8
+    SetVDPAddressImmediate ADDRESS
+    outi
+    .redefine ADDRESS ADDRESS+4 ; every 4 bytes -> 1 bitplane
+  .endr
+  .undefine ADDRESS
+.endm
+
+.macro UpdateCarDecorators args CarData, TileIndex, Bitplane
+  ld c, PORT_VDP_DATA
+  ld ix, CarData
+  ld d, $00
+  ld a, (ix+13) ; Direction?
+  or a ; Multiply by 4
+  rl a
+  rl a
+  rl a
+  ld e, a
+  ; Offset into decorator data
+  ld hl, _RAM_D980_CarDecoratorTileData1bpp
+  add hl, de
+  UpdateTileBitplane TileIndex, Bitplane  
+.endm
 
 LABEL_324C_UpdatePerFrameTiles:
   ; Updates all the tiles which are written into every frame
@@ -7939,7 +8016,7 @@ LABEL_324C_UpdatePerFrameTiles:
   jp z, LABEL_746B_RuffTrux_UpdatePerFrameTiles
 
   ; Update tiles for car "decorators"
-  ; Always do the red car
+  ; Always do the red and blue cars
   ld a, (_RAM_DE91_CarDirectionPrevious) ; 0-$f
   or a
   rl a ; multiply by 8
@@ -7948,59 +8025,21 @@ LABEL_324C_UpdatePerFrameTiles:
   ld e, a
   ld hl, _RAM_D980_CarDecoratorTileData1bpp ; table here holds the 1bpp tile data
   add hl, de
-  ld a, $00 ; tile 190 = red car decorator
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $04 ; every 4 bytes -> 1 bitplane
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $08
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $0C
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $10
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $14
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $18
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $1C
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
+
+  UpdateTileBitplane SpriteIndex_Decorators.Red, 0
+
   call LABEL_336A_UpdateBlueCarDecorator
+  
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jr z, +
-  ; Tournament
+  
+  ; Tournament -> do the other two cars
   call LABEL_3302_UpdateGreenCarDecorator
   jp LABEL_33D2_UpdateYellowCarDecorator ; and ret
 
-+:; Head to head
-  ld a, $C0 ; Tile $1a6
-  out (PORT_VDP_ADDRESS), a
-  ld a, $74
-  out (PORT_VDP_ADDRESS), a
++:; Head to head -> update the laps remaining counter
+  SetTileAddressImmediate SpriteIndex_Digits + 2
   ld a, (_RAM_DF24_LapsRemaining)
   sub $01
   cp $04
@@ -8023,7 +8062,7 @@ LABEL_324C_UpdatePerFrameTiles:
   jp LABEL_AFD_RestorePaging_fromDE8E
 
 +:
-  ld b, TILE_DATA_SIZE ; Emit a blank tile
+  ld b, TILE_DATA_SIZE ; Emit a blank tile when the number is too large
   xor a
 -:out (PORT_VDP_DATA), a
   dec b
@@ -8031,165 +8070,15 @@ LABEL_324C_UpdatePerFrameTiles:
   jp --
 
 LABEL_3302_UpdateGreenCarDecorator:
-  ld c, PORT_VDP_DATA
-  ld ix, _RAM_DCAB_
-  ld d, $00
-  ld a, (ix+13)
-  or a
-  rl a
-  rl a
-  rl a
-  ld e, a
-  ld hl, _RAM_D980_CarDecoratorTileData1bpp
-  add hl, de
-  ld a, $21 ; Tile $191 = green car "decorator"
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $25
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $29
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $2D
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $31
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $35
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $39
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $3D
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
+  UpdateCarDecorators _RAM_DCAB_CarData_Green, SpriteIndex_Decorators.Green, 1 ; Tile $191 = green car "decorator"
   ret
 
 LABEL_336A_UpdateBlueCarDecorator:
-  ld c, PORT_VDP_DATA
-  ld ix, _RAM_DCEC_
-  ld d, $00
-  ld a, (ix+13) ; Direction?
-  or a
-  rl a
-  rl a
-  rl a
-  ld e, a
-  ld hl, _RAM_D980_CarDecoratorTileData1bpp
-  add hl, de
-  ld a, $42 ; Tile $192 = Blue car "decorator"
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $46
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $4A
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $4E
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $52
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $56
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $5A
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $5E
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
+  UpdateCarDecorators _RAM_DCEC_CarData_Blue, SpriteIndex_Decorators.Blue, 2 ; Tile $192 = Blue car "decorator"
   ret
 
 LABEL_33D2_UpdateYellowCarDecorator:
-  ld c, PORT_VDP_DATA
-  ld ix, _RAM_DD2D_
-  ld d, $00
-  ld a, (ix+13)
-  or a
-  rl a
-  rl a
-  rl a
-  ld e, a
-  ld hl, _RAM_D980_CarDecoratorTileData1bpp
-  add hl, de
-  ld a, $63 ; Tile $193 = yellow car "decorator"
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $67
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $6B
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $6F
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $73
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $77
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $7B
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
-  ld a, $7F
-  out (PORT_VDP_ADDRESS), a
-  ld a, $72
-  out (PORT_VDP_ADDRESS), a
-  outi
+  UpdateCarDecorators _RAM_DD2D_CarData_Yellow, SpriteIndex_Decorators.Yellow, 3 ; Tile $193 = yellow car "decorator"
   ret
 
 LABEL_343A_:
@@ -8957,32 +8846,34 @@ LABEL_39AE_:
 LABEL_3A23_:
   JumpToPagedFunction LABEL_36A85_
 
-LABEL_3A2E_:
+LABEL_3A2E_SetShadowSpriteIndices:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr z, +
-  ld a, $A8
+  
+  ; Not RuffTrux
+  ld a, <SpriteIndex_Shadow+0
   ld (_RAM_DA60_SpriteTableXNs.49.n), a
   ld (_RAM_DA60_SpriteTableXNs.53.n), a
-  ld a, $A9
+  ld a, <SpriteIndex_Shadow+1
   ld (_RAM_DA60_SpriteTableXNs.50.n), a
   ld (_RAM_DA60_SpriteTableXNs.54.n), a
-  ld a, $AA
+  ld a, <SpriteIndex_Shadow+2
   ld (_RAM_DA60_SpriteTableXNs.51.n), a
   ld (_RAM_DA60_SpriteTableXNs.55.n), a
-  ld a, $AB
+  ld a, <SpriteIndex_Shadow+3
   ld (_RAM_DA60_SpriteTableXNs.52.n), a
   ld (_RAM_DA60_SpriteTableXNs.56.n), a
   ret
 
-+:
-  ld a, $0B
++:; RuffTrux
+  ld a, SpriteIndex_RuffTrux_Shadow1
   ld (_RAM_DA60_SpriteTableXNs.49.n), a
-  ld a, $18
+  ld a, SpriteIndex_RuffTrux_Shadow2
   ld (_RAM_DA60_SpriteTableXNs.50.n), a
-  ld a, $1B
+  ld a, SpriteIndex_RuffTrux_Shadow3
   ld (_RAM_DA60_SpriteTableXNs.51.n), a
-  ld a, $88
+  ld a, SpriteIndex_RuffTrux_Shadow4
   ld (_RAM_DA60_SpriteTableXNs.52.n), a
   ret
 
@@ -9035,7 +8926,10 @@ LABEL_3AC9_:
   or a
   JrNzRet _LABEL_3AC8_ret
 LABEL_3ACF_:
-  ld a, (_RAM_DE84_)
+  ; Set up RuffTrux sprites
+  ; ix = sprite XNs
+  ; iy = sprite Ys
+  ld a, (_RAM_DE84_) ; Sprite X
   ld (ix+0), a
   ld (ix+8), a
   ld (ix+16), a
@@ -9055,7 +8949,7 @@ LABEL_3ACF_:
   ld (ix+14), a
   ld (ix+22), a
   ld (ix+30), a
-  ld a, (_RAM_DE85_)
+  ld a, (_RAM_DE85_) ; Sprite Y
   ld (iy+0), a
   ld (iy+1), a
   ld (iy+2), a
@@ -9075,17 +8969,17 @@ LABEL_3ACF_:
   ld (iy+13), a
   ld (iy+14), a
   ld (iy+15), a
-  ld a, (_RAM_DE86_)
+  ld a, (_RAM_DE86_) ; Rotation index
   sla a
   sla a
   sla a
   sla a
-  ld hl, DATA_35C2D_
+  ld hl, DATA_35C2D_RuffTruxTileIndices
   ld d, $00
   ld e, a
   add hl, de
-  ld c, $11
-  ld a, :DATA_35C2D_
+  ld c, 16 + 1 ; one too many?
+  ld a, :DATA_35C2D_RuffTruxTileIndices
   ld (PAGING_REGISTER), a
 -:
   ld a, (hl)
@@ -9095,8 +8989,10 @@ LABEL_3ACF_:
   inc hl
   dec c
   jr nz, -
+  ; Restore paging
   ld a, (_RAM_DE8E_PageNumber)
   ld (PAGING_REGISTER), a
+  ; Set previous sprite (?) to 0, 0
   xor a
   ld (ix-2), a
   ld (iy-1), a
@@ -9395,19 +9291,15 @@ _LABEL_3DBC_ret:
 LABEL_3DBD_:
   JumpToPagedFunction LABEL_239C6_
 
-; Data from 3DC8 to 3DD0 (9 bytes)
 DATA_3DC8_TrackTypeTileDataPages:
-.db :DATA_3C000_Sportscars_Tiles :DATA_39C83_FourByFour_Tiles :DATA_3D901_Powerboats_Tiles :DATA_38000_TurboWheels_Tiles :DATA_34000_FormulaOne_Tiles :DATA_3A8FA_Warriors_Tiles :DATA_39168_Tanks_Tiles :DATA_3CD8D_RuffTrux_Tiles
-.db $0D ; Dangling helicopters reference
+.db :DATA_3C000_Sportscars_Tiles :DATA_39C83_FourByFour_Tiles :DATA_3D901_Powerboats_Tiles :DATA_38000_TurboWheels_Tiles :DATA_34000_FormulaOne_Tiles :DATA_3A8FA_Warriors_Tiles :DATA_39168_Tanks_Tiles :DATA_3CD8D_RuffTrux_Tiles :DATA_34000_Helicopters_Tiles_BadReference
 
 LABEL_3DD1_:
   JumpToPagedFunction LABEL_3636E_
 
-; Data from 3DDC to 3DE3 (8 bytes)
 DATA_3DDC_TrackTypeTileDataPointerLo:
 .db <DATA_3C000_Sportscars_Tiles <DATA_39C83_FourByFour_Tiles <DATA_3D901_Powerboats_Tiles <DATA_38000_TurboWheels_Tiles <DATA_34000_FormulaOne_Tiles <DATA_3A8FA_Warriors_Tiles <DATA_39168_Tanks_Tiles <DATA_3CD8D_RuffTrux_Tiles
 
-; Data from 3DE4 to 3DEB (8 bytes)
 DATA_3DE4_TrackTypeTileDataPointerHi:
 .db >DATA_3C000_Sportscars_Tiles >DATA_39C83_FourByFour_Tiles >DATA_3D901_Powerboats_Tiles >DATA_38000_TurboWheels_Tiles >DATA_34000_FormulaOne_Tiles >DATA_3A8FA_Warriors_Tiles >DATA_39168_Tanks_Tiles >DATA_3CD8D_RuffTrux_Tiles
 
@@ -9434,7 +9326,6 @@ LABEL_3E24_:
 LABEL_3E2F_:
   JumpToPagedFunction LABEL_37946_
 
-; Data from 3E3A to 3E42 (9 bytes)
 DATA_3E3A_TrackTypeDataPageNumbers:
 .db :DATA_C000_TrackData_SportsCars
 .db :DATA_10000_TrackData_FourByFour
@@ -9546,8 +9437,8 @@ LABEL_3F3F_:
 +:ret
 
 LABEL_3F54_BlankGameRAM:
-  ld bc, _RAM_DF9A_EndOfRAM - _RAM_DCAB_ ; $02EF ; Byte count
--:ld hl, _RAM_DCAB_ ; Start
+  ld bc, _RAM_DF9A_EndOfRAM - _RAM_DCAB_CarData_Green ; $02EF ; Byte count
+-:ld hl, _RAM_DCAB_CarData_Green ; Start
   add hl, bc
   xor a
   ld (hl), a
@@ -9620,12 +9511,12 @@ DATA_3FD3_:
 ; Uninitialised memory containing source code
 .db "D", 9, "A,(BULLON2)", 13, 10, 9, "OR", 9, "A", 13, 10, 9, "JR", 9, "Z,"
 .endif
-.ends
+;.ends
 
 .orga $3fff
 ; Bank marker
 .db :CADDR
-.section "Bank 1"
+;.section "Bank 1"
 
 ; Metatile tilemaps are stored from $0080 in each track data bank
 ; Each metatile is 12 * 12 = 144 bytes of tile indices
@@ -9926,7 +9817,7 @@ LABEL_44C3_:
 +:ret
 
 LABEL_4595_:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_DF7B_)
   add a, l
   ld l, a
@@ -9934,7 +9825,7 @@ LABEL_4595_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_DF7B_)
   add a, l
   ld l, a
@@ -10250,15 +10141,15 @@ LABEL_479E_:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
   JrNzRet _LABEL_479D_ret
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   jp ++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call ++
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call ++
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
 ++:
   ld a, (ix+10)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
@@ -10458,11 +10349,11 @@ LABEL_48FC_:
   jp -
 
 LABEL_4927_:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call +
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call +
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld a, $01
   ld (ix+21), a
@@ -10576,65 +10467,35 @@ LABEL_49C9_:
   JumpToPagedFunction LABEL_1BDF3_
 
 ; Data from 49FA to 4DA9 (944 bytes)
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01
-.db $01 $01 $01 $01 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00 $00 $00 $00 $00 $01 $00 $00 $00 $00 $00 $01 $00 $00 $01
-.db $00 $00 $01 $00 $00 $01 $00 $00 $01 $00 $01 $00 $01 $00 $00 $00
-.db $00 $00 $00 $00 $01 $00 $00 $01 $00 $00 $01 $01 $00 $01 $01 $00
-.db $01 $01 $01 $01 $01 $00 $01 $01 $01 $01 $01 $01 $00 $00 $00 $00
-.db $00 $00 $01 $00 $01 $00 $01 $00 $01 $01 $01 $01 $01 $01 $02 $01
-.db $01 $02 $01 $01 $02 $02 $01 $02 $01 $01 $00 $00 $00 $00 $00 $00
-.db $01 $01 $00 $01 $01 $00 $02 $01 $01 $02 $01 $01 $02 $02 $01 $02
-.db $02 $01 $02 $02 $02 $02 $02 $02 $00 $00 $00 $00 $00 $00 $01 $01
-.db $01 $01 $01 $00 $02 $02 $01 $02 $02 $01 $03 $02 $02 $02 $02 $02
-.db $03 $02 $03 $02 $03 $02 $00 $00 $00 $00 $00 $00 $01 $01 $01 $01
-.db $01 $01 $02 $02 $02 $02 $02 $02 $03 $02 $03 $02 $03 $02 $03 $03
-.db $03 $03 $03 $03 $00 $00 $00 $00 $00 $00 $02 $01 $01 $01 $01 $01
-.db $03 $02 $02 $03 $02 $02 $03 $03 $03 $03 $03 $03 $04 $03 $04 $03
-.db $04 $03 $00 $00 $00 $00 $00 $00 $02 $01 $01 $02 $01 $01 $03 $03
-.db $02 $03 $03 $02 $04 $03 $03 $04 $03 $03 $04 $04 $04 $04 $04 $04
-.db $00 $00 $00 $00 $00 $00 $02 $01 $02 $01 $02 $01 $03 $03 $03 $03
-.db $03 $03 $04 $04 $04 $04 $04 $03 $05 $04 $05 $04 $05 $04 $00 $00
-.db $00 $00 $00 $00 $02 $02 $01 $02 $02 $01 $04 $03 $03 $04 $03 $03
-.db $05 $04 $04 $04 $04 $04 $05 $05 $05 $05 $05 $05 $00 $00 $00 $00
-.db $00 $00 $02 $02 $02 $02 $02 $01 $04 $04 $03 $04 $04 $03 $05 $05
-.db $04 $05 $05 $04 $06 $05 $06 $05 $06 $05 $00 $00 $00 $00 $00 $00
-.db $02 $02 $02 $02 $02 $02 $04 $04 $04 $04 $04 $04 $05 $05 $05 $05
-.db $05 $05 $06 $06 $06 $06 $06 $06 $00 $00 $00 $00 $00 $00 $03 $02
-.db $02 $02 $02 $02 $05 $04 $04 $05 $04 $04 $06 $05 $06 $05 $06 $05
-.db $07 $06 $07 $06 $07 $06 $00 $00 $00 $00 $00 $00 $03 $02 $02 $03
-.db $02 $02 $05 $05 $04 $05 $05 $04 $06 $06 $06 $06 $06 $05 $07 $07
-.db $07 $07 $07 $07 $00 $00 $00 $00 $00 $00 $03 $02 $03 $02 $03 $02
-.db $05 $05 $05 $05 $05 $05 $07 $06 $06 $07 $06 $06 $08 $07 $08 $07
-.db $08 $07 $00 $00 $00 $00 $00 $00 $03 $03 $02 $03 $03 $02 $06 $05
-.db $05 $06 $05 $05 $07 $07 $06 $07 $07 $06 $08 $08 $08 $08 $08 $08
+; One of the three is pointed to by _RAM_DF53_
+; Depending on whether it's track 0, 1 or 2 (for F1)
+; ???
+_LABEL_49FA_:
+.db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+_LABEL_4A80_:
+.db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+_LABEL_4B10_:
+.db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+; Data pointed to by DATA_1D65__Lo etc
+; TODO what is it? 0..8 with a weird ramp effect
+_LABEL_4BAC_: .db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+_LABEL_4BCA_: .db 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 1 0 1 0
+_LABEL_4BE8_: .db 0 0 0 0 0 0 1 0 0 1 0 0 1 1 0 1 1 0 1 1 1 1 1 0 1 1 1 1 1 1
+_LABEL_4C06_: .db 0 0 0 0 0 0 1 0 1 0 1 0 1 1 1 1 1 1 2 1 1 2 1 1 2 2 1 2 1 1
+_LABEL_4C24_: .db 0 0 0 0 0 0 1 1 0 1 1 0 2 1 1 2 1 1 2 2 1 2 2 1 2 2 2 2 2 2
+_LABEL_4C42_: .db 0 0 0 0 0 0 1 1 1 1 1 0 2 2 1 2 2 1 3 2 2 2 2 2 3 2 3 2 3 2
+_LABEL_4C60_: .db 0 0 0 0 0 0 1 1 1 1 1 1 2 2 2 2 2 2 3 2 3 2 3 2 3 3 3 3 3 3
+_LABEL_4C7E_: .db 0 0 0 0 0 0 2 1 1 1 1 1 3 2 2 3 2 2 3 3 3 3 3 3 4 3 4 3 4 3
+_LABEL_4C9C_: .db 0 0 0 0 0 0 2 1 1 2 1 1 3 3 2 3 3 2 4 3 3 4 3 3 4 4 4 4 4 4
+_LABEL_4CBA_: .db 0 0 0 0 0 0 2 1 2 1 2 1 3 3 3 3 3 3 4 4 4 4 4 3 5 4 5 4 5 4
+_LABEL_4CD8_: .db 0 0 0 0 0 0 2 2 1 2 2 1 4 3 3 4 3 3 5 4 4 4 4 4 5 5 5 5 5 5
+_LABEL_4CF6_: .db 0 0 0 0 0 0 2 2 2 2 2 1 4 4 3 4 4 3 5 5 4 5 5 4 6 5 6 5 6 5
+_LABEL_4D14_: .db 0 0 0 0 0 0 2 2 2 2 2 2 4 4 4 4 4 4 5 5 5 5 5 5 6 6 6 6 6 6
+_LABEL_4D32_: .db 0 0 0 0 0 0 3 2 2 2 2 2 5 4 4 5 4 4 6 5 6 5 6 5 7 6 7 6 7 6
+_LABEL_4D50_: .db 0 0 0 0 0 0 3 2 2 3 2 2 5 5 4 5 5 4 6 6 6 6 6 5 7 7 7 7 7 7
+_LABEL_4D6E_: .db 0 0 0 0 0 0 3 2 3 2 3 2 5 5 5 5 5 5 7 6 6 7 6 6 8 7 8 7 8 7
+_LABEL_4D8C_: .db 0 0 0 0 0 0 3 3 2 3 3 2 6 5 5 6 5 5 7 7 6 7 7 6 8 8 8 8 8 8
 
 LABEL_4DAA_:
   ld a, (ix+20)
@@ -11216,7 +11077,7 @@ LABEL_51B3_:
   ld a, (_RAM_D5DF_)
   or a
   ret nz
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld l, (ix+0)
   ld h, (ix+1)
   ld (_RAM_D59F_), hl
@@ -11232,7 +11093,7 @@ LABEL_51DA_:
   ld a, (_RAM_DC3F_GameMode)
   or a
   jr nz, +
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld a, (ix+12)
   ld (_RAM_DE56_), a
   ld a, $01
@@ -11245,7 +11106,7 @@ LABEL_51DA_:
 +:
   xor a
   ld (_RAM_DC3D_IsHeadToHead), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld a, (ix+13)
   ld (_RAM_DE56_), a
   ld a, (ix+11)
@@ -11343,19 +11204,19 @@ LABEL_52B7_:
   inc a
   and $03
   ld (_RAM_D5CA_), a
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   ld a, (ix+13)
   ld (_RAM_DE56_), a
   ld a, (ix+11)
   ld (_RAM_DE57_), a
   call LABEL_5304_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld a, (ix+13)
   ld (_RAM_DE56_), a
   ld a, (ix+11)
   ld (_RAM_DE57_), a
   call LABEL_5304_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   ld a, (ix+13)
   ld (_RAM_DE56_), a
   ld a, (ix+11)
@@ -11695,9 +11556,9 @@ LABEL_5451_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_1_FourByFour
   jr nz, +
-  ld a, :DATA_37232_
+  ld a, :DATA_37232_FourByFour_
   ld (PAGING_REGISTER), a
-  ld hl, DATA_37232_
+  ld hl, DATA_37232_FourByFour_
   ld d, $00
   ld a, (_RAM_DCF6_)
   and $3F
@@ -11748,7 +11609,7 @@ LABEL_55FA_:
 +:
   ld (ix+11), a
 LABEL_5608_:
-  ld hl, DATA_25D0_
+  ld hl, DATA_25D0_TimesTable36Lo
   ld a, (ix+10)
   and $3F
   ld e, a
@@ -11757,7 +11618,7 @@ LABEL_5608_:
   ld a, (hl)
   ld c, a
   ld d, $00
-  ld hl, DATA_2611_
+  ld hl, DATA_2611_TimesTable36Hi
   add hl, de
   ld a, (hl)
   ld d, a
@@ -11972,11 +11833,12 @@ LABEL_5769_:
 +:
   ld a, (_RAM_DF00_)
   or a
-  jr nz, ++
+  jr nz, ++ ; no-op
 ++:
   call LABEL_EE6_
 +++:
-  ld hl, DATA_1D65_
+  ; Look up pointer (index 0..16)
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_DE57_)
   add a, l
   ld l, a
@@ -11984,7 +11846,7 @@ LABEL_5769_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_DE57_)
   add a, l
   ld l, a
@@ -11992,6 +11854,7 @@ LABEL_5769_:
   adc a, h
   ld h, a
   ld d, (hl)
+  
   push de
     ld hl, DATA_3FC3_
     ld a, (_RAM_DE56_)
@@ -12401,11 +12264,11 @@ _LABEL_5A87_ret:
   ret
 
 LABEL_5A88_:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call +
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call +
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld d, $00
   ld a, (ix+20)
@@ -12871,7 +12734,7 @@ LABEL_5E3A_:
 +:ret
 
 ++:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   ld bc, $0000
   ld a, (_RAM_DCC0_)
   cp $01
@@ -12979,7 +12842,7 @@ LABEL_5E3A_:
   ld (_RAM_DE2F_), a
   ld (_RAM_DE32_), a
   call LABEL_2934_BehaviourF
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_2961_
 ++:
   xor a
@@ -12991,11 +12854,11 @@ _LABEL_5F52_ret:
 +++:
   xor a
   ld (_RAM_DE32_), a
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   jp LABEL_2961_
 
 LABEL_5F5E_:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld bc, $0000
   ld a, (_RAM_DD01_)
   cp $01
@@ -13158,7 +13021,7 @@ LABEL_6054_:
 
 +:
   call LABEL_2934_BehaviourF
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_2961_
 ++:
   xor a
@@ -13173,11 +13036,11 @@ LABEL_609D_:
   jr nz, LABEL_6054_
   xor a
   ld (_RAM_DE35_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   jp LABEL_2961_
 
 LABEL_60AE_:
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   ld bc, $0000
   ld a, (_RAM_DD42_)
   cp $01
@@ -13285,7 +13148,7 @@ LABEL_60AE_:
   ld (_RAM_DE2F_), a
   ld (_RAM_DE38_), a
   call LABEL_2934_BehaviourF
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_2961_
 ++:
   xor a
@@ -13297,7 +13160,7 @@ _LABEL_618F_ret:
 +++:
   xor a
   ld (_RAM_DE38_), a
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   jp LABEL_2961_
 
 LABEL_619B_:
@@ -13337,31 +13200,31 @@ LABEL_619B_:
   ld a, $01
   cp b
   jr z, +
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B0C_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B2F_
   jp ++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B2F_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B0C_
 ++:
   ld a, $01
   cp c
   jr z, +
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B50_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B73_
   jp ++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B73_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B50_
 ++:
   call LABEL_6582_
@@ -13407,9 +13270,9 @@ LABEL_619B_:
   xor a
   ld (_RAM_DE35_), a
   ld (_RAM_DE32_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_2961_
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_2961_
 ++:
   xor a
@@ -13459,31 +13322,31 @@ LABEL_629A_:
   ld a, $01
   cp b
   jr z, +
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B0C_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B2F_
   jp ++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B2F_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B0C_
 ++:
   ld a, $01
   cp c
   jr z, +
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B50_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B73_
   jp ++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_1B73_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B50_
 ++:
   call LABEL_6582_
@@ -13529,9 +13392,9 @@ LABEL_629A_:
   xor a
   ld (_RAM_DE38_), a
   ld (_RAM_DE32_), a
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_2961_
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_2961_
 ++:
   xor a
@@ -13577,31 +13440,31 @@ LABEL_6394_:
   ld a, $01
   cp b
   jr z, +
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B0C_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B2F_
   jp ++
 
 +:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B2F_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B0C_
 ++:
   ld a, $01
   cp c
   jr z, +
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B50_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B73_
   jp ++
 
 +:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_1B73_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_1B50_
 ++:
   call LABEL_6582_
@@ -13647,9 +13510,9 @@ LABEL_6394_:
   xor a
   ld (_RAM_DE35_), a
   ld (_RAM_DE38_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_2961_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_2961_
 ++:
   xor a
@@ -13673,7 +13536,7 @@ LABEL_648E_:
   jp ++
 
 +:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld iy, _RAM_DE34_
 ++:
   JumpToPagedFunction LABEL_1BCE2_
@@ -13859,15 +13722,15 @@ LABEL_663D_InitialisePlugholeTiles:
   jr z, + ; Only for powerboats...
   ret
 
-+:ld a, :DATA_35708_PlugholeTilesPart1
++:ld a, :DATA_35708_PlugholeTilesHighBitplanePart1
   ld (PAGING_REGISTER), a
-  ld hl, DATA_35708_PlugholeTilesPart1 ; Tile data
-  ld de, $5B63        ; Tile $db bitplane 3?
-  ld bc, $0068        ; Data to copy in - 13 tiles?
+  ld hl, DATA_35708_PlugholeTilesHighBitplanePart1 ; Tile data
+  ld de, $5B63        ; Tile $db bitplane 3
+  ld bc, $0068        ; 13 tiles
   call _f             ; Emit it
-  ld hl, DATA_35770_PlugholeTilesPart2 ; Then some more
-  ld de, $5DC3        ; Tile $ee bitplane 3?
-  ld bc, $0088        ; 16 tiles?
+  ld hl, DATA_35770_PlugholeTilesHighBitplanePart2 ; Then some more
+  ld de, $5DC3        ; Tile $ee bitplane 3
+  ld bc, $0088        ; 17 tiles
   ; Fall through and ret
 __:
   ld a, e         ; Set VRAM address to de
@@ -13890,7 +13753,7 @@ __:
   ret
 
 LABEL_6677_:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_DE2F_)
   add a, l
   ld l, a
@@ -13898,7 +13761,7 @@ LABEL_6677_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_DE2F_)
   add a, l
   ld l, a
@@ -14328,7 +14191,7 @@ LABEL_6947_:
   ld e, $74
   ld d, $00
   add hl, de
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
   ld hl, (_RAM_DBAB_)
   ld e, $64
   ld d, $00
@@ -14506,7 +14369,7 @@ LABEL_6A97_:
 
 +:
   ld hl, (_RAM_DCE0_)
-  ld (_RAM_DCAB_), hl
+  ld (_RAM_DCAB_CarData_Green), hl
   ld hl, (_RAM_DCE2_)
   ld (_RAM_DCAD_), hl
   xor a
@@ -14569,7 +14432,7 @@ LABEL_6B60_:
 
 +:
   ld hl, (_RAM_DD21_)
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
   ld hl, (_RAM_DD23_)
   ld (_RAM_DCEE_), hl
   xor a
@@ -14628,7 +14491,7 @@ LABEL_6BC2_:
 
 +:
   ld hl, (_RAM_DD62_)
-  ld (_RAM_DD2D_), hl
+  ld (_RAM_DD2D_CarData_Yellow), hl
   ld hl, (_RAM_DD64_)
   ld (_RAM_DD2F_), hl
   xor a
@@ -14704,14 +14567,14 @@ LABEL_6C39_:
   jr nc, ++
 -:
   cp d
-  jp c, LABEL_6D43_
+  jp c, LABEL_6D43_Powerboats
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jp z, +++
   ld a, (_RAM_DB97_TrackType)
   cp TT_4_FormulaOne
   jp z, LABEL_6E00_
-  jp LABEL_6D43_
+  jp LABEL_6D43_Powerboats
 
 +:
   ld h, a
@@ -14731,25 +14594,26 @@ LABEL_6C39_:
 +++:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jp z, LABEL_6D43_
+  jp z, LABEL_6D43_Powerboats
   cp TT_4_FormulaOne
   jr nz, LABEL_6D08_
+  ; Formula One
   ld a, (_RAM_DB96_TrackIndexForThisType)
   or a
   jr z, ++
   cp $01
   jr z, +
-  ld hl, $4B10
+  ld hl, _LABEL_4B10_
   ld (_RAM_DF53_), hl
   jp +++
 
 +:
-  ld hl, $4A80
+  ld hl, _LABEL_4A80_
   ld (_RAM_DF53_), hl
   jp +++
 
 ++:
-  ld hl, $49FA
+  ld hl, _LABEL_49FA_
   ld (_RAM_DF53_), hl
 +++:
   ld a, (_RAM_D587_)
@@ -14767,6 +14631,7 @@ LABEL_6C39_:
   ld a, (hl)
   cp c
   jp nz, LABEL_6E00_
+
 LABEL_6D08_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -14794,7 +14659,7 @@ LABEL_6D08_:
   call LABEL_71C7_
   jp LABEL_6E00_
 
-LABEL_6D43_:
+LABEL_6D43_Powerboats:
   ld b, $00
   ld a, (_RAM_D587_)
   ld l, a
@@ -15020,7 +14885,7 @@ LABEL_6EF3_:
 +:
   ld a, $01
   ld (_RAM_D5BE_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   jp LABEL_4DD4_
 
 LABEL_6F10_:
@@ -15270,13 +15135,13 @@ LABEL_709C_:
   cp $00
   jr nz, +
 +++:
-  add a, SpriteIndex_Blanks - (SpriteIndex_Digits - 1) ; Adjust to the first blank tile (in a more complicated way than is at all necessary)
-+:add a, SpriteIndex_Digits - 1 ; so 1 => "1"
+  add a, <SpriteIndex_Blank - (<SpriteIndex_Digits - 1) ; Adjust to the blank tile (in a more complicated way than is at all necessary)
++:add a, <SpriteIndex_Digits - 1 ; so 1 => "1"
 -:ld (_RAM_DF37_HUDSpriteNs.LapCounter), a
   jp ++++++++
 
 _TooMany:
-  ld a, SpriteIndex_Blanks ; $AC ; Blank
+  ld a, <SpriteIndex_Blank ; $AC ; Blank
   jp -
 
 ++++++:
@@ -15302,9 +15167,9 @@ _TooMany:
   ld a, (_RAM_DF65_) ; has finished
   cp $00
   jr z, +
-  ld a, SpriteIndex_FinishedIndicators.Red
+  ld a, <SpriteIndex_FinishedIndicators.Red
   jp ++
-+:ld a, SpriteIndex_PositionIndicators.Red
++:ld a, <SpriteIndex_PositionIndicators.Red
 ++:
   ld (hl), a
 
@@ -15316,9 +15181,9 @@ _TooMany:
   ld a, (_RAM_DCC5_)
   cp $00
   jr z, +
-  ld a, SpriteIndex_FinishedIndicators.Green
+  ld a, <SpriteIndex_FinishedIndicators.Green
   jp ++
-+:ld a, SpriteIndex_PositionIndicators.Green
++:ld a, <SpriteIndex_PositionIndicators.Green
 ++:
   ld (hl), a
 
@@ -15506,7 +15371,7 @@ LABEL_7295_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBB8_)
   call LABEL_7367_
-  ld (_RAM_DCAB_), hl
+  ld (_RAM_DCAB_CarData_Green), hl
   ld a, (_RAM_DBB7_)
   ld (_RAM_DEF5_), a
   ld a, $60
@@ -15531,7 +15396,7 @@ LABEL_72CA_:
 +:
   xor a
   ld (_RAM_DF5B_), a
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   ld (_RAM_D941_), hl
   ld hl, (_RAM_DCEE_)
   ld (_RAM_D943_), hl
@@ -15544,7 +15409,7 @@ LABEL_72CA_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBBB_)
   call LABEL_7367_
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
   ld a, (_RAM_DBBA_)
   ld (_RAM_DEF5_), a
   ld a, $60
@@ -15571,7 +15436,7 @@ LABEL_7332_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBBE_)
   call LABEL_7367_
-  ld (_RAM_DD2D_), hl
+  ld (_RAM_DD2D_CarData_Yellow), hl
   ld a, (_RAM_DBBD_)
   ld (_RAM_DEF5_), a
   ld a, $60
@@ -16492,13 +16357,16 @@ LABEL_7A58_:
   rr l
   srl l
   ld h, $00
-  ld de, DATA_35B8D_
+  ; Then divide by 3
+  ld de, DATA_35B8D_DivideByThree
   add hl, de
-  ld a, :DATA_35B8D_
+  ld a, :DATA_35B8D_DivideByThree
   ld (PAGING_REGISTER), a
   ld a, (hl)
+  ; So this is _RAM_DF20_ / 12
   ld (_RAM_DF22_), a
 
+  ; Then multiply by 96
   sla a
   ld l, a
   ld h, $00
@@ -16547,7 +16415,7 @@ LABEL_7AC4_:
   ld a, $01
   ld (_RAM_DF2A_Positions.Player2), a
   ld (_RAM_DF5B_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   jp LABEL_4E49_
 
 +:
@@ -16585,8 +16453,12 @@ LABEL_7B0B_:
   call LABEL_B63_
 +:ret
 
+.org $7b21
 LABEL_7B21_Decompress:
+; We need a .section to allow us to include it twice...
+.section "Decompressor section" force
 .include "decompressor.asm"
+.ends
 
 LABEL_7C67_:
   JumpToPagedFunction LABEL_36E6B_
@@ -16931,10 +16803,7 @@ LABEL_7C7D_LoadTrack:
   ld a, e
   cp $14
   jr nz, --
-  ld a, $00 ; Tile $68
-  out (PORT_VDP_ADDRESS), a
-  ld a, $4D
-  out (PORT_VDP_ADDRESS), a
+  SetTileAddressImmediate $68
   ld bc, $0020
 -:
   xor a
@@ -17130,11 +16999,11 @@ LABEL_7FC9_EmitTileData3bpp:
 ; Data from 7FDB to 7FEF (21 bytes)
 .dsb 5 $FF
 
-.ends
+;.ends
 
 .BANK 1 SLOT 1
 .ORG $0000
-.section "Slot 1" force
+;.section "Slot 1" force
 
 ; Codemasters header
 .struct CodemastersHeader
@@ -17160,11 +17029,11 @@ Unused dsb 6
 .dw $0000 ; Product number
 .db $00 ; Version
 .db SEGA_HEADER_REGION_SMS_EXPORT << 4 | SEGA_HEADER_SIXE_256KB ; SMS export, 256KB checksum
-.ends
+;.ends
 
 .BANK 2
 .ORG $0000
-.section "Bank 2"
+;.section "Bank 2"
 LABEL_8000_Main:
   di
   ld hl, STACK_TOP
@@ -25190,7 +25059,7 @@ DATA_BF80_: ; GG menu palette
 .db $EE $FE $FB $EF $EB $FB $EF $AE $BD $FE $FF $EF $EE $AF $BF $FF
 .db $FF $FF $FF $FE $BB $EE $FB $EF $EE $FE $FF $FF $BA $FE $FF $EF
 .endif
-.ends
+;.ends
 
 .orga $bfff
 DATA_BFFF_Page2PageNumber:
@@ -25198,7 +25067,7 @@ DATA_BFFF_Page2PageNumber:
 
 .BANK 3
 .ORG $0000
-.section "Bank 3"
+;.section "Bank 3"
 
 /*
 ; Track data format:
@@ -25235,10 +25104,10 @@ EffectsTiles    dw
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $FF $FF $BF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $DF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Sportscars metatiles" force
+;.section "Sportscars metatiles" force
 .incbin "Assets/Sportscars/Metatiles.tilemap" ; 64 metatiles
 
 ; Pretty much all this could be split up to optimise packing
@@ -25338,14 +25207,14 @@ DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 .ifdef BLANK_FILL_ORIGINAL
 .dsb 44 $ff
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 4
 .ORG $0000
-.section "Bank 4" force
+;.section "Bank 4" force
 
 ; Data from 10000 to 13FFF (16384 bytes)
 .dstruct DATA_10000_TrackData_FourByFour instanceof TrackData data DATA_9E50_FourByFour_BehaviourData DATA_A105_FourByFour_WallData DATA_A152_FourByFour_Track0Layout DATA_A378_FourByFour_Track1Layout DATA_A466_FourByFour_Track2Layout DATA_A466_FourByFour_Track3Layout DATA_A762_FourByFour_GGPalette DATA_A7A2_FourByFour_DecoratorTiles DATA_A822_FourByFourDATA DATA_A862_FourByFour_EffectsTiles
@@ -25354,10 +25223,10 @@ DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 .db $FF $FF $FF $EF $FF $EF $EB $FF $FB $FF $BF $BF $FF $FF $FF $EF $EF $BF $EF $FF $AF $FF $FF $FF $AF $EF $FF $BF $FF $EF $FF $FF $FF $FF $FF $FF $ED $45 $EF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $EF $FF $FF $EF $EF $FF $FF $FE $FF $EF $EF $FF $FF $AF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $EF $FF $FF $BB $FF $FB $FF $FF $FE $FF $FF $FF $FF $FB $FF $FE $EF $FB $FF
 .endif
 
-.ends
+;.ends
 
 .orga $8080
-.section "Four by Four metatiles" force
+;.section "Four by Four metatiles" force
 .incbin "Assets/Four By Four/Metatiles.tilemap"
 
 DATA_9E50_FourByFour_BehaviourData:
@@ -25437,24 +25306,24 @@ DATA_13F50_Tilemap_MicroMachinesText:
 .ifdef BLANK_FILL_ORIGINAL
 .db $00 $00 $20 $00 $00 $02 $00 $00 $02 $00 $08 $00 $00 $00 $00 $00 $00 $08 $00 $00 $02 $80 $00 $00 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF $FA $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FE $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FE $FF $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 5
 .ORG $0000
-.section "Bank 5" force
+;.section "Bank 5" force
 
 .dstruct DATA_14000_TrackData_Powerboats instanceof TrackData data DATA_9D30_Powerboats_BehaviourData DATA_9FE3_Powerboats_WallData DATA_A03C_Powerboats_Track0Layout DATA_A134_Powerboats_Track1Layout DATA_A352_Powerboats_Track2Layout DATA_A5B1_Powerboats_Track3Layout DATA_A7A0_Powerboats_GGPalette DATA_A7E0_Powerboats_DecoratorTiles DATA_A860_PowerboatsDATA DATA_A8A0_Powerboats_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $CF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FB $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Powerboats metatiles" force
+;.section "Powerboats metatiles" force
 .incbin "Assets/Powerboats/Metatiles.tilemap"
 
 DATA_9D30_Powerboats_BehaviourData:
@@ -25889,24 +25758,24 @@ DATA_17FB2_SMSPalette_RuffTrux:
 .db $FF $7F $FF $FF $FF $7F $FF $FF $FF $7F $FE $FF $FF $FF $FF $FF
 .db $FF $F7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 6
 .ORG $0000
-.section "Bank 6" force
+;.section "Bank 6" force
 
 .dstruct DATA_18000_TrackData_TurboWheels instanceof TrackData data DATA_A480_TurboWheels_BehaviourData DATA_A7B6_TurboWheels_WallData DATA_A838_TurboWheels_Track0Layout DATA_AACF_TurboWheels_Track1Layout DATA_AD10_TurboWheels_Track2Layout DATA_AD10_TurboWheels_Track3Layout DATA_AF9A_TurboWheels_GGPalette DATA_AFDA_TurboWheels_DecoratorTiles DATA_B05A_TurboWheelsDATA DATA_B09A_TurboWheels_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FE $FF $FF $FF $BF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $BF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $ED $45 $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $EF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $EE $FF $FF $FF $EF $FF $FF $EF $ED $45 $FF $FF $EF $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $EF $FF $FF $FF $EF $FF $FF $FB $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Turbo Wheels metatiles" force
+;.section "Turbo Wheels metatiles" force
 
 .incbin "Assets/Turbo Wheels/Metatiles.tilemap"
 
@@ -26356,7 +26225,7 @@ LABEL_1BCE2_:
   sub $01
   ld (iy+1), a
 +:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (iy+1)
   add a, l
   ld l, a
@@ -26364,7 +26233,7 @@ LABEL_1BCE2_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (iy+1)
   add a, l
   ld l, a
@@ -26714,24 +26583,24 @@ LABEL_1BF17_:
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 7
 .ORG $0000
-.section "Bank 7" force
+;.section "Bank 7" force
 
 .dstruct DATA_1C000_TrackData_FormulaOne instanceof TrackData data  DATA_A480_FormulaOne_BehaviourData DATA_A819_FormulaOne_WallData DATA_A8CA_FormulaOne_Track0Layout DATA_AB11_FormulaOne_Track1Layout DATA_AE73_FormulaOne_Track2Layout DATA_AE73_FormulaOne_Track3Layout DATA_B1DC_FormulaOne_GGPalette DATA_B21C_FormulaOne_DecoratorTiles DATA_B29C_FormulaOneDATA DATA_B2DC_FormulaOne_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $77 $FF $F7 $FF $DF $FF $FF $FF $D7 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FD $EF $FF $FF $5D $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $77 $FD $DD $FF $FF $FF $FF $FF $FD $FF $FF $FF $DF $FF $7F $FF $FF $FF $F7 $FF $FF $FD $F7 $FF $DF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FD $FF $DF $FF $FF $FF $FF $ED $45 $FF $7F $FF $FD $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $FF $F7 $DF $F7 $FF $FF $FF $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Formula One metatiles" force
+;.section "Formula One metatiles" force
 
 .incbin "Assets/Formula One/Metatiles.tilemap"
 
@@ -27180,24 +27049,24 @@ LABEL_1FB35_:
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FD $FF $FF $DD $FF $DD $FF $FF $7F $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $DF $77 $FF $7F $DF $DF $FF $FF $FF $FF $FF $DF $7F $FF $F7 $FD $FD $FD $FF $DF $FF $DD $FF $DF $FF $F7 $FF $FF $FF $F7 $D7 $FF $FF $FF $FF $FD $FF $5D $FF $FF $FF $7F $FF $FD $FF $7D $FF $FF $FF $FD $FF $FF $FF $FF $FF $DF $FF $FF $FF $FF $FF $FF $FF $7F $FF $DF $FF $FF $FF $F7 $FF $FF $FF $7F $FF $FF $FF $FD $FF $FD $FF $77 $FF $FF $FF $F7 $FF $D5 $FF $7D $FF $FF $FF $FF $FF $FF $DD $FF $FF $FF $FF $F7 $FF $F7 $FF $F5 $20 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $08 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $04 $00 $44 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $40 $00 $00 $00 $00 $00 $00 $00 $40 $FF $FF $FF $FF $FF $FD $FF $FD $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $D7 $EF $77 $FF $7F $FF $DF $FF $5D $FF $7F $FF $FF $FE $FF $FF $FF $FF $FE $FF $F5 $FF $FF $FF $F7 $FF $FF $FF $FD $BE $FF $EF $5F $FE $FF $FF $57 $FF $F7 $FF $FF $FF $FF $FF $FD $FE $5F $FF $F7 $FF $FF $7F $DF $FF $FF $FF $7F $FF $F7 $FF $DD $FF $7F $FF $FF $FF $DF $FF $D7 $FF $7F $FF $FF $FF $5D $FF $FF $FF $FD $FF $FF $EF $F5 $DF $77 $FF $FD $FF $FF $FF $FF $FF $FF $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $40 $00 $44 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $04 $14 $00 $00 $00 $04 $00 $00 $00 $00 $00 $04 $00 $44 $00 $40 $00 $00 $00 $00 $00 $00 $40 $00 $00 $04 $00 $40 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $44 $FF $FF $FF $FF $FF $D7 $FF $7F $FF $FF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FD $ED $F7 $FF $FF $FF $FD $FF $FF $FF $F5 $FF $FF $FF $5D $FF $7F $FF $F7 $FF $FF $FD $F7 $FF $5F $FF $7D $FF $FF $FF $DF $FF $FF $7F $FF $FF $FF $FF $7F $FF $FF $DF $7F $FF $FF $FF $5D $DF $FE $FF $77 $FF $7F $FF $FF $FD $DF $FF $7F $EF $FF $FF $57 $FF $FF $DD $DF $FF $F7 $FF $7F $FF $DF $FF $77 $FF $FF $FF $FD $FF $FF $FF $D7 $FF $7F $F7 $F7 $FF $FF $FF $DD $FF $FF $FF $FF $FF $FF $FF $5F $FF $FF $DF $7F $FF $FF $FF $DD $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $40 $00 $01 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $80 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $20 $00 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $00 $00 $40 $00 $40 $00 $00 $00 $40 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $04 $00 $00 $00 $00 $04 $FF $FF $EF $FF $FF $FF $FF $77 $FF $FF $FF $FF $FF $FF $FF $7F $FE $FF $FF $DF $FF $FF $FF $DF $FF $D7 $FF $DF $FF $F5 $FF $D5 $FF $FF $FF $77 $FE $7F $FF $FF $FF $DF $FF $77 $FF $FF $FF $55 $FF $FF $FF $FF $FF $FF $FF $FD $FF $FF $FF $FF $FF $FF $FF $FF $FF $DF $FD $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FD $DF $FD $FF $FF $FF $F7 $FF $5F $DF $F7 $FF $FF $FF $DF $FF $7F $FF $FD $FF $FF $F7 $7F $FF $FF $FF $D5 $FF $FF $FF $FF $FF $F7 $FF $F7 $BF $FF $BF $7F $FF $FF $FF $F7 $FF $FF $FF $DF $FF $FF $FF $77 $00 $00 $00 $00 $00 $00 $00 $10 $00 $00 $00 $04 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $40 $00 $50 $00 $00 $00 $44 $00 $00 $00 $00 $00 $00 $00 $14 $00 $40 $00 $40 $00 $04 $00 $14 $00 $00 $00 $10 $00 $10 $00 $40 $00 $10 $00 $10 $00 $00 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $00 $50 $00 $04 $00 $00 $40 $44 $00 $00 $40 $10 $00 $00 $00 $04 $00 $00 $00 $14 $00 $01 $00 $40 $00 $00 $00 $11 $00 $44 $00 $50 $00 $00 $00 $44 $00 $04 $00 $10 $00 $00 $00 $04 $00 $50 $00 $10 $00 $00 $00 $00 $00 $00 $00 $00 $FF $FF $FF $F5 $FF $FD $FF $FD $FF $FF $FF $F7 $FF $FD $DF $F7 $FF $FD $77 $DF $FF $FF $FF $DF $FF $FF $FF $DF $DD $FD $F7 $D7 $FF $DF $FF $DD $FF $7F $FF $DF $FF $7F $FF $7F $FF $FF $FF $7F $FF $FD $FF $DF $FF $5F $FF $F7 $FF $FF $DD $57 $FF $DF $FF $7F $FF $DF $FF $FD $FF $DF $FF $D5 $FF $FF $FF $FF $FF $F7 $DF $77 $FF $D7 $FF $57 $FF $FF $FF $7F $FF $FF $FF $7F $FF $DF $FF $DD $FF $FF $FF $7D $FF $77 $FD $FF $FF $FF $FF $FF $FF $DD $FF $FD $FF $F7 $FF $FD $FF $7F $FD $7D $BF $FF $FF $FD $FF $F7 $F7
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 8
 .ORG $0000
-.section "Bank 8" force
+;.section "Bank 8" force
 
 .dstruct DATA_20000_TrackData_Warriors instanceof TrackData data  DATA_9D30_Warriors_BehaviourData DATA_A01A_Warriors_WallData DATA_A10F_Warriors_Track0Layout DATA_A3B8_Warriors_Track1Layout DATA_A67C_Warriors_Track2Layout DATA_A67C_Warriors_Track3Layout DATA_A924_Warriors_GGPalette DATA_A964_Warriors_DecoratorTiles DATA_A9E4_WarriorsDATA DATA_AA24_Warriors_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Warriors metatiles" force
+;.section "Warriors metatiles" force
 
 .incbin "Assets/Warriors/Metatiles.tilemap"
 
@@ -27569,7 +27438,7 @@ LABEL_239C6_:
 +++:ret
 
 LABEL_23A91_:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_D5B9_)
   add a, l
   ld l, a
@@ -27577,7 +27446,7 @@ LABEL_23A91_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_D5B9_)
   add a, l
   ld l, a
@@ -27616,7 +27485,7 @@ LABEL_23A91_:
   jr z, +
   xor a
   ld (_RAM_DF84_), a
-  ld a, (_RAM_DCEC_)
+  ld a, (_RAM_DCEC_CarData_Blue)
   ld l, a
   ld a, (_RAM_DCED_)
   ld h, a
@@ -27626,7 +27495,7 @@ LABEL_23A91_:
   or a
   sbc hl, de
   ld a, l
-  ld (_RAM_DCEC_), a
+  ld (_RAM_DCEC_CarData_Blue), a
   ld a, h
   ld (_RAM_DCED_), a
   jp ++
@@ -27634,7 +27503,7 @@ LABEL_23A91_:
 +:
   ld a, $01
   ld (_RAM_DF84_), a
-  ld a, (_RAM_DCEC_)
+  ld a, (_RAM_DCEC_CarData_Blue)
   ld l, a
   ld a, (_RAM_DCED_)
   ld h, a
@@ -27643,11 +27512,11 @@ LABEL_23A91_:
   ld e, a
   add hl, de
   ld a, l
-  ld (_RAM_DCEC_), a
+  ld (_RAM_DCEC_CarData_Blue), a
   ld a, h
   ld (_RAM_DCED_), a
 ++:
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_D5B9_)
   add a, l
   ld l, a
@@ -27655,7 +27524,7 @@ LABEL_23A91_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_D5B9_)
   add a, l
   ld l, a
@@ -27793,12 +27662,12 @@ LABEL_23BF1_:
   ld hl, (_RAM_DBA9_)
   ld de, $0074
   add hl, de
-  ld (_RAM_DCAB_), hl
+  ld (_RAM_DCAB_CarData_Green), hl
   ld hl, (_RAM_DBA9_)
   ld de, $0090
   add hl, de
-  ld (_RAM_DCEC_), hl
-  ld (_RAM_DD2D_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
+  ld (_RAM_DD2D_CarData_Yellow), hl
   ld hl, (_RAM_DBAB_)
   ld de, $0040
   add hl, de
@@ -27818,12 +27687,12 @@ LABEL_23BF1_:
   ld hl, (_RAM_DBA9_)
   ld de, $0014
   add hl, de
-  ld (_RAM_DCAB_), hl
+  ld (_RAM_DCAB_CarData_Green), hl
   ld hl, (_RAM_DBA9_)
   ld de, $0030
   add hl, de
-  ld (_RAM_DCEC_), hl
-  ld (_RAM_DD2D_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
+  ld (_RAM_DD2D_CarData_Yellow), hl
   ld hl, (_RAM_DBAB_)
   ld de, $0040
   add hl, de
@@ -28145,24 +28014,24 @@ DATA_23ECF_HandlingData_SMS:
 .db $FF $FF $00 $00
 .endr
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 9
 .ORG $0000
-.section "Bank 9" force
+;.section "Bank 9" force
 
 .dstruct DATA_24000_TrackData_Tanks instanceof TrackData data  DATA_9F70_Tanks_BehaviourData DATA_A32A_Tanks_WallData DATA_A42C_Tanks_Track0Layout DATA_A5A6_Tanks_Track1Layout DATA_A7D4_Tanks_Track2Layout DATA_A7D4_Tanks_Track3Layout DATA_AA4A_Tanks_GGPalette DATA_AA8A_Tanks_DecoratorTiles DATA_AB0A_TanksDATA DATA_AB4A_Tanks_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "Tanks metatiles" force
+;.section "Tanks metatiles" force
 
 .incbin "Assets/Tanks/Metatiles.tilemap"
 
@@ -28243,24 +28112,24 @@ DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .db $ff $ff $00 $00 ; Empty
 .endr
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 10
 .ORG $0000
-.section "Bank 10" force
+;.section "Bank 10" force
 
 .dstruct DATA_28000_TrackData_RuffTrux instanceof TrackData data  DATA_A1B0_RuffTrux_BehaviourData DATA_A396_RuffTrux_WallData DATA_A420_RuffTrux_Track0Layout DATA_A5F0_RuffTrux_Track1Layout DATA_A7A8_RuffTrux_Track2Layout DATA_A7A8_RuffTrux_Track3Layout DATA_A9C5_RuffTrux_GGPalette DATA_A9C5_RuffTrux_DecoratorTiles DATA_AA05_RuffTruxDATA DATA_AA45_RuffTrux_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
 .endif
-.ends
+;.ends
 
 .orga $8080
-.section "RuffTrux metatiles" force
+;.section "RuffTrux metatiles" force
 
 ; Metatiles
 .incbin "Assets/RuffTrux/Metatiles.tilemap" ; 64 metatiles
@@ -28867,14 +28736,14 @@ DATA_2BE7D_SoundData_: .db $07 $00 $00 $04 $00 $00 $05 $00 $00 $06 $00 $00 $00 $
 .db $ff $ff $00 $00 ; Uninitialised data
 .endr
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 11
 .ORG $0000
-.section "Bank 11"
+;.section "Bank 11"
 
 DATA_2C000_TrackData_Helicopters_BadReference:
 
@@ -28934,14 +28803,14 @@ DATA_2FF6F_Tilemap:
 .ifdef BLANK_FILL_ORIGINAL
 .db $00 $FF $FF $00 $00
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 12
 .ORG $0000
-.section "Bank 12"
+;.section "Bank 12"
 
 ; Data from 30000 to 30A67 (2664 bytes)
 DATA_30000_CarTiles_FormulaOne:
@@ -30028,8 +29897,8 @@ DATA_33B5E_:
   ld (_RAM_D963_SFXTrigger_Player1), a
   ld ix, _RAM_DA60_SpriteTableXNs.57.x
   ld iy, _RAM_DAE0_SpriteTableYs.57
-  ld (ix+$01), $ad
-  ld (ix+$03), $ae
+  ld (ix+$01), <SpriteIndex_Bullet
+  ld (ix+$03), <SpriteIndex_BulletShadow
   ld hl, DATA_33C0A_
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld e, a
@@ -30073,10 +29942,10 @@ DATA_33C1A_:
 DATA_33C2A_:
 .db $00 $07 $08 $09 $0A $0B $0C $0D $0E $0F $10 $0F $0E $0D $0C $0B $0A $09 $08 $07 $06 $05 $04 $03 $02 $01 $00
 
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   ld iy, _RAM_DA60_SpriteTableXNs.59.x
   jr ++
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld iy, _RAM_DA60_SpriteTableXNs.61.x
   jr ++
   ld a, (_RAM_D5AB_)
@@ -30085,7 +29954,7 @@ DATA_33C2A_:
   inc a
   ld (_RAM_D5AB_), a
   ret
-+:ld ix, _RAM_DD2D_
++:ld ix, _RAM_DD2D_CarData_Yellow
   ld iy, _RAM_DA60_SpriteTableXNs.63.x
 ++:
   ld a, (ix+$3f)
@@ -30093,8 +29962,8 @@ DATA_33C2A_:
   jp z, LABEL_34D9C_
   cp $1a
   jp nc, LABEL_34D87_
-  ; e = DATA_1D65_[ix+$40]
-  ld hl, DATA_1D65_
+  ; e = DATA_1D65__Lo[ix+$40]
+  ld hl, DATA_1D65__Lo
   ld a, (ix+$40)
   add a, l
   ld l, a
@@ -30102,8 +29971,8 @@ DATA_33C2A_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ; d = DATA_1D76_[ix+$40]
-  ld hl, DATA_1D76_
+  ; d = DATA_1D76__Hi[ix+$40]
+  ld hl, DATA_1D76__Hi
   ld a, (ix+$40)
   add a, l
   ld l, a
@@ -30374,25 +30243,25 @@ LABEL_33E81_:
   jr z, +
   cp $02
   jr z, ++
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_33F11_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_33F11_
   ld de, _RAM_DA60_SpriteTableXNs.59.x
   ld bc, _RAM_DAE0_SpriteTableYs.59
   jp +++
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_33F3A_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_33F3A_
   ld de, _RAM_DA60_SpriteTableXNs.61.x
   ld bc, _RAM_DAE0_SpriteTableYs.61
   jp +++
 ++:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_33F69_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_33F69_
   ld de, _RAM_DA60_SpriteTableXNs.63.x
   ld bc, _RAM_DAE0_SpriteTableYs.63
@@ -30506,14 +30375,14 @@ LABEL_33D91_:
   ret
 
 LABEL_33F92_:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrNzRet _LABEL_33FF7_ret
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call +
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld a, (ix+$2e)
   or a
@@ -30557,16 +30426,17 @@ _LABEL_33FF7_ret:
 .ifdef BLANK_FILL_ORIGINAL
 .db $ff $00 $00 $ff $ff $00 $00
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 13
 .ORG $0000
-.section "Bank 13"
+;.section "Bank 13"
 
-; Data from 34000 to 35707 (5896 bytes)
+DATA_34000_Helicopters_Tiles_BadReference: ; Helicopters tiles used to be in this bank (?)
+
 DATA_34000_FormulaOne_Tiles:
 .incbin "Assets/Formula One/Tiles.compressed" ; 3bpp bitplane separated
 DATA_34958_CarTiles_Sportscars:
@@ -30582,8 +30452,10 @@ DATA_35350_CarTiles_TurboWheels:
 .incbin "Assets/Turbo Wheels/Car.3bpp.runencoded"
 .dsb 1, 0
 
-; Data from 35708 to 3576F (104 bytes)
-DATA_35708_PlugholeTilesPart1:
+; 1bpp data to push the plughole into the upper 8 palette entries
+DATA_35708_PlugholeTilesHighBitplanePart1:
+; TODO: generate this from PNG
+; Need to make an "ignore this colour" option?
 .db $00 $00 $00 $00 $03 $0F $3F $FF $00 $00 $00 $3F $FF $FF $FF $FF
 .db $01 $03 $07 $0F $1F $3F $3F $7F $FF $FF $FF $FF $FF $FF $FF $FF
 .db $FF $FF $FF $FF $FF $FF $FF $FF $7F $BF $BF $B7 $27 $46 $48 $48
@@ -30592,8 +30464,7 @@ DATA_35708_PlugholeTilesPart1:
 .db $0F $07 $07 $07 $03 $03 $01 $00 $FF $FF $FF $FF $FF $FF $FF $FF
 .db $7F $3F $0F $03 $01 $00 $00 $00
 
-; Data from 35770 to 357F7 (136 bytes)
-DATA_35770_PlugholeTilesPart2:
+DATA_35770_PlugholeTilesHighBitplanePart2:
 .db $00 $00 $00 $F0 $FC $FF $FF $FF $00 $00 $00 $00 $00 $80 $F0 $FC
 .db $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF $FF $FF
 .db $00 $00 $80 $C0 $E0 $F0 $F0 $F8 $FF $FF $FF $FF $FF $FF $FF $FF
@@ -30671,10 +30542,10 @@ DATA_35868_CarTileLoaderCounterToTableLookup:
 
 _LoadOnePosition:
   ld a, (_RAM_DB79_CarTileLoaderHFlip)
-  cp $01
+  cp 1
   jr z, _hflip
   ld a, (_RAM_DB7A_CarTileLoaderVFlip)
-  cp $01
+  cp 1
   jr z, LABEL_358D9_vflip
   jp LABEL_3591C_noflip
 
@@ -30988,7 +30859,7 @@ LABEL_35A3E_CarTileLoader_HFlipSwapData:
   sla a
   ld e, a
   ld d, $00
-  ld hl, DATA_35ABF_ ; Read into de, hl
+  ld hl, DATA_35ABF_HFlipSwapDataLocations ; Read into de, hl
   add hl, de
   ld a, (hl)
   ld e, a
@@ -31035,7 +30906,7 @@ LABEL_35A3E_CarTileLoader_HFlipSwapData:
   sla a
   ld e, a
   ld d, $00
-  ld hl, DATA_35ABF_ ; read into hl only
+  ld hl, DATA_35ABF_HFlipSwapDataLocations ; read into hl only
   add hl, de
   ld a, (hl)
   ld e, a
@@ -31045,7 +30916,7 @@ LABEL_35A3E_CarTileLoader_HFlipSwapData:
   ld l, e
   ld de, $0018  ; add one tile?
   add hl, de
-  ld bc, $0018  ; FOr one tile...
+  ld bc, $0018  ; For one tile...
 -:
   push bc
     ld a, (hl)
@@ -31064,8 +30935,7 @@ LABEL_35A3E_CarTileLoader_HFlipSwapData:
   jr nz, -- ; Loop 8 times again
   ret
 
-; Data from 35ABF to 35AC0 (2 bytes)
-DATA_35ABF_:
+DATA_35ABF_HFlipSwapDataLocations:
 .dw $C0F0 $C120 ; Address pairs for data munging
 .dw $C138 $C168
 .dw $C180 $C1B0
@@ -31076,20 +30946,24 @@ DATA_35ABF_:
 .dw $C318 $C348
 .dw $C360 $C390
 
-; Data from 35AE3 to 35B4C (106 bytes)
+; VRAM offsets of the five car positions - N, NNW, NW, WNW, W
+; They are every $f0 bytes from the start of the buffer
 DATA_35AE3_CarTileRAMLocations:
-.dw $C000 $C0F0 $C1E0 $C2D0 $C3C0 ; VRAM offsets of the five car positions - N, NNW, NW, WNW, W
+  TimesTable16 _RAM_C000_DecompressionTemporaryBuffer $f0 5
+
+; Tile addresses to write at for various flipping modes, only first of each triplet is used?  
 DATA_35AED_CarTileAddresses:
-.dw $661C $631C $601C ; Tile addresses to write at for various flipping modes, only first is used?
-.dw $667C $637C $607C
-.dw $66DC $63DC $60DC
+; Addresses are $1c bytes past the start of each tile
+.dw $661C $631C $601C ; $130, $118, $100 
+.dw $667C $637C $607C ; $133, $11b, $103
+.dw $66DC $63DC $60DC ; ...
 .dw $673C $643C $613C
 .dw $679C $649C $619C
 .dw $67FC $64FC $61FC
 .dw $685C $655C $625C
 .dw $68BC $65BC $62BC
-.dw $6F1C $6C1C $691C
-.dw $6F7C $6C7C $697C
+.dw $6F1C $6C1C $691C ; Jumps to $178, $160, $148
+.dw $6F7C $6C7C $697C ; and continues...
 .dw $6FDC $6CDC $69DC
 .dw $703C $6D3C $6A3C
 .dw $709C $6D9C $6A9C
@@ -31097,71 +30971,124 @@ DATA_35AED_CarTileAddresses:
 .dw $715C $6E5C $6B5C
 .dw $71BC $6EBC $6BBC
 
-; Data from 35B4D to 35B8C (64 bytes)
 DATA_35B4D_CarDrawingData:
 ; Rotation generation data
-;    ,,- index of underlying data (car position unflipped)
-;    ||  ,,- index of rotation
-;    ||  ||  ,,- horizontal flip
-;    ||  ||  ||  ,,- vertical flip
-.db $00 $00 $00 $00
-.db $01 $01 $00 $00
-.db $02 $02 $00 $00
-.db $03 $03 $00 $00
-.db $04 $04 $00 $00
-.db $03 $05 $00 $01
-.db $02 $06 $00 $01
-.db $01 $07 $00 $01
-.db $00 $08 $00 $01
-.db $01 $09 $01 $01
-.db $02 $0A $01 $01
-.db $03 $0B $01 $01
-.db $04 $0C $01 $00
-.db $03 $0D $01 $00
-.db $02 $0E $01 $00
-.db $01 $0F $01 $00
+;   ,- index of underlying data (car position unflipped, 0..4)
+;   |  ,- index of rotation
+;   |  | ,- horizontal flip
+;   |  | | ,- vertical flip
+.db 0 $0 0 0
+.db 1 $1 0 0
+.db 2 $2 0 0
+.db 3 $3 0 0
+.db 4 $4 0 0
+.db 3 $5 0 1
+.db 2 $6 0 1
+.db 1 $7 0 1
+.db 0 $8 0 1
+.db 1 $9 1 1
+.db 2 $A 1 1
+.db 3 $B 1 1
+.db 4 $C 1 0
+.db 3 $D 1 0
+.db 2 $E 1 0
+.db 1 $F 1 0
 
-; Data from 35B8D to 35BEC (96 bytes)
-DATA_35B8D_:
-; Gradual ramp from 0 to $1f
-.db $00 $00 $00 $01 $01 $01 $02 $02 $02 $03 $03 $03 $04 $04 $04 $05
-.db $05 $05 $06 $06 $06 $07 $07 $07 $08 $08 $08 $09 $09 $09 $0A $0A
-.db $0A $0B $0B $0B $0C $0C $0C $0D $0D $0D $0E $0E $0E $0F $0F $0F
-.db $10 $10 $10 $11 $11 $11 $12 $12 $12 $13 $13 $13 $14 $14 $14 $15
-.db $15 $15 $16 $16 $16 $17 $17 $17 $18 $18 $18 $19 $19 $19 $1A $1A
-.db $1A $1B $1B $1B $1C $1C $1C $1D $1D $1D $1E $1E $1E $1F $1F $1F
+DATA_35B8D_DivideByThree:
+  DivisionTable 3 96
 
-; Data from 35BED to 35C2C (64 bytes)
 DATA_35BED_96TimesTable:
   TimesTable16 0 96 32
 
-; Data from 35C2D to 35D2C (256 bytes)
-DATA_35C2D_:
-.db $00 $01 $02 $03 $20 $21 $22 $23 $40 $41 $42 $43 $60 $61 $62 $63
-.db $04 $05 $06 $07 $24 $25 $26 $27 $44 $45 $46 $47 $64 $65 $66 $67
-.db $08 $09 $0A $08 $28 $29 $2A $2B $48 $49 $4A $4B $08 $69 $6A $08
-.db $0C $0D $0E $0F $2C $2D $2E $2F $4C $4D $4E $4F $6C $6D $6E $6F
-.db $10 $11 $12 $13 $30 $31 $32 $33 $50 $51 $52 $53 $70 $71 $72 $73
-.db $14 $15 $16 $17 $34 $35 $36 $37 $54 $55 $56 $57 $74 $75 $76 $77
-.db $08 $19 $1A $08 $38 $39 $3A $3B $58 $59 $5A $5B $08 $79 $7A $08
-.db $1C $1D $1E $1F $3C $3D $3E $3F $5C $5D $5E $5F $7C $7D $7E $7F
-.db $80 $81 $82 $83 $A0 $A1 $A2 $A3 $C0 $C1 $C2 $C3 $E0 $E1 $E2 $E3
-.db $84 $85 $86 $87 $A4 $A5 $A6 $A7 $C4 $C5 $C6 $C7 $E4 $E5 $E6 $E7
-.db $08 $89 $8A $08 $A8 $A9 $AA $AB $C8 $C9 $CA $CB $08 $E9 $EA $08
-.db $8C $8D $8E $8F $AC $AD $AE $AF $CC $CD $CE $CF $EC $ED $EE $EF
-.db $90 $91 $92 $93 $B0 $B1 $B2 $B3 $D0 $D1 $D2 $D3 $F0 $F1 $F2 $F3
-.db $94 $95 $96 $97 $B4 $B5 $B6 $B7 $D4 $D5 $D6 $D7 $F4 $F5 $F6 $F7
-.db $08 $99 $9A $08 $B8 $B9 $BA $BB $D8 $D9 $DA $DB $08 $F9 $FA $08
-.db $9C $9D $9E $9F $BC $BD $BE $BF $DC $DD $DE $DF $FC $FD $FE $FF
+DATA_35C2D_RuffTruxTileIndices:
+; 16 bytes tile indices for each of 16 positions
+.db $00 $01 $02 $03 
+.db $20 $21 $22 $23 
+.db $40 $41 $42 $43 
+.db $60 $61 $62 $63
 
-; Data from 35D2D to 35F0C (480 bytes)
+.db $04 $05 $06 $07
+.db $24 $25 $26 $27
+.db $44 $45 $46 $47
+.db $64 $65 $66 $67
+
+.db $08 $09 $0A $08 ; 45 degrees, using tile $08 for corners
+.db $28 $29 $2A $2B
+.db $48 $49 $4A $4B
+.db $08 $69 $6A $08
+
+.db $0C $0D $0E $0F
+.db $2C $2D $2E $2F
+.db $4C $4D $4E $4F
+.db $6C $6D $6E $6F
+
+.db $10 $11 $12 $13
+.db $30 $31 $32 $33
+.db $50 $51 $52 $53
+.db $70 $71 $72 $73
+
+.db $14 $15 $16 $17
+.db $34 $35 $36 $37
+.db $54 $55 $56 $57
+.db $74 $75 $76 $77
+
+.db $08 $19 $1A $08 ; 45 degrees, using tile $08 for corners
+.db $38 $39 $3A $3B
+.db $58 $59 $5A $5B
+.db $08 $79 $7A $08
+
+.db $1C $1D $1E $1F
+.db $3C $3D $3E $3F
+.db $5C $5D $5E $5F
+.db $7C $7D $7E $7F
+
+.db $80 $81 $82 $83
+.db $A0 $A1 $A2 $A3
+.db $C0 $C1 $C2 $C3
+.db $E0 $E1 $E2 $E3
+
+.db $84 $85 $86 $87
+.db $A4 $A5 $A6 $A7
+.db $C4 $C5 $C6 $C7
+.db $E4 $E5 $E6 $E7
+
+.db $08 $89 $8A $08 ; 45 degrees, using tile $08 for corners
+.db $A8 $A9 $AA $AB
+.db $C8 $C9 $CA $CB
+.db $08 $E9 $EA $08
+
+.db $8C $8D $8E $8F
+.db $AC $AD $AE $AF
+.db $CC $CD $CE $CF
+.db $EC $ED $EE $EF
+
+.db $90 $91 $92 $93
+.db $B0 $B1 $B2 $B3
+.db $D0 $D1 $D2 $D3
+.db $F0 $F1 $F2 $F3
+
+.db $94 $95 $96 $97
+.db $B4 $B5 $B6 $B7
+.db $D4 $D5 $D6 $D7
+.db $F4 $F5 $F6 $F7
+
+.db $08 $99 $9A $08 ; 45 degrees, using tile $08 for corners
+.db $B8 $B9 $BA $BB
+.db $D8 $D9 $DA $DB
+.db $08 $F9 $FA $08
+
+.db $9C $9D $9E $9F
+.db $BC $BD $BE $BF
+.db $DC $DD $DE $DF
+.db $FC $FD $FE $FF
+
 DATA_35D2D_HeadToHeadHUDTiles:
 ; 3bpp tile data (24 bytes per tile)
 ; - Red dot
 ; - Blue dot
 ; - "WINNER" (6 tiles)
 ; - "BONUS" (first 4 tiles)
-; - Exhaust smoke? TODO supposed to be showing this I guess, on the sprites following cars - broken?
+; - Explosion sprites
 ; - "BONUS" (last 2 tiles)
 ; - Digit for laps remaining (unused - replaced with tile from challenge mode data)
 ; - Blank tile
@@ -32404,28 +32331,28 @@ LABEL_3682E_:
   ld a, b
   and $7F
   ld c, a
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   ld b, $00
   or a
   sbc hl, bc
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
   jp ++
 
 +:
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   ld c, b
   ld b, $00
   add hl, bc
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
 ++:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
   ld de, $0028
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   or a
   sbc hl, de
-  ld (_RAM_DCEC_), hl
+  ld (_RAM_DCEC_CarData_Blue), hl
 +:
   ld a, (_RAM_DE55_)
   sla a
@@ -32439,20 +32366,18 @@ LABEL_3682E_:
   ld a, (hl)
   ld b, a
   ld a, c
-  and $80
+  and $80 ; Check sign
   jr z, +
   ld a, c
-  and $7F
+  and $7F ; Remove sign bit
   ld c, a
   ld a, (_RAM_DBA5_)
-  sub c
+  sub c ; Subtract
   ld (_RAM_DBA5_), a
   ld (_RAM_DBA7_), a
   jp ++
-
-+:
-  ld a, (_RAM_DBA5_)
-  add a, c
++:ld a, (_RAM_DBA5_)
+  add a, c ; Add
   ld (_RAM_DBA5_), a
   ld (_RAM_DBA7_), a
 ++:
@@ -32486,15 +32411,44 @@ LABEL_3682E_:
   ld (_RAM_DCEE_), hl
 +:ret
 
-; Data from 368F7 to 36916 (32 bytes)
 DATA_368F7_:
-.db $0C $8C $0C $8C $09 $89 $86 $06 $00 $00 $86 $06 $09 $89 $8C $0C
-.db $0C $8C $8C $0C $89 $09 $06 $86 $00 $00 $06 $86 $89 $09 $0C $8C
+  ; Delta pairs applied to _RAM_DBA4_ and _RAM_DCEC_CarData_Blue, indexed by _RAM_DE55_
+  SignAndMagnitude  12, -12
+  SignAndMagnitude  12, -12
+  SignAndMagnitude   9,  -9
+  SignAndMagnitude  -6,   6
+  SignAndMagnitude   0,   0
+  SignAndMagnitude  -6,   6
+  SignAndMagnitude   9,  -9
+  SignAndMagnitude -12,  12
+  SignAndMagnitude  12, -12
+  SignAndMagnitude -12,  12
+  SignAndMagnitude  -9,   9
+  SignAndMagnitude   6,  -6
+  SignAndMagnitude   0,   0
+  SignAndMagnitude   6,  -6
+  SignAndMagnitude  -9,   9
+  SignAndMagnitude  12, -12
 
-; Data from 36917 to 36936 (32 bytes)
 DATA_36917_:
-.db $00 $00 $06 $86 $09 $89 $8C $0C $0C $8C $0C $8C $89 $09 $06 $86
-.db $00 $00 $86 $06 $89 $09 $0C $8C $0C $8C $8C $0C $09 $89 $86 $06
+  ; Delta pairs applied to _RAM_DBA5_ and _RAM_DCEE_, indexed by _RAM_DE55_
+  SignAndMagnitude   0,   0
+  SignAndMagnitude   6,  -6
+  SignAndMagnitude   9,  -9
+  SignAndMagnitude -12,  12
+  SignAndMagnitude  12, -12
+  SignAndMagnitude  12, -12
+  SignAndMagnitude  -9,   9
+  SignAndMagnitude   6,  -6
+  SignAndMagnitude   0,   0
+  SignAndMagnitude  -6,   6
+  SignAndMagnitude  -9,   9
+  SignAndMagnitude  12, -12
+  SignAndMagnitude  12, -12
+  SignAndMagnitude -12,  12
+  SignAndMagnitude   9,  -9
+  SignAndMagnitude  -6,   6
+  ; Since they're always matched, it could be stored as a single byte...
 
 LABEL_36937_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -32631,7 +32585,7 @@ LABEL_36A2C_:
 --:
   ld a, $01
   ld (_RAM_DF5B_), a
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   jp LABEL_4E49_
 
 LABEL_36A3F_:
@@ -32835,7 +32789,7 @@ LABEL_36BBF_:
   jp LABEL_2A55_
 
 +:
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   ld b, h
   ld c, l
   ld de, (_RAM_DBAD_)
@@ -32870,14 +32824,14 @@ LABEL_36BE6_:
   ld a, $02
   ld (_RAM_D940_), a
   ld de, (_RAM_D941_)
-  ld hl, (_RAM_DCEC_)
+  ld hl, (_RAM_DCEC_CarData_Blue)
   or a
   sbc hl, de
   jr nc, +
   ld a, $00
   ld (_RAM_DD0D_), a
   ld hl, (_RAM_D941_)
-  ld de, (_RAM_DCEC_)
+  ld de, (_RAM_DCEC_CarData_Blue)
   or a
   sbc hl, de
   ld (_RAM_D941_), hl
@@ -32946,7 +32900,7 @@ LABEL_36C72_:
   add hl, de
   ld b, h
   ld c, l
-  ld de, (_RAM_DCEC_)
+  ld de, (_RAM_DCEC_CarData_Blue)
   or a
   sbc hl, de
   jr nc, +
@@ -33120,24 +33074,7 @@ LABEL_36D52_RuffTrux_UpdateTimer:
 
 ; Data from 36DAF to 36DFE (80 bytes)
 DATA_36DAF_TimerDigitTilesData: ; 1bpp data. This is written into the right bitplane, but the upper bitplanes select whether 0 means transparent or black.
-;.db $00 $00 $1C $36 $36 $36 $1C $00 ; 0
-.db %00000000
-.db %00000000
-.db %00011100
-.db %00110110
-.db %00110110
-.db %00110110
-.db %00011100
-.db %00000000
-.db $00 $00 $0C $1C $0C $0C $1E $00 ; 1 ...
-.db $00 $00 $1C $36 $0C $18 $3E $00
-.db $00 $00 $3C $06 $1C $06 $3C $00
-.db $00 $00 $36 $36 $1E $06 $06 $00
-.db $00 $00 $3E $30 $3C $06 $3C $00
-.db $00 $00 $1C $30 $3C $36 $1C $00
-.db $00 $00 $3E $06 $0C $18 $18 $00
-.db $00 $00 $1C $36 $1C $36 $1C $00
-.db $00 $00 $1C $36 $1E $06 $3C $00
+.incbin "Assets/RuffTrux/Numbers.1bpp"
 
 LABEL_36DFF_RuffTrux_DecrementTimer:
   ld a, (_RAM_D599_IsPaused)
@@ -33486,6 +33423,7 @@ LABEL_3707E_:
   jp LABEL_37071_
 
 ; Data from 370D1 to 37160 (144 bytes)
+; Something to do with metadata? 12x12 bytes
 DATA_370D1_:
 .db $00 $00 $00 $00 $01 $01 $01 $02 $02 $02 $03 $03 $00 $00 $00 $01
 .db $01 $01 $02 $02 $02 $03 $03 $03 $00 $00 $01 $01 $01 $02 $02 $02
@@ -33498,6 +33436,7 @@ DATA_370D1_:
 .db $43 $43 $43 $44 $00 $00 $00 $41 $41 $41 $42 $42 $42 $43 $43 $43
 
 ; Data from 37161 to 371F0 (144 bytes)
+; Alternate (switched) version of the above
 DATA_37161_:
 .db $23 $83 $83 $82 $82 $82 $81 $81 $81 $00 $00 $00 $23 $83 $83 $83
 .db $82 $82 $82 $81 $81 $81 $00 $00 $24 $84 $83 $83 $83 $82 $82 $82
@@ -33545,18 +33484,21 @@ LABEL_371F1_:
   ret
 
 ; Data from 37232 to 37271 (64 bytes)
-DATA_37232_:
+; Something specific to Four by Four
+DATA_37232_FourByFour_:
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $01 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 
 ; Data from 37272 to 37291 (32 bytes)
+; indexed by _RAM_DE92_EngineVelocity, value stored at _RAM_D58A_
+; 1000, 960, 920, ... , 440, 400
 DATA_37272_:
-.db $E8 $03 $C0 $03 $98 $03 $70 $03 $48 $03 $20 $03 $F8 $02 $D0 $02
-.db $A8 $02 $80 $02 $58 $02 $30 $02 $08 $02 $E0 $01 $B8 $01 $90 $01
+  TimesTable16 1000, -40, 16
 
 LABEL_37292_GameVBlankEngineUpdate:
+  ; Look up 16-bit value in table
   ld a, (_RAM_DE92_EngineVelocity)
   sla a
   ld e, a
@@ -33564,17 +33506,19 @@ LABEL_37292_GameVBlankEngineUpdate:
   ld hl, DATA_37272_
   add hl, de
   ld a, (hl)
-  ld (_RAM_D58A_), a
+  ld (_RAM_D58A_.Lo), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D58B_), a
-  ld l, a
+  ld (_RAM_D58A_.Hi), a
+  ld l, a ; Does nothing
+  ; Subtract $10 for some reason
   ld bc, $0010
   ld hl, (_RAM_D58A_)
   or a
   sbc hl, bc
   ld (_RAM_D58A_), hl
-  ld a, (_RAM_D58B_)
+  ; Then grab the high byte
+  ld a, (_RAM_D58A_.Hi)
   ld l, a
   ld a, (_RAM_DF00_)
   or a
@@ -33586,12 +33530,14 @@ LABEL_37292_GameVBlankEngineUpdate:
 -:
   ld de, $0004
   ld hl, (_RAM_D95B_)
+  ; _RAM_D95B_ -= 4
   or a
   sbc hl, de
   ld (_RAM_D95B_), hl
   ret
 
 LABEL_372D3_:
+  ; _RAM_D95B_ += 2
   ld hl, (_RAM_D95B_)
   ld de, $0002
   add hl, de
@@ -33599,7 +33545,7 @@ LABEL_372D3_:
   ret
 
 +:
-  ld a, (_RAM_D58A_)
+  ld a, (_RAM_D58A_.Lo)
   ld l, a
   ld a, (_RAM_D95B_)
   cp l
@@ -33614,6 +33560,7 @@ LABEL_372D3_:
   cp $01
   jr z, +
 --:
+  ; _RAM_D95B_ -= 4
   ld de, $0004
   ld hl, (_RAM_D95B_)
   or a
@@ -34594,7 +34541,7 @@ LABEL_37A75_:
   ld iy, _RAM_DAE0_SpriteTableYs.57
   cp $1A
   jp nc, LABEL_37B49_
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (_RAM_D5A8_)
   add a, l
   ld l, a
@@ -34602,7 +34549,7 @@ LABEL_37A75_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (_RAM_D5A8_)
   add a, l
   ld l, a
@@ -34823,12 +34770,12 @@ DATA_37C2A_:
 .db $0A $09 $08 $07 $06 $05 $04 $03 $02 $01 $00
 
 LABEL_37C45_:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   ld iy, _RAM_DA60_SpriteTableXNs.59
   jr ++
 
 LABEL_37C4F_:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   ld iy, _RAM_DA60_SpriteTableXNs.61
   jr ++
 
@@ -34841,7 +34788,7 @@ LABEL_37C59_:
   ret
 
 +:
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   ld iy, _RAM_DA60_SpriteTableXNs.63
 ++:
   ld a, (ix+63)
@@ -34849,7 +34796,7 @@ LABEL_37C59_:
   jp z, LABEL_37D9C_
   cp $1A
   jp nc, LABEL_37D87_
-  ld hl, DATA_1D65_
+  ld hl, DATA_1D65__Lo
   ld a, (ix+64)
   add a, l
   ld l, a
@@ -34857,7 +34804,7 @@ LABEL_37C59_:
   adc a, h
   ld h, a
   ld e, (hl)
-  ld hl, DATA_1D76_
+  ld hl, DATA_1D76__Hi
   ld a, (ix+64)
   add a, l
   ld l, a
@@ -35140,27 +35087,27 @@ LABEL_37E81_:
   jr z, +
   cp $02
   jr z, ++
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_37F11_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_37F11_
   ld de, _RAM_DA60_SpriteTableXNs.59
   ld bc, _RAM_DAE0_SpriteTableYs.59
   jp +++
 
 +:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_37F3A_
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
   call LABEL_37F3A_
   ld de, _RAM_DA60_SpriteTableXNs.61
   ld bc, _RAM_DAE0_SpriteTableYs.61
   jp +++
 
 ++:
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call LABEL_37F69_
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call LABEL_37F69_
   ld de, _RAM_DA60_SpriteTableXNs.63
   ld bc, _RAM_DAE0_SpriteTableYs.63
@@ -35280,14 +35227,14 @@ LABEL_37F69_:
 .endif
 
 LABEL_37F92_:
-  ld ix, _RAM_DCEC_
+  ld ix, _RAM_DCEC_CarData_Blue
   call +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrNzRet _LABEL_37FF7_ret
-  ld ix, _RAM_DCAB_
+  ld ix, _RAM_DCAB_CarData_Green
   call +
-  ld ix, _RAM_DD2D_
+  ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld a, (ix+46)
   or a
@@ -35334,16 +35281,15 @@ _LABEL_37FF7_ret:
 .db $FF $00 $00 $FF
 .db $FF $00 $00
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 14
 .ORG $0000
-.section "Bank 14"
+;.section "Bank 14"
 
-; Data from 38000 to 393CD (5070 bytes)
 DATA_38000_TurboWheels_Tiles:
 .incbin "Assets/Turbo Wheels/Tiles.compressed"
 
@@ -35384,7 +35330,6 @@ LABEL_3B97D_DecompressFromHLToC000:
 LABEL_3B989_Decompress:
 .include "decompressor.asm"
 
-; Data from 3BACF to 3BAF0 (34 bytes)
 ; This is RAM data (!) for the menu music engine
 ; TODO document it
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
@@ -35803,16 +35748,15 @@ LABEL_3BD0F_RamCodeEnd:
 .db $FF $FF $00 $00
 .endr
 .endif
-.ends
+;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
 
 .BANK 15
 .ORG $0000
-.section "Bank 15"
+;.section "Bank 15"
 
-; Data from 3C000 to 3FFFF (16384 bytes)
 DATA_3C000_Sportscars_Tiles:
 .incbin "Assets/Sportscars/Tiles.compressed" ; bitplane-split 3bpp
 
@@ -35848,26 +35792,26 @@ TEXT_3ED29_VEHICLE_NAME_TANKS:
 .asc "      TANKS     "
 TEXT_3ED39_VEHICLE_NAME_RUFFTRUX:
 .asc "    RUFFTRUX    "
-.ends
+;.ends
 
-.section "Splash screen" force
+;.section "Splash screen" force
 DATA_3ED49_SplashScreenCompressed:
 .incbin "Assets/SplashScreen/SplashScreen.compressed"
-.ends
+;.ends
 
-.section "Jon's Squinky Tennis" force
+;.section "Jon's Squinky Tennis" force
 DATA_3F753_JonsSquinkyTennisCompressed:
 .incbin "Assets/JonsSquinkyTennis.compressed"
-.ends
+;.ends
 
 .ifdef BLANK_FILL_ORIGINAL
-.section "Bank 15 blank fill" force
+;.section "Bank 15 blank fill" force
 ; Blank fill
 .repeat 33
 .dw $0000, $ffff
 .endr
 .dw $0000
-.ends
+;.ends
 .endif
 
 .orga $bfff
