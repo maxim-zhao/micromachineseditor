@@ -683,9 +683,9 @@
 02:8404 TEXT_8404_ForHeadToHead
 02:8416 TEXT_8416_Lives
 02:841c LABEL_841C_
-02:8486 LABEL_8486_
+02:8486 LABEL_8486_InitialiseDisplayCase
 02:84aa LABEL_84AA_MenuIndex5_Initialise
-02:84c7 LABEL_84C7_
+02:84c7 LABEL_84C7_InitialiseOnePlayerTrackIntro
 02:8507 LABEL_8507_MenuIndex2_FourPlayerResults_Initialise
 02:85ec TEXT_85EC_Results
 02:85f4 LABEL_85F4_
@@ -708,7 +708,7 @@
 02:8953 LABEL_8953_InitialiseTwoPlayersMenu
 02:89e2 LABEL_89E2_
 02:8a30 LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
-02:8a38 LABEL_8A38_MenuIndex4_Initialise
+02:8a38 LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise
 02:8b55 LABEL_8B55_
 02:8b89 LABEL_8B89_
 02:8b9d LABEL_8B9D_
@@ -849,9 +849,9 @@
 02:a325 TEXT_A325_SelectVehicle
 02:a335 TEXT_A335_TournamentRace
 02:a345 TEXT_A345_SelectATrack
-02:a355 LABEL_A355_
-02:a3ea LABEL_A3EA_
-02:a402 LABEL_A402_
+02:a355 LABEL_A355_PrintWonLostCounterLabels
+02:a3ea LABEL_A3EA_PrintWonText
+02:a402 LABEL_A402_PrintLostText
 02:a41a TEXT_A41A_W
 02:a41c TEXT_A41C_L
 02:a41e TEXT_A41E_Won
@@ -903,8 +903,10 @@
 02:a8f2 _LABEL_A8F2_TournamentResults_SecondPlace
 02:a8f7 _LABEL_A8F7_TournamentResults_ThirdPlace
 02:a8fc LABEL_A8FC_TournamentResults_FourthPlace
-02:a95d LABEL_A95D_
-02:a97b LABEL_A97B_
+02:a91e _isPlayer1
+02:a93f _isPlayer2
+02:a95d _isPlayer3
+02:a97b _isPlayer4
 02:a996 LABEL_A996_
 02:a9a6 DATA_A9A6_TilemapAddresses_GG
 02:a9ae DATA_A9AE_TilemapAddresses_SMS
@@ -926,7 +928,7 @@
 02:abb0 LABEL_ABB0_
 02:abb3 LABEL_ABB3_
 02:ac1e LABEL_AC1E_
-02:acee LABEL_ACEE_
+02:acee LABEL_ACEE_DrawColouredBalls
 02:ad42 LABEL_AD42_DrawDisplayCase
 02:ad9c LABEL_AD9C_HaveCar
 02:adaa DATA_ADAA_DisplayCaseSourceDataAddresses
@@ -984,7 +986,7 @@
 02:b35a LABEL_B35A_VRAMAddressToHL
 02:b361 LABEL_B361_VRAMAddressToDE
 02:b368 LABEL_B368_
-02:b375 _LABEL_B375_ConfigureTilemapRect_5x6_24
+02:b375 _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
 02:b377 _LABEL_B377_ConfigureTilemapRect_5x6_rega
 02:b389 LABEL_B389_
 02:b3a4 LABEL_B3A4_EmitToVDPAtDE_Text
@@ -1031,8 +1033,8 @@
 02:b9b3 LABEL_B9B3_Initialise_RAM_DC2C_
 02:b9c4 LABEL_B9C4_
 02:b9ed LABEL_B9ED_
-02:ba3c LABEL_BA3C_LoadColouredCirclesTilesToIndex150
-02:ba42 LABEL_BA42_LoadColouredCirclesTiles
+02:ba3c LABEL_BA3C_LoadColouredBallTilesToIndex150
+02:ba42 LABEL_BA42_LoadColouredBallTiles
 02:ba4f LABEL_BA4F_LoadMediumNumberTiles
 02:ba63 LABEL_BA63_
 02:bab7 TEXT_BAB7_Qualifying
@@ -1077,7 +1079,7 @@
 02:bf3e DATA_BF3E_MenuPalette_SMS
 02:bf5e LABEL_BF5E_
 02:bf70 LABEL_BF70_
-02:bf80 DATA_BF80_
+02:bf80 DATA_BF80_MenuPalette_GG
 02:bfff DATA_BFFF_Page2PageNumber
 03:8000 DATA_C000_TrackData_SportsCars
 03:8000 DATA_C000_TrackData_SportsCars.BehaviourData
@@ -1288,7 +1290,7 @@
 08:a9e4 DATA_A9E4_WarriorsDATA
 08:aa24 DATA_AA24_Warriors_EffectsTiles
 08:ab2c DATA_22B2C_Tiles_PunctuationAndLine
-08:ab8c DATA_22B8C_Tiles_ColouredCircles
+08:ab8c DATA_22B8C_Tiles_ColouredBalls
 08:abec DATA_22BEC_Tiles_Cursor
 08:ac4e DATA_22C4E_Tiles_BigLogo
 08:b656 DATA_23656_Tiles_VsCPUPatch

@@ -1,6 +1,6 @@
 ; Some options for what we want to keep identical to the original...
 .define BLANK_FILL_ORIGINAL ; disable to squash blanks and blank unused bytes
-.define UNREACHABLE_CODE ; disable to drop out the unreachable code - BUGGY
+.define UNREACHABLE_CODE ; disable to drop out the unreachable code and code that does nothing - BUGGY
 .define JUMP_TO_RET ; disable to use conditional rets
 .define TAIL_CALL ; disable to optimise calls followed by rets to jumps - INCOMPLETE
 .define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - INCOMPLETE
@@ -161,11 +161,11 @@ MenuScreen_OnePlayerMode      db ; 13 Challenge or Head to Head
 .ende
 
 .enum 0
-MenuIndex_0 db
-MenuIndex_1 db
+MenuIndex_0_TitleScreen db
+MenuIndex_1_QualificationResults db
 MenuIndex_2_FourPlayerResults db
 MenuIndex_3_LifeWonOrLost db
-MenuIndex_4 db
+MenuIndex_4_TwoPlayerResults db
 MenuIndex_5 db
 MenuIndex_6 db
 .ende
@@ -219,7 +219,7 @@ Music_0C_TwoPlayerTournamentWinner db ; Tournament champion
 .ende
 
 ; Sprite indices
-.struct FourPlayers
+.struct FourPlayers_InGame
 Player1 .db ; For 2-player mode
 Red db
 Player2 .db ; For 2-player mode
@@ -228,11 +228,109 @@ Blue db
 Yellow db
 .endst
 
+; Yellow and blue are the other way round in menus
+.struct FourPlayers_Menu
+Red db
+Green db
+Yellow db
+Blue db
+.endst
+
+; Tile numbers in menus
+; TODO: most of this varies by menu
+; Invariant: font, punctuation, line
+.struct FontTiles
+LettersAToN dsb 14
+Space       db
+LettersPToZ dsb 11
+Digits      dsb 10
+.endst
+
+.struct PunctuationTiles
+ExclamationMark db
+Hyphen          db
+QuestionMark    db
+Line            db
+.endst
+
+.struct PlayerPortraitTiles
+Tiles dsb 5*6
+.endst
+
+.struct CarPortraitTiles
+Tiles dsb 10*8
+.endst
+
+.struct BigNumberTiles
+Tiles dsb 2*4
+.endst
+
+; Title screen
+.enum 0
+MenuTileIndex_Title_Font        instanceof FontTiles
+MenuTileIndex_Title_Portraits   instanceof CarPortraitTiles 2
+MenuTileIndex_Title_Unused      dsb 84
+MenuTileIndex_Title_Logo        dsb 177
+.ende
+
+; Results screen
+.enum 0
+MenuTileIndex_Results_Font        instanceof FontTiles
+MenuTileIndex_Results_Portraits   instanceof PlayerPortraitTiles 4
+MenuTileIndex_Results_Unused      dsb 38
+MenuTileIndex_Results_Logo        dsb 22
+MenuTileIndex_Results_Text1       dsb 24
+MenuTileIndex_Results_Text2       dsb 18
+MenuTileIndex_Results_Numbers     instanceof BigNumberTiles 4
+MenuTileIndex_Results_ColouredBalls instanceof FourPlayers_Menu
+.ende
+
+; Track intro screen
+.enum 0
+MenuTileIndex_TrackIntro_Font        instanceof FontTiles
+MenuTileIndex_TrackIntro_Portraits   instanceof PlayerPortraitTiles 4
+MenuTileIndex_TrackIntro_Unused      dsb 38
+MenuTileIndex_TrackIntro_Logo        dsb 22
+MenuTileIndex_TrackIntro_Text1       dsb 24
+MenuTileIndex_TrackIntro_Text2       dsb 18
+MenuTileIndex_TrackIntro_CarPortrait instanceof CarPortraitTiles
+MenuTileIndex_TrackIntro_ColouredBalls instanceof FourPlayers_Menu
+.ende
+
+; Player select, ..?
+.enum 0
+MenuTileIndex_Font        instanceof FontTiles
+MenuTileIndex_Portraits   instanceof PlayerPortraitTiles 4
+MenuTileIndex_Unused      dsb 30
+MenuTileIndex_Cursor      dsb 9 ; $ba
+MenuTileIndex_SmallLogo   dsb 22
+MenuTileIndex_Text1       dsb 24
+MenuTileIndex_Text2       dsb 18
+; ...
+.ende
+
+.define MenuTileIndex_Hand $bb ; todo
+
+; Small logo layout
+.enum $100
+MenuTileIndex_Logo            .db ; 80, 122 or 177 tiles for big logos
+__todo dsb $50
+MenuTileIndex_ColouredBalls   instanceof FourPlayers_Menu ; $150
+MenuTileIndex_TODO            dsb 96 ; Used elsewhere?
+MenuTileIndex_Punctuation     instanceof PunctuationTiles
+.ende
+
+.enum $100
+ResultsMenuTileIndex_BigNumbers     dsb 4*6 ; $100 big numbers, 6 tiles each
+ResultsMenuTileIndex_ColouredBalls  instanceof FourPlayers_Menu ; $118
+.ende
+
+; Tile numbers in-game
 .enum $190
-SpriteIndex_Decorators          instanceof FourPlayers ; $90
-SpriteIndex_PositionIndicators  instanceof FourPlayers ; $94
+SpriteIndex_Decorators          instanceof FourPlayers_InGame ; $90
+SpriteIndex_PositionIndicators  instanceof FourPlayers_InGame ; $94
 SpriteIndex_Suffixes            dsb 4 ; $98
-SpriteIndex_FinishedIndicators  instanceof FourPlayers ; $9c
+SpriteIndex_FinishedIndicators  instanceof FourPlayers_InGame ; $9c
 SpriteIndex_Smoke               dsb 4 ; $a0
 SpriteIndex_Digits              dsb 4 ; $a4 - #2 is for used for head to head track counter
 SpriteIndex_Shadow              dsb 4 ; $a8
@@ -302,18 +400,16 @@ PlayerPortrait_OutOfGame2 db ; $5a
 .ende
 
 ; ASCII mapping for menu screen text
-.define BLANK_TILE_INDEX = $0e
-.define ZERO_DIGIT_TILE_INDEX = $1a
-.define HYPHEN_TILE_INDEX = $b5
+; Uses enum for tile indices, code decides on the high byte by itself
 .asctable
-map "A" to "N" = $00
-map "O" = $1a
-map "P" to "Z" = $0f
-map "0" to "9" = ZERO_DIGIT_TILE_INDEX
-map " " = BLANK_TILE_INDEX
-map "!" = $B4
-map "-" = HYPHEN_TILE_INDEX
-map "?" = $B6
+map "A" to "N" = MenuTileIndex_Font.LettersAToN
+map "O" = MenuTileIndex_Font.Digits
+map "P" to "Z" = MenuTileIndex_Font.LettersPToZ
+map "0" to "9" = MenuTileIndex_Font.Digits
+map " " = MenuTileIndex_Font.Space
+map "!" = <MenuTileIndex_Punctuation.ExclamationMark
+map "-" = <MenuTileIndex_Punctuation.Hyphen
+map "?" = <MenuTileIndex_Punctuation.QuestionMark
 .enda
 
 .define STACK_TOP $dfff
@@ -384,6 +480,10 @@ map "?" = $B6
 
 .macro SetPaletteAddressImmediateGG args index
   SetVDPAddressImmediate index*2 | PALETTE_WRITE_MASK
+.endm
+
+.macro PaletteAddressToHLSMS args index
+  ld hl, index | PALETTE_WRITE_MASK
 .endm
 
 .macro SetTileAddressImmediate args index
@@ -1677,7 +1777,7 @@ _RAM_DF26_ db
 _RAM_DF27_ db
 _RAM_DF28_ db
 _RAM_DF29_ db
-_RAM_DF2A_Positions instanceof FourPlayers ; Positions (0-3) for cars
+_RAM_DF2A_Positions instanceof FourPlayers_InGame ; Positions (0-3) for cars
 _RAM_DF2E_HUDSpriteXs instanceof TournamentHUDSprites
 _RAM_DF37_HUDSpriteNs instanceof TournamentHUDSprites
 _RAM_DF40_HUDSpriteYs instanceof TournamentHUDSprites
@@ -1860,7 +1960,7 @@ LABEL_75_EnterGameTrampolineImpl:
 ; Copied to $dbcd onwards
 ; This initialises a bunch of stuff...
 ; _RAM_DBCD_MenuIndex onwards
-.db MenuIndex_0 ; _RAM_DBCD_MenuIndex
+.db MenuIndex_0_TitleScreen ; _RAM_DBCD_MenuIndex
 .db $01 ; _RAM_DBCE_Player1Qualified
 .db $01 ; _RAM_DBCF_LastRacePosition
 .db $00 ; _RAM_DBD0_LastRacePosition_Player2
@@ -15715,13 +15815,13 @@ LABEL_74E6_HeadToHeadResults:
   jr -
 
 +++:
-  ld a, MenuIndex_4
+  ld a, MenuIndex_4_TwoPlayerResults
 ++++:
   ld (_RAM_DBCD_MenuIndex), a
   jp LABEL_14_EnterMenus
 
 LABEL_7519_BackToTitleSreen:
-  xor a ; MenuIndex_0
+  xor a ; MenuIndex_0_TitleScreen
   ld (_RAM_DBCD_MenuIndex), a
   jp LABEL_14_EnterMenus
 
@@ -15749,7 +15849,7 @@ LABEL_7520_RuffTruxResults:
   jp LABEL_14_EnterMenus
 
 LABEL_7545_QualifyingResults:
-  ld a, MenuIndex_1
+  ld a, MenuIndex_1_QualificationResults
   ld (_RAM_DBCD_MenuIndex), a
   ld a, (_RAM_DF2A_Positions.Red)
   cp $00 ; Won
@@ -17154,7 +17254,7 @@ LABEL_8021_MenuScreenEntryPoint:
   jp ++
 +:dec a
   jr nz, +
-  call LABEL_8A38_MenuIndex4_Initialise
+  call LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise
   jp ++
 +:dec a
   jr nz, ++
@@ -17261,7 +17361,7 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
   ld a, MenuScreen_Title
   ld (_RAM_D699_MenuScreenIndex), a
   ld (_RAM_D7B3_), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_B337_BlankTiles
   call LABEL_9400_BlankSprites
@@ -17341,7 +17441,7 @@ LABEL_81C1_:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_SelectPlayerCount
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_BAFF_LoadFontTiles
@@ -17379,12 +17479,12 @@ LABEL_8205_:
   ld (_RAM_D6B8_), a
   ld (_RAM_D6B7_), a
   ld (_RAM_D6B9_), a
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   call LABEL_9F40_LoadPortraitTiles
 
-  call _LABEL_B375_ConfigureTilemapRect_5x6_24
+  call _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
 .ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -17421,7 +17521,7 @@ LABEL_8272_:
   call LABEL_B478_SelectPortraitPage
   ld hl, DATA_1F3E4_Tiles_Portrait_Powerboats
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   ld de, 80 * 8 ; 80 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -17478,7 +17578,7 @@ LABEL_82DF_MenuIndex1_QualificationResults_Initialise:
   ld (_RAM_D6B4_), a
   ld a, $07
   ld (_RAM_D6B1_), a
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   ld (_RAM_DBD3_PlayerPortraitBeingDrawn), a
@@ -17528,7 +17628,7 @@ _LABEL_8360_Qualified:
   ld (_RAM_DBD8_TrackIndex), a
 
 +:; Load portrait
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   call LABEL_9F40_LoadPortraitTiles
@@ -17561,7 +17661,7 @@ _LABEL_8360_Qualified:
   ld hl, TEXT_8416_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -17659,11 +17759,11 @@ LABEL_84C7_InitialiseOnePlayerTrackIntro:
   ld a, $01
   ld (_RAM_D6C3_), a
   call LABEL_AC1E_
-  call LABEL_ACEE_
+  call LABEL_ACEE_DrawColouredBalls
   call LABEL_AB5B_GetPortraitSource_CourseSelect
   call LABEL_AB86_Decompress3bppTiles_Index100
   call LABEL_ABB0_
-  call LABEL_BA3C_LoadColouredCirclesTilesToIndex150
+  call LABEL_BA3C_LoadColouredBallTilesToIndex150
   ld a, $40
   ld (_RAM_D6AF_FlashingCounter), a
   xor a
@@ -17678,7 +17778,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerChallengeResults
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
@@ -17705,7 +17805,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   call LABEL_B305_DrawHorizontalLine_Top
 
   ; Load player tiles
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
@@ -17719,7 +17819,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   add a, c
   call LABEL_9F40_LoadPortraitTiles
 
-  TileWriteAddressToHL $42
+  TileWriteAddressToHL MenuTileIndex_Portraits.2
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
@@ -17733,7 +17833,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   add a, c
   call LABEL_9F40_LoadPortraitTiles
   
-  TileWriteAddressToHL $60
+  TileWriteAddressToHL MenuTileIndex_Portraits.3
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
@@ -17747,7 +17847,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   add a, c
   call LABEL_9F40_LoadPortraitTiles
 
-  TileWriteAddressToHL $7e
+  TileWriteAddressToHL MenuTileIndex_Portraits.4
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3A_RequiredPositionForNextRace)
   ld c, a
@@ -17819,7 +17919,7 @@ LABEL_85F4_:
   ld (_RAM_D6B4_), a
   ld a, $07
   ld (_RAM_D6B1_), a
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_D6C4_)
   ld c, a
@@ -17865,7 +17965,7 @@ LABEL_866C_MenuIndex3_LifeWonOrLost_Initialise:
   call LABEL_B305_DrawHorizontalLine_Top
   xor a
   ld (_RAM_D6B8_), a
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ; Pick a portrait - won or lost
   ld a, (_RAM_DC38_LifeWonOrLost_Mode)
@@ -17915,13 +18015,13 @@ LABEL_866C_MenuIndex3_LifeWonOrLost_Initialise:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
   call LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX + 1
+  add a, <MenuTileIndex_Font.Digits + 1
   ld (_RAM_D701_SpriteN + 0), a ; Sprite 0
 .ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
@@ -18026,7 +18126,7 @@ _LABEL_876B_RuffTruxWon:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -18039,7 +18139,7 @@ _LABEL_876B_RuffTruxWon:
   ld (_RAM_DC09_Lives), a
   call LABEL_A673_SelectLowSpriteTiles
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   ld (_RAM_D701_SpriteN), a
   ld a, (_RAM_DC3C_IsGameGear)
   or a
@@ -18078,7 +18178,7 @@ LABEL_87E9_RuffTruxLost:
   ld hl, TEXT_884A_Lives
   call LABEL_A5B0_EmitToVDP_Text
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -18109,7 +18209,7 @@ LABEL_8877_:
   call LABEL_B478_SelectPortraitPage
   ld hl, DATA_2AB4D_Tiles_Portrait_RuffTrux
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $100
+  TileWriteAddressToHL MenuTileIndex_Logo
   ld de, 80 * 8 ; 80 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -18194,7 +18294,7 @@ LABEL_8953_InitialiseTwoPlayersMenu:
   call LABEL_988D_
   call LABEL_A673_SelectLowSpriteTiles
 
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   call LABEL_9F40_LoadPortraitTiles
@@ -18239,7 +18339,7 @@ LABEL_89E2_:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerGameType
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
@@ -18270,19 +18370,20 @@ LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu:
   ld a, MenuScreen_TrackSelect
   jp +
 
-LABEL_8A38_MenuIndex4_Initialise:
+LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TwoPlayerResult
 +:ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
   call LABEL_BAFF_LoadFontTiles
   call LABEL_959C_LoadPunctuationTiles
   call LABEL_A296_LoadHandTiles
-  call LABEL_BA3C_LoadColouredCirclesTilesToIndex150
+  call LABEL_BA3C_LoadColouredBallTilesToIndex150
   call LABEL_BA4F_LoadMediumNumberTiles
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +
@@ -18290,6 +18391,14 @@ LABEL_8A38_MenuIndex4_Initialise:
   cp MenuScreen_TrackSelect
   jr z, ++
 +:
+.else
+.ifdef IS_GAME_GEAR
+  ld a, (_RAM_D699_MenuScreenIndex)
+  cp MenuScreen_TrackSelect
+  jr z, ++
+.else
+.endif
+.endif
   ld a, $B2
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call LABEL_9448_LoadHeaderTiles
@@ -18299,7 +18408,9 @@ LABEL_8A38_MenuIndex4_Initialise:
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jr nz, +
-  TileWriteAddressToHL $24
+
+  ; Two players mode - load portraits
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBCF_LastRacePosition)
   ld c, a
@@ -18313,37 +18424,60 @@ LABEL_8A38_MenuIndex4_Initialise:
   call LABEL_9F40_LoadPortraitTiles
   jp ++
 
-+:
-  TileWriteAddressToHL $24
++:; One player mode (vs CPU) - load portraits
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   call LABEL_9F40_LoadPortraitTiles
   ld a, (_RAM_DBD5_Player2Character)
   call LABEL_9F40_LoadPortraitTiles
+
 ++:
-  call _LABEL_B375_ConfigureTilemapRect_5x6_24
+  call _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
   ld a, (_RAM_D699_MenuScreenIndex)
+
+  ; Draw tilemaps
+.ifdef GAME_GEAR_CHECKS
   cp MenuScreen_TwoPlayerResult
   jr z, +
-  TilemapWriteAddressToHL 9, 5
+  TilemapWriteAddressToHL 9, 5  ; Two player mode
   jp ++
-
-+:TilemapWriteAddressToHL 9, 15
++:TilemapWriteAddressToHL 9, 15 ; One player mode
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
   jr z, +
-  ; Add two rows for SMS -> 9, 13
+  ; Add two rows for SMS
   ld bc, $0080
   add hl, bc
 +:
+.else
+.ifdef IS_GAME_GEAR
+  cp MenuScreen_TwoPlayerResult
+  jr z, +
+  TilemapWriteAddressToHL 9, 5  ; Two player mode
+  jp ++
++:TilemapWriteAddressToHL 9, 15 ; One player mode
+++:
+.else
+  cp MenuScreen_TwoPlayerResult
+  jr z, +
+  TilemapWriteAddressToHL 9, 7  ; Two player mode
+  jp ++
++:TilemapWriteAddressToHL 9, 17 ; One player mode
+++:
+.endif
+.endif
   call LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, $42
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $06
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
+  
+  ; Same again for the second portrait
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
+.ifdef GAME_GEAR_CHECKS
   jr z, +
   TilemapWriteAddressToHL 18, 5
   jp ++
@@ -18352,11 +18486,26 @@ LABEL_8A38_MenuIndex4_Initialise:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld bc, $0080 ; Add 2 rows for SMS -> 18, 13
+  ld bc, $0080 ; Add 2 rows for SMS
   add hl, bc
 +:
+.else
+.ifdef IS_GAME_GEAR
+  jr z, +
+  TilemapWriteAddressToHL 18, 5  ; Two player mode
+  jp ++
++:TilemapWriteAddressToHL 18, 15 ; One player mode
+++:
+.else
+  jr z, +
+  TilemapWriteAddressToHL 18, 7  ; Two player mode
+  jp ++
++:TilemapWriteAddressToHL 18, 17 ; One player mode
+++:
+.endif
+.endif
   call LABEL_BCCF_EmitTilemapRectangleSequence
-  call LABEL_A355_
+  call LABEL_A355_PrintWonLostCounterLabels
   call LABEL_B9ED_
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
@@ -19105,7 +19254,7 @@ LABEL_8FC4_Handler_MenuScreen_LifeWonOrLost:
 .endif
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC09_Lives)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -19341,7 +19490,7 @@ LABEL_918B_:
   ld a, (_RAM_D691_TrackType)
   or a
   jr nz, +
-  ld a, BLANK_TILE_INDEX
+  ld a, <MenuTileIndex_Font.Space
   jp ++
 
 +:
@@ -19868,7 +20017,7 @@ LABEL_94F0_DrawHeaderTextTilemap:
 LABEL_959C_LoadPunctuationTiles:
   ld a, :DATA_22B2C_Tiles_PunctuationAndLine
   ld (_RAM_D741_RequestedPageIndex), a
-  TileWriteAddressToHL $1b4
+  TileWriteAddressToHL MenuTileIndex_Punctuation
   call LABEL_B35A_VRAMAddressToHL
   ld e, 4 * 8 ; 4 tiles
   ld hl, DATA_22B2C_Tiles_PunctuationAndLine
@@ -20721,10 +20870,10 @@ LABEL_9D4E_:
 
 ; Data from 9DAD to 9DB4 (8 bytes)
 DATA_9DAD_TileVRAMAddresses:
-  TileWriteAddressData $24
-  TileWriteAddressData $42
-  TileWriteAddressData $60
-  TileWriteAddressData $7e
+  TileWriteAddressData MenuTileIndex_Portraits.1
+  TileWriteAddressData MenuTileIndex_Portraits.2
+  TileWriteAddressData MenuTileIndex_Portraits.3
+  TileWriteAddressData MenuTileIndex_Portraits.4
 
 ; Data from 9DB5 to 9DBC (8 bytes)
 DATA_9DB5_TileVRAMAddresses:
@@ -21159,7 +21308,7 @@ LABEL_A0F0_BlankTilemapRectangle:
   ld de, $0009 ; Height in tiles
 --:
   call LABEL_B35A_VRAMAddressToHL
--:ld a, BLANK_TILE_INDEX
+-:ld a, <MenuTileIndex_Font.Space
   out (PORT_VDP_DATA), a
   xor a
   out (PORT_VDP_DATA), a
@@ -21364,10 +21513,10 @@ LABEL_A272_PrintBCDNumberWithLeadingHyphen:
   srl a
   srl a
   srl a
-  jr nz, + ; high 0 -> "-"
-  ld a, HYPHEN_TILE_INDEX
+  jr nz, + ; high 1 -> "-"
+  ld a, <MenuTileIndex_Punctuation.Hyphen
   jp ++
-+:add a, ZERO_DIGIT_TILE_INDEX ; else convert to digit
++:add a, <MenuTileIndex_Font.Digits ; else convert to digit
 ++:
   out (PORT_VDP_DATA), a
   rlc a
@@ -21375,7 +21524,7 @@ LABEL_A272_PrintBCDNumberWithLeadingHyphen:
   out (PORT_VDP_DATA), a
   ld a, (hl) ; Low nibble is printed as a 0
   and $0F
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   ret
 
@@ -21385,7 +21534,7 @@ LABEL_A296_LoadHandTiles:
   ld hl, DATA_2B151_Tiles_Hand
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   ld de, 39 * 8 ; 39 tiles
-  TileWriteAddressToHL $bb
+  TileWriteAddressToHL MenuTileIndex_Hand
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 LABEL_A2AA_PrintOrFlashMenuScreenText:
@@ -21442,7 +21591,7 @@ LABEL_A302_:
   call LABEL_A5B0_EmitToVDP_Text
   ; Emit number
   ld a, (_RAM_DC35_TournamentRaceNumber)
-  add a, ZERO_DIGIT_TILE_INDEX
+  add a, <MenuTileIndex_Font.Digits
   out (PORT_VDP_DATA), a
   ret
 
@@ -21460,107 +21609,126 @@ TEXT_A325_SelectVehicle:  .asc "  SELECT VEHICLE"
 TEXT_A335_TournamentRace: .asc "TOURNAMENT RACE "
 TEXT_A345_SelectATrack:   .asc "  SELECT A TRACK"
 
-LABEL_A355_:
+LABEL_A355_PrintWonLostCounterLabels:
+.ifdef UNREACHABLE_CODE
   ld a, (_RAM_DBD4_Player1Character)
   ; Divide by 8 to make a character index
   srl a
   srl a
   srl a
+  ; Result is not used...
+.endif
+  
+; Repeated code pattern... set VRAM address depending on system and whetehr _RAM_D699_MenuScreenIndex == MenuScreen_TwoPlayerResult
+.macro SetVRAMWriteAddress1P2P args X1P, Y1P, X2P, Y2P, GGXOffset, GGYOffset
+.ifdef IS_GAME_GEAR
   ld de, $0000
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld e, $7C
+  ld e, (GGYOffset * TILEMAP_WIDTH + GGXOffset) * TILEMAP_ENTRY_SIZE
 +:ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jr z, +
-  TilemapWriteAddressToHL 6, 6
+  TilemapWriteAddressToHL X2P, Y2P
   add hl, de
   jp ++
-+:TilemapWriteAddressToHL 6, 16
++:TilemapWriteAddressToHL X1P, Y1P
   add hl, de
 ++:
-  call LABEL_B35A_VRAMAddressToHL
-  call LABEL_A3EA_
-  ld de, $0000
-  ld a, (_RAM_DC3C_IsGameGear)
-  dec a
-  jr z, +
-  ld e, $7A
-+:ld a, (_RAM_D699_MenuScreenIndex)
+.else
+  ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jr z, +
-  TilemapWriteAddressToHL 6, 8
-  add hl, de
-  jp ++
-+:TilemapWriteAddressToHL 6, 18
-  add hl, de
+  .ifdef IS_GAME_GEAR
+    TilemapWriteAddressToHL X2P - GGXOffset, Y2P - GGYOffset
+  .else
+    TilemapWriteAddressToHL X1P - GGXOffset, Y1P - GGYOffset
+  .endif
+  jr ++
+  .ifdef IS_GAME_GEAR
+    TilemapWriteAddressToHL X2P, Y2P
+  .else
+    TilemapWriteAddressToHL X1X, Y1P
+  .endif
 ++:
+.endif
   call LABEL_B35A_VRAMAddressToHL
-  call LABEL_A402_
-  ld de, $0000
-  ld a, (_RAM_DC3C_IsGameGear)
-  dec a
-  jr z, +
-  ld e, $80
-+:ld a, (_RAM_D699_MenuScreenIndex)
-  cp MenuScreen_TwoPlayerResult
-  jr z, +
-  TilemapWriteAddressToHL 23, 6
-  add hl, de
-  jp ++
-+:TilemapWriteAddressToHL 23, 16
-  add hl, de
-++:
-  call LABEL_B35A_VRAMAddressToHL
-  call LABEL_A3EA_
-  ld de, $0000
-  ld a, (_RAM_DC3C_IsGameGear)
-  dec a
-  jr z, +
-  ld e, $80
-+:ld a, (_RAM_D699_MenuScreenIndex)
-  cp MenuScreen_TwoPlayerResult
-  jr z, +
-  TilemapWriteAddressToHL 23, 8
-  add hl, de
-  jp ++
-+:TilemapWriteAddressToHL 23, 18
-  add hl, de
-++:
-  call LABEL_B35A_VRAMAddressToHL
-  jp LABEL_A402_
+.endm
 
-LABEL_A3EA_:
+  ; Set tilemap address for "won" text
+  SetVRAMWriteAddress1P2P 6, 16, 6, 6, -2, +2
+  call LABEL_A3EA_PrintWonText
+  
+  ; Set tilemap address for "lost" text
+  SetVRAMWriteAddress1P2P 6, 18, 6, 8, -3, +2
+  call LABEL_A402_PrintLostText
+  
+  SetVRAMWriteAddress1P2P 23, 16, 23, 6, 0, +2
+  call LABEL_A3EA_PrintWonText
+
+  SetVRAMWriteAddress1P2P 23, 18, 23, 8, 0, +2
+  jp LABEL_A402_PrintLostText ; and ret
+
+LABEL_A3EA_PrintWonText:
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld bc, $0005
   ld hl, TEXT_A41E_Won
   jp LABEL_A5B0_EmitToVDP_Text
-
-+:
-  ld bc, $0002
++:ld bc, $0002
   ld hl, TEXT_A41A_W
   jp LABEL_A5B0_EmitToVDP_Text
+.else
+  .ifdef IS_GAME_GEAR
+    ld bc, $0002
+    ld hl, TEXT_A41A_W
+  .else
+    ld bc, $0005
+    ld hl, TEXT_A41E_Won
+  .endif
+  jp LABEL_A5B0_EmitToVDP_Text
+.endif
 
-LABEL_A402_:
+
+LABEL_A402_PrintLostText:
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld bc, $0005
   ld hl, TEXT_A423_Lost
   jp LABEL_A5B0_EmitToVDP_Text
-
-+:
-  ld bc, $0002
++:ld bc, $0002
   ld hl, TEXT_A41C_L
   jp LABEL_A5B0_EmitToVDP_Text
+.else
+  .ifdef IS_GAME_GEAR
+    ld bc, $0002
+    ld hl, TEXT_A41C_L
+  .else
+    ld bc, $0005
+    ld hl, TEXT_A423_Lost
+  .endif
+  jp LABEL_A5B0_EmitToVDP_Text
+.endif
 
+.ifdef GAME_GEAR_CHECKS
 TEXT_A41A_W:    .asc "W-"
 TEXT_A41C_L:    .asc "L-"
 TEXT_A41E_Won:  .asc "WON- "
 TEXT_A423_Lost: .asc "LOST-"
+.else
+  .ifdef IS_GAME_GEAR
+TEXT_A41A_W:    .asc "W-"
+TEXT_A41C_L:    .asc "L-"
+  .else
+TEXT_A41E_Won:  .asc "WON- "
+TEXT_A423_Lost: .asc "LOST-"
+  .endif
+.endif
 
 ; Unused code (?)
 .ifdef UNREACHABLE_CODE
@@ -22032,7 +22200,7 @@ LABEL_A877_LoadPositionGraphicsAndDrawPositionPortraitTilemaps:
   ld de, 24 * 8 ; 24 tiles
   TileWriteAddressToHL $100
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
-  call LABEL_BA42_LoadColouredCirclesTiles
+  call LABEL_BA42_LoadColouredBallTiles
 
   ; Draw portrait tiles
   ; #1
@@ -22098,78 +22266,75 @@ _LABEL_A8F7_TournamentResults_ThirdPlace:
 
 LABEL_A8FC_TournamentResults_FourthPlace:
   ld c, $03
+.ifdef UNREACHABLE_CODE
   jp +
+.endif
 
-+:ld a, (_RAM_DBCF_LastRacePosition)
++:; run handler for player at position c
+  ld a, (_RAM_DBCF_LastRacePosition)
   cp c
-  jp z, +
+  jp z, _isPlayer1
   ld a, (_RAM_DBD0_LastRacePosition_Player2)
   cp c
-  jp z, +++
+  jp z, _isPlayer2
   ld a, (_RAM_DBD1_LastRacePosition_Player3)
   cp c
-  jp z, LABEL_A95D_
+  jp z, _isPlayer3
   ld a, (_RAM_DBD2_LastRacePosition_Player4)
   cp c
-  jp z, LABEL_A97B_
+  jp z, _isPlayer4
   ret
 
-+:
+_isPlayer1:
   ld a, $80
   ld (_RAM_D6AF_FlashingCounter), a
   ld b, $00
   call LABEL_A9C6_
-  call _LABEL_B375_ConfigureTilemapRect_5x6_24
+  call _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld hl, DATA_A9AE_TilemapAddresses_SMS
   jr ++
-
-+:
-  ld hl, DATA_A9A6_TilemapAddresses_GG
++:ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBCF_LastRacePosition)
   jp LABEL_A996_
 
-+++:
+_isPlayer2:
   ld b, $01
   call LABEL_A9C6_
-  ld a, $42
+  ld a, MenuTileIndex_Portraits.2
   call _LABEL_B377_ConfigureTilemapRect_5x6_rega
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld hl, DATA_A9AE_TilemapAddresses_SMS
   jr ++
-
-+:
-  ld hl, DATA_A9A6_TilemapAddresses_GG
++:ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD0_LastRacePosition_Player2)
   jp LABEL_A996_
 
-LABEL_A95D_:
+_isPlayer3:
   ld b, $02
   call LABEL_A9C6_
-  ld a, $60
+  ld a, MenuTileIndex_Portraits.3
   call _LABEL_B377_ConfigureTilemapRect_5x6_rega
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld hl, DATA_A9AE_TilemapAddresses_SMS
   jr ++
-
-+:
-  ld hl, DATA_A9A6_TilemapAddresses_GG
++:ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD1_LastRacePosition_Player3)
   jp LABEL_A996_
 
-LABEL_A97B_:
+_isPlayer4:
   ld b, $03
   call LABEL_A9C6_
-  ld a, $7E
+  ld a, MenuTileIndex_Portraits.4
   call _LABEL_B377_ConfigureTilemapRect_5x6_rega
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -22179,6 +22344,8 @@ LABEL_A97B_:
 +:ld hl, DATA_A9A6_TilemapAddresses_GG
 ++:
   ld a, (_RAM_DBD2_LastRacePosition_Player4)
+  ; fall through
+  
 LABEL_A996_:
   sla a
   ld c, a
@@ -22220,8 +22387,8 @@ DATA_A9BE_TilemapAddresses_SMS:
   TilemapWriteAddressData 20, 26
 
 LABEL_A9C6_:
-; c = position index?
-; b = tile index
+; c = position index (0-3)
+; b = tile index (player index 0-3)
   ld a, c
   sla a
   ld e, a
@@ -22520,12 +22687,12 @@ LABEL_AC1E_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
   jr z, +++
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   ld (_RAM_D6BB_), a
   call LABEL_9F40_LoadPortraitTiles
-  call _LABEL_B375_ConfigureTilemapRect_5x6_24
+  call _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -22538,7 +22705,7 @@ LABEL_AC1E_:
 ++:
   call LABEL_BCCF_EmitTilemapRectangleSequence
 +++:
-  TileWriteAddressToHL $42
+  TileWriteAddressToHL MenuTileIndex_Portraits.2
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
@@ -22568,7 +22735,7 @@ LABEL_AC1E_:
   or a
   sbc hl, de
   call LABEL_BCCF_EmitTilemapRectangleSequence
-  TileWriteAddressToHL $60
+  TileWriteAddressToHL MenuTileIndex_Portraits.3
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
@@ -22600,7 +22767,7 @@ LABEL_AC1E_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
   JrZRet +++
-  TileWriteAddressToHL $7e
+  TileWriteAddressToHL MenuTileIndex_Portraits.4
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD7_Player4Character)
   call LABEL_9F40_LoadPortraitTiles
@@ -22619,10 +22786,11 @@ LABEL_AC1E_:
   call LABEL_BCCF_EmitTilemapRectangleSequence
 +++:ret
 
-LABEL_ACEE_:
+LABEL_ACEE_DrawColouredBalls:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
   jr z, +
+  ; Four balls
   TilemapWriteAddressToHL 3, 14
   call LABEL_B35A_VRAMAddressToHL
   TilemapWriteAddressToHL 11, 14
@@ -22630,25 +22798,27 @@ LABEL_ACEE_:
   TilemapWriteAddressToDE 27, 14
   jr ++
 
-+:TilemapWriteAddressToHL 9, 14
++:; Two balls
+  TilemapWriteAddressToHL 9, 14
   call LABEL_B35A_VRAMAddressToHL
   TilemapWriteAddressToDE 21, 14
+.ifdef UNREACHABLE_CODE
   jr ++
-
+.endif
 ++:
-  EmitDataToVDPImmediate16 $150
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Red
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
-  jr z, +
+  jr z, + ; Skip green and yellow for 2-player mode
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $151
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Green
   ld h, b
   ld l, c
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $152
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Yellow
 +:
   call LABEL_B361_VRAMAddressToDE
-  EmitDataToVDPImmediate16 $153
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Blue
   ret
 
 LABEL_AD42_DrawDisplayCase:
@@ -22970,7 +23140,7 @@ LABEL_AFCD_InitialiseOnePlayerMenu:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerMode
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_B337_BlankTiles
   call LABEL_9400_BlankSprites
@@ -23381,7 +23551,7 @@ LABEL_B2B3_:
   ret
 
 LABEL_B2BB_DrawMenuScreenBase_WithLine:
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
@@ -23396,7 +23566,7 @@ LABEL_B2BB_DrawMenuScreenBase_WithLine:
 +:ret
 
 LABEL_B2DC_DrawMenuScreenBase_NoLine:
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
@@ -23492,7 +23662,7 @@ LABEL_B368_:
   ld (_RAM_D6C5_PaletteFadeIndex), a
   ret
 
-_LABEL_B375_ConfigureTilemapRect_5x6_24:
+_LABEL_B375_ConfigureTilemapRect_5x6_Portrait1:
   ld a, $24
 _LABEL_B377_ConfigureTilemapRect_5x6_rega:
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
@@ -24025,7 +24195,7 @@ LABEL_B70B_:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_TrackSelect
   ld (_RAM_D699_MenuScreenIndex), a
-  ld e, BLANK_TILE_INDEX
+  ld e, <MenuTileIndex_Font.Space
   call LABEL_9170_BlankTilemap_BlankControlsRAM
   call LABEL_9400_BlankSprites
   call LABEL_90CA_BlankTiles_BlankControls
@@ -24218,7 +24388,7 @@ LABEL_B877_:
   call LABEL_B305_DrawHorizontalLine_Top
   call LABEL_B8CF_LoadTrophyTiles
   call LABEL_B8E3_LoadTrophyTilemap
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DC34_IsTournament)
   or a
@@ -24247,7 +24417,7 @@ LABEL_B877_:
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_B8C9_EmitTilemapRectangle_5x6_24:
-  call _LABEL_B375_ConfigureTilemapRect_5x6_24
+  call _LABEL_B375_ConfigureTilemapRect_5x6_Portrait1
   jp LABEL_BCCF_EmitTilemapRectangleSequence
 
 LABEL_B8CF_LoadTrophyTiles:
@@ -24394,46 +24564,50 @@ LABEL_B9C4_:
   ret
 
 LABEL_B9ED_:
-  ; Offset location for GG by $40 = 2 rows?
+  ; Set VRAM address
+  
+  ; Offset location for GG by $40 = 2 rows
   ld a, (_RAM_DC3C_IsGameGear)
   xor $01
   rrca
   rrca
   ld e, a
   ld d, $00
+  
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
   jr z, +
   TilemapWriteAddressToHL 8, 10
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $150 ; Tile $150
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Red
   TilemapWriteAddressToHL 23, 10
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $153 ; Tile $153
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Blue
   ret
 
 +:
   TilemapWriteAddressToHL 8, 20
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $150 ; Tile $150
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Red
   TilemapWriteAddressToHL 23, 20
   add hl, de
   call LABEL_B35A_VRAMAddressToHL
-  EmitDataToVDPImmediate16 $153 ; Tile $153
+  EmitDataToVDPImmediate16 MenuTileIndex_ColouredBalls.Blue
   ret
 
-LABEL_BA3C_LoadColouredCirclesTilesToIndex150:
-  TileWriteAddressToHL $150
+LABEL_BA3C_LoadColouredBallTilesToIndex150:
+  TileWriteAddressToHL MenuTileIndex_ColouredBalls
   call LABEL_B35A_VRAMAddressToHL
-
-LABEL_BA42_LoadColouredCirclesTiles:
-  ld a, :DATA_22B8C_Tiles_ColouredCircles
+  ; fall through
+  
+LABEL_BA42_LoadColouredBallTiles:
+  ld a, :DATA_22B8C_Tiles_ColouredBalls
   ld (_RAM_D741_RequestedPageIndex), a
   ld e, 4 * 8 ; 4 tiles
-  ld hl, DATA_22B8C_Tiles_ColouredCircles
+  ld hl, DATA_22B8C_Tiles_ColouredBalls
   JumpToRamCode LABEL_3BB45_Emit3bppTileDataToVRAM
 
 LABEL_BA4F_LoadMediumNumberTiles:
@@ -24513,7 +24687,7 @@ LABEL_BAD5_LoadMenuLogoTiles:
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   ld de, 112 * 8 ; 122 tiles
 ++:
-  TileWriteAddressToHL $100
+  TileWriteAddressToHL MenuTileIndex_Logo
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL ; and ret
 
 LABEL_BAFF_LoadFontTiles:
@@ -24521,7 +24695,7 @@ LABEL_BAFF_LoadFontTiles:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_2B02D_Tiles_Font
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL 0
+  TileWriteAddressToHL MenuTileIndex_Font
   ld de, 36 * 8 ; 36 tiles
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -24535,7 +24709,7 @@ LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_FAA5_Tiles_Portrait_SportsCars
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   ld de, 80 * 8 ; 80 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   ; (Seems not to be used... the slideshow does not use it)
@@ -24543,7 +24717,7 @@ LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow:
 
 +:; GG: blank tiles
   ld bc, 80 * 32 ; 80 tiles
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   call LABEL_B35A_VRAMAddressToHL
 -:xor a
   out (PORT_VDP_DATA), a
@@ -24558,14 +24732,23 @@ LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow:
   TailCall LABEL_90E7_
 
 LABEL_BB49_SetMenuHScroll:
+; SMS scroll 6, GG scroll 0
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ; SMS scroll 6, GG scroll 0
   ld a, $06
   jr ++
 +:xor a
-++:out (PORT_VDP_REGISTER), a
+++:
+.else
+.ifdef IS_GAME_GEAR
+  xor a
+.else
+  ld a, 6
+.endif
+.endif
+  out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_XSCROLL
   out (PORT_VDP_REGISTER), a
   ret
@@ -24633,7 +24816,7 @@ LABEL_BB95_LoadIconMenuGraphics:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_26C52_Tiles_Challenge_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   ld de, 60 * 8 ; 60 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -24670,7 +24853,7 @@ LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_27391_Tiles_Tournament_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $24
+  TileWriteAddressToHL MenuTileIndex_Portraits.1
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -25067,7 +25250,7 @@ LABEL_BEF5_:
 +:
   call LABEL_B35A_VRAMAddressToHL
   ld c, $07
--:EmitDataToVDPImmediate8 BLANK_TILE_INDEX
+-:EmitDataToVDPImmediate8 <MenuTileIndex_Font.Space
   xor a
   out (PORT_VDP_DATA), a
   dec c
@@ -25075,10 +25258,10 @@ LABEL_BEF5_:
   ret
 
 LABEL_BF2E_LoadMenuPalette_SMS:
-  ld hl, $C000 ; Palette index 0
+  PaletteAddressToHLSMS 0 ; Palette index 0
   call LABEL_B35A_VRAMAddressToHL
   ld hl, DATA_BF3E_MenuPalette_SMS
-  ld b, $20
+  ld b, 32
   ld c, PORT_VDP_DATA
   otir
   ret
@@ -25119,7 +25302,9 @@ DATA_BF3E_MenuPalette_SMS:
   SMSCOLOUR $000000
 
 .ifdef UNREACHABLE_CODE
-LABEL_BF5E_: ; GG-only code, misaligned here
+; GG-only code, misaligned here
+; Looks like the equivalent of the above - but not hooked up
+LABEL_BF5E_: 
   jr + ; Weird
 +:call $B358 ; not a function
   ld c, $05
@@ -25133,13 +25318,13 @@ LABEL_BF5E_: ; GG-only code, misaligned here
 LABEL_BF70_: ; unused code? Left over memory?
   ld hl, $c000
   call $b358 ; not a function
-  ld hl, DATA_BF80_
+  ld hl, DATA_BF80_MenuPalette_GG
   ld b, $40
   ld c, PORT_VDP_DATA
   otir
   ret
 
-DATA_BF80_: ; GG menu palette
+DATA_BF80_MenuPalette_GG: ; GG menu palette
   GGCOLOUR $440088
   GGCOLOUR $EEEEEE
   GGCOLOUR $008800
@@ -27244,7 +27429,7 @@ DATA_AA24_Warriors_EffectsTiles:
 
 DATA_22B2C_Tiles_PunctuationAndLine:
 .incbin "Assets/Menu/PunctuationAndLine.3bpp"
-DATA_22B8C_Tiles_ColouredCircles:
+DATA_22B8C_Tiles_ColouredBalls:
 .incbin "Assets/Menu/Balls.3bpp"
 DATA_22BEC_Tiles_Cursor:
 .incbin "Assets/Menu/Cursor.3bpp.compressed"
@@ -35547,7 +35732,7 @@ LABEL_3BB57_EmitTilemapRectangle:
   ld a, (hl)          ; Read data
   cp $FF
   jr nz, +
-  ld a, BLANK_TILE_INDEX ; $ff -> $0e (blank tile)
+  ld a, <MenuTileIndex_Font.Space ; $ff -> $0e (blank tile)
   JumpToRamCode ++
 +:add a, b            ; Else add offset
 ; Executed in RAM at d9ad
