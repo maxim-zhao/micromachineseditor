@@ -804,8 +804,8 @@ _RAM_D68E_SlideshowVRAMWriteAddress instanceof BigEndianWord
 _RAM_D690_CarPortraitTileIndex db
 _RAM_D691_TitleScreenSlideshowIndex db
 _RAM_D692_SlideshowPointerOffset db
-_RAM_D693_ db
-_RAM_D694_NeedToDrawCarPortrait db
+_RAM_D693_SlowLoadSlideshowTiles db ; Used for other purposes elsewhere?
+_RAM_D694_DrawCarPortraitTilemap db
 _RAM_D695_SlideshowTileWriteCounter instanceof Word
 _RAM_D697_ db
 _RAM_D698_ db ; unused?
@@ -18519,7 +18519,7 @@ LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise:
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
   ld (_RAM_D6CE_), a
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -19382,9 +19382,9 @@ LABEL_90E7_:
   xor a
   ld (_RAM_D691_TitleScreenSlideshowIndex), a
   ld (_RAM_D692_SlideshowPointerOffset), a
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   ld a, 1
-  ld (_RAM_D694_NeedToDrawCarPortrait), a
+  ld (_RAM_D694_DrawCarPortraitTilemap), a
   ld a, MenuTileIndex_Title_Portraits.1
   ld (_RAM_D690_CarPortraitTileIndex), a
   TailCall LABEL_918B_MaybeDrawCarPortraitTilemap
@@ -19480,7 +19480,7 @@ LABEL_9170_BlankTilemap_BlankControlsRAM:
   TailCall LABEL_AF5D_BlankControlsRAM
 
 LABEL_918B_MaybeDrawCarPortraitTilemap:
-  ld a, (_RAM_D694_NeedToDrawCarPortrait)
+  ld a, (_RAM_D694_DrawCarPortraitTilemap)
   or a
   JrZRet _LABEL_91E7_ret
   ; Init tilemap sequence at the right point
@@ -19560,7 +19560,7 @@ LABEL_91E8_TitleScreenSlideshow_Increment:
   sla a
   ld d, $00
   ld e, a
-  ld hl, DATA_9254_VehiclePortraitOffsets
+  ld hl, _DATA_9254_VehiclePortraitOffsets
   add hl, de
   ld a, (hl)
   ld (_RAM_D7B5_DecompressorSource.Lo), a
@@ -19588,13 +19588,14 @@ LABEL_91E8_TitleScreenSlideshow_Increment:
   xor a
   ld (_RAM_D695_SlideshowTileWriteCounter.Lo), a
   ld (_RAM_D695_SlideshowTileWriteCounter.Hi), a
-  ld (_RAM_D694_NeedToDrawCarPortrait), a
-  ld a, $01
-  ld (_RAM_D693_), a
+  ld (_RAM_D694_DrawCarPortraitTilemap), a
+  ; Start slow-loading tiles
+  ld a, 1
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   ret
 
 ; Data from 9254 to 9267 (20 bytes)
-DATA_9254_VehiclePortraitOffsets:
+_DATA_9254_VehiclePortraitOffsets:
 ; Pointers to compressed tile data for the title screen slideshow
 ; Index 0 is special, the value is not used
 ; Index 6 is skippwd
@@ -19615,7 +19616,7 @@ _DATA_9268_SlideshowTileWriteAddresses:
   TileWriteAddressData MenuTileIndex_Title_Portraits.2
 
 ; Data from 926C to 9275 (10 bytes)
-DATA_926C_VehiclePortraitPageNumbers:
+_DATA_926C_VehiclePortraitPageNumbers:
 ; Pages containing "portrait" data for the title screen slideshow
 ; Index 0 is special, the value is not used
 ; Index 6 is skippwd
@@ -19678,9 +19679,11 @@ LABEL_92CB_SlowCopySlideshowTilesToVRAM:
   ld a, (_RAM_D6D4_Slideshow_PendingLoad)
   cp $01
   JrZRet +
-  ld a, (_RAM_D693_)
+  ld a, (_RAM_D693_SlowLoadSlideshowTiles)
   or a
   JrZRet +
+
+  ; Retrieve pointers
   ld a, (_RAM_D68C_SlideshowRAMReadAddress.Hi)
   ld h, a
   ld a, (_RAM_D68C_SlideshowRAMReadAddress.Lo)
@@ -19689,8 +19692,12 @@ LABEL_92CB_SlowCopySlideshowTilesToVRAM:
   ld d, a
   ld a, (_RAM_D68E_SlideshowVRAMWriteAddress.Lo)
   ld e, a
+
+  ; Do the work
   call LABEL_B361_VRAMAddressToDE
   CallRamCode LABEL_3BB93_Emit3bppTiles_2Rows
+  
+  ; Save them again
   ld a, h
   ld (_RAM_D68C_SlideshowRAMReadAddress.Hi), a
   ld a, l
@@ -19699,6 +19706,8 @@ LABEL_92CB_SlowCopySlideshowTilesToVRAM:
   ld (_RAM_D68E_SlideshowVRAMWriteAddress.Hi), a
   ld a, e
   ld (_RAM_D68E_SlideshowVRAMWriteAddress.Lo), a
+  
+  ; Loop $140 times -> 80 tiles
   ld hl, (_RAM_D695_SlideshowTileWriteCounter)
   inc hl
   ld (_RAM_D695_SlideshowTileWriteCounter), hl
@@ -19707,10 +19716,11 @@ LABEL_92CB_SlowCopySlideshowTilesToVRAM:
   ld a, l
   cp $40
   JrNzRet +
+  ; Slow load is done, do tilemap
   xor a
-  ld (_RAM_D693_), a
-  ld a, $01
-  ld (_RAM_D694_NeedToDrawCarPortrait), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
+  ld a, 1
+  ld (_RAM_D694_DrawCarPortraitTilemap), a
 +:ret
 
 LABEL_9317_InitialiseHandSprites:
@@ -21370,9 +21380,9 @@ LABEL_A129_:
   ld hl, 32*10 ; 10 tiles
   add hl, de
   ld (_RAM_D6A8_DisplayCaseTileAddress), hl
-  ld a, (_RAM_D693_)
+  ld a, (_RAM_D693_SlowLoadSlideshowTiles)
   sub $01
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   jp LABEL_80FC_EndMenuScreenHandler
 
 LABEL_A14F_:
@@ -22615,7 +22625,7 @@ LABEL_AB5B_GetPortraitSource_CourseSelect:
 LABEL_AB68_GetPortraitSource_TrackType:
   ld (_RAM_D691_TitleScreenSlideshowIndex), a
   sla a
-  ld de, DATA_9254_VehiclePortraitOffsets
+  ld de, _DATA_9254_VehiclePortraitOffsets
   add a, e
   ld e, a
   ld a, d
@@ -22656,9 +22666,9 @@ LABEL_ABB0_:
 LABEL_ABB3_:
   xor a
   ld (_RAM_D692_SlideshowPointerOffset), a
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   ld a, $01
-  ld (_RAM_D694_NeedToDrawCarPortrait), a
+  ld (_RAM_D694_DrawCarPortraitTilemap), a
   xor a
   ld (_RAM_D690_CarPortraitTileIndex), a
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -23850,7 +23860,7 @@ LABEL_B478_SelectPortraitPage:
   ; Indexes into a table with a to select the page number for a subsequent call to RAM code
   ld e, a
   ld d, $00
-  ld hl, DATA_926C_VehiclePortraitPageNumbers
+  ld hl, _DATA_926C_VehiclePortraitPageNumbers
   add hl, de
   ld a, (hl)
   ld (_RAM_D741_RequestedPageIndex), a
@@ -24045,7 +24055,7 @@ LABEL_B56D_MenuScreen_TrackSelect:
   jp LABEL_B618_
 
 ++:
-  ld a, (_RAM_D693_)
+  ld a, (_RAM_D693_SlowLoadSlideshowTiles)
   cp $01
   jp z, LABEL_B6AB_
   cp $00
@@ -24169,7 +24179,7 @@ LABEL_B666_:
   ld a, $01
   ld (_RAM_D6D4_Slideshow_PendingLoad), a
   ld a, $09
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   TileWriteAddressToDE $160
   ld (_RAM_D6A8_DisplayCaseTileAddress), de
   ld a, $01
@@ -24255,7 +24265,7 @@ LABEL_B70B_:
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
-  ld (_RAM_D693_), a
+  ld (_RAM_D693_SlowLoadSlideshowTiles), a
   ld (_RAM_D6CE_), a
   call LABEL_AB5B_GetPortraitSource_CourseSelect
   call LABEL_AB9B_Decompress3bppTiles_Index160
@@ -35800,28 +35810,23 @@ LABEL_3BB57_EmitTilemapRectangle:
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d9d3
+; No need to be in VRAM? (RAM to VRAM)
 LABEL_3BB93_Emit3bppTiles_2Rows:
   CallRamCode LABEL_3BCF5_RestorePagingFromD741
+.repeat 2
   ld c, $03
+  ; 3 bytes data
 -:ld a, (hl)
   out (PORT_VDP_DATA), a
   inc hl
   inc de
   dec c
   jr nz, -
+  ; 1 byte padding
   xor a
   out (PORT_VDP_DATA), a
   inc de
-  ld c, $03
--:ld a, (hl)
-  out (PORT_VDP_DATA), a
-  inc hl
-  inc de
-  dec c
-  jr nz, -
-  xor a
-  out (PORT_VDP_DATA), a
-  inc de
+.endr
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at d9f5

@@ -743,9 +743,9 @@
 02:918b LABEL_918B_MaybeDrawCarPortraitTilemap
 02:91e7 _LABEL_91E7_ret
 02:91e8 LABEL_91E8_TitleScreenSlideshow_Increment
-02:9254 DATA_9254_VehiclePortraitOffsets
+02:9254 _DATA_9254_VehiclePortraitOffsets
 02:9268 _DATA_9268_SlideshowTileWriteAddresses
-02:926c DATA_926C_VehiclePortraitPageNumbers
+02:926c _DATA_926C_VehiclePortraitPageNumbers
 02:9276 LABEL_9276_DrawVehicleName
 02:92cb LABEL_92CB_SlowCopySlideshowTilesToVRAM
 02:9317 LABEL_9317_InitialiseHandSprites
@@ -2249,8 +2249,8 @@
 0000d690 _RAM_D690_CarPortraitTileIndex
 0000d691 _RAM_D691_TitleScreenSlideshowIndex
 0000d692 _RAM_D692_SlideshowPointerOffset
-0000d693 _RAM_D693_
-0000d694 _RAM_D694_NeedToDrawCarPortrait
+0000d693 _RAM_D693_SlowLoadSlideshowTiles
+0000d694 _RAM_D694_DrawCarPortraitTilemap
 0000d695 _RAM_D695_SlideshowTileWriteCounter
 0000d695 _RAM_D695_SlideshowTileWriteCounter.Lo
 0000d696 _RAM_D695_SlideshowTileWriteCounter.Hi
