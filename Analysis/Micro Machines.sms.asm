@@ -1,6 +1,6 @@
 ; Some options for what we want to keep identical to the original...
 .define BLANK_FILL_ORIGINAL ; disable to squash blanks and blank unused bytes
-.define UNREACHABLE_CODE ; disable to drop out the unreachable code and code that does nothing - BUGGY
+.define UNNECESSARY_CODE ; disable to drop out the unreachable code and code that does nothing - BUGGY
 .define JUMP_TO_RET ; disable to use conditional rets
 .define TAIL_CALL ; disable to optimise calls followed by rets to jumps - INCOMPLETE
 .define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - INCOMPLETE
@@ -237,8 +237,7 @@ Blue db
 .endst
 
 ; Tile numbers in menus
-; TODO: most of this varies by menu
-; Invariant: font, punctuation, line
+
 .struct FontTiles
 LettersAToN dsb 14
 Space       db
@@ -265,11 +264,23 @@ Tiles dsb 10*8
 Tiles dsb 2*4
 .endst
 
+; Generic one - TODO get rid of much of it
+.enum 0
+MenuTileIndex_Font        instanceof FontTiles
+MenuTileIndex_Portraits   instanceof PlayerPortraitTiles 4
+MenuTileIndex_Unused      dsb 30
+MenuTileIndex_Cursor      dsb 9 ; $ba
+MenuTileIndex_SmallLogo   dsb 22
+MenuTileIndex_Text1       dsb 24
+MenuTileIndex_Text2       dsb 18
+; ...
+.ende
+
 ; Title screen
 .enum 0
 MenuTileIndex_Title_Font        instanceof FontTiles
 MenuTileIndex_Title_Portraits   instanceof CarPortraitTiles 2
-MenuTileIndex_Title_Unused      dsb 84
+MenuTileIndex_Title_Unused      dsb 60
 MenuTileIndex_Title_Logo        dsb 177
 .ende
 
@@ -297,17 +308,6 @@ MenuTileIndex_TrackIntro_CarPortrait instanceof CarPortraitTiles
 MenuTileIndex_TrackIntro_ColouredBalls instanceof FourPlayers_Menu
 .ende
 
-; Player select, ..?
-.enum 0
-MenuTileIndex_Font        instanceof FontTiles
-MenuTileIndex_Portraits   instanceof PlayerPortraitTiles 4
-MenuTileIndex_Unused      dsb 30
-MenuTileIndex_Cursor      dsb 9 ; $ba
-MenuTileIndex_SmallLogo   dsb 22
-MenuTileIndex_Text1       dsb 24
-MenuTileIndex_Text2       dsb 18
-; ...
-.ende
 
 .define MenuTileIndex_Hand $bb ; todo
 
@@ -461,6 +461,10 @@ map "?" = <MenuTileIndex_Punctuation.QuestionMark
 
 .macro TileWriteAddressToHL args index
   ld hl, VRAM_WRITE_MASK | (index * 32)
+.endm
+
+.macro TileWriteAddressToDE args index
+  ld de, VRAM_WRITE_MASK | (index * 32)
 .endm
 
 .macro TileWriteAddressData args index
@@ -687,6 +691,11 @@ Lo db
 Hi db
 .endst
 
+.struct BigEndianWord
+Hi db
+Lo db
+.endst
+
 .enum $C000 export
 _RAM_C000_StartOfRam .db
 _RAM_C000_DecompressionTemporaryBuffer .db
@@ -790,17 +799,14 @@ _RAM_D688_ db
 _RAM_D689_ db ; unused?
 _RAM_D68A_TilemapRectangleSequence_TileIndex db
 _RAM_D68B_TilemapRectangleSequence_Row db
-_RAM_D68C_ db
-_RAM_D68D_ db
-_RAM_D68E_ db
-_RAM_D68F_ db
-_RAM_D690_ db
-_RAM_D691_TrackType db
-_RAM_D692_ db
+_RAM_D68C_SlideshowRAMReadAddress instanceof BigEndianWord
+_RAM_D68E_SlideshowVRAMWriteAddress instanceof BigEndianWord
+_RAM_D690_CarPortraitTileIndex db
+_RAM_D691_TitleScreenSlideshowIndex db
+_RAM_D692_SlideshowPointerOffset db
 _RAM_D693_ db
-_RAM_D694_ db
-_RAM_D695_ db
-_RAM_D696_ db
+_RAM_D694_NeedToDrawCarPortrait db
+_RAM_D695_SlideshowTileWriteCounter instanceof Word
 _RAM_D697_ db
 _RAM_D698_ db ; unused?
 _RAM_D699_MenuScreenIndex db
@@ -856,9 +862,9 @@ _RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect db
 _RAM_D6D1_TitleScreenCheatCodes_ButtonPressSeen db ; Used for "debouncing"
 _RAM_D6D2_Unused db
 _RAM_D6D3_VBlankDone db
-_RAM_D6D4_ db
+_RAM_D6D4_Slideshow_PendingLoad db
 _RAM_D6D5_InGame db
-_RAM_D6D6_ db
+_RAM_D6D6_TitleScreenSlideshowIndexPlus7_Unused db
 _RAM_D6D7_ dsb 10 ; unused?
 _RAM_D6E1_SpriteData .db
 _RAM_D6E1_SpriteX dsb 32
@@ -881,7 +887,7 @@ _RAM_D797_ db
 _RAM_D798_ dsb 27 ; unused?
 _RAM_D7B3_ db
 _RAM_D7B4_IsHeadToHead db
-_RAM_D7B5_DecompressorSource dw
+_RAM_D7B5_DecompressorSource instanceof Word
 _RAM_D7B7_ db
 _RAM_D7B8_ db
 _RAM_D7B9_ db
@@ -1900,7 +1906,7 @@ LABEL_38_:
     jr z, ++
     cp $01
     jr z, +
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
     ; Unreachable code
     in a, (PORT_VDP_STATUS) ; Ack INT
   pop af
@@ -4263,7 +4269,7 @@ LABEL_1295_:
   ld (_RAM_DEAB_), a
   JpRet ++ ; ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -6584,7 +6590,7 @@ LABEL_2673_:
   ld (_RAM_DEAF_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -9882,7 +9888,7 @@ LABEL_44C3_:
   ld (_RAM_DEAF_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -9912,7 +9918,7 @@ LABEL_44C3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -9923,7 +9929,7 @@ LABEL_44C3_:
   ld (_RAM_DEB2_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -9937,7 +9943,7 @@ LABEL_44C3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -9946,7 +9952,7 @@ LABEL_44C3_:
   ld (_RAM_DEB1_VScrollDelta), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -17282,7 +17288,7 @@ LABEL_8021_MenuScreenEntryPoint:
   dec a
   jr z, +
   ; Staying in menus
-  ld a, (_RAM_D6D4_)
+  ld a, (_RAM_D6D4_Slideshow_PendingLoad)
   or a
   CallRamCodeIfZFlag LABEL_3BB26_Trampoline_MenuMusicFrameHandler
   nop ; Hook point?
@@ -17342,7 +17348,7 @@ LABEL_80FC_EndMenuScreenHandler:
 +:jp (hl)
 
 ; Data from 8101 to 8113 (19 bytes) - dead code?
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_8101_Unknown: ; unreachable?
   ld a,(_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK | BUTTON_2_MASK
@@ -17369,7 +17375,7 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
   call LABEL_BAD5_LoadMenuLogoTiles
   call LABEL_BDED_LoadMenuLogoTilemap
   call LABEL_BB13_InitialiseTitleScreenCarPortraitSlideshow
-  call LABEL_B323_Populate_RAM_DBFE_PlayerPortraitValues
+  call LABEL_B323_PopulatePlayerPortraitValues
   call LABEL_8CDB_ResetCheats
 
   ld a, PlayerPortrait_MrQuestion
@@ -17539,12 +17545,12 @@ LABEL_8272_:
 
   ld c, Music_05_RaceStart
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, :TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
+  ld a, :TEXT_3ECC9_Vehicle_Name_Powerboats
   ld (_RAM_D741_RequestedPageIndex), a
   TilemapWriteAddressToHL 8, 22
   call LABEL_B35A_VRAMAddressToHL
   ld bc, 16
-  ld hl, TEXT_3ECC9_VEHICLE_NAME_POWERBOATS
+  ld hl, TEXT_3ECC9_Vehicle_Name_Powerboats
   CallRamCode LABEL_3BC6A_EmitText
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
@@ -18238,10 +18244,10 @@ LABEL_8877_:
 +:TilemapWriteAddressToHL 8, 22 ; GG
 ++:call LABEL_B35A_VRAMAddressToHL
 
-  ld a, :TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
+  ld a, :TEXT_3ED39_Vehicle_Name_Rufftrux
   ld (_RAM_D741_RequestedPageIndex), a
   ld bc, 16
-  ld hl, TEXT_3ED39_VEHICLE_NAME_RUFFTRUX
+  ld hl, TEXT_3ED39_Vehicle_Name_Rufftrux
   CallRamCode LABEL_3BC6A_EmitText
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -18591,13 +18597,15 @@ LABEL_8B9D_:
 
 ; 2nd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_8BAB_Handler_MenuScreen_Title:
-  call LABEL_AF10_
-  ld a, (_RAM_D7BB_)
+  call LABEL_AF10_CheckGearToGear
+
+  ld a, (_RAM_D7BB_) ; ??? Never set?
   or a
-  jr nz, LABEL_8C2C_
-  call LABEL_BE1A_DrawCopyrightText
-  call LABEL_918B_
-  call LABEL_92CB_
+  jr nz, LABEL_8C2C_GoToTwoPlayerMenu
+
+  call LABEL_BE1A_InitiallyDrawCopyrightText
+  call LABEL_918B_MaybeDrawCarPortraitTilemap
+  call LABEL_92CB_SlowCopySlideshowTilesToVRAM
   call LABEL_B9C4_
   call LABEL_B484_CheckTitleScreenCheatCodes
   ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect)
@@ -18630,6 +18638,8 @@ LABEL_8BAB_Handler_MenuScreen_Title:
   ld a, (_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK
   jr z, ++
+
+  ; GG: start, gear to gear + player 2 skip on
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   jr z, +++
@@ -18650,7 +18660,7 @@ LABEL_8BAB_Handler_MenuScreen_Title:
   ; Either player pressed Start
   ld a, (_RAM_DC41_GearToGearActive)
   or a
-  jr nz, LABEL_8C2C_
+  jr nz, LABEL_8C2C_GoToTwoPlayerMenu
   call LABEL_B1F4_Trampoline_StopMenuMusic
   call LABEL_81C1_
 +++:
@@ -18661,7 +18671,7 @@ LABEL_8C23_StartCourseSelect:
   call LABEL_B70B_
   jp LABEL_80FC_EndMenuScreenHandler
 
-LABEL_8C2C_:
+LABEL_8C2C_GoToTwoPlayerMenu:
   call LABEL_B1F4_Trampoline_StopMenuMusic
   call LABEL_8953_InitialiseTwoPlayersMenu
   jp LABEL_80FC_EndMenuScreenHandler
@@ -18692,7 +18702,7 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   call LABEL_8CA2_ProcessMenuControls_Player1Priority
   jp +
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   call LABEL_8CB1_
 .endif
 
@@ -19368,15 +19378,16 @@ LABEL_90CA_BlankTiles_BlankControls:
   ret
 
 LABEL_90E7_:
+; Called once, could be inlined
   xor a
-  ld (_RAM_D691_TrackType), a
-  ld (_RAM_D692_), a
+  ld (_RAM_D691_TitleScreenSlideshowIndex), a
+  ld (_RAM_D692_SlideshowPointerOffset), a
   ld (_RAM_D693_), a
-  ld a, $01
-  ld (_RAM_D694_), a
-  ld a, $24
-  ld (_RAM_D690_), a
-  TailCall LABEL_918B_
+  ld a, 1
+  ld (_RAM_D694_NeedToDrawCarPortrait), a
+  ld a, MenuTileIndex_Title_Portraits.1
+  ld (_RAM_D690_CarPortraitTileIndex), a
+  TailCall LABEL_918B_MaybeDrawCarPortraitTilemap
 
 LABEL_90FF_ReadControllers:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -19468,36 +19479,36 @@ LABEL_9170_BlankTilemap_BlankControlsRAM:
   jr nz, -
   TailCall LABEL_AF5D_BlankControlsRAM
 
-LABEL_918B_:
-  ld a, (_RAM_D694_)
+LABEL_918B_MaybeDrawCarPortraitTilemap:
+  ld a, (_RAM_D694_NeedToDrawCarPortrait)
   or a
   JrZRet _LABEL_91E7_ret
-  ld a, (_RAM_D690_)
+  ; Init tilemap sequence at the right point
+  ld a, (_RAM_D690_CarPortraitTileIndex)
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld a, (_RAM_D691_TrackType)
-  cp $00
+  ; We cycle this as it gets us all the vehicles in game order
+  ; (index 0 is special)
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
+  cp 0
   jr nz, +
   TilemapWriteAddressToHL 11, 15
   jp ++
-+:TilemapWriteAddressToHL 11, 14
++:TilemapWriteAddressToHL 11, 14 ; For index 0 we draw a bit higher up - not sure why?
 ++:
+  ; Draw a 10x8 rect from the selected index
+  ; Or all blanks for portrait index 0
   xor a
   ld (_RAM_D68B_TilemapRectangleSequence_Row), a
---:
-  call LABEL_B35A_VRAMAddressToHL
-  ld e, $0A ; Width
--:
-  ld a, (_RAM_D691_TrackType)
+--:call LABEL_B35A_VRAMAddressToHL
+  ld e, 10 ; Width
+-:ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   or a
   jr nz, +
-  ld a, <MenuTileIndex_Font.Space
+  ld a, <MenuTileIndex_Font.Space ; Draw blank if index 0
   jp ++
-
-+:
-  ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
-++:
-  out (PORT_VDP_DATA), a
-  xor a
++:ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
+++:out (PORT_VDP_DATA), a
+  xor a ; High byte = 0
   out (PORT_VDP_DATA), a
   ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
   add a, $01
@@ -19505,177 +19516,192 @@ LABEL_918B_:
   dec e
   jr nz, -
   ld a, (_RAM_D68B_TilemapRectangleSequence_Row)
-  cp $07
+  cp 7 ; Height - 1
   jr z, +
   add a, $01
   ld (_RAM_D68B_TilemapRectangleSequence_Row), a
-  ld de, $0040 ; Add to VRAM address
+  ld de, TILEMAP_ROW_SIZE
   add hl, de
   jp --
 
-+:
-  call LABEL_9276_
-  call LABEL_91E8_
++:; Tilemap drawing done
+  call LABEL_9276_DrawVehicleName
+  call LABEL_91E8_TitleScreenSlideshow_Increment
 _LABEL_91E7_ret:
   ret
 
-LABEL_91E8_:
-  ld a, (_RAM_D691_TrackType)
-  add a, $01
-  ld (_RAM_D691_TrackType), a
-  cp $06
-  jr z, LABEL_91E8_
-  cp $0A
+LABEL_91E8_TitleScreenSlideshow_Increment:
+  ; Increment index
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
+  add a, 1
+  ld (_RAM_D691_TitleScreenSlideshowIndex), a
+  ; Skip choppers
+  cp 6
+  jr z, LABEL_91E8_TitleScreenSlideshow_Increment ; -> self
+  ; Loop 9 -> 0
+  cp 10
   jr nz, +
   xor a
-  ld (_RAM_D691_TrackType), a
+  ld (_RAM_D691_TitleScreenSlideshowIndex), a
 +:
+.ifdef UNNECESSARY_CODE
   add a, $07
-  ld (_RAM_D6D6_), a
+  ld (_RAM_D6D6_TitleScreenSlideshowIndexPlus7_Unused), a
+.endif
   ld a, $01
-  ld (_RAM_D6D4_), a
-  xor a
-  ld (_RAM_D68D_), a
-  ld a, $C0
-  ld (_RAM_D68C_), a
-  ld a, (_RAM_D691_TrackType)
+  ld (_RAM_D6D4_Slideshow_PendingLoad), a
+  ; Reset address to _RAM_C000_DecompressionTemporaryBuffer
+  xor a ; ld a, <_RAM_C000_DecompressionTemporaryBuffer
+  ld (_RAM_D68C_SlideshowRAMReadAddress.Lo), a
+  ld a, >_RAM_C000_DecompressionTemporaryBuffer
+  ld (_RAM_D68C_SlideshowRAMReadAddress.Hi), a
+  ; Point decompressor to the next tileset
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   sla a
   ld d, $00
   ld e, a
   ld hl, DATA_9254_VehiclePortraitOffsets
   add hl, de
   ld a, (hl)
-  ld (_RAM_D7B5_DecompressorSource), a
+  ld (_RAM_D7B5_DecompressorSource.Lo), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D7B5_DecompressorSource+1), a
-  ld a, (_RAM_D692_)
+  ld (_RAM_D7B5_DecompressorSource.Hi), a
+  ; And the next write location
+  ld a, (_RAM_D692_SlideshowPointerOffset) ; flip between 0 and 2 for the following lookup
   xor $02
-  ld (_RAM_D692_), a
+  ld (_RAM_D692_SlideshowPointerOffset), a
   ld d, $00
-  ld hl, DATA_9268_
+  ld hl, _DATA_9268_SlideshowTileWriteAddresses
   ld e, a
   add hl, de
   ld a, (hl)
-  ld (_RAM_D68F_), a
+  ld (_RAM_D68E_SlideshowVRAMWriteAddress.Lo), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D68E_), a
-  ld a, (_RAM_D690_)
-  xor $50
-  ld (_RAM_D690_), a
+  ld (_RAM_D68E_SlideshowVRAMWriteAddress.Hi), a
+  ; Set tile index for tilemap drawing
+  ld a, (_RAM_D690_CarPortraitTileIndex)
+  xor MenuTileIndex_Title_Portraits.1 ~ MenuTileIndex_Title_Portraits.2 ;$50
+  ld (_RAM_D690_CarPortraitTileIndex), a
+  ; 
   xor a
-  ld (_RAM_D695_), a
-  ld (_RAM_D696_), a
-  ld (_RAM_D694_), a
+  ld (_RAM_D695_SlideshowTileWriteCounter.Lo), a
+  ld (_RAM_D695_SlideshowTileWriteCounter.Hi), a
+  ld (_RAM_D694_NeedToDrawCarPortrait), a
   ld a, $01
   ld (_RAM_D693_), a
   ret
 
 ; Data from 9254 to 9267 (20 bytes)
 DATA_9254_VehiclePortraitOffsets:
-; Pointers to compressed tile data for each track type
+; Pointers to compressed tile data for the title screen slideshow
+; Index 0 is special, the value is not used
+; Index 6 is skippwd
 .dw DATA_2AB4D_Tiles_Portrait_RuffTrux
 .dw DATA_FAA5_Tiles_Portrait_SportsCars
 .dw DATA_1F3E4_Tiles_Portrait_Powerboats
 .dw DATA_16F2B_Tiles_Portrait_FormulaOne
 .dw DATA_F35D_Tiles_Portrait_FourByFour
 .dw DATA_F765_Tiles_Portrait_Warriors
-.dw $AB4D ; invalid?
+.dw $AB4D ; invalid
 .dw DATA_16AC8_Tiles_Portrait_TurboWheels
 .dw DATA_1736E_Tiles_Portrait_Tanks
 .dw DATA_2AB4D_Tiles_Portrait_RuffTrux
 
 ; Data from 9268 to 926B (4 bytes)
-DATA_9268_:
-.db $80 $44 $80 $4E
+_DATA_9268_SlideshowTileWriteAddresses:
+  TileWriteAddressData MenuTileIndex_Title_Portraits.1
+  TileWriteAddressData MenuTileIndex_Title_Portraits.2
 
 ; Data from 926C to 9275 (10 bytes)
 DATA_926C_VehiclePortraitPageNumbers:
-; Pages containing portrait (?) data for different vehicle types(?)
+; Pages containing "portrait" data for the title screen slideshow
+; Index 0 is special, the value is not used
+; Index 6 is skippwd
 .db :DATA_2AB4D_Tiles_Portrait_RuffTrux
 .db :DATA_FAA5_Tiles_Portrait_SportsCars
 .db :DATA_1F3E4_Tiles_Portrait_Powerboats
 .db :DATA_16F2B_Tiles_Portrait_FormulaOne
 .db :DATA_F35D_Tiles_Portrait_FourByFour
 .db :DATA_F765_Tiles_Portrait_Warriors
-.db $04 ; invalid?
+.db $04 ; invalid
 .db :DATA_16AC8_Tiles_Portrait_TurboWheels
 .db :DATA_1736E_Tiles_Portrait_Tanks
 .db :DATA_2AB4D_Tiles_Portrait_RuffTrux
 
-LABEL_9276_:
-  ld a, :TEXT_3ECA9_VEHICLE_NAME_BLANK
+LABEL_9276_DrawVehicleName:
+  ld a, :DATA_3ECA9_VehicleNames
   ld (_RAM_D741_RequestedPageIndex), a
-  call LABEL_BEF5_
-  ld a, (_RAM_D691_TrackType)
+  call LABEL_BEF5_TitleScreen_ClearText
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   or a
   rl a ; x16
   rl a
   rl a
   rl a
-  ld hl, TEXT_3ECA9_VEHICLE_NAME_BLANK
+  ld hl, DATA_3ECA9_VehicleNames
   add a, l ; add it on
   ld l, a
   ld a, h
-  adc a, $00
+  adc a, 0
   ld h, a
-  ld a, (_RAM_D691_TrackType)
-  cp $00 ; Qualifying race
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
+  cp $00 ; Text screen
   jr z, +++
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
   ld a, (_RAM_D699_MenuScreenIndex)
-  cp MenuScreen_OnePlayerTrackIntro
+  cp MenuScreen_OnePlayerTrackIntro ; TODO ???
   jr nc, ++
 +:
-  TilemapWriteAddressToDE 8, 22 (GG, SMS one player)
+  TilemapWriteAddressToDE 8, 22 ; (GG, SMS title screen)
   jp ++++
 ++:
-  TilemapWriteAddressToDE 8, 27 (SMS two player)
+  TilemapWriteAddressToDE 8, 27 ; (SMS track select)
   jp ++++
 +++:
-  TilemapWriteAddressToDE 8, 14 (qualifying race)
+  TilemapWriteAddressToDE 8, 14 ; (text)
 ++++:
   call LABEL_B361_VRAMAddressToDE
   ld bc, 16
   CallRamCode LABEL_3BC6A_EmitText
-  ld a, (_RAM_D691_TrackType)
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   or a
   JrNzRet + ; ret
   ld a, $01
   ld (_RAM_D6CB_MenuScreenState), a
 +:ret
 
-LABEL_92CB_:
-  ld a, (_RAM_D6D4_)
+LABEL_92CB_SlowCopySlideshowTilesToVRAM:
+  ld a, (_RAM_D6D4_Slideshow_PendingLoad)
   cp $01
   JrZRet +
   ld a, (_RAM_D693_)
   or a
   JrZRet +
-  ld a, (_RAM_D68C_)
+  ld a, (_RAM_D68C_SlideshowRAMReadAddress.Hi)
   ld h, a
-  ld a, (_RAM_D68D_)
+  ld a, (_RAM_D68C_SlideshowRAMReadAddress.Lo)
   ld l, a
-  ld a, (_RAM_D68E_)
+  ld a, (_RAM_D68E_SlideshowVRAMWriteAddress.Hi)
   ld d, a
-  ld a, (_RAM_D68F_)
+  ld a, (_RAM_D68E_SlideshowVRAMWriteAddress.Lo)
   ld e, a
   call LABEL_B361_VRAMAddressToDE
   CallRamCode LABEL_3BB93_Emit3bppTiles_2Rows
   ld a, h
-  ld (_RAM_D68C_), a
+  ld (_RAM_D68C_SlideshowRAMReadAddress.Hi), a
   ld a, l
-  ld (_RAM_D68D_), a
+  ld (_RAM_D68C_SlideshowRAMReadAddress.Lo), a
   ld a, d
-  ld (_RAM_D68E_), a
+  ld (_RAM_D68E_SlideshowVRAMWriteAddress.Hi), a
   ld a, e
-  ld (_RAM_D68F_), a
-  ld hl, (_RAM_D695_)
+  ld (_RAM_D68E_SlideshowVRAMWriteAddress.Lo), a
+  ld hl, (_RAM_D695_SlideshowTileWriteCounter)
   inc hl
-  ld (_RAM_D695_), hl
+  ld (_RAM_D695_SlideshowTileWriteCounter), hl
   dec h
   JrNzRet +
   ld a, l
@@ -19684,7 +19710,7 @@ LABEL_92CB_:
   xor a
   ld (_RAM_D693_), a
   ld a, $01
-  ld (_RAM_D694_), a
+  ld (_RAM_D694_NeedToDrawCarPortrait), a
 +:ret
 
 LABEL_9317_InitialiseHandSprites:
@@ -21610,7 +21636,7 @@ TEXT_A335_TournamentRace: .asc "TOURNAMENT RACE "
 TEXT_A345_SelectATrack:   .asc "  SELECT A TRACK"
 
 LABEL_A355_PrintWonLostCounterLabels:
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ld a, (_RAM_DBD4_Player1Character)
   ; Divide by 8 to make a character index
   srl a
@@ -21731,7 +21757,7 @@ TEXT_A423_Lost: .asc "LOST-"
 .endif
 
 ; Unused code (?)
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_A428_DrawPlayerOpponentTypeSelectText:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -22266,7 +22292,7 @@ _LABEL_A8F7_TournamentResults_ThirdPlace:
 
 LABEL_A8FC_TournamentResults_FourthPlace:
   ld c, $03
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   jp +
 .endif
 
@@ -22587,7 +22613,7 @@ LABEL_AB5B_GetPortraitSource_CourseSelect:
   add hl, bc
   ld a, (hl)
 LABEL_AB68_GetPortraitSource_TrackType:
-  ld (_RAM_D691_TrackType), a
+  ld (_RAM_D691_TitleScreenSlideshowIndex), a
   sla a
   ld de, DATA_9254_VehiclePortraitOffsets
   add a, e
@@ -22596,17 +22622,17 @@ LABEL_AB68_GetPortraitSource_TrackType:
   adc a, $00
   ld d, a
   ld a, (de)
-  ld (_RAM_D7B5_DecompressorSource), a
+  ld (_RAM_D7B5_DecompressorSource.Lo), a
   inc de
   ld a, (de)
-  ld (_RAM_D7B5_DecompressorSource+1), a
+  ld (_RAM_D7B5_DecompressorSource.Hi), a
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
   ld (_RAM_D6A6_DisplayCase_Source), hl
   ret
 
 LABEL_AB86_Decompress3bppTiles_Index100:
   ; Decompresses 80 tiles of 3bpp tile data from the given source address and page to tile $100
-  ld a, (_RAM_D691_TrackType)
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   call LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
@@ -22616,7 +22642,7 @@ LABEL_AB86_Decompress3bppTiles_Index100:
 
 LABEL_AB9B_Decompress3bppTiles_Index160:
   ; Decompresses 80 tiles of 3bpp tile data from the given source address and page to tile $160
-  ld a, (_RAM_D691_TrackType)
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   call LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
@@ -22629,39 +22655,34 @@ LABEL_ABB0_:
 
 LABEL_ABB3_:
   xor a
-  ld (_RAM_D692_), a
+  ld (_RAM_D692_SlideshowPointerOffset), a
   ld (_RAM_D693_), a
   ld a, $01
-  ld (_RAM_D694_), a
+  ld (_RAM_D694_NeedToDrawCarPortrait), a
   xor a
-  ld (_RAM_D690_), a
+  ld (_RAM_D690_CarPortraitTileIndex), a
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TrackSelect
   jr nz, +
   ld a, $60
-  ld (_RAM_D690_), a
-+:
-  TailCall +
+  ld (_RAM_D690_CarPortraitTileIndex), a
++:TailCall +
 
-+:
-  ld a, (_RAM_D690_)
++:ld a, (_RAM_D690_CarPortraitTileIndex)
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  TilemapWriteAddressToHL 11, 19
+  TilemapWriteAddressToHL 11, 19 ; SMS
   jr ++
-
-+:
-  TilemapWriteAddressToHL 11, 14
++:TilemapWriteAddressToHL 11, 14 ; GG
 ++:
   xor a
   ld (_RAM_D68B_TilemapRectangleSequence_Row), a
 --:
   call LABEL_B35A_VRAMAddressToHL
-  ld de, $000A
--:
-  ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
+  ld de, 10 ; width
+-:ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
   out (PORT_VDP_DATA), a
   EmitDataToVDPImmediate8 1 ; High byte
   ld a, (_RAM_D68A_TilemapRectangleSequence_TileIndex)
@@ -22672,16 +22693,16 @@ LABEL_ABB3_:
   or e
   jr nz, -
   ld a, (_RAM_D68B_TilemapRectangleSequence_Row)
-  cp $07
+  cp $07 ; height - 1
   jr z, +
   add a, $01
   ld (_RAM_D68B_TilemapRectangleSequence_Row), a
-  ld de, $0040
+  ld de, TILEMAP_ROW_SIZE
   add hl, de
   jp --
 
 +:
-  TailCall LABEL_9276_
+  TailCall LABEL_9276_DrawVehicleName
 
 LABEL_AC1E_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
@@ -22802,7 +22823,7 @@ LABEL_ACEE_DrawColouredBalls:
   TilemapWriteAddressToHL 9, 14
   call LABEL_B35A_VRAMAddressToHL
   TilemapWriteAddressToDE 21, 14
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   jr ++
 .endif
 ++:
@@ -23030,51 +23051,66 @@ LABEL_AECD_:
   ld (_RAM_D6B0_), a
   ret
 
-LABEL_AF10_:
+.define GearToGearStatus_Connected $04 ; TODO move to "System definitions.inc"
+; These are game specific
+; They should (?) be impossible button presses
+.define GearToGearConnect1 $ca
+.define GearToGearConnect2 $55
+
+LABEL_AF10_CheckGearToGear:
+  ; Do nothing on SMS
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   ret z
   in a, (PORT_GG_LinkStatus)
-  and $04
+  and GearToGearStatus_Connected
   jr nz, +++
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, LABEL_AF6F_
-  ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
-  cp $CA
+  ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2) ; received value
+  cp GearToGearConnect1
   jr z, +
-  cp $55
+  cp GearToGearConnect2
   jr z, ++
-  ld a, $CA
+  ; Else send GearToGearConnect1 to see if the other end is there
+  ld a, GearToGearConnect1
   out (PORT_GG_LinkSend), a
   ret
 
-+:
-  ld a, $01
++:; Got a $ca
+  ; Gear to gear active
+  ld a, 1
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
   ld (_RAM_DC41_GearToGearActive), a
-  ld a, $55
+  ; Send GearToGearConnect2 to take control as player 1
+  ld a, GearToGearConnect2
   out (PORT_GG_LinkSend), a
   jr LABEL_AF5D_BlankControlsRAM
 
-++:
+++:; Got GearToGearConnect2, so we are player 2
   xor a
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
-  ld a, $01
+  ld a, 1
   ld (_RAM_DC41_GearToGearActive), a
+  ; Restart music (to indicate connection?)
   ld c, Music_01_TitleScreen
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  jr LABEL_AF5D_BlankControlsRAM
+  jr LABEL_AF5D_BlankControlsRAM ; and ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
 +++:
-  call LABEL_AF92_
+  ; No connection
+  ; Maybe there used to be a message for it to show?
+  call LABEL_AF92_BlankTitleScreenCheatMessage
   xor a
   ld (_RAM_DC41_GearToGearActive), a
+.ifdef UNNECESSARY_CODE
   ld a, $00
+.endif
   ld (_RAM_DC42_GearToGear_IAmPlayer1), a
   ret
 
@@ -23093,7 +23129,7 @@ LABEL_AF6F_:
   and $0F
   ld (_RAM_D7BA_HardModeTextFlashCounter), a
   and $08
-  jr z, LABEL_AF92_
+  jr z, LABEL_AF92_BlankTitleScreenCheatMessage
   TilemapWriteAddressToHL 13, 13
   call LABEL_B35A_VRAMAddressToHL
   ld c, $05
@@ -23104,7 +23140,7 @@ LABEL_AF6F_:
   out (PORT_VDP_DATA), a
   ret
 
-LABEL_AF92_:
+LABEL_AF92_BlankTitleScreenCheatMessage:
   TilemapWriteAddressToHL 13, 13
   call LABEL_B35A_VRAMAddressToHL
   ld c, $06
@@ -23603,7 +23639,7 @@ LABEL_B31C_:
   ld (_RAM_D6C0_), a
   jp -
 
-LABEL_B323_Populate_RAM_DBFE_PlayerPortraitValues:
+LABEL_B323_PopulatePlayerPortraitValues:
   ; Copies data from DATA_97DF_8TimesTable to _RAM_DBFE_PlayerPortraitValues
   ; This selects the first portrait of each player
   ld hl, DATA_97DF_8TimesTable
@@ -23798,15 +23834,15 @@ LABEL_B44E_BlankMenuRAM:
   ret
 
 LABEL_B45D_:
-  ld a, (_RAM_D6D4_) ; Only if 1
+  ld a, (_RAM_D6D4_Slideshow_PendingLoad) ; Only if 1
   or a
   JpZRet +
-  ld a, (_RAM_D691_TrackType)
+  ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   call LABEL_B478_SelectPortraitPage
   ld hl, (_RAM_D7B5_DecompressorSource)
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   xor a
-  ld (_RAM_D6D4_), a
+  ld (_RAM_D6D4_Slideshow_PendingLoad), a
   ld (_RAM_D6D3_VBlankDone), a
 +:ret
 
@@ -23968,7 +24004,7 @@ LABEL_B505_UpdateHardModeText:
 TEXT_B541_HardMode:     .asc "  HARD  MODE"
 TEXT_B54D_RockHardMode: .asc "ROCK HARD MODE"
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ; Turns off the cheats and blanks any text shown
   xor a
   ld (_RAM_DC46_Cheat_HardMode), a
@@ -24131,10 +24167,10 @@ LABEL_B666_:
 +++++:
   call LABEL_A0F0_BlankTilemapRectangle
   ld a, $01
-  ld (_RAM_D6D4_), a
+  ld (_RAM_D6D4_Slideshow_PendingLoad), a
   ld a, $09
   ld (_RAM_D693_), a
-  ld de, $6C00
+  TileWriteAddressToDE $160
   ld (_RAM_D6A8_DisplayCaseTileAddress), de
   ld a, $01
   ld (_RAM_D697_), a
@@ -24687,7 +24723,7 @@ LABEL_BAD5_LoadMenuLogoTiles:
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   ld de, 112 * 8 ; 122 tiles
 ++:
-  TileWriteAddressToHL MenuTileIndex_Logo
+  TileWriteAddressToHL MenuTileIndex_Title_Logo
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL ; and ret
 
 LABEL_BAFF_LoadFontTiles:
@@ -24761,7 +24797,7 @@ LABEL_BB5B_SetBackdropToColour0:
   ret
 
 ; Data from BB63 to BB6B (9 bytes)
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_BB63_ScreenOn:
   ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
@@ -25169,7 +25205,8 @@ LABEL_BDED_LoadMenuLogoTilemap: ; TODO: how does it work for GG?
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   JumpToRamCode LABEL_3BB57_EmitTilemapRectangle ; and ret
 
-LABEL_BE1A_DrawCopyrightText:
+LABEL_BE1A_InitiallyDrawCopyrightText:
+  ; Only if state != 0
   ld a, (_RAM_D6CB_MenuScreenState)
   or a
   ret z
@@ -25204,7 +25241,7 @@ LABEL_BE1A_DrawCopyrightText:
   call LABEL_B35A_VRAMAddressToHL
   ld hl, TEXT_BEE4_DavidSaunders
   ld c, $11
-  jp LABEL_A5B0_EmitToVDP_Text
+  jp LABEL_A5B0_EmitToVDP_Text ; and ret
 
 ; Data from BE77 to BE90 (26 bytes)
 TEXT_BE77_CopyrightCodemasters:
@@ -25230,7 +25267,9 @@ TEXT_BED9_And:
 TEXT_BEE4_DavidSaunders:
 .asc "   DAVID SAUNDERS"
 
-LABEL_BEF5_:
+LABEL_BEF5_TitleScreen_ClearText:
+  ; We draw some blanks where the text shows around the vehicle portrait
+  ; This is a bit of a hack! Better to clear it at the right time
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_Title
   ret nz
@@ -25245,10 +25284,11 @@ LABEL_BEF5_:
   TilemapWriteAddressToHL 21, 18
   call +
   TilemapWriteAddressToHL 21, 20
+.ifdef UNNECESSARY_CODE
   jr +
+.endif
 
-+:
-  call LABEL_B35A_VRAMAddressToHL
++:call LABEL_B35A_VRAMAddressToHL
   ld c, $07
 -:EmitDataToVDPImmediate8 <MenuTileIndex_Font.Space
   xor a
@@ -25301,7 +25341,7 @@ DATA_BF3E_MenuPalette_SMS:
   SMSCOLOUR $000000
   SMSCOLOUR $000000
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 ; GG-only code, misaligned here
 ; Looks like the equivalent of the above - but not hooked up
 LABEL_BF5E_: 
@@ -26452,7 +26492,7 @@ LABEL_1BC3F_:
   ld (_RAM_DEAF_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26709,7 +26749,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEAF_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26733,7 +26773,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26744,7 +26784,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEB2_), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26758,7 +26798,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26767,7 +26807,7 @@ LABEL_1BDF3_:
   ld (_RAM_DEB1_VScrollDelta), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -26863,7 +26903,7 @@ LABEL_1BF17_:
   jp LABEL_2961_
 
 ; Data from 1BF35 to 1BF43 (15 bytes)
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ld a, (ix+$0c)
   ld l, a
   cp (ix+$0d)
@@ -27679,7 +27719,7 @@ LABEL_239C6_:
   ld (_RAM_DCFB_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -27703,7 +27743,7 @@ LABEL_239C6_:
   ld (_RAM_DCFC_), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -27714,7 +27754,7 @@ LABEL_239C6_:
   ld (_RAM_DD0C_), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -27728,7 +27768,7 @@ LABEL_239C6_:
   ld (_RAM_DCFC_), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -27737,7 +27777,7 @@ LABEL_239C6_:
   ld (_RAM_DCFC_), a
   JpRet +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -28545,7 +28585,7 @@ LABEL_2B5D5_SilencePSG:
   out (PORT_PSG), a
   ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_2B5E6_Player1SFX_Unused:
   ld a, (_RAM_D97E_Player1SFX_Unused)
   ld (_RAM_D963_SFXTrigger_Player1), a
@@ -31642,7 +31682,7 @@ LABEL_3608C_:
   ld (_RAM_DE9D_), a
   JpRet ++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -31697,7 +31737,7 @@ LABEL_360B9_:
   ld (_RAM_DEAF_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -31789,7 +31829,7 @@ LABEL_3616B_:
   ld (_RAM_DCFB_), a
   jp +++
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
   ret
 .endif
 
@@ -35650,7 +35690,7 @@ LABEL_3BAF1_MenusVBlank:
   push hl
   push ix
   push iy
-    ld a, (_RAM_D6D4_)
+    ld a, (_RAM_D6D4_Slideshow_PendingLoad)
     cp $00
     jr z, + ; almost always the case
     ld a, ($BFFF) ; Last byte of currently mapped page is (usually) the bank number
@@ -35989,7 +36029,7 @@ LABEL_3BCC7_VRAMAddressToHL:
   out (PORT_VDP_ADDRESS), a
   ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_3BCCE_ReadPagedByte_de: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ld a, (de)          ; 03BCD1 1A
@@ -36014,7 +36054,7 @@ LABEL_3BCE6_Trampoline_StopMenuMusic:
   call LABEL_30D28_StopMenuMusic
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_3BCEF_Trampoline_Unknown: ; unused?
   CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
   jp $a003 ; Bad destination at $3a003
@@ -36026,7 +36066,7 @@ LABEL_3BCF5_RestorePagingFromD741:
   ld (PAGING_REGISTER), a
   ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 LABEL_3BCFC_RestorePagingPreserveA:
 ; Restores paging to slot 2 without losing the value in a
   ld (_RAM_D743_ReadPagedByteTemp),a
@@ -36042,7 +36082,7 @@ LABEL_3BD08_BackToSlot2:
   ld (PAGING_REGISTER), a
   ret
 
-.ifdef UNREACHABLE_CODE
+.ifdef UNNECESSARY_CODE
 ; Extra byte picked up by RAM code copier...
 .db $00
 .endif
@@ -36078,25 +36118,26 @@ DATA_3E5D7_Tiles_MediumLogo:
 DATA_3EC67_Tiles_MediumLogo:
 .incbin "Assets/Menu/Logo-Medium.tilemap.compressed"
 
-TEXT_3ECA9_VEHICLE_NAME_BLANK:
+DATA_3ECA9_VehicleNames:
+TEXT_3ECA9_Vehicle_Name_Blank:
 .asc "                "
-TEXT_3ECB9_VEHICLE_NAME_SPORTSCARS:
+TEXT_3ECB9_Vehicle_Name_Sportscars:
 .asc "   SPORTSCARS   "
-TEXT_3ECC9_VEHICLE_NAME_POWERBOATS:
+TEXT_3ECC9_Vehicle_Name_Powerboats:
 .asc "   POWERBOATS   "
-TEXT_3ECD9_VEHICLE_NAME_FORMULA_ONE:
+TEXT_3ECD9_Vehicle_Name_Formula_One:
 .asc "  FORMULA  ONE  "
-TEXT_3ECE9_VEHICLE_NAME_FOUR_BY_FOUR:
+TEXT_3ECE9_Vehicle_Name_Four_By_Four:
 .asc "  FOUR BY FOUR  "
-TEXT_3ECF9_VEHICLE_NAME_WARRIORS:
+TEXT_3ECF9_Vehicle_Name_Warriors:
 .asc "    WARRIORS    "
-TEXT_3ED09_VEHICLE_NAME_CHOPPERS:
+TEXT_3ED09_Vehicle_Name_Choppers:
 .asc "    CHOPPERS    "
-TEXT_3ED19_VEHICLE_NAME_TURBO_WHEELS:
+TEXT_3ED19_Vehicle_Name_Turbo_Wheels:
 .asc "  TURBO WHEELS  "
-TEXT_3ED29_VEHICLE_NAME_TANKS:
+TEXT_3ED29_Vehicle_Name_Tanks:
 .asc "      TANKS     "
-TEXT_3ED39_VEHICLE_NAME_RUFFTRUX:
+TEXT_3ED39_Vehicle_Name_Rufftrux:
 .asc "    RUFFTRUX    "
 ;.ends
 
@@ -36122,3 +36163,4 @@ DATA_3F753_JonsSquinkyTennisCompressed:
 
 .orga $bfff
 .db :CADDR ; Page number marker
+
