@@ -284,6 +284,20 @@ MenuTileIndex_Title_Unused      dsb 60
 MenuTileIndex_Title_Logo        dsb 177
 .ende
 
+; "Select A or B" screens
+.enum 0
+MenuTileIndex_Select_Font        instanceof FontTiles
+MenuTileIndex_Select_Icon1       dsb 60
+MenuTileIndex_Select_Unused1     dsb 20
+MenuTileIndex_Select_Icon2       dsb 60
+MenuTileIndex_Select_Unused2     dsb 11
+MenuTileIndex_Select_Hand        dsb 31
+MenuTileIndex_Select_Unused3     dsb 3
+MenuTileIndex_Select_Text1       dsb 14
+MenuTileIndex_Select_Text2       dsb 16
+MenuTileIndex_Select_Logo        dsb 177
+.ende
+
 ; Results screen
 .enum 0
 MenuTileIndex_Results_Font        instanceof FontTiles
@@ -892,7 +906,7 @@ _RAM_D7B7_ db
 _RAM_D7B8_ db
 _RAM_D7B9_ db
 _RAM_D7BA_HardModeTextFlashCounter db
-_RAM_D7BB_ db
+_RAM_D7BB_Unused db
 _RAM_D7BB_MenuRamEnd .db
 _RAM_D7BC_ db ; unused?
 _RAM_D7BD_RamCode dsb $392 ; runs over the next bit
@@ -1120,7 +1134,7 @@ _RAM_DC18_Player1_LostCount db
 .enum $DC21 export
 _RAM_DC21_ dsb 11
 
-_RAM_DC2C_ dsb 8
+_RAM_DC2C_GGTrackSelectFlags dsb 8 ; Seems to hold 1 for tracks that have been played, 0 otherwise
 
 _RAM_DC34_IsTournament db
 _RAM_DC35_TournamentRaceNumber db
@@ -17407,7 +17421,7 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
   ld (_RAM_DC37_), a
 
   call LABEL_A778_InitialiseDisplayCaseData
-  call LABEL_B9B3_Initialise_RAM_DC2C_
+  call LABEL_B9B3_Initialise_RAM_DC2C_GGTrackSelectFlags
 
   ld hl, _RAM_DC21_ ; Blank this
   ld bc, 11
@@ -17443,7 +17457,8 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 
-LABEL_81C1_:
+LABEL_81C1_InitialiseSelectGameMenu:
+  ; End current menu, start "select game"
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_SelectPlayerCount
   ld (_RAM_D699_MenuScreenIndex), a
@@ -17455,9 +17470,9 @@ LABEL_81C1_:
   call LABEL_BDED_LoadMenuLogoTilemap
   ld c, Music_07_Menus
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, $00
+  ld a, 0
   ld (_RAM_D6C7_IsTwoPlayer), a
-  call LABEL_BB95_LoadIconMenuGraphics
+  call LABEL_BB95_LoadHandMenuGraphics
   call LABEL_BC0C_
   call LABEL_A4B7_
   call LABEL_9317_InitialiseHandSprites
@@ -18359,7 +18374,7 @@ LABEL_89E2_:
   ld a, $01
   ld (_RAM_D6C7_IsTwoPlayer), a
   ld (_RAM_D7B3_), a
-  call LABEL_BB95_LoadIconMenuGraphics
+  call LABEL_BB95_LoadHandMenuGraphics
   call LABEL_BC0C_
   call LABEL_A530_DrawChooseGameText
   ld c, Music_07_Menus
@@ -18543,31 +18558,39 @@ LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise:
   jr z, +
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
-  jr z, LABEL_8B55_
--:
-  ld a, $CC
+  jr z, _player2
+
+.define GearToGear_Signal $cc
+-:; Send the signal
+  ld a, GearToGear_Signal
   out (PORT_GG_LinkSend), a
+  ; Wait for something to arrive
   ld a, (_RAM_DC47_GearToGear_OtherPlayerControls1)
-  cp $3F
+  cp NO_BUTTONS_PRESSED
   jr z, -
+  ; That's our value
   ld (_RAM_D6CF_GearToGearTrackSelectIndex), a
   jr +
 
-LABEL_8B55_:
+_player2:
+-:; Wait for the signal
   ld a, (_RAM_DC48_GearToGear_OtherPlayerControls2)
-  cp $CC
-  jr nz, LABEL_8B55_
+  cp GearToGear_Signal
+  jr nz, -
+  ; Emit the value
   ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   out (PORT_GG_LinkSend), a
-+:
-  call LABEL_AF5D_BlankControlsRAM
+
++:call LABEL_AF5D_BlankControlsRAM
+  ; Set the selected index to 1
   ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   ld c, a
   ld b, $00
-  ld hl, _RAM_DC2C_
+  ld hl, _RAM_DC2C_GGTrackSelectFlags
   add hl, bc
   ld a, $01
   ld (hl), a
+  ; Get the real track index
   ld a, c
   call LABEL_B213_GearToGearTrackSelect_GetIndex
   ld a, c
@@ -18599,14 +18622,16 @@ LABEL_8B9D_:
 LABEL_8BAB_Handler_MenuScreen_Title:
   call LABEL_AF10_CheckGearToGear
 
-  ld a, (_RAM_D7BB_) ; ??? Never set?
+.ifdef UNNECESSARY_CODE
+  ld a, (_RAM_D7BB_Unused) ; ??? Never set?
   or a
   jr nz, LABEL_8C2C_GoToTwoPlayerMenu
+.endif
 
   call LABEL_BE1A_InitiallyDrawCopyrightText
   call LABEL_918B_MaybeDrawCarPortraitTilemap
   call LABEL_92CB_SlowCopySlideshowTilesToVRAM
-  call LABEL_B9C4_
+  call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_B484_CheckTitleScreenCheatCodes
   ld a, (_RAM_D6D0_TitleScreenCheatCodeCounter_CourseSelect)
   cp $09 ; full length
@@ -18662,7 +18687,7 @@ LABEL_8BAB_Handler_MenuScreen_Title:
   or a
   jr nz, LABEL_8C2C_GoToTwoPlayerMenu
   call LABEL_B1F4_Trampoline_StopMenuMusic
-  call LABEL_81C1_
+  call LABEL_81C1_InitialiseSelectGameMenu
 +++:
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -18678,7 +18703,7 @@ LABEL_8C2C_GoToTwoPlayerMenu:
 
 ; 3rd entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
-  call LABEL_B9C4_
+  call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr z, +
@@ -21569,8 +21594,8 @@ LABEL_A296_LoadHandTiles:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_2B151_Tiles_Hand
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  ld de, 39 * 8 ; 39 tiles
-  TileWriteAddressToHL MenuTileIndex_Hand
+  ld de, 39 * 8 ; 39 tiles - too many?
+  TileWriteAddressToHL MenuTileIndex_Select_Hand
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 LABEL_A2AA_PrintOrFlashMenuScreenText:
@@ -23201,7 +23226,7 @@ LABEL_AFCD_InitialiseOnePlayerMenu:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
   ld (_RAM_D6C7_IsTwoPlayer), a
-  call LABEL_BB95_LoadIconMenuGraphics
+  call LABEL_BB95_LoadHandMenuGraphics
   call LABEL_BC0C_
   call +
   call LABEL_A50C_DrawOnePlayerSelectGameText
@@ -23255,7 +23280,7 @@ LABEL_B01D_SquinkyTennisHook:
 
 ; 20th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B06C_MenuScreen_OnePlayerMode:
-  call LABEL_B9C4_
+  call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_8CA2_ProcessMenuControls_Player1Priority
   ld a, (_RAM_D6A0_MenuSelection)
   or a
@@ -24027,7 +24052,7 @@ TEXT_B54D_RockHardMode: .asc "ROCK HARD MODE"
 
 ; 17th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B56D_MenuScreen_TrackSelect:
-  call LABEL_B9C4_
+  call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_A2AA_PrintOrFlashMenuScreenText
   call LABEL_9FC5_
   ld a, (_RAM_D6C1_)
@@ -24192,7 +24217,7 @@ LABEL_B6AB_:
 
 ; 18th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
 LABEL_B6B1_MenuScreen_TwoPlayerResult:
-  call LABEL_B9C4_
+  call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_A039_
   ld hl, (_RAM_D6AB_MenuTimer)
   inc hl
@@ -24570,8 +24595,8 @@ LABEL_B9A3_CombinePlayerMenuControlButtons:
   ld (_RAM_D6C9_ControllingPlayersLR1Buttons), a
   ret
 
-LABEL_B9B3_Initialise_RAM_DC2C_:
-  ld hl, _RAM_DC2C_
+LABEL_B9B3_Initialise_RAM_DC2C_GGTrackSelectFlags:
+  ld hl, _RAM_DC2C_GGTrackSelectFlags
   ld c, $08
 -:
   xor a
@@ -24579,34 +24604,40 @@ LABEL_B9B3_Initialise_RAM_DC2C_:
   inc hl
   dec c
   jr nz, -
+  ; Mark index 5 as "done"
   ld a, $01
-  ld (_RAM_DC2C_+5), a
+  ld (_RAM_DC2C_GGTrackSelectFlags+5), a
   ret
 
-LABEL_B9C4_:
+LABEL_B9C4_CycleGearToGearTrackSelectIndex:
+; This is called every frame so it sort of randomises the starting index?
+  ; Loop up to 8 times
   ld e, $08
--:
+-:; Increment index (and loop 7->0)
   ld a, (_RAM_D6CF_GearToGearTrackSelectIndex)
   add a, $01
   and $07
   ld (_RAM_D6CF_GearToGearTrackSelectIndex), a
+  ; Index into _RAM_DC2C_GGTrackSelectFlags
   ld c, a
   ld b, $00
-  ld hl, _RAM_DC2C_
+  ld hl, _RAM_DC2C_GGTrackSelectFlags
   add hl, bc
   ld a, (hl)
   or a
+  ; Break when we find a 0
   jr z, +
   dec e
-  jr nz, -
-+:
+  jr nz, - ; Else loop
+
++:; _RAM_D6CF_GearToGearTrackSelectIndex is either back where it started, or pointing at the first unset index found
+  ; Then we increment (and loop) this... TODO what is it?
   ld a, (_RAM_D7B3_)
   add a, $01
   cp $0B
   jr nz, +
   ld a, $01
-+:
-  ld (_RAM_D7B3_), a
++:ld (_RAM_D7B3_), a
   ret
 
 LABEL_B9ED_:
@@ -24852,18 +24883,19 @@ LABEL_BB85_ScreenOffAtLineFF:
   out (PORT_VDP_REGISTER), a
   ret
 
-LABEL_BB95_LoadIconMenuGraphics:
+LABEL_BB95_LoadHandMenuGraphics:
   ld a, (_RAM_D6C7_IsTwoPlayer)
   dec a
-  jr z, LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
+  jr z, _TwoPlayerTournamentSingleRaceGraphics
 
   ; _RAM_D6C7_IsTwoPlayer != 1
+  ; Load "Challenge" icon
   ld a, :DATA_26C52_Tiles_Challenge_Icon
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_26C52_Tiles_Challenge_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Portraits.1
-  ld de, 60 * 8 ; 60 tiles
+  TileWriteAddressToHL MenuTileIndex_Title_Portraits.1
+  ld de, 60 * 8 ; 60 tiles - smaller than a car portrait
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
   ld a, (_RAM_DC3C_IsGameGear)
@@ -24877,8 +24909,8 @@ LABEL_BB95_LoadIconMenuGraphics:
   ; Load "head to head" image tiles
   ld hl, DATA_26FC6_Tiles_HeadToHead_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $74
-  ld de, 60 * 8 ; 60 tiles
+  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
+  ld de, 60 * 8 ; 60 tiles again
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   jp +++
 
@@ -24886,28 +24918,28 @@ LABEL_BB95_LoadIconMenuGraphics:
   ; GG selecting player count: replace "head to head" icon with "two players on one game gear"
   ld hl, DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $74
-  ld de, 60 * 8 ; 60 tiles
+  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
+  ld de, 60 * 8 ; 60 tiles again
   call LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
   jp +++
 
-LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics:
+_TwoPlayerTournamentSingleRaceGraphics:
   ; _RAM_D6C7_IsTwoPlayer == 1
   ; Load tournament icon
   ld a, :DATA_27391_Tiles_Tournament_Icon
-
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_27391_Tiles_Tournament_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Portraits.1
+  TileWriteAddressToHL MenuTileIndex_Title_Portraits.1
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
   ld hl, DATA_27674_Tiles_SingleRace_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL $74
+  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
+
 +++:
   call LABEL_A296_LoadHandTiles
   call LABEL_949B_LoadHeadToHeadTextTiles
@@ -28544,10 +28576,10 @@ DATA_2AB4D_Tiles_Portrait_RuffTrux:
 .incbin "Assets/RuffTrux/Portrait.3bpp.compressed"
 
 DATA_2B02D_Tiles_Font:
-.incbin "Assets/RuffTrux/Font.3bpp.compressed"
+.incbin "Assets/Menu/Font.3bpp.compressed"
 
 DATA_2B151_Tiles_Hand:
-.incbin "Assets/RuffTrux/Hand.3bpp.compressed"
+.incbin "Assets/Menu/Hand.3bpp.compressed"
 
 DATA_2B33E_SpriteNs_Hand:
 DATA_2B33E_SpriteNs_HandFist:
@@ -35732,7 +35764,7 @@ LABEL_3BB26_Trampoline_MenuMusicFrameHandler:
 ; Executed in RAM at d971
 LABEL_3BB31_Emit3bppTileDataToVRAM:
 ; hl = source
-; de = count of rows (3 bytes = 1 row of pixels in a tile) to emit
+; de = count of rows (3 bytes data => 1 row of pixels in a tile) to emit
 ; Write address must be set
   CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d974

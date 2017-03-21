@@ -672,7 +672,7 @@
 02:80fc LABEL_80FC_EndMenuScreenHandler
 02:8101 LABEL_8101_Unknown
 02:8114 LABEL_8114_MenuIndex0_TitleScreen_Initialise
-02:81c1 LABEL_81C1_
+02:81c1 LABEL_81C1_InitialiseSelectGameMenu
 02:8205 LABEL_8205_
 02:8272 LABEL_8272_
 02:82df LABEL_82DF_MenuIndex1_QualificationResults_Initialise
@@ -709,7 +709,7 @@
 02:89e2 LABEL_89E2_
 02:8a30 LABEL_8A30_InitialiseTwoPlayersRaceSelectMenu
 02:8a38 LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise
-02:8b55 LABEL_8B55_
+02:8b55 _player2
 02:8b89 LABEL_8B89_
 02:8b9d LABEL_8B9D_
 02:8bab LABEL_8BAB_Handler_MenuScreen_Title
@@ -1030,8 +1030,8 @@
 02:b984 TEXT_B984_Champion
 02:b98e LABEL_B98E_GetMenuControls
 02:b9a3 LABEL_B9A3_CombinePlayerMenuControlButtons
-02:b9b3 LABEL_B9B3_Initialise_RAM_DC2C_
-02:b9c4 LABEL_B9C4_
+02:b9b3 LABEL_B9B3_Initialise_RAM_DC2C_GGTrackSelectFlags
+02:b9c4 LABEL_B9C4_CycleGearToGearTrackSelectIndex
 02:b9ed LABEL_B9ED_
 02:ba3c LABEL_BA3C_LoadColouredBallTilesToIndex150
 02:ba42 LABEL_BA42_LoadColouredBallTiles
@@ -1049,8 +1049,8 @@
 02:bb6c LABEL_BB6C_ScreenOff
 02:bb75 LABEL_BB75_ScreenOnAtLineFF
 02:bb85 LABEL_BB85_ScreenOffAtLineFF
-02:bb95 LABEL_BB95_LoadIconMenuGraphics
-02:bbe0 LABEL_BBE0_LoadTwoPlayerTournamentSingleRaceGraphics
+02:bb95 LABEL_BB95_LoadHandMenuGraphics
+02:bbe0 _TwoPlayerTournamentSingleRaceGraphics
 02:bc0c LABEL_BC0C_
 02:bcce _LABEL_BCCE_ret
 02:bccf LABEL_BCCF_EmitTilemapRectangleSequence
@@ -2343,7 +2343,7 @@
 0000d7b8 _RAM_D7B8_
 0000d7b9 _RAM_D7B9_
 0000d7ba _RAM_D7BA_HardModeTextFlashCounter
-0000d7bb _RAM_D7BB_
+0000d7bb _RAM_D7BB_Unused
 0000d7bc _RAM_D7BB_MenuRamEnd
 0000d7bc _RAM_D7BC_
 0000d7bd _RAM_D7BD_RamCode
@@ -2844,7 +2844,7 @@
 0000dc17 _RAM_DC17_Player2_LostCount
 0000dc18 _RAM_DC18_Player1_LostCount
 0000dc21 _RAM_DC21_
-0000dc2c _RAM_DC2C_
+0000dc2c _RAM_DC2C_GGTrackSelectFlags
 0000dc34 _RAM_DC34_IsTournament
 0000dc35 _RAM_DC35_TournamentRaceNumber
 0000dc36 _RAM_DC36_
