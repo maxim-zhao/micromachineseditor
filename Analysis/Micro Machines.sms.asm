@@ -264,12 +264,23 @@ Tiles dsb 10*8
 Tiles dsb 2*4
 .endst
 
+.struct CursorTiles
+TopLeft     db
+Top         db
+TopRight    db
+Left        db
+Right       db
+BottomLeft  db
+Bottom      db
+BottomRight db
+.endst
+
 ; Generic one - TODO get rid of much of it
 .enum 0
 MenuTileIndex_Font        instanceof FontTiles
 MenuTileIndex_Portraits   instanceof PlayerPortraitTiles 4
 MenuTileIndex_Unused      dsb 30
-MenuTileIndex_Cursor      dsb 9 ; $ba
+MenuTileIndex_Cursor      instanceof CursorTiles
 MenuTileIndex_SmallLogo   dsb 22
 MenuTileIndex_Text1       dsb 24
 MenuTileIndex_Text2       dsb 18
@@ -291,11 +302,26 @@ MenuTileIndex_Select_Icon1       dsb 60
 MenuTileIndex_Select_Unused1     dsb 20
 MenuTileIndex_Select_Icon2       dsb 60
 MenuTileIndex_Select_Unused2     dsb 11
-MenuTileIndex_Select_Hand        dsb 31
-MenuTileIndex_Select_Unused3     dsb 3
+MenuTileIndex_Select_Hand        dsb 39 ; actually 36 but we pad (and load extra data) to fill the space...
 MenuTileIndex_Select_Text1       dsb 14
 MenuTileIndex_Select_Text2       dsb 16
-MenuTileIndex_Select_Logo        dsb 177
+MenuTileIndex_Select_Logo        dsb 112 ; $100 - 177 tiles (SMS), 112 (GG)
+MenuTileIndex_Select_Icon3       dsb 60 ; $170
+; No punctuation
+.ende
+
+; Character select
+.enum 0
+MenuTileIndex_SelectPlayers_Font                instanceof FontTiles
+MenuTileIndex_SelectPlayers_SelectedPortraits   instanceof PlayerPortraitTiles 4
+MenuTileIndex_SelectPlayers_Unused              dsb 30
+MenuTileIndex_SelectPlayers_Cursor              instanceof CursorTiles
+MenuTileIndex_SelectPlayers_Logo                dsb 22 ; small logo
+MenuTileIndex_SelectPlayers_Text1               dsb 24 ; Micro Machines
+MenuTileIndex_SelectPlayers_Text2               dsb 16 ; Challenge (or other?)
+MenuTileIndex_SelectPlayers_AvailablePortraits  instanceof PlayerPortraitTiles 6
+MenuTileIndex_SelectPlayers_Blank               db
+MenuTileIndex_SelectPlayers_Punctuation         instanceof PunctuationTiles
 .ende
 
 ; Results screen
@@ -617,12 +643,12 @@ map "?" = <MenuTileIndex_Punctuation.QuestionMark
 ; There's a lot of tables for multiplication...
 
 .macro TimesTableLo args start, step, count
-.define x start
+.define _x start
 .rept count
-.db <x
-.redefine x x+step
+.db <_x
+.redefine _x _x+step
 .endr
-.undef x
+.undef _x
 .endm
 
 .macro TimesTableHi args start, step, count
@@ -855,7 +881,7 @@ _RAM_D6B9_ db
 _RAM_D6BA_ db
 _RAM_D6BB_ db
 _RAM_D6BC_DisplayCase_IndexBackup dw
-_RAM_D6BE_ dw
+_RAM_D6BE_TileWriteAddress dw
 _RAM_D6C0_ db
 _RAM_D6C1_ db
 _RAM_D6C2_DisplayCase_FlashingCarIndex db
@@ -881,7 +907,7 @@ _RAM_D6D5_InGame db
 _RAM_D6D6_TitleScreenSlideshowIndexPlus7_Unused db
 _RAM_D6D7_ dsb 10 ; unused?
 _RAM_D6E1_SpriteData .db
-_RAM_D6E1_SpriteX dsb 32
+_RAM_D6E1_SpriteX dsb 32 ; The game uses at most 32 sprites...
 _RAM_D701_SpriteN dsb 32
 _RAM_D721_SpriteY dsb 32
 _RAM_D741_RequestedPageIndex db
@@ -1112,7 +1138,7 @@ _RAM_DBD9_DisplayCaseData dsb 24 ; 0 = blank, 1 = filled, 2 = flashing
 _RAM_DBF1_RaceNumberText dsb 8 ; "RACE xx-", xx is replaced at runtime
 ; ------> End block initialised from ROM
 _RAM_DBF9_ dw
-_RAM_DBFB_ db
+_RAM_DBFB_PortraitCurrentIndex db
 _RAM_DBFC_ db
 _RAM_DBFD_ db
 _RAM_DBFE_PlayerPortraitValues dsb 11
@@ -17458,7 +17484,7 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
 
 
 LABEL_81C1_InitialiseSelectGameMenu:
-  ; End current menu, start "select game"
+  ; End current menu (title), start "select game"
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_SelectPlayerCount
   ld (_RAM_D699_MenuScreenIndex), a
@@ -17472,11 +17498,11 @@ LABEL_81C1_InitialiseSelectGameMenu:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   ld a, 0
   ld (_RAM_D6C7_IsTwoPlayer), a
-  call LABEL_BB95_LoadHandMenuGraphics
-  call LABEL_BC0C_
-  call LABEL_A4B7_
+  call LABEL_BB95_LoadSelectMenuGraphics
+  call LABEL_BC0C_LoadSelectMenuTilemaps
+  call LABEL_A4B7_DrawSelectMenuText
   call LABEL_9317_InitialiseHandSprites
-  call LABEL_BDB8_
+  call LABEL_BDB8_LoadGG2PlayerIcon
   ld a, $00
   ld (_RAM_D6A0_MenuSelection), a
   ld (_RAM_D6AB_MenuTimer.Lo), a
@@ -17484,23 +17510,23 @@ LABEL_81C1_InitialiseSelectGameMenu:
   call LABEL_A673_SelectLowSpriteTiles
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
-LABEL_8205_:
+LABEL_8205_InitialiseOnePlayerSelectCharacterMenu:
   call LABEL_BB85_ScreenOffAtLineFF
   ld a, MenuScreen_OnePlayerSelectCharacter
   ld (_RAM_D699_MenuScreenIndex), a
-  ld a, $00
+  ld a, 0
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call LABEL_B2DC_DrawMenuScreenBase_NoLine
   call LABEL_B2F3_DrawHorizontalLines_CharacterSelect
-  call LABEL_987B_BlankTile1B4
-  call LABEL_9434_
-  call LABEL_988D_
+  call LABEL_987B_BlankTileForBlankPortraits
+  call LABEL_9434_LoadCursorTiles
+  call LABEL_988D_LoadCursorSprites
   xor a
-  ld (_RAM_D6B1_), a
+  ld (_RAM_D6B1_), a ; TODO
   ld (_RAM_D6B8_), a
   ld (_RAM_D6B7_), a
   ld (_RAM_D6B9_), a
-  TileWriteAddressToHL MenuTileIndex_Portraits.1
+  TileWriteAddressToHL MenuTileIndex_SelectPlayers_SelectedPortraits.1
   call LABEL_B35A_VRAMAddressToHL
   ld a, (_RAM_DBD4_Player1Character)
   call LABEL_9F40_LoadPortraitTiles
@@ -17512,9 +17538,16 @@ LABEL_8205_:
   jr z, +
   TilemapWriteAddressToHL 13, 8 ; for GG
   jr ++
-.endif
 +:TilemapWriteAddressToHL 9, 9 ; for SMS
-++:call LABEL_BCCF_EmitTilemapRectangleSequence
+++:
+.else
+.ifdef IS_GAME_GEAR
+  TilemapWriteAddressToHL 13, 8 ; for GG
+.else
+  TilemapWriteAddressToHL 9, 9 ; for SMS
+.endif
+.endif
+  call LABEL_BCCF_EmitTilemapRectangleSequence
 
   ld a, $60
   ld (_RAM_D6AF_FlashingCounter), a
@@ -17523,6 +17556,7 @@ LABEL_8205_:
   ld (_RAM_D6B4_), a
   ld (_RAM_D6B0_), a
   call LABEL_BDA6_
+  ; Start music
   ld c, Music_02_CharacterSelect
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   call LABEL_A67C_
@@ -17706,9 +17740,9 @@ LABEL_841C_:
   call LABEL_B2DC_DrawMenuScreenBase_NoLine
   call LABEL_A673_SelectLowSpriteTiles
   call LABEL_B2F3_DrawHorizontalLines_CharacterSelect
-  call LABEL_987B_BlankTile1B4
-  call LABEL_9434_
-  call LABEL_988D_
+  call LABEL_987B_BlankTileForBlankPortraits
+  call LABEL_9434_LoadCursorTiles
+  call LABEL_988D_LoadCursorSprites
   xor a
   ld (_RAM_D6B1_), a
   ld (_RAM_D6C0_), a
@@ -17732,7 +17766,7 @@ LABEL_841C_:
   call LABEL_B3AE_
   ld c, Music_02_CharacterSelect
   call LABEL_B1EC_Trampoline_PlayMenuMusic
-  ld a, (_RAM_DBFB_)
+  ld a, (_RAM_DBFB_PortraitCurrentIndex)
   ld (_RAM_D6A2_), a
   ld c, a
   ld b, $00
@@ -17949,13 +17983,14 @@ LABEL_85F4_:
   add hl, bc
   ld a, (hl)
   ld (_RAM_DBD3_PlayerPortraitBeingDrawn), a
-  ld a, $59
+  ld a, PlayerPortrait_MrQuestion
   ld (hl), a
   ld a, (_RAM_DBD3_PlayerPortraitBeingDrawn)
   add a, $01
   call LABEL_9F40_LoadPortraitTiles
   TilemapWriteAddressToHL 13, 12
   call LABEL_B8C9_EmitTilemapRectangle_5x6_24
+  ; Set player to "out of game"
   ld a, (_RAM_DBD3_PlayerPortraitBeingDrawn)
   srl a
   srl a
@@ -17964,7 +17999,7 @@ LABEL_85F4_:
   ld b, $00
   ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
-  ld a, $5A
+  ld a, PlayerPortrait_OutOfGame2
   ld (hl), a
   ld a, (_RAM_D6C4_)
   add a, $01
@@ -18310,9 +18345,9 @@ LABEL_8953_InitialiseTwoPlayersMenu:
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
   call LABEL_B2DC_DrawMenuScreenBase_NoLine
   call LABEL_B2F3_DrawHorizontalLines_CharacterSelect
-  call LABEL_987B_BlankTile1B4
-  call LABEL_9434_
-  call LABEL_988D_
+  call LABEL_987B_BlankTileForBlankPortraits
+  call LABEL_9434_LoadCursorTiles
+  call LABEL_988D_LoadCursorSprites
   call LABEL_A673_SelectLowSpriteTiles
 
   TileWriteAddressToHL MenuTileIndex_Portraits.1
@@ -18374,8 +18409,8 @@ LABEL_89E2_:
   ld a, $01
   ld (_RAM_D6C7_IsTwoPlayer), a
   ld (_RAM_D7B3_), a
-  call LABEL_BB95_LoadHandMenuGraphics
-  call LABEL_BC0C_
+  call LABEL_BB95_LoadSelectMenuGraphics
+  call LABEL_BC0C_LoadSelectMenuTilemaps
   call LABEL_A530_DrawChooseGameText
   ld c, Music_07_Menus
   call LABEL_B1EC_Trampoline_PlayMenuMusic
@@ -18839,7 +18874,7 @@ LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter:
   jr nz, LABEL_8D28_MenuScreenHandlerDone
 +:
   ld a, (_RAM_D6A2_)
-  ld (_RAM_DBFB_), a
+  ld (_RAM_DBFB_PortraitCurrentIndex), a
   ld a, (_RAM_D6AD_)
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
@@ -18971,7 +19006,7 @@ LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace:
   cp $01
   jr nz, +
   ld a, (_RAM_D6A2_)
-  ld (_RAM_DBFB_), a
+  ld (_RAM_DBFB_PortraitCurrentIndex), a
   ld a, (_RAM_D6AD_)
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
@@ -19800,21 +19835,18 @@ LABEL_9317_InitialiseHandSprites:
   ld hl, DATA_2B33E_SpriteNs_HandFist
   JumpToRamCode LABEL_3BBB5_PopulateSpriteNs
 
-; Data from 936E to 9385 (24 bytes)
 DATA_936E_TitleScreenHandXs_GG:
 .db $6E $76 $7E $86 $8E $96
 .db $6E $76 $7E $86 $8E $96
 .db $6E $76 $7E $86 $8E $96
 .db $6E $76 $7E $86 $8E $96
 
-; Data from 9386 to 939D (24 bytes)
 DATA_9386_TitleScreenHandYs_GG:
 .db $90 $90 $90 $90 $90 $90
 .db $98 $98 $98 $98 $98 $98
 .db $A0 $A0 $A0 $A0 $A0 $A0
 .db $A8 $A8 $A8 $A8 $A8 $A8
 
-; Data from 939E to 93B5 (24 bytes)
 DATA_939E_TitleScreenHandXs_SMS:
 ; X coordinates of sprites on title screen
 .db $65 $6D $75 $7D $85 $8D
@@ -19822,7 +19854,6 @@ DATA_939E_TitleScreenHandXs_SMS:
 .db $65 $6D $75 $7D $85 $8D
 .db $65 $6D $75 $7D $85 $8D
 
-; Data from 93B6 to 93CD (24 bytes)
 DATA_93B6_TitleScreenHandYs_SMS:
 ; Y coordinates of sprites on title screen
 .db $78 $78 $78 $78 $78 $78
@@ -19896,13 +19927,13 @@ LABEL_9400_BlankSprites:
   jr nz, -
   ret
 
-LABEL_9434_:
+LABEL_9434_LoadCursorTiles:
   ld a, :DATA_22BEC_Tiles_Cursor
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_22BEC_Tiles_Cursor
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
   ld de, 8 * 8 ; 8 tiles
-  TileWriteAddressToHL $ba
+  TileWriteAddressToHL <MenuTileIndex_SelectPlayers_Cursor
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 LABEL_9448_LoadHeaderTiles:
@@ -20268,7 +20299,7 @@ LABEL_96F6_:
   ld a, (_RAM_D6A4_)
   cp $01
   jr z, LABEL_973C_DrawPortrait_RightTwoColumns
-  ld hl, DATA_9773_TileWriteAddresses
+  ld hl, DATA_9773_TileWriteAddresses_AvailablePortraits
 LABEL_9700_:
   ld a, (_RAM_DC3C_IsGameGear)
   cp $01
@@ -20336,13 +20367,13 @@ DATA_9767_TileWriteAddresses_GG:
   TileWriteAddressData $100
 
 ; Data from 9773 to 977E (12 bytes)
-DATA_9773_TileWriteAddresses:
-  TileWriteAddressData $196
-  TileWriteAddressData $100
-  TileWriteAddressData $11e
-  TileWriteAddressData $13c
-  TileWriteAddressData $15a
-  TileWriteAddressData $178
+DATA_9773_TileWriteAddresses_AvailablePortraits:
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.6
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.1
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.2
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.3
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.4
+  TileWriteAddressData MenuTileIndex_SelectPlayers_AvailablePortraits.5
 
 LABEL_977F_:
   ld a, (_RAM_D6AE_)
@@ -20429,6 +20460,7 @@ LABEL_97EA_DrawDriverPortraitColumn:
 
 ; Data from 9817 to 9848 (50 bytes)
 DATA_9817_:
+; = (index - 2) % 5 == 0
 .db $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00
 .db $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00
 .db $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01
@@ -20436,13 +20468,14 @@ DATA_9817_:
 
 ; Data from 9849 to 987A (50 bytes)
 DATA_9849_:
+; = floor(index / 5) * 2
 .db $00 $00 $00 $00 $00 $02 $02 $02 $02 $02 $04 $04 $04 $04 $04 $06
 .db $06 $06 $06 $06 $08 $08 $08 $08 $08 $0A $0A $0A $0A $0A $0C $0C
 .db $0C $0C $0C $0E $0E $0E $0E $0E $10 $10 $10 $10 $10 $12 $12 $12
 .db $12 $12
 
-LABEL_987B_BlankTile1B4:
-  TileWriteAddressToHL $1b4
+LABEL_987B_BlankTileForBlankPortraits:
+  TileWriteAddressToHL MenuTileIndex_SelectPlayers_Blank
   call LABEL_B35A_VRAMAddressToHL
   ld bc, TILE_DATA_SIZE
 -:xor a
@@ -20453,20 +20486,16 @@ LABEL_987B_BlankTile1B4:
   jr nz, -
   ret
 
-LABEL_988D_:
+LABEL_988D_LoadCursorSprites:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld hl, DATA_98AE_
+  ld hl, DATA_98AE_PlayerSelectCursorSprites_SMS
   jp ++
-
-+:
-  ld hl, DATA_990E_
-++:
-  ld de, _RAM_D6E1_SpriteX
-  ld bc, $0060
--:
-  ld a, (hl)
++:ld hl, DATA_990E_PlayerSelectCursorSprites_GG
+++:ld de, _RAM_D6E1_SpriteX
+  ld bc, 32 * 3 ; data size (all X, N, Ys)
+-:ld a, (hl) ; ldir
   ld (de), a
   inc hl
   inc de
@@ -20474,25 +20503,72 @@ LABEL_988D_:
   ld a, c
   or a
   jr nz, -
-  jp LABEL_93CE_UpdateSpriteTable
+  jp LABEL_93CE_UpdateSpriteTable ; and ret
+  
+.macro PlayerSelectCursorData args x, y, w, h
+  ; Cursor coordinates are 32 X, N and Y bytes
+  ; defining the cursor position in the order top,
+  ; left, right, bottom in each section.
+  ; X top
+  TimesTableLo x 8 w
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+  ; X left
+  .dsb h-2 x
+  .if h < 10
+    .dsb 10-h $ff
+  .endif
+  ; X right
+  .dsb h-2 x+(w-1)*8
+  .if h < 10
+    .dsb 10-h $ff
+  .endif
+  ; X bottom
+  TimesTableLo x 8 w
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+  ; Indexes
+  .db MenuTileIndex_Cursor.TopLeft
+  .dsb w-2 MenuTileIndex_Cursor.Top
+  .db MenuTileIndex_Cursor.TopRight
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+  .dsb 8 MenuTileIndex_Cursor.Left  ; no cutting short
+  .dsb 8 MenuTileIndex_Cursor.Right ; no cutting short
+  .db MenuTileIndex_Cursor.BottomLeft
+  .dsb w-2 MenuTileIndex_Cursor.Bottom
+  .db MenuTileIndex_Cursor.BottomRight
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+  ; Y top
+  .dsb w y
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+  ; Y left, right
+  .repeat 2
+    TimesTableLo y+8 8 h-2
+    .if h < 10
+      .dsb 10-h $ff
+    .endif
+  .endr
+  ; Y bottom
+  .dsb w y+(h-1)*8
+  .if w < 8
+    .dsb 8-w $ff
+  .endif
+.endm
 
 ; Data from 98AE to 990D (96 bytes)
-DATA_98AE_:
-.db $62 $6A $72 $7A $82 $8A $92 $9A $62 $62 $62 $62 $62 $62 $62 $62
-.db $9A $9A $9A $9A $9A $9A $9A $9A $62 $6A $72 $7A $82 $8A $92 $9A
-.db $BA $BB $BB $BB $BB $BB $BB $BC $BD $BD $BD $BD $BD $BD $BD $BD
-.db $BE $BE $BE $BE $BE $BE $BE $BE $BF $C0 $C0 $C0 $C0 $C0 $C0 $C1
-.db $8F $8F $8F $8F $8F $8F $8F $8F $97 $9F $A7 $AF $B7 $BF $C7 $CF
-.db $97 $9F $A7 $AF $B7 $BF $C7 $CF $D7 $D7 $D7 $D7 $D7 $D7 $D7 $D7
+DATA_98AE_PlayerSelectCursorSprites_SMS:
+  PlayerSelectCursorData $62 $8f 8 10
 
-; Data from 990E to 996D (96 bytes)
-DATA_990E_:
-.db $40 $48 $50 $58 $60 $68 $70 $FF $40 $40 $40 $40 $40 $40 $FF $FF
-.db $70 $70 $70 $70 $70 $70 $FF $FF $40 $48 $50 $58 $60 $68 $70 $FF
-.db $BA $BB $BB $BB $BB $BB $BC $FF $BD $BD $BD $BD $BD $BD $BD $BD
-.db $BE $BE $BE $BE $BE $BE $BE $BE $BF $C0 $C0 $C0 $C0 $C0 $C1 $FF
-.db $77 $77 $77 $77 $77 $77 $77 $FF $7F $87 $8F $97 $9F $A7 $FF $FF
-.db $7F $87 $8F $97 $9F $A7 $FF $FF $AF $AF $AF $AF $AF $AF $AF $FF
+DATA_990E_PlayerSelectCursorSprites_GG:
+  PlayerSelectCursorData $40 $77 7 8
 
 LABEL_996E_:
   ld a, (_RAM_D6C6_)
@@ -20751,7 +20827,6 @@ LABEL_9B87_:
   add hl, bc
   ld a, (hl)
   
-  ; some of these are impossible?
   cp PlayerPortrait_OutOfGame
   JrZRet _LABEL_9C5D_ret
   cp PlayerPortrait_OutOfGame2
@@ -21103,10 +21178,10 @@ LABEL_9E70_:
   JrNzRet _LABEL_9F3F_ret
   ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
-  add a, $01
+  add a, $01 ; change from happy to sad
   ld (hl), a
   ld (_RAM_D6AA_), a
-  ld a, $59
+  ld a, PlayerPortrait_MrQuestion
   ld (_RAM_D6BA_), a
   ld a, $01
   ld (_RAM_D6B0_), a
@@ -21594,7 +21669,7 @@ LABEL_A296_LoadHandTiles:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_2B151_Tiles_Hand
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  ld de, 39 * 8 ; 39 tiles - too many?
+  ld de, 39 * 8 ; 39 tiles - too many (there are only 31 in the data)
   TileWriteAddressToHL MenuTileIndex_Select_Hand
   jp LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -21850,7 +21925,8 @@ TEXT_A4AD_Computer: .asc "COMPUTER"
 TEXT_A4B5_Vs:       .asc "VS"
 .endif
 
-LABEL_A4B7_:
+LABEL_A4B7_DrawSelectMenuText:
+  ; Draw "Select Game"
   TilemapWriteAddressToHL 10, 13
   call LABEL_A500_DrawSelectGameText
   ld a, (_RAM_D699_MenuScreenIndex)
@@ -21859,9 +21935,10 @@ LABEL_A4B7_:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   JrZRet +
+  ; For SMS 1/2 player, draw icon text labels
   TilemapWriteAddressToHL 3, 16
   call LABEL_B35A_VRAMAddressToHL
-  ld bc, $001A
+  ld bc, 26
   ld hl, TEXT_A4E6_OnePlayerTwoPlayer
   call LABEL_A5B0_EmitToVDP_Text
 +:ret
@@ -22018,13 +22095,14 @@ LABEL_A673_SelectLowSpriteTiles:
   ret
 
 LABEL_A67C_:
+  ; Unknown, character select related?
   ld a, $00
   ld (_RAM_D6AD_), a
   ld a, $04
   ld (_RAM_D6AE_), a
   ld a, $03
   ld (_RAM_D6A2_), a
-  ld (_RAM_DBFB_), a
+  ld (_RAM_DBFB_PortraitCurrentIndex), a
   ld bc, $0003
   ret
 
@@ -23226,8 +23304,8 @@ LABEL_AFCD_InitialiseOnePlayerMenu:
   call LABEL_B1EC_Trampoline_PlayMenuMusic
   xor a
   ld (_RAM_D6C7_IsTwoPlayer), a
-  call LABEL_BB95_LoadHandMenuGraphics
-  call LABEL_BC0C_
+  call LABEL_BB95_LoadSelectMenuGraphics
+  call LABEL_BC0C_LoadSelectMenuTilemaps
   call +
   call LABEL_A50C_DrawOnePlayerSelectGameText
   call LABEL_9317_InitialiseHandSprites
@@ -23294,7 +23372,7 @@ LABEL_B06C_MenuScreen_OnePlayerMode:
   jr nz, +
   xor a
   ld (_RAM_DC3F_IsTwoPlayer), a
-  call LABEL_8205_
+  call LABEL_8205_InitialiseOnePlayerSelectCharacterMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
@@ -23679,7 +23757,7 @@ LABEL_B323_PopulatePlayerPortraitValues:
   ; This selects the first portrait of each player
   ld hl, DATA_97DF_8TimesTable
   ld de, _RAM_DBFE_PlayerPortraitValues
-  ld bc, $0000
+  ld bc, 0 ; would be faster to ldir
 -:ld a, (hl)
   ld (de), a
   inc hl
@@ -23764,30 +23842,34 @@ LABEL_B3A4_EmitToVDPAtDE_Text:
   TailCall LABEL_A5B0_EmitToVDP_Text
 
 LABEL_B3AE_:
-  ld a, $06
-  ld (_RAM_D6AB_MenuTimer.Lo), a
+  ld a, $06 ; Counter to draw 6 portraits
+  ld (_RAM_D6AB_MenuTimer.Lo), a ; Using this as a counter now
   ld a, (_RAM_D6AD_)
-  sub $01
-  cp $FF
+  sub 1
+  cp -1
   jr nz, +
-  ld a, $0A
-+:
-  ld c, a
+  ld a, 10
++:ld c, a
   ld b, $00
-  call LABEL_B412_
-LABEL_B3C4_:
-  ld hl, DATA_9773_TileWriteAddresses
+  call LABEL_B412_Scale_RAM_DBFB_PortraitCurrentIndex
+  ; fall through
+-:; Look up tile address for that scaled index (assume it's even)
+  ld hl, DATA_9773_TileWriteAddresses_AvailablePortraits
   add hl, de
-  ld (_RAM_D6BE_), de
+  ld (_RAM_D6BE_TileWriteAddress), de
   ld e, (hl)
   inc hl
   ld d, (hl)
+  ; And set it
   call LABEL_B361_VRAMAddressToDE
+  ; And remember it TODO rename variable
   ld (_RAM_D6A8_DisplayCaseTileAddress), de
+  ; _RAM_D6BB_ = player index * 8
   ld hl, DATA_97DF_8TimesTable
   add hl, bc
   ld a, (hl)
   ld (_RAM_D6BB_), a
+  
   ld hl, _RAM_DBFE_PlayerPortraitValues
   add hl, bc
   ld a, (hl)
@@ -23795,7 +23877,7 @@ LABEL_B3C4_:
   call LABEL_9F40_LoadPortraitTiles
   call LABEL_AECD_
   ld bc, (_RAM_D6BC_DisplayCase_IndexBackup)
-  ld de, (_RAM_D6BE_)
+  ld de, (_RAM_D6BE_TileWriteAddress)
   ld a, e
   add a, $02
   cp $0C
@@ -23814,14 +23896,17 @@ LABEL_B3C4_:
   sub $01
   ld (_RAM_D6AB_MenuTimer.Lo), a
   or a
-  jr nz, LABEL_B3C4_
+  jr nz, -
   ret
 
-LABEL_B412_:
+LABEL_B412_Scale_RAM_DBFB_PortraitCurrentIndex:
+; scaling by system
+; Could be inlined
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
-  ld a, (_RAM_DBFB_)
+  ; SMS
+  ld a, (_RAM_DBFB_PortraitCurrentIndex) ; Subtract 3 then divide by 4 -> de
   sub $03
   sra a
   sra a
@@ -23829,14 +23914,15 @@ LABEL_B412_:
   ld e, a
   ret
 
-+:
-  ld a, (_RAM_DBFB_)
++:ld a, (_RAM_DBFB_PortraitCurrentIndex)
   ld e, a
   ld d, $00
   ld hl, DATA_9849_
   add hl, de
   ld e, (hl)
-  ld d, $00
+.ifdef UNNECESSARY_CODE
+  ld d, $00 ; already 0 above
+.endif
   ret
 
 LABEL_B433_ResetMenuTimerOnControlPress:
@@ -24883,7 +24969,7 @@ LABEL_BB85_ScreenOffAtLineFF:
   out (PORT_VDP_REGISTER), a
   ret
 
-LABEL_BB95_LoadHandMenuGraphics:
+LABEL_BB95_LoadSelectMenuGraphics:
   ld a, (_RAM_D6C7_IsTwoPlayer)
   dec a
   jr z, _TwoPlayerTournamentSingleRaceGraphics
@@ -24894,7 +24980,7 @@ LABEL_BB95_LoadHandMenuGraphics:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_26C52_Tiles_Challenge_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Title_Portraits.1
+  TileWriteAddressToHL MenuTileIndex_Select_Icon1
   ld de, 60 * 8 ; 60 tiles - smaller than a car portrait
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
@@ -24909,7 +24995,7 @@ LABEL_BB95_LoadHandMenuGraphics:
   ; Load "head to head" image tiles
   ld hl, DATA_26FC6_Tiles_HeadToHead_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
+  TileWriteAddressToHL MenuTileIndex_Select_Icon2
   ld de, 60 * 8 ; 60 tiles again
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
   jp +++
@@ -24918,7 +25004,7 @@ LABEL_BB95_LoadHandMenuGraphics:
   ; GG selecting player count: replace "head to head" icon with "two players on one game gear"
   ld hl, DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
+  TileWriteAddressToHL MenuTileIndex_Select_Icon2
   ld de, 60 * 8 ; 60 tiles again
   call LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
   jp +++
@@ -24930,29 +25016,29 @@ _TwoPlayerTournamentSingleRaceGraphics:
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_27391_Tiles_Tournament_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Title_Portraits.1
+  TileWriteAddressToHL MenuTileIndex_Select_Icon1
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
   ld hl, DATA_27674_Tiles_SingleRace_Icon
   CallRamCode LABEL_3B97D_DecompressFromHLToC000
-  TileWriteAddressToHL MenuTileIndex_Title_Portraits.2
+  TileWriteAddressToHL MenuTileIndex_Select_Icon2
   ld de, 54 * 8 ; 54 tiles
   call LABEL_AFA5_Emit3bppTileDataFromDecompressionBufferToVRAMAddressHL
 
 +++:
   call LABEL_A296_LoadHandTiles
-  call LABEL_949B_LoadHeadToHeadTextTiles
-  jp LABEL_948A_LoadChallengeTextTiles ; tail call optimisation
+  call LABEL_949B_LoadHeadToHeadTextTiles ; immediately after in VRAM
+  jp LABEL_948A_LoadChallengeTextTiles ; immediately after in VRAM - and ret
 
-LABEL_BC0C_:
+LABEL_BC0C_LoadSelectMenuTilemaps:
   ld a, (_RAM_D6C7_IsTwoPlayer)
   or a
   jr z, +
-  ld a, $09
+  ld a, 9 ; 9x6
   ld (_RAM_D69A_TilemapRectangleSequence_Width), a
   jp ++
-+:ld a, $0A
++:ld a, 10 ; 10x6
   ld (_RAM_D69A_TilemapRectangleSequence_Width), a
 ++:
   ld a, (_RAM_DC3C_IsGameGear)
@@ -24970,9 +25056,9 @@ LABEL_BC0C_:
   or a
   sbc hl, de
 +:
-  ld a, $24
+  ld a, MenuTileIndex_Select_Icon1
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld a, $06
+  ld a, 6
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   xor a
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
@@ -24998,14 +25084,16 @@ LABEL_BC0C_:
   ld de, TILEMAP_ROW_SIZE
   or a
   sbc hl, de
-+:ld a, $74
++:ld a, MenuTileIndex_Select_Icon2  
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
   ld a, $06
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
-  JrZRet _LABEL_BCCE_ret
+  JrZRet +++
+  
+  ; For the "challenge/head to head" screen, draw graphical text
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -25014,12 +25102,12 @@ LABEL_BC0C_:
 +:TilemapWriteAddressToDE 6, 21
 ++:
   call LABEL_B361_VRAMAddressToDE
-  ld hl, DATA_2B4BA_Tilemap_ChallengeText
-  ld a, $08
+  ld hl, DATA_2B4BA_Tilemap_ChallengeText ; 8x2
+  ld a, 8
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
-  ld a, $02
+  ld a, 2
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  ld a, $F0
+  ld a, MenuTileIndex_Select_Text2
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   CallRamCode LABEL_3BB57_EmitTilemapRectangle
   ld a, (_RAM_DC3C_IsGameGear)
@@ -25030,16 +25118,16 @@ LABEL_BC0C_:
 +:TilemapWriteAddressToDE 16, 21
 ++:
   call LABEL_B361_VRAMAddressToDE
-  ld hl, DATA_2B5BE_Tilemap_HeadToHeadText
-  ld a, $0A
+  ld hl, DATA_2B5BE_Tilemap_HeadToHeadText ; 10x2
+  ld a, 10
   ld (_RAM_D69D_EmitTilemapRectangle_Width), a
-  ld a, $02
+  ld a, 2
   ld (_RAM_D69E_EmitTilemapRectangle_Height), a
-  ld a, $E2
+  ld a, MenuTileIndex_Select_Text1
   ld (_RAM_D69F_EmitTilemapRectangle_IndexOffset), a
   CallRamCode LABEL_3BB57_EmitTilemapRectangle
-_LABEL_BCCE_ret:
-  ret
+
++++:ret
 
 LABEL_BCCF_EmitTilemapRectangleSequence:
   ; Emits a rectangle of tilemap data
@@ -25195,6 +25283,7 @@ LABEL_BD94_Emit4bppTileDataToVRAMAddressHL:
   ret
 
 LABEL_BDA6_:
+; Unknown purpose - character select related?
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6A3_), a
   ld a, NO_BUTTONS_PRESSED ; $3F
@@ -25203,10 +25292,12 @@ LABEL_BDA6_:
   ld (_RAM_D687_Player1Controls_PreviousFrame), a
   ret
 
-LABEL_BDB8_:
+LABEL_BDB8_LoadGG2PlayerIcon:
   ld a, (_RAM_DC3C_IsGameGear)
   or a
   JrZRet +
+  ; GG only
+  ; Replace "head to head" with "2 players on one GG" icon
   ld a, :DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
   ld (_RAM_D741_RequestedPageIndex), a
   ld hl, DATA_17C0C_Tiles_TwoPlayersOnOneGameGear
@@ -25215,13 +25306,13 @@ LABEL_BDB8_:
   ld de, 20 * 8 ; 20 tiles
   call LABEL_BD94_Emit4bppTileDataToVRAMAddressHL
   TilemapWriteAddressToHL 16, 21
-  ld a, $70
+  ld a, <MenuTileIndex_Select_Icon3 ; $70
   ld (_RAM_D68A_TilemapRectangleSequence_TileIndex), a
-  ld a, $02
+  ld a, 2
   ld (_RAM_D69B_TilemapRectangleSequence_Height), a
-  ld a, $0A
+  ld a, 10
   ld (_RAM_D69A_TilemapRectangleSequence_Width), a
-  ld a, $01
+  ld a, >MenuTileIndex_Select_Icon3
   ld (_RAM_D69C_TilemapRectangleSequence_Flags), a
   call LABEL_BCCF_EmitTilemapRectangleSequence
 +:ret
@@ -34001,7 +34092,7 @@ LABEL_3730C_GameVBlankPart3:
   jr nc, +
   ld e, a
   ld d, $00
-  ld hl, DATA_3751E_
+  ld hl, DATA_3751E_11TimesTable
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
@@ -34029,7 +34120,7 @@ LABEL_3730C_GameVBlankPart3:
   jr nc, +
   ld e, a
   ld d, $00
-  ld hl, DATA_3751E_
+  ld hl, DATA_3751E_11TimesTable
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
@@ -34057,7 +34148,7 @@ LABEL_3730C_GameVBlankPart3:
   jr nc, +
   ld e, a
   ld d, $00
-  ld hl, DATA_3751E_
+  ld hl, DATA_3751E_11TimesTable
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
@@ -34216,8 +34307,9 @@ DATA_374A5_:
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02
 
 ; Data from 3751E to 37528 (11 bytes)
-DATA_3751E_:
-.db $0B $16 $21 $2C $37 $42 $4D $58 $63 $6E $79
+DATA_3751E_11TimesTable:
+  ; 11, 22, ... 133
+  TimesTableLo 11 11 11
 
 LABEL_37529_:
   ld a, (_RAM_DC54_IsGameGear)
