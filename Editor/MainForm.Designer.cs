@@ -29,13 +29,10 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.tbFilename = new System.Windows.Forms.TextBox();
-            this.tbOffset = new System.Windows.Forms.TextBox();
-            this.tbOutput = new System.Windows.Forms.TextBox();
-            this.btnDecode = new System.Windows.Forms.Button();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.toolStripStatusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
-            this.btnSearch = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabTrackList = new System.Windows.Forms.TabPage();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
@@ -54,16 +51,31 @@
             this.tabPalette = new System.Windows.Forms.TabPage();
             this.pbPalette = new System.Windows.Forms.PictureBox();
             this.tabRaw = new System.Windows.Forms.TabPage();
-            this.udRunBytes = new System.Windows.Forms.NumericUpDown();
-            this.btnDecompressRun = new System.Windows.Forms.Button();
-            this.udSkip = new System.Windows.Forms.NumericUpDown();
-            this.cbPalette = new System.Windows.Forms.ComboBox();
-            this.udImageWidth = new System.Windows.Forms.NumericUpDown();
-            this.btnDecodeRaw = new System.Windows.Forms.Button();
-            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
+            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+            this.tbOutput = new System.Windows.Forms.TextBox();
             this.pbRaw = new System.Windows.Forms.PictureBox();
-            this.btnDecodeRun = new System.Windows.Forms.Button();
-            this.btnText = new System.Windows.Forms.Button();
+            this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
+            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
+            this.udImageWidth = new System.Windows.Forms.NumericUpDown();
+            this.cbPalette = new System.Windows.Forms.ComboBox();
+            this.udSkip = new System.Windows.Forms.NumericUpDown();
+            this.toolStrip1 = new System.Windows.Forms.ToolStrip();
+            this.toolStripLabel1 = new System.Windows.Forms.ToolStripLabel();
+            this.tbOffset = new System.Windows.Forms.ToolStripTextBox();
+            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
+            this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
+            this.btnDecode = new System.Windows.Forms.ToolStripButton();
+            this.btnSearch = new System.Windows.Forms.ToolStripButton();
+            this.btnText = new System.Windows.Forms.ToolStripButton();
+            this.btnDecodeRun = new System.Windows.Forms.ToolStripButton();
+            this.btnDecodeRaw = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.btnDecompressRun = new System.Windows.Forms.ToolStripButton();
+            this.tbRunBytes = new System.Windows.Forms.ToolStripTextBox();
+            this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
+            this.toolStripDropDownButton1 = new System.Windows.Forms.ToolStripDropDownButton();
+            this.exhaustiveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.fastToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.tbLog = new System.Windows.Forms.TextBox();
             this.nudStageIndex = new System.Windows.Forms.NumericUpDown();
@@ -86,11 +98,16 @@
             this.tabPalette.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).BeginInit();
             this.tabRaw.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udSkip)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
+            this.splitContainer2.Panel1.SuspendLayout();
+            this.splitContainer2.Panel2.SuspendLayout();
+            this.splitContainer2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).BeginInit();
+            this.flowLayoutPanel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.udSkip)).BeginInit();
+            this.toolStrip1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).BeginInit();
             this.SuspendLayout();
@@ -104,42 +121,6 @@
             this.tbFilename.Name = "tbFilename";
             this.tbFilename.Size = new System.Drawing.Size(1676, 31);
             this.tbFilename.TabIndex = 0;
-            this.tbFilename.Text = "C:\\Users\\Maxim\\Documents\\Roms\\Micro Machines.sms";
-            // 
-            // tbOffset
-            // 
-            this.tbOffset.Location = new System.Drawing.Point(12, 12);
-            this.tbOffset.Margin = new System.Windows.Forms.Padding(6);
-            this.tbOffset.Name = "tbOffset";
-            this.tbOffset.Size = new System.Drawing.Size(96, 31);
-            this.tbOffset.TabIndex = 0;
-            this.tbOffset.Text = "2fde0";
-            // 
-            // tbOutput
-            // 
-            this.tbOutput.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.tbOutput.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tbOutput.Location = new System.Drawing.Point(12, 64);
-            this.tbOutput.Margin = new System.Windows.Forms.Padding(6);
-            this.tbOutput.Multiline = true;
-            this.tbOutput.Name = "tbOutput";
-            this.tbOutput.ReadOnly = true;
-            this.tbOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbOutput.Size = new System.Drawing.Size(1118, 436);
-            this.tbOutput.TabIndex = 9;
-            // 
-            // btnDecode
-            // 
-            this.btnDecode.Location = new System.Drawing.Point(120, 8);
-            this.btnDecode.Margin = new System.Windows.Forms.Padding(6);
-            this.btnDecode.Name = "btnDecode";
-            this.btnDecode.Size = new System.Drawing.Size(150, 44);
-            this.btnDecode.TabIndex = 1;
-            this.btnDecode.Text = "Decompress";
-            this.btnDecode.UseVisualStyleBackColor = true;
-            this.btnDecode.Click += new System.EventHandler(this.btnDecode_Click);
             // 
             // statusStrip1
             // 
@@ -158,17 +139,6 @@
             this.toolStripStatusLabel1.Name = "toolStripStatusLabel1";
             this.toolStripStatusLabel1.Size = new System.Drawing.Size(79, 32);
             this.toolStripStatusLabel1.Text = "Ready";
-            // 
-            // btnSearch
-            // 
-            this.btnSearch.Location = new System.Drawing.Point(282, 7);
-            this.btnSearch.Margin = new System.Windows.Forms.Padding(6);
-            this.btnSearch.Name = "btnSearch";
-            this.btnSearch.Size = new System.Drawing.Size(150, 44);
-            this.btnSearch.TabIndex = 2;
-            this.btnSearch.Text = "Search";
-            this.btnSearch.UseVisualStyleBackColor = true;
-            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // tabControl1
             // 
@@ -375,20 +345,8 @@
             // 
             // tabRaw
             // 
-            this.tabRaw.Controls.Add(this.udRunBytes);
-            this.tabRaw.Controls.Add(this.btnDecompressRun);
-            this.tabRaw.Controls.Add(this.udSkip);
-            this.tabRaw.Controls.Add(this.cbPalette);
-            this.tabRaw.Controls.Add(this.udImageWidth);
-            this.tabRaw.Controls.Add(this.btnDecodeRaw);
-            this.tabRaw.Controls.Add(this.numericUpDown1);
-            this.tabRaw.Controls.Add(this.pbRaw);
-            this.tabRaw.Controls.Add(this.btnDecodeRun);
-            this.tabRaw.Controls.Add(this.btnText);
-            this.tabRaw.Controls.Add(this.tbOffset);
-            this.tabRaw.Controls.Add(this.btnSearch);
-            this.tabRaw.Controls.Add(this.tbOutput);
-            this.tabRaw.Controls.Add(this.btnDecode);
+            this.tabRaw.Controls.Add(this.splitContainer2);
+            this.tabRaw.Controls.Add(this.toolStrip1);
             this.tabRaw.Location = new System.Drawing.Point(8, 39);
             this.tabRaw.Margin = new System.Windows.Forms.Padding(6);
             this.tabRaw.Name = "tabRaw";
@@ -398,123 +356,64 @@
             this.tabRaw.Text = "Raw";
             this.tabRaw.UseVisualStyleBackColor = true;
             // 
-            // udRunBytes
+            // splitContainer2
             // 
-            this.udRunBytes.Location = new System.Drawing.Point(1045, 14);
-            this.udRunBytes.Maximum = new decimal(new int[] {
-            9999,
-            0,
-            0,
-            0});
-            this.udRunBytes.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            this.udRunBytes.Name = "udRunBytes";
-            this.udRunBytes.Size = new System.Drawing.Size(69, 31);
-            this.udRunBytes.TabIndex = 12;
-            this.udRunBytes.Value = new decimal(new int[] {
-            150,
-            0,
-            0,
-            0});
+            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer2.Location = new System.Drawing.Point(6, 45);
+            this.splitContainer2.Name = "splitContainer2";
             // 
-            // btnDecompressRun
+            // splitContainer2.Panel1
             // 
-            this.btnDecompressRun.Location = new System.Drawing.Point(948, 5);
-            this.btnDecompressRun.Margin = new System.Windows.Forms.Padding(6);
-            this.btnDecompressRun.Name = "btnDecompressRun";
-            this.btnDecompressRun.Size = new System.Drawing.Size(88, 44);
-            this.btnDecompressRun.TabIndex = 11;
-            this.btnDecompressRun.Text = "Run";
-            this.btnDecompressRun.UseVisualStyleBackColor = true;
-            this.btnDecompressRun.Click += new System.EventHandler(this.btnDecompressRun_Click);
+            this.splitContainer2.Panel1.Controls.Add(this.tbOutput);
             // 
-            // udSkip
+            // splitContainer2.Panel2
             // 
-            this.udSkip.Location = new System.Drawing.Point(1560, 16);
-            this.udSkip.Maximum = new decimal(new int[] {
-            256,
-            0,
-            0,
-            0});
-            this.udSkip.Name = "udSkip";
-            this.udSkip.Size = new System.Drawing.Size(82, 31);
-            this.udSkip.TabIndex = 10;
-            this.udSkip.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            this.splitContainer2.Panel2.Controls.Add(this.pbRaw);
+            this.splitContainer2.Panel2.Controls.Add(this.flowLayoutPanel1);
+            this.splitContainer2.Size = new System.Drawing.Size(1654, 452);
+            this.splitContainer2.SplitterDistance = 522;
+            this.splitContainer2.TabIndex = 14;
             // 
-            // cbPalette
+            // tbOutput
             // 
-            this.cbPalette.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cbPalette.FormattingEnabled = true;
-            this.cbPalette.Items.AddRange(new object[] {
-            "BF3E Menu",
-            "BF80 Menu (GG)",
-            "17ED2 Sportscars tiles",
-            "17EE2 Sportscars sprites",
-            "17EF2 Four by Four tiles",
-            "17F02 Four by Four sprites",
-            "17F12 Powerboats tiles",
-            "17F22 Powerboats sprites",
-            "17F32 Turbo Wheels tiles",
-            "17F42 Turbo Wheels sprites",
-            "17F52 Formula One tiles",
-            "17F62 Formula One sprites",
-            "17F72 Warriors tiles",
-            "17F82 Warriors sprites",
-            "17F92 Tanks tiles",
-            "17FA2 Tanks sprites",
-            "17FB2 RuffTrux tiles",
-            "17FC2 RuffTrux sprites"});
-            this.cbPalette.Location = new System.Drawing.Point(1295, 16);
-            this.cbPalette.Name = "cbPalette";
-            this.cbPalette.Size = new System.Drawing.Size(259, 33);
-            this.cbPalette.TabIndex = 8;
-            this.cbPalette.SelectedIndexChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            this.tbOutput.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tbOutput.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tbOutput.Location = new System.Drawing.Point(0, 0);
+            this.tbOutput.Margin = new System.Windows.Forms.Padding(6);
+            this.tbOutput.Multiline = true;
+            this.tbOutput.Name = "tbOutput";
+            this.tbOutput.ReadOnly = true;
+            this.tbOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.tbOutput.Size = new System.Drawing.Size(522, 452);
+            this.tbOutput.TabIndex = 10;
             // 
-            // udImageWidth
+            // pbRaw
             // 
-            this.udImageWidth.Increment = new decimal(new int[] {
-            8,
-            0,
-            0,
-            0});
-            this.udImageWidth.Location = new System.Drawing.Point(1207, 14);
-            this.udImageWidth.Maximum = new decimal(new int[] {
-            256,
-            0,
-            0,
-            0});
-            this.udImageWidth.Minimum = new decimal(new int[] {
-            8,
-            0,
-            0,
-            0});
-            this.udImageWidth.Name = "udImageWidth";
-            this.udImageWidth.Size = new System.Drawing.Size(82, 31);
-            this.udImageWidth.TabIndex = 7;
-            this.udImageWidth.Value = new decimal(new int[] {
-            32,
-            0,
-            0,
-            0});
-            this.udImageWidth.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            this.pbRaw.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pbRaw.Location = new System.Drawing.Point(0, 39);
+            this.pbRaw.Margin = new System.Windows.Forms.Padding(6);
+            this.pbRaw.Name = "pbRaw";
+            this.pbRaw.Size = new System.Drawing.Size(1128, 413);
+            this.pbRaw.TabIndex = 8;
+            this.pbRaw.TabStop = false;
             // 
-            // btnDecodeRaw
+            // flowLayoutPanel1
             // 
-            this.btnDecodeRaw.Location = new System.Drawing.Point(777, 7);
-            this.btnDecodeRaw.Margin = new System.Windows.Forms.Padding(6);
-            this.btnDecodeRaw.Name = "btnDecodeRaw";
-            this.btnDecodeRaw.Size = new System.Drawing.Size(159, 44);
-            this.btnDecodeRaw.TabIndex = 5;
-            this.btnDecodeRaw.Text = "Raw";
-            this.btnDecodeRaw.UseVisualStyleBackColor = true;
-            this.btnDecodeRaw.Click += new System.EventHandler(this.btnDecodeRaw_Click);
+            this.flowLayoutPanel1.AutoSize = true;
+            this.flowLayoutPanel1.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.flowLayoutPanel1.Controls.Add(this.numericUpDown1);
+            this.flowLayoutPanel1.Controls.Add(this.udImageWidth);
+            this.flowLayoutPanel1.Controls.Add(this.cbPalette);
+            this.flowLayoutPanel1.Controls.Add(this.udSkip);
+            this.flowLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Top;
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(0, 0);
+            this.flowLayoutPanel1.Name = "flowLayoutPanel1";
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(1128, 39);
+            this.flowLayoutPanel1.TabIndex = 9;
             // 
             // numericUpDown1
             // 
-            this.numericUpDown1.Location = new System.Drawing.Point(1132, 16);
+            this.numericUpDown1.Location = new System.Drawing.Point(3, 3);
             this.numericUpDown1.Maximum = new decimal(new int[] {
             4,
             0,
@@ -535,38 +434,216 @@
             0});
             this.numericUpDown1.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
             // 
-            // pbRaw
+            // udImageWidth
             // 
-            this.pbRaw.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.pbRaw.Location = new System.Drawing.Point(1142, 56);
-            this.pbRaw.Margin = new System.Windows.Forms.Padding(6);
-            this.pbRaw.Name = "pbRaw";
-            this.pbRaw.Size = new System.Drawing.Size(512, 435);
-            this.pbRaw.TabIndex = 7;
-            this.pbRaw.TabStop = false;
+            this.udImageWidth.Increment = new decimal(new int[] {
+            8,
+            0,
+            0,
+            0});
+            this.udImageWidth.Location = new System.Drawing.Point(78, 3);
+            this.udImageWidth.Maximum = new decimal(new int[] {
+            256,
+            0,
+            0,
+            0});
+            this.udImageWidth.Minimum = new decimal(new int[] {
+            8,
+            0,
+            0,
+            0});
+            this.udImageWidth.Name = "udImageWidth";
+            this.udImageWidth.Size = new System.Drawing.Size(82, 31);
+            this.udImageWidth.TabIndex = 7;
+            this.udImageWidth.Value = new decimal(new int[] {
+            32,
+            0,
+            0,
+            0});
+            this.udImageWidth.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
             // 
-            // btnDecodeRun
+            // cbPalette
             // 
-            this.btnDecodeRun.Location = new System.Drawing.Point(606, 7);
-            this.btnDecodeRun.Margin = new System.Windows.Forms.Padding(6);
-            this.btnDecodeRun.Name = "btnDecodeRun";
-            this.btnDecodeRun.Size = new System.Drawing.Size(159, 44);
-            this.btnDecodeRun.TabIndex = 4;
-            this.btnDecodeRun.Text = "Decode RLE";
-            this.btnDecodeRun.UseVisualStyleBackColor = true;
-            this.btnDecodeRun.Click += new System.EventHandler(this.btnDecodeRun_Click);
+            this.cbPalette.FormattingEnabled = true;
+            this.cbPalette.Items.AddRange(new object[] {
+            "BF3E Menu",
+            "BF80 Menu (GG)",
+            "17ED2 Sportscars tiles",
+            "17EE2 Sportscars sprites",
+            "17EF2 Four by Four tiles",
+            "17F02 Four by Four sprites",
+            "17F12 Powerboats tiles",
+            "17F22 Powerboats sprites",
+            "17F32 Turbo Wheels tiles",
+            "17F42 Turbo Wheels sprites",
+            "17F52 Formula One tiles",
+            "17F62 Formula One sprites",
+            "17F72 Warriors tiles",
+            "17F82 Warriors sprites",
+            "17F92 Tanks tiles",
+            "17FA2 Tanks sprites",
+            "17FB2 RuffTrux tiles",
+            "17FC2 RuffTrux sprites"});
+            this.cbPalette.Location = new System.Drawing.Point(166, 3);
+            this.cbPalette.Name = "cbPalette";
+            this.cbPalette.Size = new System.Drawing.Size(259, 33);
+            this.cbPalette.TabIndex = 8;
+            this.cbPalette.SelectedIndexChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            // 
+            // udSkip
+            // 
+            this.udSkip.Location = new System.Drawing.Point(431, 3);
+            this.udSkip.Maximum = new decimal(new int[] {
+            256,
+            0,
+            0,
+            0});
+            this.udSkip.Name = "udSkip";
+            this.udSkip.Size = new System.Drawing.Size(82, 31);
+            this.udSkip.TabIndex = 10;
+            this.udSkip.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            // 
+            // toolStrip1
+            // 
+            this.toolStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
+            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolStripLabel1,
+            this.tbOffset,
+            this.toolStripSeparator2,
+            this.toolStripLabel2,
+            this.btnDecode,
+            this.btnSearch,
+            this.btnText,
+            this.btnDecodeRun,
+            this.btnDecodeRaw,
+            this.toolStripSeparator1,
+            this.btnDecompressRun,
+            this.tbRunBytes,
+            this.toolStripSeparator3,
+            this.toolStripDropDownButton1});
+            this.toolStrip1.Location = new System.Drawing.Point(6, 6);
+            this.toolStrip1.Name = "toolStrip1";
+            this.toolStrip1.Size = new System.Drawing.Size(1654, 39);
+            this.toolStrip1.TabIndex = 13;
+            this.toolStrip1.Text = "toolStrip1";
+            // 
+            // toolStripLabel1
+            // 
+            this.toolStripLabel1.Name = "toolStripLabel1";
+            this.toolStripLabel1.Size = new System.Drawing.Size(80, 36);
+            this.toolStripLabel1.Text = "Offset";
+            // 
+            // tbOffset
+            // 
+            this.tbOffset.Name = "tbOffset";
+            this.tbOffset.Size = new System.Drawing.Size(100, 39);
+            this.tbOffset.Text = "2fde0";
+            // 
+            // toolStripSeparator2
+            // 
+            this.toolStripSeparator2.Name = "toolStripSeparator2";
+            this.toolStripSeparator2.Size = new System.Drawing.Size(6, 39);
+            // 
+            // toolStripLabel2
+            // 
+            this.toolStripLabel2.Name = "toolStripLabel2";
+            this.toolStripLabel2.Size = new System.Drawing.Size(97, 36);
+            this.toolStripLabel2.Text = "Decode";
+            // 
+            // btnDecode
+            // 
+            this.btnDecode.Image = ((System.Drawing.Image)(resources.GetObject("btnDecode.Image")));
+            this.btnDecode.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnDecode.Name = "btnDecode";
+            this.btnDecode.Size = new System.Drawing.Size(93, 36);
+            this.btnDecode.Text = "LZ+";
+            this.btnDecode.Click += new System.EventHandler(this.btnDecode_Click);
+            // 
+            // btnSearch
+            // 
+            this.btnSearch.Image = ((System.Drawing.Image)(resources.GetObject("btnSearch.Image")));
+            this.btnSearch.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnSearch.Name = "btnSearch";
+            this.btnSearch.Size = new System.Drawing.Size(122, 36);
+            this.btnSearch.Text = "Search";
+            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // btnText
             // 
-            this.btnText.Location = new System.Drawing.Point(444, 8);
-            this.btnText.Margin = new System.Windows.Forms.Padding(6);
+            this.btnText.Image = ((System.Drawing.Image)(resources.GetObject("btnText.Image")));
+            this.btnText.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnText.Name = "btnText";
-            this.btnText.Size = new System.Drawing.Size(150, 44);
-            this.btnText.TabIndex = 3;
+            this.btnText.Size = new System.Drawing.Size(94, 36);
             this.btnText.Text = "Text";
-            this.btnText.UseVisualStyleBackColor = true;
             this.btnText.Click += new System.EventHandler(this.btnText_Click);
+            // 
+            // btnDecodeRun
+            // 
+            this.btnDecodeRun.Image = ((System.Drawing.Image)(resources.GetObject("btnDecodeRun.Image")));
+            this.btnDecodeRun.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnDecodeRun.Name = "btnDecodeRun";
+            this.btnDecodeRun.Size = new System.Drawing.Size(88, 36);
+            this.btnDecodeRun.Text = "RLE";
+            this.btnDecodeRun.Click += new System.EventHandler(this.btnDecodeRun_Click);
+            // 
+            // btnDecodeRaw
+            // 
+            this.btnDecodeRaw.Image = ((System.Drawing.Image)(resources.GetObject("btnDecodeRaw.Image")));
+            this.btnDecodeRaw.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnDecodeRaw.Name = "btnDecodeRaw";
+            this.btnDecodeRaw.Size = new System.Drawing.Size(94, 36);
+            this.btnDecodeRaw.Text = "Raw";
+            this.btnDecodeRaw.Click += new System.EventHandler(this.btnDecodeRaw_Click);
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 39);
+            // 
+            // btnDecompressRun
+            // 
+            this.btnDecompressRun.Image = ((System.Drawing.Image)(resources.GetObject("btnDecompressRun.Image")));
+            this.btnDecompressRun.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnDecompressRun.Name = "btnDecompressRun";
+            this.btnDecompressRun.Size = new System.Drawing.Size(93, 36);
+            this.btnDecompressRun.Text = "Run";
+            this.btnDecompressRun.Click += new System.EventHandler(this.btnDecompressRun_Click);
+            // 
+            // tbRunBytes
+            // 
+            this.tbRunBytes.Name = "tbRunBytes";
+            this.tbRunBytes.Size = new System.Drawing.Size(100, 39);
+            this.tbRunBytes.Text = "150";
+            // 
+            // toolStripSeparator3
+            // 
+            this.toolStripSeparator3.Name = "toolStripSeparator3";
+            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 39);
+            // 
+            // toolStripDropDownButton1
+            // 
+            this.toolStripDropDownButton1.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.exhaustiveToolStripMenuItem,
+            this.fastToolStripMenuItem});
+            this.toolStripDropDownButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripDropDownButton1.Image")));
+            this.toolStripDropDownButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripDropDownButton1.Name = "toolStripDropDownButton1";
+            this.toolStripDropDownButton1.Size = new System.Drawing.Size(189, 36);
+            this.toolStripDropDownButton1.Text = "Compress...";
+            // 
+            // exhaustiveToolStripMenuItem
+            // 
+            this.exhaustiveToolStripMenuItem.Name = "exhaustiveToolStripMenuItem";
+            this.exhaustiveToolStripMenuItem.Size = new System.Drawing.Size(269, 38);
+            this.exhaustiveToolStripMenuItem.Text = "Exhaustive";
+            this.exhaustiveToolStripMenuItem.Click += new System.EventHandler(this.exhaustiveToolStripMenuItem_Click);
+            // 
+            // fastToolStripMenuItem
+            // 
+            this.fastToolStripMenuItem.Name = "fastToolStripMenuItem";
+            this.fastToolStripMenuItem.Size = new System.Drawing.Size(269, 38);
+            this.fastToolStripMenuItem.Text = "Fast";
+            this.fastToolStripMenuItem.Click += new System.EventHandler(this.fastToolStripMenuItem_Click);
             // 
             // tabPage1
             // 
@@ -662,11 +739,19 @@
             ((System.ComponentModel.ISupportInitialize)(this.pbPalette)).EndInit();
             this.tabRaw.ResumeLayout(false);
             this.tabRaw.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.udRunBytes)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udSkip)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
+            this.splitContainer2.Panel1.ResumeLayout(false);
+            this.splitContainer2.Panel1.PerformLayout();
+            this.splitContainer2.Panel2.ResumeLayout(false);
+            this.splitContainer2.Panel2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
+            this.splitContainer2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.pbRaw)).EndInit();
+            this.flowLayoutPanel1.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.udImageWidth)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.udSkip)).EndInit();
+            this.toolStrip1.ResumeLayout(false);
+            this.toolStrip1.PerformLayout();
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudStageIndex)).EndInit();
@@ -678,12 +763,8 @@
         #endregion
 
         private System.Windows.Forms.TextBox tbFilename;
-        private System.Windows.Forms.TextBox tbOffset;
-        private System.Windows.Forms.TextBox tbOutput;
-        private System.Windows.Forms.Button btnDecode;
         private System.Windows.Forms.StatusStrip statusStrip1;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel1;
-        private System.Windows.Forms.Button btnSearch;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabRaw;
         private System.Windows.Forms.NumericUpDown nudStageIndex;
@@ -697,7 +778,6 @@
         private System.Windows.Forms.TabPage tabMetaTiles;
         private System.Windows.Forms.Panel panelMetaTiles;
         private System.Windows.Forms.PictureBox pbMetaTiles;
-        private System.Windows.Forms.Button btnText;
         private System.Windows.Forms.TabPage tabTrackList;
         private System.Windows.Forms.ListView lvTracks;
         private System.Windows.Forms.ContextMenuStrip trackListMenu;
@@ -707,15 +787,31 @@
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TextBox tbLog;
         private System.Windows.Forms.PropertyGrid pgTrack;
-        private System.Windows.Forms.Button btnDecodeRun;
-        private System.Windows.Forms.PictureBox pbRaw;
         private System.Windows.Forms.NumericUpDown numericUpDown1;
-        private System.Windows.Forms.Button btnDecodeRaw;
         private System.Windows.Forms.NumericUpDown udImageWidth;
         private System.Windows.Forms.ComboBox cbPalette;
         private System.Windows.Forms.NumericUpDown udSkip;
-        private System.Windows.Forms.NumericUpDown udRunBytes;
-        private System.Windows.Forms.Button btnDecompressRun;
+        private System.Windows.Forms.SplitContainer splitContainer2;
+        private System.Windows.Forms.TextBox tbOutput;
+        private System.Windows.Forms.PictureBox pbRaw;
+        private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
+        private System.Windows.Forms.ToolStrip toolStrip1;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel1;
+        private System.Windows.Forms.ToolStripTextBox tbOffset;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel2;
+        private System.Windows.Forms.ToolStripButton btnDecode;
+        private System.Windows.Forms.ToolStripButton btnSearch;
+        private System.Windows.Forms.ToolStripButton btnText;
+        private System.Windows.Forms.ToolStripButton btnDecodeRun;
+        private System.Windows.Forms.ToolStripButton btnDecodeRaw;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.ToolStripButton btnDecompressRun;
+        private System.Windows.Forms.ToolStripTextBox tbRunBytes;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
+        private System.Windows.Forms.ToolStripDropDownButton toolStripDropDownButton1;
+        private System.Windows.Forms.ToolStripMenuItem exhaustiveToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem fastToolStripMenuItem;
     }
 }
 

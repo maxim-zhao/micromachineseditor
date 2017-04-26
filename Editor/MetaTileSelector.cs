@@ -26,9 +26,9 @@ namespace MicroMachinesEditor
         private int _selectedIndex = -1;
 
         // Drawing objects
-        private readonly Pen _selectionPen = new Pen(SystemColors.Highlight, 2) { Alignment = PenAlignment.Inset, };
+        private readonly Pen _selectionPen = new Pen(SystemColors.Highlight, 2) { Alignment = PenAlignment.Inset };
         private readonly Brush _selectionBrush = new SolidBrush(Color.FromArgb(128, SystemColors.Highlight));
-        private readonly Pen _hoverPen = new Pen(SystemColors.HotTrack, 2) { Alignment = PenAlignment.Inset, };
+        private readonly Pen _hoverPen = new Pen(SystemColors.HotTrack, 2) { Alignment = PenAlignment.Inset };
 
         #endregion
 

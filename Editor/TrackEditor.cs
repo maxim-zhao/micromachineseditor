@@ -115,6 +115,10 @@ namespace MicroMachinesEditor
 
         private void trackRenderer_MouseMove(object sender, MouseEventArgs e)
         {
+            if (_track == null)
+            {
+                return;
+            }
             if (e.Button == MouseButtons.Left)
             {
                 SetMetaTile(e.Location);

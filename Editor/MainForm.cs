@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -61,7 +62,9 @@ namespace MicroMachinesEditor
             IList<byte> decoded = new List<byte>();
             try
             {
-                decoded = Codec.Decompress(bufferHelper);
+                var sb = new StringBuilder();
+                decoded = Codec.Decompress(bufferHelper, sb);
+                Log(sb.ToString());
             }
             catch (Exception ex)
             {
@@ -71,7 +74,14 @@ namespace MicroMachinesEditor
             Log($"Decoded {bufferHelper.Offset - offset} bytes from {offset:X} to {bufferHelper.Offset - 1:X} to {decoded.Count} bytes of data ({CompressionRatio(bufferHelper.Offset - offset, decoded.Count):P2} compression)");
 
             _raw = decoded.ToArray();
-            RenderRawAsTiles();
+            try
+            {
+                RenderRawAsTiles();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message + ex.StackTrace);
+            }
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -306,8 +316,14 @@ namespace MicroMachinesEditor
         {
             _uiContext = TaskScheduler.FromCurrentSynchronizationContext();
 
-            LoadTracks();
-            PopulateTrackList();
+            // Populate filename from the commandline
+            var args = Environment.GetCommandLineArgs();
+            if (args.Length > 1)
+            {
+                tbFilename.Text = args[1];
+                LoadTracks();
+                PopulateTrackList();
+            }
         }
 
         private void Log(string message)
@@ -325,7 +341,7 @@ namespace MicroMachinesEditor
         {
             lvTracks.BeginUpdate();
             lvTracks.Items.Clear();
-            var il = new ImageList { ImageSize = new Size(128, 128), ColorDepth = ColorDepth.Depth24Bit, };
+            var il = new ImageList { ImageSize = new Size(128, 128), ColorDepth = ColorDepth.Depth24Bit };
             lvTracks.LargeImageList = il;
             foreach (var track in _tracks)
             {
@@ -479,7 +495,14 @@ namespace MicroMachinesEditor
             byte[] file = File.ReadAllBytes(tbFilename.Text);
             int offset = Convert.ToInt32(tbOffset.Text, 16);
             _raw = file.Skip(offset).Take(file.Length - offset).ToArray();
-            RenderRawAsTiles();
+            try
+            {
+                RenderRawAsTiles();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message + ex.StackTrace);
+            }
         }
 
         private void RenderRawAsTiles()
@@ -488,7 +511,7 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            if (cbPalette.SelectedIndex == -1)
+            if (string.IsNullOrEmpty(cbPalette.Text))
             {
                 cbPalette.SelectedIndex = 0;
             }
@@ -547,7 +570,7 @@ namespace MicroMachinesEditor
         {
             byte[] file = File.ReadAllBytes(tbFilename.Text);
             int offset = Convert.ToInt32(tbOffset.Text, 16);
-            int runBytes = Convert.ToInt32(udRunBytes.Value);
+            int runBytes = Convert.ToInt32(tbRunBytes.Text);
             int rawOffset = offset + runBytes;
             var result = new List<byte>();
             byte lastByte = 0;
@@ -570,6 +593,71 @@ namespace MicroMachinesEditor
             _raw = result.ToArray();
             RenderRawAsTiles();
             Log($"Decoded {rawOffset - offset} bytes from {offset:X} to {rawOffset - 1:X} to {result.Count} bytes of data ({CompressionRatio(rawOffset - offset, result.Count):P2} compression)");
+        }
+
+        private void Compress(bool exhaustive)
+        {
+            using (var ofd = new OpenFileDialog() {Filter = "All files|*.*"})
+            {
+                if (ofd.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                var sb = new StringBuilder();
+                try
+                {
+                    var data = File.ReadAllBytes(ofd.FileName);
+                    var compressed = exhaustive ? Codec.Compress(data) : Codec.CompressForwards(data);
+                    File.WriteAllBytes(ofd.FileName + ".compressed", compressed.ToArray());
+                    tbOutput.AppendText($"Compressed {data.Length} bytes to {compressed.Count}\r\n");
+                    // Then see if it was lossy (!)
+                    var sha1 = System.Security.Cryptography.SHA1.Create();
+                    var originalChecksum = BitConverter.ToString(sha1.ComputeHash(data)).Replace("-", "");
+                    // Decompress to check validity
+                    var uncompressed = Codec.Decompress(compressed, 0, sb);
+                    var decompressedChecksum = BitConverter.ToString(sha1.ComputeHash(uncompressed.ToArray())).Replace("-", "");
+                    var comparison = decompressedChecksum == originalChecksum ? "match" : "differ";
+                    tbOutput.AppendText($"Data checksums {comparison }: {originalChecksum} before, {decompressedChecksum} after\r\n");
+                    // If they differ, find where
+                    if (decompressedChecksum != originalChecksum)
+                    {
+                        int length;
+                        if (uncompressed.Count < data.Length)
+                        {
+                            tbOutput.AppendText($"Uncompressed is {uncompressed.Count} bytes < original {data.Length} bytes\r\n");
+                            length = uncompressed.Count;
+                        }
+                        else
+                        {
+                            tbOutput.AppendText($"Uncompressed is {uncompressed.Count} bytes > original {data.Length} bytes\r\n");
+                            length = data.Length;
+                        }
+                        for (int i = 0; i < length; ++i)
+                        {
+                            if (data[i] != uncompressed[i])
+                            {
+                                tbOutput.AppendText($"First difference is at offset {i:X}\r\n");
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    MessageBox.Show(this, exception.Message + exception.StackTrace);
+                }
+                tbOutput.AppendText(sb.ToString());
+            }
+        }
+
+        private void fastToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Compress(false);
+        }
+
+        private void exhaustiveToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Compress(true);
         }
     }
 }

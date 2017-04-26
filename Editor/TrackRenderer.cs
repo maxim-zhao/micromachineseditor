@@ -15,7 +15,7 @@ namespace MicroMachinesEditor
         private readonly Pen _gridPen = new Pen(Color.Gray);
         private readonly Brush _nonTrackBrush = new SolidBrush(Color.FromArgb(127, Color.Black));
         private readonly Font _positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 30);
-        private readonly StringFormat _positionNumberStringFormat = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center, };
+        private readonly StringFormat _positionNumberStringFormat = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
 
         public TrackRenderer()
         {

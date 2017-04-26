@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Text;
 
 namespace MicroMachinesEditor
 {
@@ -10,34 +12,39 @@ namespace MicroMachinesEditor
     /// </summary>
     static class Codec
     {
-        public static List<byte> Decompress(IList<byte> data, int offset)
+        public static List<byte> Decompress(IList<byte> data, int offset, StringBuilder sb = null)
         {
             var bufferHelper = new BufferHelper(data, offset);
-            return Decompress(bufferHelper);
+            return Decompress(bufferHelper, sb);
         }
 
-        public static List<byte> Decompress(BufferHelper data)
+        public static List<byte> Decompress(BufferHelper data, StringBuilder sb = null)
         {
             var result = new List<byte>();
             for (;;)
             {
+                sb?.AppendLine($"Getting mask from {data.Offset:X}");
                 byte mask = data.Next();
                 // Iterate over its bits, left to right
                 for (int i = 7; i >= 0; --i)
                 {
+                    sb?.AppendLine($"Next data from {data.Offset:X}");
                     if (!IsBitSet(mask, i))
                     {
                         // Raw byte
                         byte b = data.Next();
                         result.Add(b);
+                        sb?.AppendLine($"Bit 0: raw {b:X2}");
                     }
                     else
                     {
                         // Something more complicated
                         byte controlByte = data.Next();
+                        sb?.Append($"Bit 1: {controlByte:X2} ");
                         if (AreAllBitsSet(controlByte))
                         {
                             // End of data
+                            sb?.AppendLine("= end of data");
                             return result;
                         }
                         int highNibble = controlByte >> 4;
@@ -45,33 +52,33 @@ namespace MicroMachinesEditor
                         switch (highNibble)
                         {
                             case 0:
-                                ProcessRawRun(result, data, lowNibble);
+                                ProcessRawRun(result, data, lowNibble, sb);
                                 // We want to re-use the mask bit so we do this to cancel out the decrement above
                                 ++i;
                                 break;
                             case 1:
-                                ProcessRLE(result, data, lowNibble);
+                                ProcessRLE(result, data, lowNibble, sb);
                                 break;
                             case 2:
-                                ProcessLZ(result, data, lowNibble, 2);
+                                ProcessLZ(result, data, lowNibble, 2, sb);
                                 break;
                             case 3:
-                                ProcessLZ(result, data, lowNibble, 256 + 2);
+                                ProcessLZ(result, data, lowNibble, 256 + 2, sb);
                                 break;
                             case 4:
-                                ProcessLZ(result, data, lowNibble, 512 + 2);
+                                ProcessLZ(result, data, lowNibble, 512 + 2, sb);
                                 break;
                             case 5:
-                                ProcessBigLZ(result, data, lowNibble);
+                                ProcessBigLZ(result, data, lowNibble, sb);
                                 break;
                             case 6:
-                                ProcessReverseLZ(result, data, lowNibble);
+                                ProcessReverseLZ(result, data, lowNibble, sb);
                                 break;
                             case 7:
-                                ProcessIncrementingRun(result, data, lowNibble);
+                                ProcessIncrementingRun(result, data, lowNibble, sb);
                                 break;
                             default: // 8-F
-                                ProcessTinyLZ(result, controlByte);
+                                ProcessTinyLZ(result, controlByte, sb);
                                 break;
                         }
                     }
@@ -79,15 +86,15 @@ namespace MicroMachinesEditor
             }
         }
 
-        private static void ProcessTinyLZ(List<byte> result, byte controlByte)
+        private static void ProcessTinyLZ(IList<byte> result, byte controlByte, StringBuilder sb)
         {
             // %1nnooooo = copy n+2 bytes from relative offset -(o+n+2)
             int runLength = ((controlByte >> 5) & 0x03) + 2;
             int runOffset = ((controlByte >> 0) & 0x1f) + runLength;
-            LZCopy(result, runLength, runOffset);
+            LZCopy(result, runLength, runOffset, sb);
         }
 
-        private static void ProcessIncrementingRun(List<byte> result, BufferHelper data, int lowNibble)
+        private static void ProcessIncrementingRun(IList<byte> result, BufferHelper data, int lowNibble, StringBuilder sb)
         {
             // _F nn = emit nn + 17 bytes incrementing from last value written
             // _n    = emit n + 2 bytes incrementing from last value written
@@ -95,58 +102,74 @@ namespace MicroMachinesEditor
             int runLength;
             if (lowNibble == 0xf)
             {
-                runLength = data.Next() + 17;
+                var b = data.Next();
+                runLength = b + 17;
+                sb?.Append($"{b:X2} ");
             }
             else
             {
                 runLength = lowNibble + 2;
             }
+            sb?.AppendLine($"= incrementing from {value + 1:X2} to {value + runLength:X2}");
             for (int i = 0; i < runLength; ++i)
             {
                 result.Add(++value);
             }
         }
 
-        private static void ProcessReverseLZ(List<byte> result, BufferHelper data, int lowNibble)
+        private static void ProcessReverseLZ(IList<byte> result, BufferHelper data, int lowNibble, StringBuilder sb)
         {
             // 6x oo = copy x+3 bytes from oo+1 bytes earlier in the output stream, going backwards
             int runLength = lowNibble + 3;
             int runOffset = data.Next() + 1;
+            sb?.Append($"{runOffset-1:X2} = reverse LZ offset {runOffset} length {runLength}:");
             int copyOffset = result.Count - runOffset;
             for (int i = 0; i < runLength; ++i)
             {
-                result.Add(result[copyOffset--]);
+                var b = result[copyOffset--];
+                result.Add(b);
+                sb?.Append($" {b:X2}");
             }
+            sb?.AppendLine();
         }
 
-        private static void ProcessBigLZ(List<byte> result, BufferHelper data, int lowNibble)
+        private static void ProcessBigLZ(IList<byte> result, BufferHelper data, int lowNibble, StringBuilder sb)
         {
             // 5f hh oo cc = copy c+4 bytes from relative offset -(h*256+o+1)
             // 5x oo cc    = copy c+4 bytes from relative offset -(x*256+o+1)
             int runOffset;
             if (lowNibble == 0x0f)
             {
-                runOffset = data.Next() * 256 + data.Next() + 1;
+                var h = data.Next();
+                var l = data.Next();
+                sb.Append($"{h:X2} {l:X2} ");
+                runOffset = h * 256 + l + 1;
             }
             else
             {
-                runOffset = lowNibble * 256 + data.Next() + 1;
+                var o = data.Next();
+                sb.Append($"{o:X2} ");
+                runOffset = lowNibble * 256 + o + 1;
             }
-            int runLength = data.Next() + 4;
-            LZCopy(result, runLength, runOffset);
+            var b = data.Next();
+            sb.Append($"{b:X2} ");
+            int runLength = b + 4;
+            LZCopy(result, runLength, runOffset, sb);
         }
 
-        private static void ProcessLZ(List<byte> result, BufferHelper data, int lowNibble, int shift)
+        private static void ProcessLZ(IList<byte> result, BufferHelper data, int lowNibble, int shift, StringBuilder sb)
         {
             // 2x nn = copy x+3 bytes from relative offset -(nn+2)
             // 3x nn = copy x+3 bytes from relative offset -(nn+2+256)
             // 4x nn = copy x+3 bytes from relative offset -(nn+2+512)
+            var b = data.Next();
             int runLength = lowNibble + 3;
-            int runOffset = data.Next() + shift;
-            LZCopy(result, runLength, runOffset);
+            int runOffset = b + shift;
+            sb.Append($"{b:X2} ");
+            LZCopy(result, runLength, runOffset, sb);
         }
 
-        private static void ProcessRLE(List<byte> result, BufferHelper data, int lowNibble)
+        private static void ProcessRLE(IList<byte> result, BufferHelper data, int lowNibble, StringBuilder sb)
         {
             // _F nn = repeat last written byte nn + 17 times
             // _n    = repeat last written byte n + 2 times
@@ -154,7 +177,9 @@ namespace MicroMachinesEditor
             int repeatCount;
             if (lowNibble == 0xf)
             {
-                repeatCount = data.Next() + 17;
+                var b = data.Next();
+                repeatCount = b + 17;
+                sb?.Append($"{b:X2} ");
             }
             else
             {
@@ -164,38 +189,48 @@ namespace MicroMachinesEditor
             {
                 result.Add(valueToCopy);
             }
+            sb?.AppendLine($"= RLE {repeatCount}: {valueToCopy:X2}...");
         }
 
-        private static void ProcessRawRun(List<byte> result, BufferHelper data, int lowNibble)
+        private static void ProcessRawRun(ICollection<byte> result, BufferHelper data, int lowNibble, StringBuilder sb)
         {
-            // _F FF nnnn = length nnnn
-            // _F nn      = length nn + 30
-            // _n         = length n + 8
+            // _F FF nnnn = length nnnn    (n = 0..ffff -> length =  0 .. 65535)
+            // _F nn      = length nn + 30 (n = 0..fe   -> length = 30 ..   284)
+            // _n         = length n + 8   (n = 0..e    -> length =  8 ..    22) (gap!)
             int length;
             if (lowNibble == 0x0f)
             {
                 length = data.Next();
+                sb?.Append($"{length:X2} ");
                 if (length == 0xff)
                 {
-                    length = data.Next() + data.Next() << 8;
+                    length = data.Next() + (data.Next() << 8);
+                    sb?.Append($"{length:X4} = raw {length} bytes");
                 }
                 else
                 {
+                    sb?.Append($"= raw {length + 30} bytes");
                     length += 30;
                 }
             }
             else
             {
                 length = lowNibble + 8;
+                sb?.Append($"= raw {length} bytes");
             }
+            sb?.Append(":");
             for (int i = 0; i < length; ++i)
             {
-                result.Add(data.Next());
+                var b = data.Next();
+                result.Add(b);
+                sb?.Append($" {b:X2}");
             }
+            sb?.AppendLine();
         }
 
-        private static void LZCopy(IList<byte> buffer, int runLength, int runOffset)
+        private static void LZCopy(IList<byte> buffer, int runLength, int runOffset, StringBuilder sb)
         {
+            sb?.Append($"= LZ offset {runOffset} length {runLength}:");
             // The source and dest may overlap! So we do a dumb copy.
             int fromIndex = buffer.Count - runOffset;
             if (fromIndex < 0)
@@ -204,8 +239,11 @@ namespace MicroMachinesEditor
             }
             for (int i = 0; i < runLength; ++i)
             {
-                buffer.Add(buffer[fromIndex++]);
+                var b = buffer[fromIndex++];
+                buffer.Add(b);
+                sb?.Append($" {b:X2}");
             }
+            sb?.AppendLine();
         }
 
         private static bool IsBitSet(byte b, int index)
@@ -378,8 +416,9 @@ namespace MicroMachinesEditor
         private class BitmaskHelper
         {
             private readonly IList<byte> _output;
-            private int _bitsUsed;
+            private int _bitsUsed = 8;
             private int _offset;
+            private int? _lastBitSquashable;
 
             public BitmaskHelper(IList<byte> output)
             {
@@ -388,6 +427,12 @@ namespace MicroMachinesEditor
 
             public void PutBit(int bit)
             {
+                if (_lastBitSquashable.HasValue && bit == _lastBitSquashable.Value)
+                {
+                    // "Squash" by not emitting this one
+                    _lastBitSquashable = null;
+                    return;
+                }
                 if (_bitsUsed == 8)
                 {
                     // Emit a new byte
@@ -401,13 +446,27 @@ namespace MicroMachinesEditor
                 int newBitmask = _output[_offset] | ((bit & 1) << (7 - _bitsUsed));
                 _output[_offset] = (byte)newBitmask;
                 ++_bitsUsed;
+                _lastBitSquashable = null;
+            }
+
+            public void PutSquashableBit(int i)
+            {
+                PutBit(i);
+                _lastBitSquashable = i;
             }
         }
 
         private abstract class Match
         {
-            public int Offset { get; set; } // Where in the data it is
-            public int Length { get; set; } // How many bytes it emits
+            // Where in the data it is (i.e. the end data run)
+            public int Offset { get; protected set; } 
+            // How many bytes it emits
+            public int Length { get; protected set; }
+            // How many bytes it is encoded to
+            public int EncodedLength { get; set; }
+            // The compression ratio
+            public double CompressionRatio => (Length - EncodedLength + 0.125) / Length;
+
 
             internal bool Overlaps(Match other)
             {
@@ -431,92 +490,201 @@ namespace MicroMachinesEditor
                 //      [other]   = true
                 //
                 // It's easiest to pick out the false ones and invert...
-                bool thisBeforeOther = Offset + Length < other.Offset;
-                bool otherBeforeThis = other.Offset + other.Length < Offset;
+                bool thisBeforeOther = Offset + Length <= other.Offset;
+                bool otherBeforeThis = other.Offset + other.Length <= Offset;
                 return !(thisBeforeOther || otherBeforeThis);
             }
 
             // Get the encoded version of this match
             public abstract IEnumerable<byte> GetBytes(BitmaskHelper bitmaskHelper);
+
+            public override string ToString()
+            {
+                return $"{GetType().Name} {Length} => {EncodedLength} @{Offset:X} ({CompressionRatio:P})";
+            }
         }
 
         private class RLEMatch : Match
         {
+            private RLEMatch(int length, int offset)
+            {
+                Length = length;
+                Offset = offset;
+                EncodedLength = length < 17 ? 1 : length < 272 ? 2 : 4;
+            }
+
             // Create a match from the given offset, or null if there is no acceptable match
+/*
             public static Match GetBestMatch(IList<byte> data, int offset)
             {
-                int count = GetRLECount(data, offset);
+                int length = GetRLECount(data, offset);
+                // Encoding                Size       Run length  Values
+                // 1 bit + 1x              1.1 bytes  2..16       x = n - 2
+                // 1 bit + 1f + xx         2.1 bytes  17..271     x = n - 17
+                // 1 bit + 1f + ff + xxxx  3.1 bytes  0..65535    x = n
                 const int minimum = 2;
-                const int maximum = 255 + 17;
-                if (count < minimum)
+                const int maximum = 65535;
+                if (length < minimum)
                 {
                     return null;
                 }
-                if (count > maximum)
+                if (length > maximum)
                 {
-                    count = maximum;
+                    length = maximum;
                 }
-                return new RLEMatch { Offset = offset, Length = count, };
+                return new RLEMatch(length, offset);
             }
+*/
 
             public override IEnumerable<byte> GetBytes(BitmaskHelper bitmaskHelper)
             {
                 bitmaskHelper.PutBit(1);
-                if (Length < 17)
+                switch (EncodedLength)
                 {
-                    // 1n    = repeat last written byte n + 2 times (so range 2..16)
-                    yield return (byte)(0x10 | (Length - 2));
+                    case 1:
+                        // 1n    = repeat last written byte n + 2 times (so range 2..16)
+                        yield return (byte)(0x10 | (Length - 2));
+                        break;
+                    case 2:
+                        // 1F nn = repeat last written byte nn + 17 times (so range 17..271)
+                        yield return 0x1f;
+                        yield return (byte)(Length - 17);
+                        break;
+                    case 4:
+                        // 1F FF nn nn = repeat last written byte nnnn (so range 0..65535)
+                        yield return 0x1f;
+                        yield return 0xff;
+                        yield return (byte)(Length >> 0);
+                        yield return (byte)(Length >> 8);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(EncodedLength));
                 }
-                else
+            }
+
+            public static IEnumerable<Match> GetAll(IList<byte> data, int offset)
+            {
+                // Returns *all* possible RLE matches starting at the given offset
+                if (offset == 0)
                 {
-                    // _F nn = repeat last written byte nn + 17 times (so range 17..272)
-                    yield return 0x1f;
-                    yield return (byte)(Length - 17);
+                    // Need a reference byte, so we return an empty collection
+                    yield break;
+                }
+                byte b = data[offset - 1];
+                for (int i = offset; i < data.Count; ++i)
+                {
+                    if (data[i] != b)
+                    {
+                        // No match, no more RLE
+                        yield break;
+                    }
+                    int length = i - offset + 1;
+                    if (length < 2 || length > 65535)
+                    {
+                        continue;
+                    }
+                    yield return new RLEMatch(length, offset);
                 }
             }
         }
 
         private class IncrementingMatch : Match
         {
+            private IncrementingMatch(int length, int offset)
+            {
+                Length = length;
+                Offset = offset;
+                EncodedLength = length < 17 ? 1 : 2;
+            }
+
             // Create a match from the given offset, or null if there is no acceptable match
+/*
             public static Match GetBestMatch(IList<byte> data, int offset)
             {
-                int count = GetCountingRun(data, offset);
+                int length = GetCountingRun(data, offset);
                 const int minimum = 2;
                 const int maximum = 255 + 17;
-                if (count < minimum)
+                if (length < minimum)
                 {
                     return null;
                 }
-                if (count > maximum)
+                if (length > maximum)
                 {
-                    count = maximum;
+                    length = maximum;
                 }
-                return new IncrementingMatch { Offset = offset, Length = count, };
+                return new IncrementingMatch(length, offset);
             }
+*/
 
             public override IEnumerable<byte> GetBytes(BitmaskHelper bitmaskHelper)
             {
                 bitmaskHelper.PutBit(1);
-                if (Length < 17)
+                switch (EncodedLength)
                 {
-                    // 7n    = repeat last written byte n + 2 times (range 2..16)
-                    yield return (byte)(0x70 | (Length - 2));
+                    case 1:
+                        // 7n    = repeat last written byte n + 2 times (range 2..16)
+                        yield return (byte) (0x70 | (Length - 2));
+                        break;
+                    case 2:
+                        // 7F nn = repeat last written byte nn + 17 times (range 17..272)
+                        yield return 0x7f;
+                        yield return (byte) (Length - 17);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(EncodedLength));
                 }
-                else
+            }
+
+            public static IEnumerable<Match> GetAll(IList<byte> data, int offset)
+            {
+                if (offset == 0)
                 {
-                    // 7F nn = repeat last written byte nn + 17 times (range 17..272)
-                    yield return 0x7f;
-                    yield return (byte)(Length - 17);
+                    yield break;
+                }
+                const int minimum = 2;
+                const int maximum = 255 + 17;
+                byte b = data[offset - 1];
+                for (int i = offset; i < data.Count; ++i)
+                {
+                    if (data[i] != ++b || i > maximum)
+                    {
+                        yield break;
+                    }
+                    if (i >= minimum)
+                    {
+                        yield return new IncrementingMatch(i, offset);
+                    }
                 }
             }
         }
 
         private class RawMatch : Match
         {
-            public IList<byte> Data { get; set; }
+            private IList<byte> Data { get; }
 
-            // No GetBestMatch
+            public RawMatch(IList<byte> data, int offset, int length)
+            {
+                Data = data;
+                Offset = offset;
+                Length = length;
+                EncodedLength = length;
+                if (length < 8)
+                {
+                    EncodedLength += 0; // Ignores the bits used to encode the length
+                }
+                else if (length < 22)
+                {
+                    EncodedLength += 1; // To encode the length...
+                }
+                else if (length < 255 + 30)
+                {
+                    EncodedLength += 2;
+                }
+                else
+                {
+                    EncodedLength += 4;
+                }
+            }
 
             public override IEnumerable<byte> GetBytes(BitmaskHelper bitmaskHelper)
             {
@@ -531,8 +699,24 @@ namespace MicroMachinesEditor
                     yield break;                    
                 }
 
+                if (Length >= 15 + 8 && Length < 30)
+                {
+                    // Runs between 23 and 30 inclusive need to be emitted as two runs (!).
+                    // We construct the split runs, emit their data and exit.
+                    var first = new RawMatch(Data, Offset, 8);
+                    var second = new RawMatch(Data, Offset + 8, Length - 8);
+                    foreach (var b in first.GetBytes(bitmaskHelper).Concat(second.GetBytes(bitmaskHelper)))
+                    {
+                        yield return b;
+                    }
+                    yield break;
+                }
+
                 // "Encoded" raw
-                if (Length < 22)
+                // This latches onto the mask bit of the block following it, but it needs to be pushed now
+                // as a "squashable" bit
+                bitmaskHelper.PutSquashableBit(1);
+                if (Length < 15 + 8)
                 {
                     // 0n         = length n + 8
                     yield return (byte)(Length - 8);
@@ -548,8 +732,8 @@ namespace MicroMachinesEditor
                     // 0F FF nnnn = length nnnn
                     yield return 0x0f;
                     yield return 0xff;
-                    yield return (byte)(Length >> 8);
                     yield return (byte)(Length & 0xff);
+                    yield return (byte)(Length >> 8);
                 }
 
                 // Then relay the bytes back
@@ -562,170 +746,387 @@ namespace MicroMachinesEditor
 
         private class LZMatch : Match
         {
-            public int LZOffset { get; set; }
+            private const int InvalidLength = 1000;
+
+            protected LZMatch(int length, int offset, int matchOffset)
+            {
+                Length = length;
+                Offset = offset;
+                Distance = offset - matchOffset;
+                // We calculate the encoded length (and validity) here
+                // Different LZ options have different limits:
+                //
+                // Type     Length      LZDistance                Size  Encoding                              Adjustments
+                //          Min    Max       Min             Max
+                // Tiny     0+2    3+2  Length+0     Length+0x1f  1     %1LLDDDDD                             L = length - 2, D = distance - length
+                // Medium2  0+3   15+3       0+2           255+2  2     %0010LLLL DDDDDDDD                    L = length - 3, D = distance - 2
+                // Medium3  0+3   15+3     256+2       256+255+2  2     %0011LLLL DDDDDDDD                    L = length - 3, D = distance - 258
+                // Medium4  0+3   15+3     512+2       512+255+2  2     %0100LLLL DDDDDDDD                    L = length - 3, D = distance - 514
+                // Big5x    0+4  255+4       0+1   0xe*256+255+1  3     %0101DDDD DDDDDDDD LLLLLLLL           L = length - 4, D = distance - 1
+                // Big5f    0+4  255+4       0+1   255*256+255+1  4     %01011111 DDDDDDDD DDDDDDDD LLLLLLLL  L = length - 4, D = distance - 1
+                EncodedLength = InvalidLength;
+                if (Length >= 0+2 && Length <= 3+2 && Distance >= Length && Distance <= Length + 0x1f && !(Length - 2 == 3 && Distance - Length == 0x1f))
+                {
+                    EncodedLength = 1;
+                }
+                else if (Length >= 0+3 && Length <= 0xf+3 && Distance >= 0+2 && Distance <= 0x2ff+2)
+                {
+                    EncodedLength = 2;
+                }
+                else if (Length >= 0+4 && Length <= 0xff+4 && Distance >= 0+1)
+                {
+                    if (Distance <= 0xeff + 1)
+                    {
+                        EncodedLength = 3;
+                    }
+                    else if (Distance <= 0xffff+1)
+                    {
+                        EncodedLength = 4;
+                    }
+                }
+            }
+
+            public int Distance { get; }
+
+/*
+            private static LZMatch GetBestMatch(IList<byte> data, int offset, int encodedLength, int minDistance, int maxDistance, int minLength, int maxLength, Func<int, int, bool> validator = null )
+            {
+                // We walk backwards looking for the longest match in the given constraints
+                int minOffset = Math.Max(0, offset - maxDistance);
+                int maxOffset = offset - minDistance;
+                int bestLength = 0;
+                int bestOffset = 0;
+                for (int i = maxOffset; i >= minOffset; --i)
+                {
+                    // Check for a match
+                    int matchLength = 0;
+                    for (; offset + matchLength < data.Count; ++matchLength)
+                    {
+                        byte wanted = data[offset + matchLength];
+                        byte have = data[i + matchLength];
+                        if (wanted != have)
+                        {
+                            break;
+                        }
+                    }
+                    if (matchLength > bestLength && (validator == null || validator(matchLength, offset - i)))
+                    {
+                        bestLength = matchLength;
+                        bestOffset = i;
+                        if (bestLength >= maxLength)
+                        {
+                            bestLength = maxLength;
+                            break;
+                        }
+                    }
+                }
+                if (bestLength >= minLength)
+                {
+                    return new LZMatch(bestLength, offset, bestOffset) {EncodedLength = encodedLength};
+                }
+                return null;
+            }
+*/
+
+/*
+            private static bool IsValidTiny(int length, int distance)
+            {
+                // We return whether we are happy to encode it
+                var lengthBits = length - 2;
+                var distanceBits = distance - length;
+                return ((lengthBits | 0x3) == 0x3) && // Only two bits used
+                       ((distanceBits | 0x1f) == 0x1f) && // Only 5 bits used
+                       (lengthBits != 0x3 || distanceBits != 0x1f); // bits are not all 1
+            }
+*/
 
             // Create a match from the given offset, or null if there is no acceptable match
-            public static Match GetBestMatch(IList<byte> data, int offset)
+/*
+            public static LZMatch GetBestMatch(IList<byte> data, int offset)
             {
                 // Different LZ options have different limits:
                 //
-                // Type     Length      LZOffset
-                //          Min    Max       Min            Max
-                // Tiny     0+2    3+2  Length+0    Length+0x3f
-                // Medium   0+3  255+3       0+2      512+255+2
-                // Big      0+4  255+4       0+1  255*256+255+1
-                //
-                const int minLength = 2;
+                // Type     Length      LZDistance                Size  Encoding                              Adjustments
+                //          Min    Max       Min             Max
+                // Tiny     0+2    3+2  Length+0     Length+0x1f  1     %1LLDDDDD                             L = length - 2, D = distance - length
+                // Medium2  0+3   16+3       0+2           255+2  2     %0010LLLL DDDDDDDD                    L = length - 3, D = distance - 2
+                // Medium3  0+3   16+3     256+2       256+255+2  2     %0011LLLL DDDDDDDD                    L = length - 3, D = distance - 258
+                // Medium4  0+3   16+3     512+2       512+255+2  2     %0100LLLL DDDDDDDD                    L = length - 3, D = distance - 514
+                // Big5x    0+4  255+4       0+1  0xef*256+255+1  3     %0101DDDD DDDDDDDD LLLLLLLL           L = length - 4, D = distance - 1
+                // Big5f    0+4  255+4       0+1   255*256+255+1  4     %01011111 DDDDDDDD DDDDDDDD LLLLLLLL  L = length - 4, D = distance - 1
 
+                // We find the best match for each encoding length
+                var matches = new[]
+                { //                              Distance min ---------- max             Length min ---- max
+                    GetBestMatch(data, offset, 1,    0x00 + 0x0 + 2,     0x1f + 0x3 + 2,     0x0 + 2,    0x3 + 2, IsValidTiny),
+                    GetBestMatch(data, offset, 2,    0x00 + 2,           0xff + 2,           0x0 + 3,    0xf + 3),
+                    GetBestMatch(data, offset, 2,   0x100 + 2,          0x1ff + 2,           0x0 + 3,    0xf + 3),
+                    GetBestMatch(data, offset, 2,   0x200 + 2,          0x2ff + 2,           0x0 + 3,    0xf + 3),
+                    GetBestMatch(data, offset, 3,   0x000 + 1,          0xeff + 1,          0x00 + 4,   0xff + 4),
+                    GetBestMatch(data, offset, 4,  0x0000 + 1,         0xffff + 1,          0x00 + 4,   0xff + 4)
+                };
 
-                LZMatch match = GetLZMatch(data, offset);
-                // If length is too short, return
-                if (match.Length < minLength)
-                {
-                    return null;
-                }
-                // Else make sure it fits one of the options
-                // We check the offset
-                bool isOk = 
-                    (
-                        // Tiny
-                        match.Length >= 0 + 2 && 
-                        match.Length <= 3 + 2 && 
-                        match.LZOffset >= match.Length && 
-                        match.LZOffset <= match.Length + 0x3f
-                    ) || (
-                        // Medium
-                        match.Length >= 0+3 && 
-                        match.Length <= 255+3 && 
-                        match.LZOffset >= 0 + 2 && 
-                        match.LZOffset <= 512 + 255 + 2
-                    ) || (
-                        // Big
-                        match.Length >= 0 + 4 &&
-                        match.Length <= 255 + 4 &&
-                        match.LZOffset >= 0 + 1 &&
-                        match.LZOffset <= 255 * 256 + 255 + 1
-                    );
-                if (!isOk)
-                {
-                    return null;
-                }
-                return match;
+                // Pick the one with the best savings
+                return matches
+                    .Where(x => x != null && x.EncodedLength < x.Length)
+                    .OrderByDescending(x => x.Length - x.EncodedLength)
+                    .ThenBy(x => x.EncodedLength)
+                    .FirstOrDefault();
             }
+*/
 
             public override IEnumerable<byte> GetBytes(BitmaskHelper bitMaskHelper)
             {
                 bitMaskHelper.PutBit(1);
-                if (Length < 6 && (LZOffset - Length - 2) < 0x40)
+                switch (EncodedLength)
                 {
-                    // %1nnooooo = copy n+2 bytes from relative offset -(o+n+2)
-                    yield return (byte)(0x80 | ((Length - 2) << 5) | (LZOffset - Length - 2));
-                }
-                else if (Length < 19 && LZOffset <= 512 + 2 + Length)
-                {
-                    if (LZOffset <= 255 + 2)
-                    {
-                        // 2x nn = copy x+3 bytes from relative offset -(nn+2)
-                        yield return (byte)(0x20 | (Length - 3));
-                        yield return (byte)(LZOffset - 2);
-                    }
-                    else if (LZOffset <= 255 + 2 + 256)
-                    {
-                        // 3x nn = copy x+3 bytes from relative offset -(nn+2+256)
-                        yield return (byte)(0x30 | (Length - 3));
-                        yield return (byte)(LZOffset - 2 - 256);
-                    }
-                    else if (LZOffset <= 255 + 2 + 512)
-                    {
-                        // 4x nn = copy x+3 bytes from relative offset -(nn+2+512)
-                        yield return (byte)(0x40 | (Length - 3));
-                        yield return (byte)(LZOffset - 2 - 512);
-                    }
-                    throw new Exception("Invalid LZMatch");
-                }
-                else
-                {
-                    if (LZOffset > 0xe * 256 + 255 + 1)
-                    {
+                    case 1:
+                        // %1nnooooo = copy n+2 bytes from relative offset -(o+n+2)
+                        yield return (byte)(0x80 | ((Length - 2) << 5) | (Distance - Length));
+                        break;
+                    case 2:
+                        if (Distance <= 255 + 2)
+                        {
+                            // 2x nn = copy x+3 bytes from relative offset -(nn+2)
+                            yield return (byte)(0x20 | (Length - 3));
+                            yield return (byte)(Distance - 2);
+                        }
+                        else if (Distance <= 255 + 2 + 256)
+                        {
+                            // 3x nn = copy x+3 bytes from relative offset -(nn+2+256)
+                            yield return (byte)(0x30 | (Length - 3));
+                            yield return (byte)(Distance - 2 - 256);
+                        }
+                        else if (Distance <= 255 + 2 + 512)
+                        {
+                            // 4x nn = copy x+3 bytes from relative offset -(nn+2+512)
+                            yield return (byte)(0x40 | (Length - 3));
+                            yield return (byte)(Distance - 2 - 512);
+                        }
+                        else
+                        {
+                            throw new Exception("Invalid LZMatch");
+                        }
+                        break;
+                    case 3:
+                        // 5x oo cc    = copy c+4 bytes from relative offset -(x*256+o+1)
+                        yield return (byte)(0x50 | ((Distance - 1) >> 8));
+                        yield return (byte)((Distance - 1) & 0xff);
+                        yield return (byte)(Length - 4);
+                        break;
+                    case 4:
                         // 5f hh oo cc = copy c+4 bytes from relative offset -(h*256+o+1)
                         yield return 0x5f;
-                        yield return (byte)((LZOffset - 1) >> 8);
-                        yield return (byte)((LZOffset - 1) & 0xff);
+                        yield return (byte)((Distance - 1) >> 8);
+                        yield return (byte)((Distance - 1) & 0xff);
                         yield return (byte)(Length - 4);
-                    }
-                    else
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(EncodedLength));
+                }
+            }
+
+            public override string ToString()
+            {
+                return $"{base.ToString()}, {nameof(Distance)}: {Distance}";
+            }
+
+            public static IEnumerable<Match> GetAll(IList<byte> data, int offset)
+            {
+                // We walk backwards looking for matches, and emit the most efficient one for every length
+                const int minDistance = 1;
+                const int maxDistance = 65536;
+                const int minLength = 2;
+                const int maxLength = 259;
+                int minOffset = Math.Max(0, offset - maxDistance);
+                int maxOffset = offset - minDistance;
+                for (int matchOffset = maxOffset; matchOffset >= minOffset; --matchOffset)
+                {
+                    // Check for a match
+                    for (int matchLength = 0; offset + matchLength < data.Count; /* increment in loop */)
                     {
-                        // 5x oo cc    = copy c+4 bytes from relative offset -(x*256+o+1)
-                        yield return (byte)(0x50 | ((LZOffset - 1) >> 8));
-                        yield return (byte)((LZOffset - 1) & 0xff);
-                        yield return (byte)(Length - 4);
+                        byte wanted = data[offset + matchLength];
+                        byte have = data[matchOffset + matchLength];
+                        if (wanted != have)
+                        {
+                            break;
+                        }
+                        // There is a match
+                        ++matchLength;
+                        if (matchLength < minLength)
+                        {
+                            continue;
+                        }
+                        var match = new LZMatch(matchLength, offset, matchOffset);
+                        if (match.EncodedLength != InvalidLength)
+                        {
+                            yield return match;
+                        }
+                        if (matchLength >= maxLength)
+                        {
+                            break;
+                        }
                     }
                 }
-
             }
         }
 
         private class ReverseLZMatch : LZMatch
         {
+            private ReverseLZMatch(int length, int offset, int matchOffset) : base(length, offset, matchOffset)
+            {}
+
+/*
+            public static Match GetBestMatch(IList<byte> data, int offset)
+            {
+                var match = GetReverseLZMatch(data, offset);
+                if (match.Length < 3)
+                {
+                    // Not worth having (and can't encode it)
+                    return null;
+                }
+                if (match.Length > 15 + 3)
+                {
+                    match.Length = 15 + 3; //  maximum length
+                }
+                match.EncodedLength = 2;
+                return match;
+            }
+*/
+
             public override IEnumerable<byte> GetBytes(BitmaskHelper bitMaskHelper)
             {
+                bitMaskHelper.PutBit(1);
                 // 6x oo = copy x+3 bytes from oo+1 bytes earlier in the output stream, going backwards
                 yield return (byte)(0x60 | (Length - 3));
-                yield return (byte)(LZOffset - 1);
+                yield return (byte)(Distance - 1);
             }
+
+            public new static IEnumerable<Match> GetAll(IList<byte> data, int offset)
+            {
+                // We walk backwards looking for matches, and emit one for every length
+                const int minDistance = 1;
+                const int maxDistance = 256;
+                const int minLength = 3;
+                const int maxLength = 18;
+                int minOffset = Math.Max(0, offset - maxDistance);
+                int maxOffset = offset - minDistance;
+                for (int i = maxOffset; i >= minOffset; --i)
+                {
+                    // Check for a match
+                    for (int matchLength = 0; i - matchLength >= 0 && offset + matchLength < data.Count; /* increment in loop */)
+                    {
+                        byte wanted = data[offset + matchLength];
+                        byte have = data[i - matchLength];
+                        if (wanted != have)
+                        {
+                            break;
+                        }
+                        ++matchLength;
+                        if (matchLength >= minLength)
+                        {
+                            yield return new ReverseLZMatch(matchLength, offset, i);
+                        }
+                        if (matchLength == maxLength)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        public static IList<byte> CompressForwards(IList<byte> data)
+        {
+            // For forward compression, we just walk through the data and pick the best option as it appears.
+            // This is a lot faster than the exhaustive option, and yields pretty similar results.
+            // TODO this is not as good as it used to be - maybe due to bug that made it work better before by removing greedier matches.
+            // TODO the way we work here is to pick the best of the 
+            var matches = new List<Match>();
+            Trace.WriteLine("Collecting matches...");
+            for (int i = 0; i < data.Count; ++i)
+            {
+                var best = new[]
+                    {
+                        RLEMatch.GetAll(data, i).LastOrDefault(),
+                        IncrementingMatch.GetAll(data, i).LastOrDefault(),
+                        LZMatch.GetAll(data, i)
+                            .OrderByDescending(x => x.Length - x.EncodedLength)
+                            .ThenByDescending(x => x.Length)
+                            .FirstOrDefault(),
+                        ReverseLZMatch.GetAll(data, i).LastOrDefault()
+                    }
+                    .Where(x => x != null)
+                    .OrderByDescending(x => x.Length - x.EncodedLength)
+                    .ThenByDescending(x => x.Length)
+                    .FirstOrDefault();
+                if (best != null)
+                {
+                    matches.Add(best);
+                    i += best.Length - 1;
+                }
+            }
+            return Compress(data, matches);
         }
 
         public static IList<byte> Compress(IList<byte> data)
         {
             // We create a list of all the compressible parts in the data
-            // There may be more than one starting at the same offset
-            List<Match> matches = new List<Match>();
-
-            // Look for compressible chunks in the data. Prefer ones with long lengths first.
+            var matches = new List<Match>();
+            Trace.WriteLine("Collecting matches...");
             for (int i = 0; i < data.Count; ++i)
             {
-                int runLength = GetRLECount(data, i);
-                if (runLength > 1) // Should be higher?
-                {
-                    matches.Add(new RLEMatch { Offset = i, Length = runLength, });
-                }
-
-                runLength = GetCountingRun(data, i);
-                if (runLength > 1) // Should be higher?
-                {
-                    matches.Add(new IncrementingMatch { Offset = i, Length = runLength, });
-                }
-
-                LZMatch lzMatch = GetLZMatch(data, i);
-                if (lzMatch.Length > 1) // Should be higher?
-                {
-                    matches.Add(new LZMatch { Offset = i, Length = lzMatch.Length, LZOffset = i - lzMatch.Offset, });
-                }
-
-                lzMatch = GetReverseLZMatch(data, i);
-                if (lzMatch.Length > 1) // Should be higher?
-                {
-                    matches.Add(new ReverseLZMatch { Offset = i, Length = lzMatch.Length, LZOffset = i - lzMatch.Offset, });
-                }
+                matches.AddRange(RLEMatch.GetAll(data, i));
+                matches.AddRange(IncrementingMatch.GetAll(data, i));
+                matches.AddRange(LZMatch.GetAll(data, i));
+                matches.AddRange(ReverseLZMatch.GetAll(data, i));
             }
+            Trace.WriteLine($"Found {matches.Count} matches. Ordering by \"best\"...");
 
             List<Match> compressedChunks = new List<Match>();
+            // We then want to choose the "best" blocks to use, which is very hard to do perfectly - because 
+            // any given chunk may "eat into" another "lesser" one, resulting in a less efficient result.
+            // We could waste a bunch of CPU randomising the choice, but that'd quickly get silly.
+            // Strategy 1: pick the ones with the best savings ratio
+            // 2136
+            //matches = matches.OrderByDescending(match => match.CompressionRatio).ThenBy(match => match.Offset).ToList();
+            // Strategy 2: pick the biggest savings at the current point, preferring longer matches
+            // 2085
+            // matches = matches.OrderBy(match => match.Offset).ThenByDescending(match => match.Length - match.EncodedLength).ThenByDescending(match => match.Length).ToList();
+            // Strategy 3: pick the ones with the biggest savings by byte count
+            // 2065
+            matches = matches.OrderByDescending(match => match.Length - match.EncodedLength)
+                .ThenBy(match => match.Offset)
+                .ToList();
+
             while (matches.Count > 0)
             {
                 // Then pick the longest
-                Match bestMatch = matches.OrderByDescending(x => x.Length).First();
+                Match bestMatch = matches.First();
+
+                Trace.WriteLine(
+                    $"Match at {bestMatch.Offset:X} of length {bestMatch.Length:X} is type {bestMatch.GetType().Name}, best of {matches.Count} remaining");
+
                 // Add it to our list
                 compressedChunks.Add(bestMatch);
 
-                // Then we want to remove any matches that overlapped it
-                int minOffset = bestMatch.Offset - 1;
-                int maxOffset = bestMatch.Offset + bestMatch.Length;
-                matches.RemoveAll(x => !x.Overlaps(bestMatch));
+                // Then we want to remove any matches that overlapped it, since they are no longer needed
+                matches.RemoveAll(x => x.Overlaps(bestMatch));
 
                 // And repeat
             }
+            Trace.WriteLine($"Reduced to {compressedChunks.Count}, sorting...");
 
-            // Then we loop over the chunls and insert "raw" chunks in the gaps
+            // Then order by offset, ascending
+            compressedChunks.Sort((a, b) => a.Offset - b.Offset);
+
+            return Compress(data, compressedChunks);
+        }
+
+        private static IList<byte> Compress(IList<byte> data, List<Match> compressedChunks)
+        {
+            // Then we loop over the chunks and insert "raw" chunks in the gaps
+            Trace.WriteLine("Adding raw chunks...");
             List<Match> allChunks = new List<Match>();
             int offset = 0;
             foreach (Match compressedChunk in compressedChunks)
@@ -734,7 +1135,7 @@ namespace MicroMachinesEditor
                 if (chunkOffset > offset)
                 {
                     // Emit a raw chunk
-                    allChunks.Add(new RawMatch { Data = data, Offset = offset, Length = chunkOffset - offset, });
+                    allChunks.Add(new RawMatch(data, offset, chunkOffset - offset));
                 }
                 allChunks.Add(compressedChunk);
                 offset = compressedChunk.Offset + compressedChunk.Length;
@@ -742,20 +1143,30 @@ namespace MicroMachinesEditor
             // Add a final raw chunk if needed
             if (offset < data.Count)
             {
-                allChunks.Add(new RawMatch { Data = data, Offset = offset, Length = data.Count - offset, });
+                allChunks.Add(new RawMatch(data, offset, data.Count - offset));
             }
 
             // Then emit them all
+            Trace.WriteLine($"Emitting {allChunks.Count} encoded chunks...");
             List<byte> result = new List<byte>();
             BitmaskHelper bitmaskHelper = new BitmaskHelper(result);
             foreach (Match chunk in allChunks)
             {
-                result.AddRange(chunk.GetBytes(bitmaskHelper));
+                // Have to do this byte-wise to get the bitstream bytes interleaved
+                foreach (var b in chunk.GetBytes(bitmaskHelper))
+                {
+                    result.Add(b);
+                }
             }
+            
+            // Finally add a terminator
+            bitmaskHelper.PutBit(1);
+            result.Add(0xff);
 
             return result;
         }
 
+/*
         private static int GetCountingRun(IList<byte> data, int start)
         {
             if (start == 0)
@@ -771,21 +1182,24 @@ namespace MicroMachinesEditor
                     break;
                 }
             }
-            return offset - start - 1;
+            return offset - start;
         }
+*/
 
-        private static LZMatch GetReverseLZMatch(IList<byte> data, int start)
+/*
+        private static ReverseLZMatch GetReverseLZMatch(IList<byte> data, int offset)
         {
             int bestLength = 0;
             int bestOffset = 0;
             // We do a dumb walk backwards through the data
-            for (int i = start - 1; i > 0; --i)
+            int minOffset = Math.Max(offset - 256, 0);
+            for (int i = offset - 1; i >= minOffset; --i)
             {
                 // Check for a match
                 int matchLength = 0;
-                for (; i - matchLength >= 0; ++matchLength)
+                for (; i - matchLength >= 0 && offset + matchLength < data.Count; ++matchLength)
                 {
-                    byte wanted = data[start + matchLength];
+                    byte wanted = data[offset + matchLength];
                     byte have = data[i - matchLength];
                     if (wanted != have)
                     {
@@ -798,21 +1212,25 @@ namespace MicroMachinesEditor
                     bestOffset = i;
                 }
             }
-            return new LZMatch { Length = bestLength, Offset = bestOffset, };
+            return new ReverseLZMatch(bestLength, offset, bestOffset);
         }
+*/
 
-        private static LZMatch GetLZMatch(IList<byte> data, int start)
+/*
+        private static LZMatch GetLZMatch(IList<byte> data, int offset)
         {
             int bestLength = 0;
             int bestOffset = 0;
-            // We do a dumb walk forwards through the data
-            for (int i = 0; i < start; ++i)
+            // We want to prefer matches which are closer, as they can encode smaller.
+            // So we should walk backwards to look.
+            // TODO: we should actually find matches for all encoding lengths?
+            for (int i = 0; i < offset; ++i)
             {
                 // Check for a match
                 int matchLength = 0;
-                for (; i + matchLength < data.Count; ++matchLength)
+                for (; offset + matchLength < data.Count; ++matchLength)
                 {
-                    byte wanted = data[start + matchLength];
+                    byte wanted = data[offset + matchLength];
                     byte have = data[i + matchLength];
                     if (wanted != have)
                     {
@@ -825,12 +1243,19 @@ namespace MicroMachinesEditor
                     bestOffset = i;
                 }
             }
-            return new LZMatch { Length = bestLength, Offset = bestOffset, };
+            return new LZMatch { Length = bestLength, Distance = offset - bestOffset, Offset = offset };
         }
+*/
 
+/*
         private static int GetRLECount(IList<byte> data, int start)
         {
-            byte b = data[start];
+            if (start == 0)
+            {
+                // Need a reference byte
+                return 0;
+            }
+            byte b = data[start - 1];
             for (int i = start; i < data.Count; ++i)
             {
                 if (data[i] != b)
@@ -838,8 +1263,9 @@ namespace MicroMachinesEditor
                     return i - start;
                 }
             }
-            return 1;
+            return data.Count - start;
         }
+*/
 /*
         public static IList<byte> CompressSimple(IList<byte> data)
         {
@@ -859,6 +1285,7 @@ namespace MicroMachinesEditor
 
         public static IList<byte> DecompressRLE(BufferHelper bufferHelper)
         {
+            // TODO
             return new List<byte>();
         }
     }
