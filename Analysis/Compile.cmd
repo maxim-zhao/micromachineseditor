@@ -1,3 +1,6 @@
+call "..\..\..\c\wla-dx\binaries\Compile.bat" "Jon's Squinky Tennis.gg.asm"
+if errorlevel 1 echo FAIL
+if errorlevel 1 goto :eof
 call "..\..\..\c\wla-dx\binaries\Compile.bat" "Micro Machines.sms.asm"
 if errorlevel 1 echo FAIL
 if errorlevel 1 goto :eof

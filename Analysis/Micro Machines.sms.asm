@@ -53,9 +53,9 @@ banks 14
 ; D6 - (BLK) 1= Display visible, 0= display   |||||||
 ;      blanked. ______________________________|||||||
 ; D5 - (IE0) 1= Frame interrupt enable. _______||||||
-; D4 - (M1) Selects 224_line screen for Mode 4  |||||
+; D4 - (M1) Selects 224-line screen for Mode 4  |||||
 ;      if M2=1, else has no effect. ____________|||||
-; D3 - (M3) Selects 240_line screen for Mode 4   ||||
+; D3 - (M3) Selects 240-line screen for Mode 4   ||||
 ;      if M2=1, else has no effect. _____________||||
 ; D2 - No effect _________________________________|||
 ; D1 - Sprites are 1=16x16,0=8x8 (TMS9918),        ||
@@ -454,6 +454,8 @@ map "?" = <MenuTileIndex_Punctuation.QuestionMark
 
 .define STACK_TOP $dfff
 
+.include "VDP macros.inc"
+
 .macro CallPagedFunction args function
   ld a, :function
   ld (PAGING_REGISTER), a
@@ -481,79 +483,6 @@ map "?" = <MenuTileIndex_Punctuation.QuestionMark
   call function
   ld a, (_RAM_DE8E_PageNumber)
   ld (PAGING_REGISTER), a
-.endm
-
-.macro TilemapWriteAddressToHL args x, y
-  ld hl, VRAM_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
-.endm
-
-.macro TilemapWriteAddressToDE args x, y
-  ld de, VRAM_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
-.endm
-
-.macro TilemapWriteAddressToBC args x, y
-  ld bc, VRAM_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
-.endm
-
-.macro TilemapWriteAddressData args x, y
-.dw VRAM_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
-.endm
-
-.macro TileWriteAddressToHL args index
-  ld hl, VRAM_WRITE_MASK | (index * 32)
-.endm
-
-.macro TileWriteAddressToDE args index
-  ld de, VRAM_WRITE_MASK | (index * 32)
-.endm
-
-.macro TileWriteAddressData args index
-.dw VRAM_WRITE_MASK | (index * 32)
-.endm
-
-.macro SetVDPAddressImmediate args address
-  ld a, <address
-  out (PORT_VDP_ADDRESS), a
-  ld a, >address
-  out (PORT_VDP_ADDRESS), a
-.endm
-
-.macro SetPaletteAddressImmediateSMS args index
-  SetVDPAddressImmediate index | PALETTE_WRITE_MASK
-.endm
-
-.macro SetPaletteAddressImmediateGG args index
-  SetVDPAddressImmediate index*2 | PALETTE_WRITE_MASK
-.endm
-
-.macro PaletteAddressToHLSMS args index
-  ld hl, index | PALETTE_WRITE_MASK
-.endm
-
-.macro SetTileAddressImmediate args index
-  SetVDPAddressImmediate index*TILE_DATA_SIZE | VRAM_WRITE_MASK
-.endm
-
-.macro SetTilemapAddressImmediate args x, y
-  SetVDPAddressImmediate VRAM_WRITE_MASK | NAME_TABLE_ADDRESS + y * 64 + x * 2
-.endm
-
-.macro EmitDataToVDPImmediate8 args data
-  ld a, \1
-  out (PORT_VDP_DATA), a
-.endm
-
-.macro EmitDataToVDPImmediate16 args data
-  EmitDataToVDPImmediate8 <\1
-  EmitDataToVDPImmediate8 >\1
-.endm
-
-.macro EmitSMSColourImmediate args hex
-  EmitDataToVDPImmediate8 ((hex >> 22) & %000011) | ((hex >> 12) & %001100) | ((hex >> 2) & %110000)
-.endm
-
-.macro EmitGGColourImmediate args hex
-  EmitDataToVDPImmediate16 ((hex >> 20) & %000001111) | ((hex >> 8) & %001111000) | ((hex << 4) & %111100000000)
 .endm
 
 ; The original game has a bad habit of jumping to ret opcodes instead of returning in place.
@@ -17361,10 +17290,10 @@ DATA_80BE_MenuScreenHandlers:
 .dw LABEL_9074_Handler_MenuScreen_UnknownD
 .dw LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter
 .dw LABEL_8C35_Handler_MenuScreen_SelectPlayerCount ; shared
-.dw LABEL_B56D_MenuScreen_TrackSelect
-.dw LABEL_B6B1_MenuScreen_TwoPlayerResult
-.dw LABEL_B84D_MenuScreen_TournamentChampion
-.dw LABEL_B06C_MenuScreen_OnePlayerMode
+.dw LABEL_B56D_Handler_MenuScreen_TrackSelect
+.dw LABEL_B6B1_Handler_MenuScreen_TwoPlayerResult
+.dw LABEL_B84D_Handler_MenuScreen_TournamentChampion
+.dw LABEL_B06C_Handler_MenuScreen_OnePlayerMode
 
 LABEL_80E6_CallMenuScreenHandler:
   call LABEL_9167_ScreenOff
@@ -23357,7 +23286,7 @@ LABEL_B01D_SquinkyTennisHook:
   TailCall LABEL_BCCF_EmitTilemapRectangleSequence
 
 ; 20th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_B06C_MenuScreen_OnePlayerMode:
+LABEL_B06C_Handler_MenuScreen_OnePlayerMode:
   call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_8CA2_ProcessMenuControls_Player1Priority
   ld a, (_RAM_D6A0_MenuSelection)
@@ -24137,7 +24066,7 @@ TEXT_B54D_RockHardMode: .asc "ROCK HARD MODE"
 .endif
 
 ; 17th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_B56D_MenuScreen_TrackSelect:
+LABEL_B56D_Handler_MenuScreen_TrackSelect:
   call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_A2AA_PrintOrFlashMenuScreenText
   call LABEL_9FC5_
@@ -24302,7 +24231,7 @@ LABEL_B6AB_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 ; 18th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_B6B1_MenuScreen_TwoPlayerResult:
+LABEL_B6B1_Handler_MenuScreen_TwoPlayerResult:
   call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_A039_
   ld hl, (_RAM_D6AB_MenuTimer)
@@ -24512,7 +24441,7 @@ LABEL_B7FF_:
   ret
 
 ; 19th entry of Jump Table from 80BE (indexed by _RAM_D699_MenuScreenIndex)
-LABEL_B84D_MenuScreen_TournamentChampion:
+LABEL_B84D_Handler_MenuScreen_TournamentChampion:
   call LABEL_B911_
   ld a, (_RAM_D6AB_MenuTimer.Lo)
   cp $FF ; 5.1s @ 50Hz, 4.25s @ 60Hz
@@ -25163,35 +25092,12 @@ LABEL_BCCF_EmitTilemapRectangleSequence:
 +:ret
 
 LABEL_BD00_InitialiseVDPRegisters:
-  ld a, VDP_REGISTER_MODECONTROL1_VALUE
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_MODECONTROL1
-  out (PORT_VDP_REGISTER), a
-
-  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_NAMETABLEBASEADDRESS
-  out (PORT_VDP_REGISTER), a
-
-  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_SPRITETABLEBASEADDRESS
-  out (PORT_VDP_REGISTER), a
-
-  ld a, VDP_REGISTER_SPRITESET_HIGH
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_SPRITESET
-  out (PORT_VDP_REGISTER), a
-
-  xor a
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_XSCROLL
-  out (PORT_VDP_REGISTER), a
-
-  xor a
-  out (PORT_VDP_REGISTER), a
-  ld a, VDP_REGISTER_YSCROLL
-  out (PORT_VDP_REGISTER), a
+  SetVDPRegisterImmediate VDP_REGISTER_MODECONTROL1, VDP_REGISTER_MODECONTROL1_VALUE
+  SetVDPRegisterImmediate VDP_REGISTER_NAMETABLEBASEADDRESS, VDP_REGISTER_NAMETABLEBASEADDRESS_VALUE
+  SetVDPRegisterImmediate VDP_REGISTER_SPRITETABLEBASEADDRESS, VDP_REGISTER_SPRITETABLEBASEADDRESS_VALUE
+  SetVDPRegisterImmediate VDP_REGISTER_SPRITESET, VDP_REGISTER_SPRITESET_HIGH
+  SetVDPRegisterImmediate VDP_REGISTER_XSCROLL, 0
+  SetVDPRegisterImmediate VDP_REGISTER_YSCROLL, 0
   ret
 
 LABEL_BD2F_PaletteFade:
