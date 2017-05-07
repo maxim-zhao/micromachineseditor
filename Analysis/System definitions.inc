@@ -68,3 +68,22 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
 
 .define TILEMAP_HFLIP 1<<9
 .define TILEMAP_VFLIP 1<<10
+
+; SN76489 notes, assuming NTSC timings
+
+.macro PSGNote args index
+; index = 0.. where 0 = A2
+; frequency = 2^(index / 12 - 2) * 440
+; PSG half-wavelength = 3579545 / 16 / frequency / 2
+; We add 0.5 so the truncation to int rounds to the nearest
+.dw 3579545 / 16 / (2^(index / 12 - 2)) / 440 / 2 + 0.5
+.endm
+
+.macro PSGNotes args startIndex, count
+.define x startIndex
+.repeat count
+  PSGNote x
+  .redefine x x+1
+.endr
+.undefine x
+.endm
