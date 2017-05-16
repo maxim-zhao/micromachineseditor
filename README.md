@@ -19,6 +19,7 @@ What is done/remains to be done
 - [x] Locating data for, and rendering images of, tiles 
 - [x] Locating data for, and rendering images of, metatiles and associated metadata (e.g. walls, material types) 
 - [x] Locating data for, and rendering images of, tracks and associated metadata 
+- [ ] Deal with the game auto-patching layouts - probably better to apply those patches to the data and then remove them, but that's tricky to do from a bare ROM
 - [x] UI for selecting metatiles and editing a track in memory, with a few options for rendering metadata over the graphics 
 - [ ] Figuring out some of the game data bits which are still mysterious to me 
 - [ ] Discovery of anything I've missed for the game to work (e.g. CPU AI, how pool table holes work) 
