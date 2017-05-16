@@ -22,7 +22,8 @@ What is done/remains to be done
 - [x] UI for selecting metatiles and editing a track in memory, with a few options for rendering metadata over the graphics 
 - [ ] Figuring out some of the game data bits which are still mysterious to me 
 - [ ] Discovery of anything I've missed for the game to work (e.g. CPU AI, how pool table holes work) 
-- [ ] Data compression. I always find compressors hard to do because it rapidly gets hard to do something optimal when the number of possibilities goes up. I suspect a dumb compressor can match the original. Or maybe swap it out for an existing one like aPLib?
+- [x] Data compression. I always find compressors hard to do because it rapidly gets hard to do something optimal when the number of possibilities goes up. I suspect a dumb compressor can match the original.
+- [ ] Maybe swap out compression for an existing one like aPLib?
 - [ ] Data (re-)insertion into the ROM, possibly with expansion 
 - [ ] Level order editing, for both 1- and 2-player modes 
 - [ ] Level metadata editing (car parameters, names) 
