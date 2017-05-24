@@ -6,12 +6,25 @@
 .define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - INCOMPLETE
 .define IS_GAME_GEAR ; Only applies when GAME_GEAR_CHECKS is disabled - INCOMPLETE
 
-; These are computed from the above to make things easier
 ; Some constants
 .define INFINITE_LIVES_COUNT 5 ; Number of lives we fix at
 .define WINS_IN_A_ROW_FOR_RUFFTRUX 3 ; Number of wins in a row to get RuffTrux
 .define RUFFTRUX_LAP_COUNT 1 ; Number of laps to complete
 .define CHALLENGE_LAP_COUNT 3 ; Number of laps to complete
+.define LOWEST_PITCH_ENGINE_TONE 1000
+.define HIGHEST_PITCH_ENGINE_TONE 400
+.define MAX_ENGINE_VOLUME 10 ; Player volume is always here
+
+.define DUST_MINIMUM_VELOCITY 7 ; Speed at which dust may appear
+
+.define TANK_SHOT_RELATIVE_SPEED 6 ; Speed at which a tank shot moves relative to the player's tank
+.define MAXIMUM_SPEED_MASK 15 ; can't exceed this
+
+.define HEAD_TO_HEAD_TEXT_X 112 ; Where the text "BONUS", "WINNER", "PLAYOFF" appears (x)
+.define HEAD_TO_HEAD_TOTAL_POINTS 8
+
+.define CHEAT_EXTRA_LIVES_COUNT 5 ; How many lives the cheat sets you to
+.define CHEAT_LEAD_CAR_VALUE $0d ; The "weight" when you have a "lead car"
 
 ; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
@@ -384,18 +397,32 @@ SpriteIndex_FinishedIndicators  instanceof FourPlayers_InGame ; $9c
 SpriteIndex_Smoke               dsb 4 ; $a0
 SpriteIndex_Digit1              db    ; $a4
 SpriteIndex_Digit2              db    ; $a5
-SpriteIndex_HeadToHeadLapCounter .db
 SpriteIndex_Digit3              db    ; $a6 
 SpriteIndex_Digit4              db    ; $a7
 SpriteIndex_Shadow              dsb 4 ; $a8
 SpriteIndex_Blank               db    ; $ac
-SpriteIndex_Dust                .db   ; $ad..$af for non-tanks
-SpriteIndex_Bullet              db    ; $ad for tanks
-SpriteIndex_BulletShadow        db    ; $ae for tanks
-SpriteIndex_Blank_Unused        db    ; $af for tanks
+SpriteIndex_Dust                dsb 3 ; $ad..$af for non-tanks
 SpriteIndex_Splash              dsb 3 ; $b0
 SpriteIndex_FallingCar          dsb 4 ; $b3 2x2 tiles
 SpriteIndex_FallingCar2         db    ; $b7 1x1 tiles
+.ende
+
+; Replacements for tanks
+.enum SpriteIndex_Dust
+SpriteIndex_Bullet              db    ; $ad for tanks
+SpriteIndex_BulletShadow        db    ; $ae for tanks
+SpriteIndex_Blank_Unused        db    ; $af for tanks
+.ende
+
+; Replacements for head to head mode
+.enum SpriteIndex_PositionIndicators
+SpriteIndex_RedBall               db    ; $94
+SpriteIndex_BlueBall              db    ; $95
+SpriteIndex_Winner                dsb 6 ; $96
+SpriteIndex_Bonus_Part1           dsb 4 ; $9c
+SpriteIndex_Smoke_Mirror          dsb 4 ; $a0 same as above
+SpriteIndex_Bonus_Part2           dsb 2 ; $a4
+SpriteIndex_HeadToHeadLapCounter  db    ; $a6
 .ende
 
 ; The RuffTrux truck is 4x4 sprites, with 16 positions all held in VRAM. This would use all 256 sprite tiles, but at 45 degree angles the corner tiles are blank; so 13 of them are used for additional sprites (HUD, shadow, smoke, splash).
@@ -595,44 +622,39 @@ map "?" = <MenuTileIndex_Punctuation.QuestionMark
 .endm
 
 .macro TimesTableHi args start, step, count
-.define x start
+.define _x start
 .rept count
-.db >x
-.redefine x x+step
+.db >_x
+.redefine _x _x+step
 .endr
-.undef x
+.undef _x
 .endm
 
 .macro TimesTable16 args start, step, count
-.define x start
+.define _x start
 .rept count
-.dw x
-.redefine x x+step
+.dw _x
+.redefine _x _x+step
 .endr
-.undef x
+.undef _x
 .endm
 
 .macro DivisionTable args divisor, count
-  .define x 0
+  .define _x 0
   .repeat count
-    .db x/divisor
-    .redefine x x+1
+    .db _x/divisor
+    .redefine _x _x+1
   .endr
-  .undefine x
+  .undefine _x
 .endm
 
 ; The game stores some numbers as sign and magnitude bytes.
 .macro SignAndMagnitude
-  ; For each arg...
-  .rept nargs
-    ; Emit with high bit set for negative
-    .if \1 < 0
-      .db (-\1) | $80
-    .else
-      .db \1
-    .endif
-    .shift
-  .endr
+  .if \1 < 0
+    .redefine _out (-\1) | $80
+  .else
+    .redefine _out \1
+  .endif
 .endm
 
 ; Tail call optimisation is often possible - and often not used in the original code.
@@ -725,7 +747,7 @@ _RAM_C800_WallData instanceof WallDataMetaTile 64 ; 64 tiles of 12x12 bits
 _RAM_CC80_BehaviourData instanceof BehaviourDataMetaTile 64 ; 64 tiles of 6x6 bytes
 
 _RAM_D580_WaitingForGameVBlank db
-_RAM_D581_ db
+_RAM_D581_OverlayTextScrollAmount db
 _RAM_D582_ db
 _RAM_D583_ db
 _RAM_D584_ db ; unused?
@@ -733,11 +755,10 @@ _RAM_D585_ dw
 _RAM_D587_ db
 _RAM_D588_ db ; unused?
 _RAM_D589_ db
-_RAM_D58A_ instanceof Word
-_RAM_D58C_ dw
-_RAM_D58E_ db
-_RAM_D58F_ db
-_RAM_D590_ dw
+_RAM_D58A_LowestPitchEngineTone instanceof Word ; GAme won't let it go "lower" (higher value) than this
+_RAM_D58C_ dw ; Some engine tone - backup?
+_RAM_D58E_OtherCar_EngineTone instanceof Word ; Not sure what car it is yet
+_RAM_D590_Unused_EngineTone dw ; Write-only?
 _RAM_D592_ db
 _RAM_D593_ db
 _RAM_D594_ db
@@ -759,7 +780,7 @@ _RAM_D5A5_ db
 _RAM_D5A6_ db
 _RAM_D5A7_ db
 _RAM_D5A8_ db
-_RAM_D5A9_ dw
+_RAM_D5A9_TankShotTileXN dw
 _RAM_D5AB_ db
 _RAM_D5AC_ dsb 4 ; unused?
 _RAM_D5B0_ db
@@ -930,7 +951,7 @@ _RAM_D7BD_RamCode dsb $392 ; runs over the next bit
 .endm
 
 .enum $D800 export
-_RAM_D800_TileHighBytes dsb 256
+_RAM_D800_TileHighBytes dsb 256 ; 256-aligned
 _RAM_D900_ dsb 64
 .ende
 
@@ -973,48 +994,48 @@ _RAM_D941_ dw
 _RAM_D943_ dw
 _RAM_D945_ db
 _RAM_D946_ db
-_RAM_D947_ db
+_RAM_D947_PlayoffWon db
 _RAM_D948_ db
 _RAM_D949_ db
 _RAM_D94A_ db
 .ende
 
+.struct SoundChannel
+  Attenuation db
+  Tone instanceof Word
+.endst
+
+.struct SFXData
+  Trigger       db ; Index of data to start a new SFX
+  Control       db ; 0 = stop, 1 = play, 2 = loop? or stop?
+  VolumePointer instanceof Word ; Pointer to volume data bytes, one per frame
+  NotePointer   instanceof Word ; Pointer to note data bytes, one per frame
+  NoisePointer  instanceof Word ; Pointer to noise data bytes, one per frame
+  Noise         db
+.endst
+
+.struct EngineSound
+  Tone          instanceof Word
+  Unused        db ; Seems unused? Not read or written during gameplay
+  Volume        db
+  Fluctuations  dsb 4
+.endst
+
 .enum $D94C export
-_RAM_D94C_SoundData .db ; 51 bytes total, up to $d97f? It's initialised but not all used?
-_RAM_D94C_Sound1Channel0Volume db
-_RAM_D94D_Sound1Channel1Volume db
-_RAM_D94E_Sound1Channel2Volume db
-_RAM_D94F_Sound2Channel0Volume db
-_RAM_D950_Sound2_Channel1Volume db
-_RAM_D951_Sound2_Channel2Volume db
-_RAM_D952_ db
-_RAM_D953_ db
-_RAM_D954_ db
-_RAM_D955_ db
-_RAM_D956_ db
-_RAM_D957_SoundIndex db
-_RAM_D958_ db
-_RAM_D959_ db
-_RAM_D95A_ db
-_RAM_D95B_ db
-_RAM_D95C_ db
-_RAM_D95D_ db
-_RAM_D95E_ db
-_RAM_D95F_ dsb 4 ; unused?
-_RAM_D963_SFXTrigger_Player1 db
-_RAM_D964_Sound1Control db
-_RAM_D965_ dsb 6 ; unused?
-_RAM_D96B_SoundMask db
-_RAM_D96C_ db
-_RAM_D96D_ db
-_RAM_D96E_ db ; unused?
-_RAM_D96F_ db
-_RAM_D970_ dsb 4 ; unused?
-_RAM_D974_SFXTrigger_Player2 db
-_RAM_D975_Sound2Control db
-_RAM_D976_ dsb 6 ; unused?
-_RAM_D97C_Sound db
-_RAM_D97D_ db
+_RAM_D94C_SoundData .db ; 51 bytes total, up to $d97f
+_RAM_D94C_SoundChannels instanceof SoundChannel 2
+_RAM_D952_EngineSound1ActualTone instanceof BigEndianWord
+_RAM_D954_EngineSound2ActualTone instanceof BigEndianWord
+_RAM_D956_Sound_ToneEngineSoundsIndex db
+_RAM_D957_Sound_HelicopterEngineIndex db
+_RAM_D958_Sound_LastAttenuation db
+_RAM_D959_Unused db
+_RAM_D95A_Sound_IsHelicopterEngine db
+_RAM_D95B_EngineSound1 instanceof EngineSound
+_RAM_D963_SFX_Player1 instanceof SFXData
+_RAM_D96C_EngineSound2 instanceof EngineSound
+_RAM_D974_SFX_Player2 instanceof SFXData
+_RAM_D97D_Sound_SFXNoiseData db
 _RAM_D97E_Player1SFX_Unused db
 _RAM_D97F_Player2SFX_Unused db
 
@@ -1024,19 +1045,13 @@ _RAM_DA00_ dsb 32
 
 _RAM_DA20_TrackMetatileLookup dsb 64
 
-_RAM_DA60_SpriteTableXNs instanceof SpriteXN 64 ;dsb 64*2
-_RAM_DAE0_SpriteTableYs instanceof SpriteY 64 ;dsb 64
+_RAM_DA60_SpriteTableXNs instanceof SpriteXN 64
+_RAM_DAE0_SpriteTableYs instanceof SpriteY 64
 
 _RAM_DB20_Player1Controls db ; in-game
 _RAM_DB21_Player2Controls db
-_RAM_DB22_ db
-.ende
-
-.enum $DB42 export
-_RAM_DB42_ db
-.ende
-
-.enum $DB62 export
+_RAM_DB22_TilemapUpdate_HorizontalTileNumbers dsb $20
+_RAM_DB42_TilemapUpdate_VerticalTileNumbers dsb $20
 _RAM_DB62_ db
 _RAM_DB63_ db
 _RAM_DB64_ db
@@ -1051,9 +1066,9 @@ _RAM_DB77_CarTileLoaderCounter db
 _RAM_DB78_CarTileLoaderTempByte db
 _RAM_DB79_CarTileLoaderHFlip db
 _RAM_DB7A_CarTileLoaderVFlip db
-_RAM_DB7B_ db
+_RAM_DB7B_HeadToHead_RedPoints db
 _RAM_DB7C_ db
-_RAM_DB7D_ db
+_RAM_DB7D_ db ; Low bit flipped every 6 frames, never used though?
 _RAM_DB7E_ db
 _RAM_DB7F_ db
 _RAM_DB80_ db
@@ -1069,16 +1084,15 @@ _RAM_DB98_TopSpeed db
 _RAM_DB99_AccelerationDelay db
 _RAM_DB9A_DecelerationDelay db
 _RAM_DB9B_SteeringDelay db
-_RAM_DB9C_MetatilemapWidth dw
-_RAM_DB9E_ db
-_RAM_DB9F_ db ; unused?
+_RAM_DB9C_MetatilemapWidth instanceof Word
+_RAM_DB9E_MetatilemapHeight_WriteOnly instanceof Word ; Never used
 _RAM_DBA0_TopLeftMetatileX dw
 _RAM_DBA2_TopLeftMetatileY dw
-_RAM_DBA4_ db
-_RAM_DBA5_ db
+_RAM_DBA4_CarX db
+_RAM_DBA5_CarY db
 _RAM_DBA6_ db
 _RAM_DBA7_ db
-_RAM_DBA8_ db
+_RAM_DBA8_SkipNextGameVBlankVDPUpdate db ; Set to 1 on startup, not sure what purpose it serves?
 _RAM_DBA9_ db
 _RAM_DBAA_ db
 _RAM_DBAB_ db
@@ -1166,7 +1180,7 @@ _RAM_DC47_GearToGear_OtherPlayerControls1 db
 _RAM_DC48_GearToGear_OtherPlayerControls2 db
 _RAM_DC49_CheatsStart .db
 _RAM_DC49_Cheat_ExplosiveOpponents db
-_RAM_DC4A_Cheat_ExtraLives db
+_RAM_DC4A_Cheat_ExtraLivesAndLeadCar db
 _RAM_DC4B_Cheat_InfiniteLives db
 _RAM_DC4C_Cheat_AlwaysFirstPlace db
 _RAM_DC4D_Cheat_NoSkidding db
@@ -1179,346 +1193,119 @@ _RAM_DC52_PreviousCombinedByte2 db
 _RAM_DC52_ db ; unused?
 _RAM_DC54_IsGameGear db ; GG mode if 1, SMS mode if 0
 _RAM_DC55_TrackIndex_Game db
-_RAM_DC56_ db
-_RAM_DC57_ dw
+_RAM_DC56_Adjustment1 db
+_RAM_DC57_Adjustment2 dw
 _RAM_DC59_FloorTiles dsb 32*2 ; 1bpp tile data
 _RAM_DC99_EnterMenuTrampoline dsb 18 ; Code in RAM
-; Game ram starts here?
-_RAM_DCAB_CarData_Green dw
-_RAM_DCAD_ dw
-_RAM_DCAF_ db
-_RAM_DCB0_ db
-_RAM_DCB1_ dsb 4 ; unused
-_RAM_DCB5_ db
-_RAM_DCB6_ db
-_RAM_DCB7_ db
-_RAM_DCB8_ db
-_RAM_DCB9_ db ; unused
-_RAM_DCBA_ db
-_RAM_DCBB_ db
-_RAM_DCBC_ db
-_RAM_DCBD_ db
-_RAM_DCBE_ db
-_RAM_DCBF_ db
-_RAM_DCC0_ db
-_RAM_DCC1_ db
-_RAM_DCC2_ db
-_RAM_DCC3_ db
-_RAM_DCC4_ db
-_RAM_DCC5_ db
-_RAM_DCC6_ db
 .ende
 
-.enum $DCC8 export
-_RAM_DCC8_ db
+.struct CarData
+XPosition instanceof Word ; +0 X position in pixels
+YPosition instanceof Word ; +2 Y position in pixels
+XMetatile db ; +4 X position in metatiles
+YMetatile db ; +5 Y position in metatiles
+XMetatileRelative db ; +6 X position within metatile (0..12)
+Unused07 db ; +7 unused, always 0
+YMetatileRelative db ; +8 Y position within metatile (0..12)
+Unused09 db ; +9 unused, always 0
+CurrentMetatile db ; +10 The metatile under the car
+Unknown11_b_Speed db ; +11
+Unknown12_b db ; +12
+Direction db ; +13 Direction (0..15)
+Unknown14_b db ; +14 unused?
+Unknown15_b db ; +15
+Unknown16_b db ; +16
+SpriteX db ; +17
+SpriteY db ; +18
+Unknown19_b db ; +19
+Unknown20_b db ; +20
+EffectsEnabled db ; +21
+Unknown22_b db ; +22
+Unknown23_b db ; +23
+Unknown24_b db ; +24
+Unknown25_b db ; +25
+Unknown26_b_HasFinished db ; +26
+Unknown27_b db ; +27
+Unknown28_b db ; +28
+Unknown29_b db ; +29
+Unknown30_b db ; +30
+Unknown31_b db ; +31
+Unknown32_b db ; +32
+Unknown33_b db ; +33
+Unknown34_w instanceof Word ; +34
+Unknown36_b db ; +36
+Unknown37_b db ; +37
+Unknown38_b db ; +38 unused?
+Unknown39_w instanceof Word ; +39
+Unknown41_w instanceof Word ; +41
+Unknown43_w instanceof Word ; +43
+Unknown45_b_TankShotSpritesIndex db ; +45
+Unknown46_b db ; +46
+Unknown47_w instanceof Word ; +47
+Unknown49_b db ; +49
+Unknown50_b db ; +50
+Unknown51_b db ; +51
+Unknown52_b db ; +52
+Unknown53_w instanceof Word ; +53
+Unknown55_w instanceof Word ; +55
+Unknown57_b db ; +57
+Unknown58_b db ; +58
+Unknown59_b db ; +59
+Unknown60_b db ; +60
+Unknown61_b db ; +61
+Unknown62_b_ShotDirection db ; +62
+Unknown63_b_TankShotState db ; +63 0 = can shoot?
+Unknown64_b_ShotSpeed db ; +64
+.endst
+
+.enum $DCAB export
+; Game ram starts here
+_RAM_DCAB_GameRAMStart .db
+
+_RAM_DCAB_CarData_Green instanceof CarData
+_RAM_DCEC_CarData_Blue instanceof CarData
+_RAM_DD2D_CarData_Yellow instanceof CarData
+
 .ende
 
-.enum $DCCD export
-_RAM_DCCD_ dw
-_RAM_DCCF_ db
-_RAM_DCD0_ db
-.ende
+.struct SpriteData
+X db
+N db
+Y db
+.endst
 
-.enum $DCD2 export
-_RAM_DCD2_ dw
-.ende
+.struct CarEffectSpritePair
+  Data instanceof SpriteData 2
+.endst
 
-.enum $DCD8 export
-_RAM_DCD8_ db
-_RAM_DCD9_ db
-_RAM_DCDA_ dw
-_RAM_DCDC_ db
-_RAM_DCDD_ db
-_RAM_DCDE_ db
-_RAM_DCDF_ db
-_RAM_DCE0_ dw
-_RAM_DCE2_ dw
-_RAM_DCE4_ db
-.ende
+.struct CarEffectState
+Enabled db ; Per-item enabled flag
+Type    db ; Effect type: 0 = dust, 1 = water
+Counter db ; Counter for tile animation
+Unused  dsb 3 ; Padding so it's the same size as CarEffectSpritePair
+.endst
 
-.enum $DCEA export
-_RAM_DCEA_ db
-.ende
+.struct CarEffects
+  ; 3x2 sprite XNY triplets
+  Sprites instanceof CarEffectSpritePair 3
+  TileBaseIndex db ; Index of first sprite for effect
+  Enabled db ; Car "effects" (dust, splashes) enabled flag? 0 -> no effect
+  SpriteRotator db ; Selects which "effect" slot is used for which hardware sprite (0..2)
+  Direction db ; Car direction
+  X db ; Sprite X for car
+  Y db ; Sprite Y for car
+  DelayCounter db ; Used for timing, effects update every DATA_4B1_Constant_3_CarEffectsDelay frames
+  NextEffectIndex db ; Selects which "effect" slot is used for the next "effect"?
+  States instanceof CarEffectState 3
+  NextType db ; The type to use when the current effect ends
+  Member45_Enabled2 db
+  Member46 db
+  Member47 db
+.endst
 
-.enum $DCEC export
-_RAM_DCEC_CarData_Blue db
-_RAM_DCED_ db
-_RAM_DCEE_ db
-_RAM_DCEF_ db
-_RAM_DCF0_ db
-_RAM_DCF1_ db
-.ende
+.enum $dd6e export
+_RAM_DD6E_CarEffects instanceof CarEffects 4
 
-.enum $DCF6 export
-_RAM_DCF6_ db
-_RAM_DCF7_ db
-_RAM_DCF8_ db
-_RAM_DCF9_ db
-.ende
-
-.enum $DCFB export
-_RAM_DCFB_ db
-_RAM_DCFC_ db
-_RAM_DCFD_ db
-_RAM_DCFE_ db
-_RAM_DCFF_ db
-_RAM_DD00_ db
-_RAM_DD01_ db
-_RAM_DD02_ db
-_RAM_DD03_ db
-_RAM_DD04_ db
-_RAM_DD05_ db
-_RAM_DD06_ db
-_RAM_DD07_ db
-_RAM_DD08_ db
-_RAM_DD09_ db
-_RAM_DD0A_ db
-_RAM_DD0B_ db
-_RAM_DD0C_ db
-_RAM_DD0D_ db
-_RAM_DD0E_ dw
-_RAM_DD10_ db
-_RAM_DD11_ db
-_RAM_DD12_ db
-_RAM_DD13_ dw
-.ende
-
-.enum $DD19 export
-_RAM_DD19_ db
-_RAM_DD1A_ db
-_RAM_DD1B_ dw
-_RAM_DD1D_ db
-_RAM_DD1E_ db
-_RAM_DD1F_ db
-_RAM_DD20_ db
-_RAM_DD21_ dw
-_RAM_DD23_ dw
-_RAM_DD25_ db
-.ende
-
-.enum $DD28 export
-_RAM_DD28_ db
-.ende
-
-.enum $DD2B export
-_RAM_DD2B_ db
-.ende
-
-.enum $DD2D export
-_RAM_DD2D_CarData_Yellow dw ; actually a struct?
-_RAM_DD2F_ dw
-_RAM_DD31_ db
-_RAM_DD32_ db
-.ende
-
-.enum $DD37 export
-_RAM_DD37_ db
-_RAM_DD38_ db
-_RAM_DD39_ db
-_RAM_DD3A_ db
-.ende
-
-.enum $DD3C export
-_RAM_DD3C_ db
-_RAM_DD3D_ db
-_RAM_DD3E_ db
-_RAM_DD3F_ db
-_RAM_DD40_ db
-_RAM_DD41_ db
-_RAM_DD42_ db
-_RAM_DD43_ db
-_RAM_DD44_ db
-_RAM_DD45_ db
-_RAM_DD46_ db
-_RAM_DD47_ db
-_RAM_DD48_ db
-.ende
-
-.enum $DD4A export
-_RAM_DD4A_ db
-.ende
-
-.enum $DD4F export
-_RAM_DD4F_ dw
-_RAM_DD51_ db
-_RAM_DD52_ db
-.ende
-
-.enum $DD54 export
-_RAM_DD54_ dw
-.ende
-
-.enum $DD5A export
-_RAM_DD5A_ db
-_RAM_DD5B_ db
-_RAM_DD5C_ dw
-_RAM_DD5E_ db
-_RAM_DD5F_ db
-_RAM_DD60_ db
-_RAM_DD61_ db
-_RAM_DD62_ dw
-_RAM_DD64_ dw
-_RAM_DD66_ db
-.ende
-
-.enum $DD6C export
-_RAM_DD6C_ db
-.ende
-
-.enum $DD6E export
-_RAM_DD6E_ db
-.ende
-
-.enum $DD70 export
-_RAM_DD70_ db
-_RAM_DD71_ db
-.ende
-
-.enum $DD73 export
-_RAM_DD73_ db
-_RAM_DD74_ db
-.ende
-
-.enum $DD76 export
-_RAM_DD76_ db
-_RAM_DD77_ db
-.ende
-
-.enum $DD79 export
-_RAM_DD79_ db
-_RAM_DD7A_ db
-.ende
-
-.enum $DD7C export
-_RAM_DD7C_ db
-_RAM_DD7D_ db
-.ende
-
-.enum $DD7F export
-_RAM_DD7F_ db
-_RAM_DD80_ db
-.ende
-
-.enum $DD9A export
-_RAM_DD9A_ db
-_RAM_DD9B_ db
-.ende
-
-.enum $DD9E export
-_RAM_DD9E_ db
-.ende
-
-.enum $DDA0 export
-_RAM_DDA0_ db
-_RAM_DDA1_ db
-.ende
-
-.enum $DDA3 export
-_RAM_DDA3_ db
-_RAM_DDA4_ db
-.ende
-
-.enum $DDA6 export
-_RAM_DDA6_ db
-_RAM_DDA7_ db
-.ende
-
-.enum $DDA9 export
-_RAM_DDA9_ db
-_RAM_DDAA_ db
-.ende
-
-.enum $DDAC export
-_RAM_DDAC_ db
-_RAM_DDAD_ db
-.ende
-
-.enum $DDAF export
-_RAM_DDAF_ db
-_RAM_DDB0_ db
-.ende
-
-.enum $DDCB export
-_RAM_DDCB_ db
-.ende
-
-.enum $DDCE export
-_RAM_DDCE_ db
-.ende
-
-.enum $DDD0 export
-_RAM_DDD0_ db
-_RAM_DDD1_ db
-.ende
-
-.enum $DDD3 export
-_RAM_DDD3_ db
-_RAM_DDD4_ db
-.ende
-
-.enum $DDD6 export
-_RAM_DDD6_ db
-_RAM_DDD7_ db
-.ende
-
-.enum $DDD9 export
-_RAM_DDD9_ db
-_RAM_DDDA_ db
-.ende
-
-.enum $DDDC export
-_RAM_DDDC_ db
-_RAM_DDDD_ db
-.ende
-
-.enum $DDDF export
-_RAM_DDDF_ db
-_RAM_DDE0_ db
-.ende
-
-.enum $DDFB export
-_RAM_DDFB_ db
-.ende
-
-.enum $DDFE export
-_RAM_DDFE_ db
-.ende
-
-.enum $DE00 export
-_RAM_DE00_ db
-_RAM_DE01_ db
-.ende
-
-.enum $DE03 export
-_RAM_DE03_ db
-_RAM_DE04_ db
-.ende
-
-.enum $DE06 export
-_RAM_DE06_ db
-_RAM_DE07_ db
-.ende
-
-.enum $DE09 export
-_RAM_DE09_ db
-_RAM_DE0A_ db
-.ende
-
-.enum $DE0C export
-_RAM_DE0C_ db
-_RAM_DE0D_ db
-.ende
-
-.enum $DE0F export
-_RAM_DE0F_ db
-_RAM_DE10_ db
-.ende
-
-.enum $DE2B export
-_RAM_DE2B_ db
-.ende
-
-.enum $DE2E export
 _RAM_DE2E_ db
 _RAM_DE2F_ db
 _RAM_DE30_ db
@@ -1568,7 +1355,7 @@ _RAM_DE57_ db
 .ende
 
 .enum $DE59 export
-_RAM_DE59_ db
+_RAM_DE59_FloorTileRotationTemp db
 .ende
 
 .enum $DE5C export
@@ -1629,7 +1416,7 @@ _RAM_DE8E_PageNumber db ; For restoring paging to "the one that's supposed to be
 
 .enum $DE90 export
 _RAM_DE90_CarDirection db
-_RAM_DE91_CarDirectionPrevious db ; To detect changes
+_RAM_DE91_CarDirectionPrevious db ; To detect changes? Or is this the "actual" one?
 _RAM_DE92_EngineVelocity db ; Not necessarily how fast the car is going, but it is if there are no other factors.
 .ende
 
@@ -1657,14 +1444,14 @@ _RAM_DEA8_ dw
 _RAM_DEAA_ db
 _RAM_DEAB_ db
 _RAM_DEAC_ db
-_RAM_DEAD_ db
+_RAM_DEAD_ db ; Rotates 0..5? For scaling acceleration/deceleration/etc delays? (6 frames = 0.12s)
 _RAM_DEAE_ db
-_RAM_DEAF_ db
+_RAM_DEAF_HScrollDelta db
 _RAM_DEB0_ db
 _RAM_DEB1_VScrollDelta db
 _RAM_DEB2_ db
 _RAM_DEB3_Player1AccelerationDelayCounter db
-_RAM_DEB4_ db
+_RAM_DEB4_DecelerationDelayCounter db
 _RAM_DEB5_ db
 _RAM_DEB6_ db
 _RAM_DEB7_ db
@@ -1682,8 +1469,8 @@ _RAM_DEC6_ db
 _RAM_DEC7_ db
 _RAM_DEC8_ db
 _RAM_DEC9_ db
-_RAM_DECA_ db
-_RAM_DECB_ db
+_RAM_DECA_TilemapUpdate_VerticalNeeded db
+_RAM_DECB_TilemapUpdate_HorizontalNeeded db
 _RAM_DECC_ db
 _RAM_DECD_ db
 _RAM_DECE_RectRowSkip db
@@ -1732,8 +1519,8 @@ _RAM_DEF2_ db
 .enum $DEF4 export
 _RAM_DEF4_ db
 _RAM_DEF5_ db
-_RAM_DEF6_ db
-_RAM_DEF7_ db
+_RAM_DEF6_FloorScrollingYAmount db ; May not just be for floor scrolling. Sign and magnitude.
+_RAM_DEF7_FloorScrollingXAmount db
 _RAM_DEF8_FloorScrollingRateLimiter db
 _RAM_DEF9_CurrentBehaviour db
 _RAM_DEFA_PreviousBehaviour db
@@ -1816,7 +1603,7 @@ _RAM_DF53_ dw
 _RAM_DF55_ db
 _RAM_DF56_ db
 _RAM_DF57_ db
-_RAM_DF58_ db
+_RAM_DF58_ db ; Also a car state?
 _RAM_DF59_CarState db ; 3 = falling, ..?
 _RAM_DF5A_CarState3 db
 _RAM_DF5B_ db
@@ -1829,9 +1616,9 @@ _RAM_DF61_ db
 _RAM_DF62_ db
 _RAM_DF63_ db
 _RAM_DF64_ db
-_RAM_DF65_ db
-_RAM_DF66_ db
-_RAM_DF67_ db
+_RAM_DF65_HasFinished db
+_RAM_DF66_CarPositionIndicator_CarX db
+_RAM_DF67_CarPositionIndicator_CarY db
 _RAM_DF68_ db
 _RAM_DF69_ db
 _RAM_DF6A_ db
@@ -1878,13 +1665,14 @@ _RAM_DF96_ db
 _RAM_DF97_ db
 _RAM_DF98_CarTileLoaderCounter db
 _RAM_DF99_ db
+
 _RAM_DF9A_EndOfRAM .db
 .ende
 
 .BANK 0 SLOT 0
 .ORG $0000
 
-;.section "Entry" force
+.section "Entry" force
   di
   ld hl, STACK_TOP
   ld sp, hl
@@ -1894,29 +1682,29 @@ _RAM_DF9A_EndOfRAM .db
   ld a, :LABEL_8000_Main
   ld (PAGING_REGISTER), a
   jp LABEL_8000_Main
-;.ends
+.ends
 
-;.section "Transitions"
+.section "Transition from game to menu" force
 
-LABEL_14_EnterMenus:
+EnterMenus:
   ; Code jumps here when transitioning from game to menus
   di
-  ld a, :LABEL_8021_MenuScreenEntryPoint
+  ld a, :MenuScreenEntryPoint
   ld (PAGING_REGISTER), a
   ld a, 1
   ld (_RAM_DC3E_InMenus), a
   ld hl, STACK_TOP
   ld sp, hl
-  jp LABEL_8021_MenuScreenEntryPoint
+  jp MenuScreenEntryPoint
 
 .ifdef BLANK_FILL_ORIGINAL
 .db "P HL", 13, 10, 9, "INC HL", 13, 10, 9, "LD" ; Source code left in RAM
 .endif
 
-;.ends
+.ends
 
 .org $0038
-;.section "VBlank handler" force
+.section "VBlank handler" force
 LABEL_38_:
   push af
     ld a, (_RAM_DC3E_InMenus)
@@ -1946,10 +1734,10 @@ LABEL_38_:
 .db " (CH2MAP2+9),A", 13, 10, 9, "L" ; Source code left in RAM
 .endif
 
-;.ends
+.ends
 
 .org $0066
-;.section "Pause/Gear To Gear handler" force
+.section "Pause/Gear To Gear handler" force
 LABEL_66_NMI:
   push af
 .ifdef GAME_GEAR_CHECKS
@@ -1969,9 +1757,9 @@ LABEL_66_NMI:
 .db "9),A" ; Source code left in RAM
 .endif
 
-;.ends
+.ends
 
-;.section "Enter game trampoline and data"
+.section "Enter game trampoline and data" force
 ; Executed in RAM at dbc0
 LABEL_75_MenuRAMSection:
 LABEL_75_EnterGameTrampolineImpl:
@@ -2000,10 +1788,9 @@ LABEL_75_EnterGameTrampolineImpl:
 .asc "RACE 01-" ; _RAM_DBF1_RaceNumberText
 LABEL_75_MenuRAMSectionEnd:
 ; End stuff copied to RAM
-;.ends
+.ends
 
-.org $00ae
-;.section "Enter menu trampoline" force
+.section "Enter menu trampoline" force
 ; Copied to RAM $dc99..$dcaa
 LABEL_AE_EnterMenuTrampolineImpl:
   di
@@ -2015,17 +1802,15 @@ LABEL_AE_EnterMenuTrampolineImpl:
   ld sp, hl
   jp LABEL_8000_Main
 LABEL_AE_EnterMenuTrampolineImplEnd:
-;.ends
+.ends
 
-.org $00c0
-;.section "Floor tiles" force
+.section "Floor tiles" force
 DATA_C0_FloorTilesRawTileData:
 .incbin "Assets/Formula One/Floor.4bpp"
 DATA_C0_FloorTilesRawTileDataEnd:
-;.ends
+.ends
 
-.org $100
-;.section "Startup" force
+.section "Startup" force
 LABEL_100_Startup:
   ; Blank RAM
   ld hl, _RAM_C000_StartOfRam
@@ -2053,7 +1838,8 @@ LABEL_100_Startup:
 
   call LABEL_173_LoadEnterMenuTrampolineToRAM
 
-  ld hl, _RAM_DC59_FloorTiles ; Fill floor tiles buffer with data
+  ; Fill floor tiles buffer with data
+  ld hl, _RAM_DC59_FloorTiles
   ld de, DATA_C0_FloorTilesRawTileData
   ld bc, DATA_C0_FloorTilesRawTileDataEnd - DATA_C0_FloorTilesRawTileData
 -:ld a, (de)
@@ -2066,15 +1852,16 @@ LABEL_100_Startup:
   jr nz, -
 
   call LABEL_186_InitialiseSoundData
+  
   ; More RAM initialisation
   ld a, $01
-  ld (_RAM_DBA8_), a
+  ld (_RAM_DBA8_SkipNextGameVBlankVDPUpdate), a
   ld a, 32
-  ld (_RAM_DB9C_MetatilemapWidth), a
-  ld (_RAM_DB9E_), a
-  ld hl, _RAM_DB22_
+  ld (_RAM_DB9C_MetatilemapWidth.Lo), a
+  ld (_RAM_DB9E_MetatilemapHeight_WriteOnly.Lo), a
+  ld hl, _RAM_DB22_TilemapUpdate_HorizontalTileNumbers
   ld (_RAM_DB62_), hl
-  ld hl, _RAM_DB42_
+  ld hl, _RAM_DB42_TilemapUpdate_VerticalTileNumbers
   ld (_RAM_DB64_), hl
   ld a, Track_1A_RuffTrux1
   ld (_RAM_DC39_NextRuffTruxTrack), a
@@ -2088,24 +1875,24 @@ LABEL_156_SetSystemAndAdjustments:
   jr z, +
   ; TODO what are these?
   ld a, $05
-  ld (_RAM_DC56_), a ; If GG
+  ld (_RAM_DC56_Adjustment1), a ; If GG
   ld a, $28
-  ld (_RAM_DC57_), a
+  ld (_RAM_DC57_Adjustment2), a
   JpRet ++
 +:xor a
-  ld (_RAM_DC56_), a ; If SMS
-  ld (_RAM_DC57_), a
+  ld (_RAM_DC56_Adjustment1), a ; If SMS
+  ld (_RAM_DC57_Adjustment2), a
 ++:ret
 .else
 .ifdef IS_GAME_GEAR
   ld a, $05
-  ld (_RAM_DC56_), a ; If GG
+  ld (_RAM_DC56_Adjustment1), a ; If GG
   ld a, $28
-  ld (_RAM_DC57_), a
+  ld (_RAM_DC57_Adjustment2), a
 .else
   xor a
-  ld (_RAM_DC56_), a ; If SMS
-  ld (_RAM_DC57_), a
+  ld (_RAM_DC56_Adjustment1), a ; If SMS
+  ld (_RAM_DC57_Adjustment2), a
 .endif
   ret
 .endif
@@ -2139,12 +1926,14 @@ LABEL_186_InitialiseSoundData:
   or c
   jr nz, -
   ret
+.ends
 
+.section "Game VBlank" force
 LABEL_199_GameVBlank:
   push af
     ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
     or a
-    jr nz, LABEL_1E0_SkipVBlank
+    jr nz, _SkipVBlank
     push hl
     push bc
     push de
@@ -2174,16 +1963,18 @@ LABEL_199_GameVBlank:
     pop de
     pop bc
     pop hl
-LABEL_1E0_SkipVBlank:
+_SkipVBlank:
     in a, (PORT_VDP_STATUS) ; Ack INT
   pop af
   ret
+.ends
 
+.section "unknown slot 0 part 1" force
 LABEL_1E4_:
   call LABEL_519D_
   ld a, (_RAM_D599_IsPaused)
   or a
-  jp nz, LABEL_29D_
+  jp nz, _IsPaused
   ld a, (_RAM_DF7F_)
   or a
   call nz, LABEL_AB1_
@@ -2218,10 +2009,10 @@ LABEL_1E4_:
   cp $02
   call z, LABEL_AA7_
   xor a
-  ld (_RAM_DD9B_), a
-  ld (_RAM_DDCB_), a
-  ld (_RAM_DDFB_), a
-  ld (_RAM_DE2B_), a
+  ld (_RAM_DD6E_CarEffects.1.Member45_Enabled2), a
+  ld (_RAM_DD6E_CarEffects.2.Member45_Enabled2), a
+  ld (_RAM_DD6E_CarEffects.3.Member45_Enabled2), a
+  ld (_RAM_DD6E_CarEffects.4.Member45_Enabled2), a
   call LABEL_27B1_
   call LABEL_1DF2_
   call LABEL_3164_
@@ -2243,13 +2034,13 @@ LABEL_1E4_:
   call LABEL_4927_
   CallPagedFunction LABEL_371F1_
   call LABEL_318_CheckForGearToGearWork
-LABEL_29D_:
+_IsPaused:
   call LABEL_3450_
   call LABEL_35E0_
   call LABEL_318_CheckForGearToGearWork
   call LABEL_73D4_UpdateHUDSprites
   call LABEL_318_CheckForGearToGearWork
-  call LABEL_84A_
+  call LABEL_84A_UpdateExtraSprites
   call LABEL_318_CheckForGearToGearWork
   call LABEL_3A23_
   call LABEL_6540_
@@ -2280,7 +2071,7 @@ LABEL_29D_:
   CallPagedFunction LABEL_2B5D2_GameVBlankUpdateSoundTrampoline
   call LABEL_318_CheckForGearToGearWork
 +:
-  call LABEL_BF0_UpdateFloorTiles
+  call LABEL_BF0_ScrollFloorTileData
   call LABEL_AE1_InGameCheatHandlerTrampoline
   call LABEL_318_CheckForGearToGearWork
 LABEL_300_:
@@ -2318,18 +2109,20 @@ LABEL_318_CheckForGearToGearWork:
   ld a, $01
   ld (_RAM_D5D7_GearToGearVBlankWorkDone), a
 +:ret
+.ends
 
+.section "Game VBlank VDP work" force
 -:xor a
-  ld (_RAM_DBA8_), a
+  ld (_RAM_DBA8_SkipNextGameVBlankVDPUpdate), a
   ret
 
 LABEL_33A_GameVBlankVDPWork:
-  ld a, (_RAM_DBA8_)
+  ld a, (_RAM_DBA8_SkipNextGameVBlankVDPUpdate)
   cp $01
   jr z, -
   call LABEL_7795_ScreenOff
-  call LABEL_78CE_
-  call LABEL_7916_
+  call LABEL_78CE_TilemapUpdate_Horizontal
+  call LABEL_7916_TilemapUpdate_Vertical
 
   ; Update scroll registers
   ld a, (_RAM_DED4_VScrollValue)
@@ -2349,18 +2142,20 @@ LABEL_33A_GameVBlankVDPWork:
   CallPagedFunction LABEL_17E95_LoadPlayoffTiles ; Call only when flag is set, then reset it
   xor a
   ld (_RAM_D5CC_PlayoffTileLoadFlag), a
-+:call LABEL_BC5_UpdateFloorTiles
++:call LABEL_BC5_EmitFloorTiles
   call LABEL_2D07_UpdatePalette_RuffTruxSubmerged
   call LABEL_3FB4_UpdateAnimatedPalette
   jp LABEL_778C_ScreenOn
+.ends
 
+.section "Enter game part 2" force
 LABEL_383_EnterGame_Part2:
   call LABEL_3ED_EnterGamePart2a
 --:
   ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
   or a
   jr nz, +
-  call LABEL_AFD_ReadControls
+  call LABEL_AFD_ReadControls_Trampoline
   ; Wait for VBlank
 -:ld a, (_RAM_D580_WaitingForGameVBlank)
   or a
@@ -2376,7 +2171,7 @@ LABEL_383_EnterGame_Part2:
   ld (_RAM_D5B5_EnableGameVBlank), a
   jp --
 
-+:
++:; Gear to Gear player 1
   ld hl, $0800 ; Busy wait
 -:dec hl
   ld a, h
@@ -2395,7 +2190,7 @@ LABEL_383_EnterGame_Part2:
   xor a
   ld (_RAM_D5D7_GearToGearVBlankWorkDone), a
   ld (_RAM_D5D8_), a
-  call LABEL_AFD_ReadControls
+  call LABEL_AFD_ReadControls_Trampoline
   call LABEL_1E4_
   ld a, (_RAM_D5D7_GearToGearVBlankWorkDone)
   or a
@@ -2429,9 +2224,9 @@ LABEL_3ED_EnterGamePart2a:
   call LABEL_AEB_GetPlayerHandicapsTrampoline
   call LABEL_7564_SetControlsToNoButtons
   call LABEL_186_InitialiseSoundData
-  call ++
-  ld a, $0A
-  ld (_RAM_D96F_), a
+  call LABEL_463_SilencePSGTrampoline
+  ld a, MAX_ENGINE_VOLUME
+  ld (_RAM_D96C_EngineSound2.Volume), a
   ld a, $01
   ld (_RAM_D5B5_EnableGameVBlank), a
   xor a
@@ -2465,50 +2260,55 @@ LABEL_3ED_EnterGamePart2a:
   im 1
   di
   ret
+.ends
 
+.section "Trampolines 1" force
 LABEL_458_PatchForLevelTrampoline:
   JumpToPagedFunction LABEL_36484_PatchForLevel
 
-++:
+LABEL_463_SilencePSGTrampoline:
   JumpToPagedFunction LABEL_2B5D5_SilencePSG
+.ends
 
-DATA_46E_: ; 4 bytes per entry * 16 entries
-  SignAndMagnitude  $04,  $17,  $0C,  $17
-  SignAndMagnitude -$01,  $13,  $06,  $16
-  SignAndMagnitude -$04,  $0F,  $02,  $15
-  SignAndMagnitude -$06,  $0B, -$03,  $12
-  SignAndMagnitude -$07,  $04, -$07,  $0C
-  SignAndMagnitude -$03, -$02, -$06,  $05
-  SignAndMagnitude  $02, -$05, -$04,  $01
-  SignAndMagnitude -$01, -$03,  $06, -$06
-  SignAndMagnitude  $04, -$07,  $0C, -$07
-  SignAndMagnitude  $0A, -$06,  $11, -$03
-  SignAndMagnitude  $0E, -$05,  $14,  $01
-  SignAndMagnitude  $13, -$02,  $16,  $05
-  SignAndMagnitude  $17,  $04,  $17,  $0C
-  SignAndMagnitude  $16,  $0B,  $13,  $12
-  SignAndMagnitude  $14,  $0F,  $0E,  $15
-  SignAndMagnitude  $11,  $13,  $0A,  $16
+.section "Car effects" force
+DATA_46E_EffectTileOffsets: ; 4 bytes per entry * 16 entries
+  ; Relative XY positions of effects sprites for each direction
+.dbm SignAndMagnitude,  4, 23,  12,  23
+.dbm SignAndMagnitude, -1, 19,   6,  22
+.dbm SignAndMagnitude, -4, 15,   2,  21
+.dbm SignAndMagnitude, -6, 11,  -3,  18
+.dbm SignAndMagnitude, -7,  4,  -7,  12
+.dbm SignAndMagnitude, -3, -2,  -6,   5
+.dbm SignAndMagnitude,  2, -5,  -4,   1
+.dbm SignAndMagnitude, -1, -3,   6,  -6
+.dbm SignAndMagnitude,  4, -7,  12,  -7
+.dbm SignAndMagnitude, 10, -6,  17,  -3
+.dbm SignAndMagnitude, 14, -5,  20,   1
+.dbm SignAndMagnitude, 19, -2,  22,   5
+.dbm SignAndMagnitude, 23,  4,  23,  12
+.dbm SignAndMagnitude, 22, 11,  19,  18
+.dbm SignAndMagnitude, 20, 15,  14,  21
+.dbm SignAndMagnitude, 17, 19,  10,  22
 
 DATA_4AE_SixTimesTable:
-  TimesTableLo 0 6 3 ; 0, 6, 12
+  TimesTableLo 0, 6, 3 ; 0, 6, 12
 
-DATA_4B1_Constant_3:
+DATA_4B1_Constant_3_CarEffectsDelay:
 .db 3
 
-LABEL_4B2_:
-  ld a, (iy+24)
+LABEL_4B2_CarEffect_FrameUpdate:
+  ld a, (iy+CarEffects.DelayCounter)
   or a
   jr z, +
   sub $01
-  ld (iy+24), a
+  ld (iy+CarEffects.DelayCounter), a
   ret
 
-+:
-  ld a, (DATA_4B1_Constant_3) ; Constant!
-  ld (iy+24), a
++:; Only do work when counter gets to 0 -> every 4 frames
+  ld a, (DATA_4B1_Constant_3_CarEffectsDelay) ; Constant!
+  ld (iy+CarEffects.DelayCounter), a
 
-  ld a, (iy+25)
+  ld a, (iy+CarEffects.NextEffectIndex)
   ld e, a
   ld d, $00
   ld hl, DATA_4AE_SixTimesTable ; (iy+25) * 6
@@ -2516,13 +2316,13 @@ LABEL_4B2_:
   ld a, (hl)
   ld e, a
   ld d, $00
-  add ix, de ; Add that to ix
-  ld a, (iy+21)
+  add ix, de ; Add that to ix -> it now points at the CarEffectSpriteDataPair
+  ld a, (iy+CarEffects.Direction)
   sla a
   sla a
   ld e, a
   ld d, $00
-  ld hl, DATA_46E_ ; Look up DATA_46E_[(iy+21)*4]
+  ld hl, DATA_46E_EffectTileOffsets ; Look up DATA_46E_EffectTileOffsets[(iy+21)*4]
   add hl, de
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
@@ -2538,17 +2338,17 @@ LABEL_4B2_:
   ld a, b     ; High bit set
   and $7F     ; Mask it off
   ld b, a
-  ld a, (iy+22) ; Subtract value
+  ld a, (iy+CarEffects.X) ; Subtract value
   sub b       ; Add constant
   add a, c
-  ld (ix+0), a ; ix+0 = iy+22 - b + c
+  ld (ix+CarEffectSpritePair.Data.1.X), a ; ix+0 = iy+22 - b + c
   jp ++
 
 +:; High bit unset
-  ld a, (iy+22)
+  ld a, (iy+CarEffects.X)
   add a, b    ; Add value
   add a, c    ; Add constant
-  ld (ix+0), a ; ix+0 = iy+22 + b + c
+  ld (ix+CarEffectSpritePair.Data.1.X), a ; ix+0 = iy+22 + b + c
 ++:
   inc hl      ; Next byte
   ld a, (hl)
@@ -2558,15 +2358,15 @@ LABEL_4B2_:
   ld a, b
   and $7F
   ld b, a
-  ld a, (iy+23) ; ix+2 = iy+23 (+/-) b - c
+  ld a, (iy+CarEffects.Y) ; ix+2 = iy+23 (+/-) b - c
   sub b
   add a, c
-  ld (ix+2), a
+  ld (ix+CarEffectSpritePair.Data.1.Y), a
   jp ++
-+:ld a, (iy+23)
++:ld a, (iy+CarEffects.Y)
   add a, b
   add a, c
-  ld (ix+2), a
+  ld (ix+CarEffectSpritePair.Data.1.Y), a
 
 ++:
   inc hl      ; Next byte: ix+3 = iy+22 (+/-) b + c
@@ -2577,15 +2377,15 @@ LABEL_4B2_:
   ld a, b
   and $7F
   ld b, a
-  ld a, (iy+22)
+  ld a, (iy+CarEffects.X)
   sub b
   add a, c
-  ld (ix+3), a
+  ld (ix+CarEffectSpritePair.Data.2.X), a
   jp ++
-+:ld a, (iy+22)
++:ld a, (iy+CarEffects.X)
   add a, b
   add a, c
-  ld (ix+3), a
+  ld (ix+CarEffectSpritePair.Data.2.X), a
 ++:
   inc hl    ; Last one: ix+5 = iy+23 (+/-) b + c
   ld a, (hl)
@@ -2595,66 +2395,69 @@ LABEL_4B2_:
   ld a, b
   and $7F
   ld b, a
-  ld a, (iy+23)
+  ld a, (iy+CarEffects.Y)
   sub b
   add a, c
-  ld (ix+5), a
+  ld (ix+CarEffectSpritePair.Data.2.Y), a
   jp ++
-+:ld a, (iy+23)
++:ld a, (iy+CarEffects.Y)
   add a, b
   add a, c
-  ld (ix+5), a
+  ld (ix+CarEffectSpritePair.Data.2.Y), a
 ++:
   ; All done
-  ; ix += 36 -> ???
-  ld de, $001A
+  ; ix += 26 -> now it points at the CarEffectState for this slot
+  ld de, CarEffects.States - CarEffects.Sprites
   add ix, de
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   jr nz, +
-  ; Powerboats only: ???
-  xor a
-  ld (iy+44), a
-  ld a, (iy+47)
+  ; Powerboats only:
+  xor a ; Force to "dust" type always
+  ld (iy+CarEffects.NextType), a
+  ld a, (iy+CarEffects.Member47)
   xor $01
-  ld (iy+45), a
+  ld (iy+CarEffects.Member45_Enabled2), a
 +:
-  ld a, (iy+45)
+  ld a, (iy+CarEffects.Member45_Enabled2)
   or a
   jr z, +
-  ld a, (iy+46)
+  ld a, (iy+CarEffects.Member46)
   or a
   jr nz, +
-  ld a, (iy+23)
+  ; Check X, Y bounds
+  ld a, (iy+CarEffects.Y)
   cp $F0
   jr nc, +
   cp $10
   jr c, +
-  ld a, (iy+22)
+  ld a, (iy+CarEffects.X)
   cp $10
   jr c, +
   cp $F0
   jr nc, +
-  ld a, $01
+  ld a, $01 ; Enabled
   jp ++
-+:xor a
++:xor a ; Disabled
 ++:
-  ld (ix+0), a
-  ld a, (iy+44)
-  ld (ix+1), a
+  ; Enable or disable the effect based on the above
+  ld (ix+CarEffectState.Enabled), a
+  
+  ; Initialise the state
+  ld a, (iy+CarEffects.NextType)
+  ld (ix+CarEffectState.Type), a
   xor a
-  ld (ix+2), a
-  ld (ix+3), a
-  ld a, (iy+25)
+  ld (ix+CarEffectState.Counter), a ; 
+  ld (ix+CarEffectState.Unused + 0), a ; Unnecessary? Never read back?
+  ; Rotate effect index through 0, 1, 2
+  ld a, (iy+CarEffects.NextEffectIndex)
   cp $02
   jr z, +
   add a, $01
--:
-  ld (iy+25), a
+-:ld (iy+CarEffects.NextEffectIndex), a
   ret
 
-+:
-  xor a
++:xor a
   jp -
 
 .ifdef JUMP_TO_RET
@@ -2662,86 +2465,91 @@ _LABEL_5C8_ret:
   ret
 .endif
 
-LABEL_5C9_:
-  ld iy, _RAM_DD6E_
-  ld ix, _RAM_DD6E_
+LABEL_5C9_UpdateCarEffects_Red:
+  ld iy, _RAM_DD6E_CarEffects.1
+  ld ix, _RAM_DD6E_CarEffects.1
   ld a, (_RAM_DE91_CarDirectionPrevious)
-  ld (iy+21), a
-  ld a, (_RAM_DBA4_)
-  ld (iy+22), a
-  ld a, (_RAM_DBA5_)
-  ld (iy+23), a
+  ld (iy+CarEffects.Direction), a
+  ld a, (_RAM_DBA4_CarX)
+  ld (iy+CarEffects.X), a
+  ld a, (_RAM_DBA5_CarY)
+  ld (iy+CarEffects.Y), a
   ld a, $01
-  ld (iy+19), a
+  ld (iy+CarEffects.Enabled), a
   ld a, (_RAM_DF00_)
-  ld (iy+46), a
+  ld (iy+CarEffects.Member46), a
   ld a, (_RAM_DF58_)
-  ld (iy+47), a
-  call LABEL_4B2_
-  jp LABEL_69C_
+  ld (iy+CarEffects.Member47), a
+  call LABEL_4B2_CarEffect_FrameUpdate
+  jp _UpdateSpriteTable
 
-LABEL_5FA_:
+LABEL_5FA_UpdateCarEffects_Green:
+  ; Skip for head to head (no green car)
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  JrZRet _LABEL_5C8_ret ; 7 when nz, 12+10 otherwise; ret z = 5/11 so always better(!)
-  ld iy, _RAM_DD9E_
-  ld ix, _RAM_DD9E_
-  ld a, (_RAM_DCB8_)
-  ld (iy+21), a
-  ld a, (_RAM_DCBC_)
-  ld (iy+22), a
-  ld a, (_RAM_DCBD_)
-  ld (iy+23), a
-  ld a, (_RAM_DCC0_)
-  ld (iy+19), a
-  ld a, (_RAM_DCBF_)
-  ld (iy+46), a
-  ld a, (_RAM_DCD9_)
-  ld (iy+47), a
-  call LABEL_4B2_
-  jp LABEL_69C_
+  JrZRet _LABEL_5C8_ret
+  
+  ld iy, _RAM_DD6E_CarEffects.2
+  ld ix, _RAM_DD6E_CarEffects.2
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
+  ld (iy+CarEffects.Direction), a
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
+  ld (iy+CarEffects.X), a
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
+  ld (iy+CarEffects.Y), a
+  ld a, (_RAM_DCAB_CarData_Green.EffectsEnabled)
+  ld (iy+CarEffects.Enabled), a
+  ld a, (_RAM_DCAB_CarData_Green.Unknown20_b)
+  ld (iy+CarEffects.Member46), a
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
+  ld (iy+CarEffects.Member47), a
+  call LABEL_4B2_CarEffect_FrameUpdate
+  jp _UpdateSpriteTable
 
-LABEL_633_:
-  ld iy, _RAM_DDCE_
-  ld ix, _RAM_DDCE_
-  ld a, (_RAM_DCF9_)
-  ld (iy+21), a
-  ld a, (_RAM_DCFD_)
-  ld (iy+22), a
-  ld a, (_RAM_DCFE_)
-  ld (iy+23), a
-  ld a, (_RAM_DD01_)
-  ld (iy+19), a
-  ld a, (_RAM_DD00_)
-  ld (iy+46), a
-  ld a, (_RAM_DD1A_)
-  ld (iy+47), a
-  call LABEL_4B2_
-  jp LABEL_69C_
+LABEL_633_UpdateCarEffects3:
+  ld iy, _RAM_DD6E_CarEffects.3
+  ld ix, _RAM_DD6E_CarEffects.3
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
+  ld (iy+CarEffects.Direction), a
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
+  ld (iy+CarEffects.X), a
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
+  ld (iy+CarEffects.Y), a
+  ld a, (_RAM_DCEC_CarData_Blue.EffectsEnabled)
+  ld (iy+CarEffects.Enabled), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
+  ld (iy+CarEffects.Member46), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
+  ld (iy+CarEffects.Member47), a
+  call LABEL_4B2_CarEffect_FrameUpdate
+  jp _UpdateSpriteTable
 
-LABEL_665_:
+LABEL_665_UpdateCarEffects4:
+  ; Skip for head to head (no yellow car)
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JpZRet _LABEL_5C8_ret
 
-  ; Challenge
-  ld iy, _RAM_DDFE_
-  ld ix, _RAM_DDFE_
-  ld a, (_RAM_DD3A_)
-  ld (iy+21), a
-  ld a, (_RAM_DD3E_)
-  ld (iy+22), a
-  ld a, (_RAM_DD3F_)
-  ld (iy+23), a
-  ld a, (_RAM_DD42_)
-  ld (iy+19), a
-  ld a, (_RAM_DD41_)
-  ld (iy+46), a
-  ld a, (_RAM_DD5B_)
-  ld (iy+47), a
-  call LABEL_4B2_
-LABEL_69C_:
-  ld a, (iy+18)
+  ld iy, _RAM_DD6E_CarEffects.4
+  ld ix, _RAM_DD6E_CarEffects.4
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
+  ld (iy+CarEffects.Direction), a
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
+  ld (iy+CarEffects.X), a
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
+  ld (iy+CarEffects.Y), a
+  ld a, (_RAM_DD2D_CarData_Yellow.EffectsEnabled)
+  ld (iy+CarEffects.Enabled), a
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown20_b)
+  ld (iy+CarEffects.Member46), a
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
+  ld (iy+CarEffects.Member47), a
+  call LABEL_4B2_CarEffect_FrameUpdate
+  ; fall through
+
+_UpdateSpriteTable:
+  ; Point de, hl to the correct sprite table entries
+  ld a, (iy+CarEffects.TileBaseIndex)
   ld c, a
   ld b, $00
   ld hl, _RAM_DA60_SpriteTableXNs
@@ -2750,87 +2558,89 @@ LABEL_69C_:
   ex de, hl
   ld hl, _RAM_DAE0_SpriteTableYs
   add hl, bc
-  ld a, (iy+20)
+  ld a, (iy+CarEffects.SpriteRotator)
   add a, $01
-  cp $03
+  cp $03 ; cycle through 0, 1, 2
   jr nz, +
   xor a
-+:ld (iy+20), a
++:ld (iy+CarEffects.SpriteRotator), a
   or a
-  jr z, +
+  jr z, @SpriteRotator1
   cp $01
-  jr z, LABEL_702_
-  call LABEL_7DD_SetCarEffectSpriteIndices
-  ld a, (iy+12)
+  jr z, @SpriteRotator0
+
+@SpriteRotator2:
+  call LABEL_7DD_SetCarEffect2SpriteIndices
+  ld a, (iy+CarEffects.Sprites.3.Data.1.X)
   ld (de), a
   inc de
-  ld a, (iy+13)
+  ld a, (iy+CarEffects.Sprites.3.Data.1.N)
   ld (de), a
   inc de
-  ld a, (iy+14)
+  ld a, (iy+CarEffects.Sprites.3.Data.1.Y)
   ld (hl), a
   inc hl
-  ld a, (iy+15)
+  ld a, (iy+CarEffects.Sprites.3.Data.2.X)
   ld (de), a
   inc de
-  ld a, (iy+16)
+  ld a, (iy+CarEffects.Sprites.3.Data.2.N)
   ld (de), a
   inc de
-  ld a, (iy+17)
+  ld a, (iy+CarEffects.Sprites.3.Data.2.Y)
   ld (hl), a
   ret
 
-+:
+@SpriteRotator1:
   call LABEL_723_SetCarEffectSpriteIndices
-  ld a, (iy+0)
+  ld a, (iy+CarEffects.Sprites.1.Data.1.X)
   ld (de), a
   inc de
-  ld a, (iy+1)
+  ld a, (iy+CarEffects.Sprites.1.Data.1.N)
   ld (de), a
   inc de
-  ld a, (iy+2)
+  ld a, (iy+CarEffects.Sprites.1.Data.1.Y)
   ld (hl), a
   inc hl
-  ld a, (iy+3)
+  ld a, (iy+CarEffects.Sprites.1.Data.2.X)
   ld (de), a
   inc de
-  ld a, (iy+4)
+  ld a, (iy+CarEffects.Sprites.1.Data.2.N)
   ld (de), a
   inc de
-  ld a, (iy+5)
+  ld a, (iy+CarEffects.Sprites.1.Data.2.Y)
   ld (hl), a
   ret
 
-LABEL_702_:
-  call LABEL_780_SetCarEffectSpriteIndices
-  ld a, (iy+6)
+@SpriteRotator0:
+  call LABEL_780_SetCarEffect1SpriteIndices
+  ld a, (iy+CarEffects.Sprites.2.Data.1.X)
   ld (de), a
   inc de
-  ld a, (iy+7)
+  ld a, (iy+CarEffects.Sprites.2.Data.1.N)
   ld (de), a
   inc de
-  ld a, (iy+8)
+  ld a, (iy+CarEffects.Sprites.2.Data.1.Y)
   ld (hl), a
   inc hl
-  ld a, (iy+9)
+  ld a, (iy+CarEffects.Sprites.2.Data.2.X)
   ld (de), a
   inc de
-  ld a, (iy+10)
+  ld a, (iy+CarEffects.Sprites.2.Data.2.N)
   ld (de), a
   inc de
-  ld a, (iy+11)
+  ld a, (iy+CarEffects.Sprites.2.Data.2.Y)
   ld (hl), a
   ret
 
 LABEL_723_SetCarEffectSpriteIndices:
-  ld a, (iy+19) ; Enabled 1?
+  ld a, (iy+CarEffects.Enabled) ; Enabled 1?
   or a
   jr z, LABEL_76B_BlankCarEffects
-  ld a, (iy+26) ; Enabled 2?
+  ld a, (iy+CarEffects.States.1.Enabled) ; Enabled 2?
   or a
   jr z, LABEL_76B_BlankCarEffects
   push hl
-    ld a, (iy+27) ; 0 for dust, 1 for liquid
+    ld a, (iy+CarEffects.States.1.Type) ; 0 for dust, 1 for liquid
     sla a ; -> offset by 4
     sla a
     ld c, a
@@ -2842,23 +2652,23 @@ LABEL_723_SetCarEffectSpriteIndices:
     jp ++
 +:  ld hl, DATA_83A_EffectTileIndices
 ++: add hl, bc
-    ld a, (iy+28) ; Animation counter
+    ld a, (iy+CarEffects.States.1.Counter) ; Animation counter
     ld c, a
     ld b, $00
     add hl, bc
     ld a, (hl)
-    ld (iy+1), a ; Set tile index
-    ld (iy+4), a
-    ld a, c ; Cycle counter
+    ld (iy+CarEffects.Sprites.1.Data.1.N), a ; Set tile index
+    ld (iy+CarEffects.Sprites.1.Data.2.N), a
+    ld a, c ; Cycle counter 0..2
     cp $03
     jr z, +
     add a, $01
-    ld (iy+28), a
+    ld (iy+CarEffects.States.1.Counter), a
   pop hl
   ret
 
 +:  xor a
-    ld (iy+26), a
+    ld (iy+CarEffects.States.1.Enabled), a
   pop hl
   ret
 
@@ -2870,20 +2680,20 @@ LABEL_76B_BlankCarEffects:
   jp ++
 +:ld a, <SpriteIndex_Blank ; Not RuffTrux
 ++:
-  ld (iy+1), a
-  ld (iy+4), a
+  ld (iy+CarEffects.Sprites.1.Data.1.N), a
+  ld (iy+CarEffects.Sprites.1.Data.2.N), a
   ret
 
 ; Same as LABEL_723_SetCarEffectSpriteIndices except offsets are different
-LABEL_780_SetCarEffectSpriteIndices:
-  ld a, (iy+19)
+LABEL_780_SetCarEffect1SpriteIndices:
+  ld a, (iy+CarEffects.Enabled)
   or a
-  jr z, _LABEL_7C8_BlankCarEffects
-  ld a, (iy+32)
+  jr z, _LABEL_7C8_BlankCarEffect1
+  ld a, (iy+CarEffects.States.2.Enabled)
   or a
-  jr z, _LABEL_7C8_BlankCarEffects
+  jr z, _LABEL_7C8_BlankCarEffect1
   push hl
-    ld a, (iy+33)
+    ld a, (iy+CarEffects.States.2.Type)
     sla a
     sla a
     ld c, a
@@ -2895,27 +2705,27 @@ LABEL_780_SetCarEffectSpriteIndices:
     jp ++
 +:  ld hl, DATA_83A_EffectTileIndices
 ++: add hl, bc
-    ld a, (iy+34)
+    ld a, (iy+CarEffects.States.2.Counter)
     ld c, a
     ld b, $00
     add hl, bc
     ld a, (hl)
-    ld (iy+7), a
-    ld (iy+10), a
+    ld (iy+CarEffects.Sprites.2.Data.1.N), a
+    ld (iy+CarEffects.Sprites.2.Data.2.N), a
     ld a, c
     cp $03
     jr z, +
     add a, $01
-    ld (iy+34), a
+    ld (iy+CarEffects.States.2.Counter), a
   pop hl
   ret
 
 +:  xor a
-    ld (iy+32), a
+    ld (iy+CarEffects.States.2.Enabled), a
   pop hl
   ret
 
-_LABEL_7C8_BlankCarEffects:
+_LABEL_7C8_BlankCarEffect1:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr nz, +
@@ -2923,20 +2733,20 @@ _LABEL_7C8_BlankCarEffects:
   jp ++
 +:ld a, <SpriteIndex_Blank ; Not RuffTrux
 ++:
-  ld (iy+7), a
-  ld (iy+10), a
+  ld (iy+CarEffects.Sprites.2.Data.1.N), a
+  ld (iy+CarEffects.Sprites.2.Data.2.N), a
   ret
 
 ; Same as LABEL_723_SetCarEffectSpriteIndices except offsets are different
-LABEL_7DD_SetCarEffectSpriteIndices:
-  ld a, (iy+19)
+LABEL_7DD_SetCarEffect2SpriteIndices:
+  ld a, (iy+CarEffects.Enabled)
   or a
-  jr z, _LABEL_825_BlankCarEffects
-  ld a, (iy+38)
+  jr z, _LABEL_825_BlankCarEffect2
+  ld a, (iy+CarEffects.States.3.Enabled)
   or a
-  jr z, _LABEL_825_BlankCarEffects
+  jr z, _LABEL_825_BlankCarEffect2
   push hl
-    ld a, (iy+39) ; Effect type: 0 = dust, 1 = liquid
+    ld a, (iy+CarEffects.States.3.Type) ; Effect type: 0 = dust, 1 = liquid
     sla a
     sla a
     ld c, a
@@ -2948,35 +2758,36 @@ LABEL_7DD_SetCarEffectSpriteIndices:
     jp ++
 +:  ld hl, DATA_83A_EffectTileIndices
 ++: add hl, bc
-    ld a, (iy+40) ; Effect counter
+    ld a, (iy+CarEffects.States.3.Counter) ; Effect counter
     ld c, a
     ld b, $00
-    add hl, bc
-    ld a, (hl)
-    ld (iy+13), a
-    ld (iy+16), a
-    ld a, c ; Loop counter 0..3
-    cp $03
+    add hl, bc ; Look up tile numbers
+    ld a, (hl) ; and save to destination
+    ld (iy+CarEffects.Sprites.3.Data.1.N), a
+    ld (iy+CarEffects.Sprites.3.Data.2.N), a
+    ld a, c ; Loop counter 0..2
+    cp 3
     jr z, +
-    add a, $01
-    ld (iy+40), a
+    add a, 1
+    ld (iy+CarEffects.States.3.Counter), a
   pop hl
   ret
 
-+:  xor a
-    ld (iy+38), a
++:  ; End of sequence
+    xor a
+    ld (iy+CarEffects.States.3.Enabled), a
   pop hl
   ret
 
-_LABEL_825_BlankCarEffects:
+_LABEL_825_BlankCarEffect2:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   jr nz, +
   ld a, SpriteIndex_RuffTrux_Blank ; RuffTrux
   jp ++
 +:ld a, <SpriteIndex_Blank ; Not RuffTrux
-++:ld (iy+13), a
-  ld (iy+16), a
+++:ld (iy+CarEffects.Sprites.3.Data.1.N), a
+  ld (iy+CarEffects.Sprites.3.Data.2.N), a
   ret
 
 ; Which tiles to use for dust trails (animated)
@@ -3001,178 +2812,204 @@ DATA_842_EffectTileIndices_RuffTrux:
 .db SpriteIndex_RuffTrux_Water2
 .db SpriteIndex_RuffTrux_Blank2
 .db SpriteIndex_RuffTrux_Blank
+.ends
 
-LABEL_84A_:
+.section "Extra sprites" force
+LABEL_84A_UpdateExtraSprites:
+  ; Handles position indicators (at end of race) and "effects"
+  ; - Position indicator is shown if car has finished
+  ; - Else if it's a tank, there's a special handler
+  ; - Else, dust/splash effects are updated
+  ; - Unless the car is not present! (Green and yellow in head-to-head mode)
+  
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
-  jp z, LABEL_97C_RuffTrux
+  jp z, LABEL_97C_UpdateExtraSprites_RuffTrux
 
   ; Not RuffTrux
-  ld a, (_RAM_DF65_)
+@Red:
+  ld a, (_RAM_DF65_HasFinished)
   or a
   jr z, +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (_RAM_DBA4_)
-  ld (_RAM_DF66_), a
-  ld a, (_RAM_DBA5_)
-  ld (_RAM_DF67_), a
+  
+  ; Red car position indicator (if finished and not head to head)
+  ld a, (_RAM_DBA4_CarX)
+  ld (_RAM_DF66_CarPositionIndicator_CarX), a
+  ld a, (_RAM_DBA5_CarY)
+  ld (_RAM_DF67_CarPositionIndicator_CarY), a
   ld a, (_RAM_DF2A_Positions.Red)
   ld ix, _RAM_DA60_SpriteTableXNs.57
   ld iy, _RAM_DAE0_SpriteTableYs.57
-  call LABEL_97F_
-  jp ++
+  call LABEL_97F_ShowCarPositionIndicator
+  jp @Green
 
-+:
++:; Either draw tank stuff... (TODO)
   ld a, (_RAM_DB97_TrackType)
   cp TT_6_Tanks
   jr nz, +
-  call LABEL_6611_Tanks
-  jp ++
-+:call LABEL_5C9_ ; Not tanks
-++:ld a, (_RAM_DCC5_)
+  call LABEL_6611_Tanks_Red_Trampoline
+  jp @Green
+  
+  ; ...or car effects
++:call LABEL_5C9_UpdateCarEffects_Red ; Not for tanks
+
+@Green:
+  ld a, (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished)
   or a
   jr z, +++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_8DC_
-  ld a, (_RAM_DCBC_)
-  ld (_RAM_DF66_), a
-  ld a, (_RAM_DCC0_)
+  jr nz, @Blue
+  
+  ; Green car position indicator (if finished and not head to head)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
+  ld (_RAM_DF66_CarPositionIndicator_CarX), a
+  ld a, (_RAM_DCAB_CarData_Green.EffectsEnabled)
   cp $01
   jr z, +
-  ld a, $F0
+  ld a, $F0 ; Hide indicator if car is off-screen?
   jp ++
-+:ld a, (_RAM_DCBD_)
-++:ld (_RAM_DF67_), a
++:ld a, (_RAM_DCAB_CarData_Green.SpriteY)
+++:
+  ld (_RAM_DF67_CarPositionIndicator_CarY), a
   ld a, (_RAM_DF2A_Positions.Green)
   ld ix, _RAM_DA60_SpriteTableXNs.59
   ld iy, _RAM_DAE0_SpriteTableYs.59
-  call LABEL_97F_
-  jp LABEL_8DC_
+  call LABEL_97F_ShowCarPositionIndicator
+  jp @Blue
+  
 +++:
+  ; Or tank stuff
   ld a, (_RAM_DB97_TrackType)
   cp TT_6_Tanks
   jr nz, +
-  ld a, (_RAM_DC3D_IsHeadToHead)
+  ld a, (_RAM_DC3D_IsHeadToHead) ; ??? Green tank can't fire?
   or a
-  jr nz, LABEL_8DC_
-  call LABEL_661C_
-  jp LABEL_8DC_
+  jr nz, @Blue
+  call LABEL_661C_Tanks_Green_Trampoline
+  jp @Blue
 
-+:
++:; Or effects (if SMS)
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr nz, LABEL_8DC_
-  call LABEL_5FA_
-LABEL_8DC_:
-  ld a, (_RAM_DD06_)
+  jr nz, @Blue
+  call LABEL_5FA_UpdateCarEffects_Green
+
+@Blue:
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished)
   or a
   jr z, +++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jr nz, LABEL_92D_
-  ld a, (_RAM_DCFD_)
-  ld (_RAM_DF66_), a
-  ld a, (_RAM_DD01_)
+  jr nz, @Yellow
+
+  ; Green car position indicator (if finished and not head to head)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
+  ld (_RAM_DF66_CarPositionIndicator_CarX), a
+  ld a, (_RAM_DCEC_CarData_Blue.EffectsEnabled)
   cp $01
   jr z, +
-  ld a, $F0
+  ld a, $F0 ; hide if off-screen
   jp ++
-
-+:
-  ld a, (_RAM_DCFE_)
++:ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
 ++:
-  ld (_RAM_DF67_), a
+  ld (_RAM_DF67_CarPositionIndicator_CarY), a
   ld a, (_RAM_DF2A_Positions.Blue)
   ld ix, _RAM_DA60_SpriteTableXNs.61
   ld iy, _RAM_DAE0_SpriteTableYs.61
-  call LABEL_97F_
-  jp LABEL_92D_
+  call LABEL_97F_ShowCarPositionIndicator
+  jp @Yellow
 
 +++:
+  ; Or tank stuff
   ld a, (_RAM_DB97_TrackType)
   cp TT_6_Tanks
   jr nz, +
-  call LABEL_6627_
-  jp LABEL_92D_
+  call LABEL_6627_Tanks_Blue_Trampoline
+  jp @Yellow
 
-+:
++:; Or effects (if SMS)
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr nz, LABEL_92D_
-+:
-  call LABEL_633_
-LABEL_92D_:
-  ld a, (_RAM_DD47_)
+  jr nz, @Yellow
++:call LABEL_633_UpdateCarEffects3
+  
+@Yellow: ; Rendered as blue in head-to-head...
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished)
   or a
   jr z, +++
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrNzRet _LABEL_97B_ret
-  ld a, (_RAM_DD3E_)
-  ld (_RAM_DF66_), a
-  ld a, (_RAM_DD42_)
+
+  ; Yellow car position indicator (if finished and not head to head)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
+  ld (_RAM_DF66_CarPositionIndicator_CarX), a
+  ld a, (_RAM_DD2D_CarData_Yellow.EffectsEnabled)
   cp $01
   jr z, +
-  ld a, $F0
+  ld a, $F0 ; Hide if off-screen
   jp ++
-
-+:
-  ld a, (_RAM_DD3F_)
++:ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
 ++:
-  ld (_RAM_DF67_), a
+  ld (_RAM_DF67_CarPositionIndicator_CarY), a
   ld a, (_RAM_DF2A_Positions.Yellow)
   ld ix, _RAM_DA60_SpriteTableXNs.63
   ld iy, _RAM_DAE0_SpriteTableYs.63
-  jp LABEL_97F_
+  jp LABEL_97F_ShowCarPositionIndicator
 
 +++:
+  ; Or tank stuff
   ld a, (_RAM_DB97_TrackType)
   cp TT_6_Tanks
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrNzRet _LABEL_97B_ret
-  TailCall LABEL_6632_ _LABEL_97B_ret
+  TailCall LABEL_6632_Tanks_Yellow_Trampoline _LABEL_97B_ret
 
-+:
++:; Or effects (if SMS)
   ld a, (_RAM_DC54_IsGameGear)
   or a
   JrNzRet _LABEL_97B_ret
-  jp LABEL_665_
+  jp LABEL_665_UpdateCarEffects4
 
 .ifdef JUMP_TO_RET
 _LABEL_97B_ret:
   ret
 .endif
 
-LABEL_97C_RuffTrux:
-  jp LABEL_5C9_
+LABEL_97C_UpdateExtraSprites_RuffTrux:
+  ; Just do dust/splash effects
+  jp LABEL_5C9_UpdateCarEffects_Red ; and ret
 
-LABEL_97F_:
+LABEL_97F_ShowCarPositionIndicator:
+  ; Sets the two sprites at ix, iy to show 1st, 2nd etc
+  ; as per the value in a (0 = 1st) at _RAM_DF66_CarPositionIndicator_CarX, _RAM_DF67_CarPositionIndicator_CarY
   sla a
   ld e, a
-  ld d, $00
+  ld d, 0
   ld hl, DATA_9AA_SuffixedPositionSpriteIndices
   add hl, de
   ld a, (hl)
-  ld (ix+1), a
+  ld (ix+1), a ; First sprite n
   inc hl
   ld a, (hl)
-  ld (ix+3), a
-  ld a, (_RAM_DF66_)
-  add a, $04
-  ld (ix+0), a
+  ld (ix+3), a ; Second sprite n
+  ld a, (_RAM_DF66_CarPositionIndicator_CarX)
+  add a, 4 ; Offset +4
+  ld (ix+0), a ; First sprite X
   add a, $08
-  ld (ix+2), a
-  ld a, (_RAM_DF67_)
-  sub $0C
-  ld (iy+0), a
+  ld (ix+2), a ; Second sprite X
+  ld a, (_RAM_DF67_CarPositionIndicator_CarY)
+  sub 12 ; Offset -12
+  ld (iy+0), a ; Sprite Ys
   ld (iy+1), a
   ret
 
@@ -3194,7 +3031,9 @@ LABEL_9B2_ConvertMetatileIndexToDataIndex:
     ld a, (hl)
   exx
   ret
+.ends
 
+.section "Game Gear NMI handler" force
 LABEL_9BF_NMI_GG:
     ld a, (_RAM_DC42_GearToGear_IAmPlayer1)
     or a
@@ -3218,8 +3057,10 @@ LABEL_9BF_NMI_GG:
     ld (_RAM_D5D8_), a
 +:pop af
   retn
+.ends
 
-; TODO what is this for? It should be inlined?
+.section "Tilemap address conversion tables" force
+; This could be inlined where it's used
 DATA_9EB_Constant_C000_MetatilemapBaseAddress:
 .dw $C000
 
@@ -3234,7 +3075,9 @@ DATA_A2D_TilemapAddressFromRowNumberHi:
 ; Table is twice as large as necessary?
   TimesTableHi NAME_TABLE_ADDRESS | VRAM_WRITE_MASK, TILEMAP_ROW_SIZE, 32
   TimesTableHi NAME_TABLE_ADDRESS | VRAM_WRITE_MASK, TILEMAP_ROW_SIZE, 32
+.ends
 
+.section "HUD sprites locations" force
 ; Sprite X locations for tournament HUD sprites (SMS)
 .dstruct DATA_A6D_SMS_TournamentHUDSpriteXs instanceof TournamentHUDSprites data $14 $10 $10 $10 $10 $18 $18 $18 $18
 
@@ -3246,7 +3089,9 @@ DATA_A2D_TilemapAddressFromRowNumberHi:
 
 ; Sprite Y locations for tournament HUD sprites (GG)
 .dstruct DATA_A88_GG_TournamentHUDSpriteYs instanceof TournamentHUDSprites data $30 $38 $40 $48 $50 $38 $40 $48 $50
+.ends
 
+.section "RuffTrux time limits" force
 ; Nibble encoded time limits to one DP
 ; Last byte is unused
 DATA_A91_RuffTruxTimeLimits:
@@ -3257,6 +3102,9 @@ DATA_A91_RuffTruxTimeLimits:
   RuffTruxTimeLimit 48.0
   RuffTruxTimeLimit 55.0
 
+.ends
+
+.section "Trampolines 2" force
 LABEL_A9D_:
   JrToPagedFunction LABEL_36D07_
 
@@ -3287,7 +3135,8 @@ LABEL_AE1_InGameCheatHandlerTrampoline:
 LABEL_AEB_GetPlayerHandicapsTrampoline:
   JrToPagedFunction LABEL_1BAB3_GetPlayerHandicaps
 
-LABEL_AF5_:
+LABEL_AF5_: 
+  ; Macros jump into this one so it can't be used here, but it's just a trampoline like the rest
   ld a, :LABEL_1BAFD_ ; $06
   ld (PAGING_REGISTER), a
   call LABEL_1BAFD_
@@ -3301,41 +3150,46 @@ LABEL_B04_:
   or a
   ret z
   JrToPagedFunction LABEL_363D0_
+.ends
 
-LABEL_B13_:
-  ld a, (_RAM_D947_)
+.section "Head to head point scored" force
+LABEL_B13_HeadToHead_BlueWins: ; TODO only part of the process
+  ; If playoff won, jump to the winner sound
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
-  ld a, (_RAM_DB7B_)
-  cp $01
+  ; Else check the points
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  cp $01 ; 1 about to become 0
   jr z, +
-  jp +++
+  jp _Bonus
 +:ld a, SFX_12_WinOrCheat
-  ld (_RAM_D963_SFXTrigger_Player1), a
-  jp ++
+  ld (_RAM_D963_SFX_Player1.Trigger), a
+  jp _Winner
 
-LABEL_B2B_:
-  ld a, (_RAM_D947_)
+LABEL_B2B_HeadToHead_RedWins:
+  ; Same as above
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
-  ld a, (_RAM_DB7B_)
-  cp $07
-  jr nz, +++
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  cp HEAD_TO_HEAD_TOTAL_POINTS - 1 ; 7 about to become 8
+  jr nz, _Bonus
 +:ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a
-++:
-  ld hl, DATA_BB9_BonusSpriteData
-  jp ++++
+  ld (_RAM_D974_SFX_Player2), a
 
-+++:
-  ld hl, DATA_BAD_WinnerSpriteData
-++++:
+_Winner:
+  ld hl, DATA_BB9_WinnerSpriteData
+  jp +
+_Bonus:
+  ld hl, DATA_BAD_BonusSpriteData
++:; Set sprite data
   ld ix, _RAM_DAE0_SpriteTableYs.20
   ld de, _RAM_DA60_SpriteTableXNs.20
-  ld c, $0C ; Count
+  ld c, 12 ; Count
 -:ld a, (hl)
   ld (de), a
-  ld a, $50 ; y - writes too many!?
+  ld a, $50 ; y - writes too many!? (12 XNs, should have 6 Ys)
   ld (ix+0), a
   inc ix
   inc hl
@@ -3343,71 +3197,72 @@ LABEL_B2B_:
   dec c
   jr nz, -
   ld a, $02
-  ld (_RAM_D581_), a
+  ld (_RAM_D581_OverlayTextScrollAmount), a
   ret
 
-LABEL_B63_:
-  ld a, (_RAM_D581_)
-  cp $A0
+LABEL_B63_UpdateOverlayText:
+  ld a, (_RAM_D581_OverlayTextScrollAmount)
+  cp $A0 ; Do nothing once it is >= this number
   JrNcRet _LABEL_BAC_ret
-  ld a, (_RAM_DB7B_)
-  cp $01
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  cp 0 + 1
   jr z, +
-  cp $07
+  cp HEAD_TO_HEAD_TOTAL_POINTS - 1
   jr nz, ++
-+:
-  ld ix, DATA_BB9_BonusSpriteData
++:ld ix, DATA_BB9_WinnerSpriteData
   jp +++
-
 ++:
-  ld ix, DATA_BAD_WinnerSpriteData
+  ld ix, DATA_BAD_BonusSpriteData
 +++:
   ld de, _RAM_DA60_SpriteTableXNs.20
   ld iy, _RAM_DAE0_SpriteTableYs.20
-  ld c, $06
+  ld c, $06 ; Tile count for overlay text
 -:
-  ld a, (_RAM_D581_)
+  ld a, (_RAM_D581_OverlayTextScrollAmount)
   ld l, a
-  ld a, (ix+0)
-  add a, l
-  ld (de), a
+  ld a, (ix+0) ; X
+  add a, l     ; Plus scroll amount
+  ld (de), a   ; Emit it
   cp $50
   jr nc, +
-  xor a
+  xor a         ; Zero X, Y if <$50?
   ld (de), a
   ld (iy+0), a
 +:
-  inc de
+  inc de        ; Next sprite
   inc de
   inc ix
   inc ix
   inc iy
-  ld a, $02
+  ld a, $02 ; Scroll amount per frame
   add a, l
-  ld (_RAM_D581_), a
+  ld (_RAM_D581_OverlayTextScrollAmount), a
   dec c
   jr nz, -
 _LABEL_BAC_ret:
   ret
 
-DATA_BAD_WinnerSpriteData: ; Sprite X, N for "WINNER"
-.db $70 $9C ; TODO enum for head to head mode
-.db $78 $9D
-.db $80 $9E
-.db $88 $9F
-.db $90 $A4
-.db $98 $A5
-DATA_BB9_BonusSpriteData: ; Sprite X, N for "BONUS"
-.db $70 $96
-.db $78 $97
-.db $80 $98
-.db $88 $99
-.db $90 $9A
-.db $98 $9B
+DATA_BAD_BonusSpriteData: ; Sprite X, N for "BONUS"
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 0, <SpriteIndex_Bonus_Part1 + 0 ; TODO enum for head to head mode
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 1, <SpriteIndex_Bonus_Part1 + 1
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 2, <SpriteIndex_Bonus_Part1 + 2
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 3, <SpriteIndex_Bonus_Part1 + 3
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 4, <SpriteIndex_Bonus_Part2 + 0
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 5, <SpriteIndex_Bonus_Part2 + 1
+DATA_BB9_WinnerSpriteData: ; Sprite X, N for "WINNER"
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 0, <SpriteIndex_Winner + 0
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 1, <SpriteIndex_Winner + 1
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 2, <SpriteIndex_Winner + 2
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 3, <SpriteIndex_Winner + 3
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 4, <SpriteIndex_Winner + 4
+.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 5, <SpriteIndex_Winner + 5
 
-;;.section "Floor tiles updates" force
-  ; Executed in RAM at da92 - or is it?
-LABEL_BC5_UpdateFloorTiles:
+.ends
+
+.section "FLoor tiles" force
+
+LABEL_BC5_EmitFloorTiles:
+; Emits floor tile data to VRAM, if enabled
   ld a, (_RAM_DF17_HaveFloorTiles)
   or a
   JrZRet + ; ret
@@ -3417,21 +3272,22 @@ LABEL_BC5_UpdateFloorTiles:
   ld a, h
   out (PORT_VDP_ADDRESS), a
   ld hl, _RAM_DC59_FloorTiles
-  ld b, $40 ; 2 tiles
+  ld b, BYTES_PER_TILE * 2
   ld c, PORT_VDP_DATA
   otir
-  ld hl, _RAM_DC59_FloorTiles + $20
-  ld b, $20 ; The the same 2 tiles in the opposite order
+  ld hl, _RAM_DC59_FloorTiles + BYTES_PER_TILE
+  ld b, BYTES_PER_TILE ; The the same 2 tiles in the opposite order
   ld c, PORT_VDP_DATA
   otir
   ld hl, _RAM_DC59_FloorTiles
-  ld b, $20
+  ld b, BYTES_PER_TILE
   ld c, PORT_VDP_DATA
   otir
 +:ret
 
-LABEL_BF0_UpdateFloorTiles:
+LABEL_BF0_ScrollFloorTileData:
   ; Skip for tracks without floors
+  ; (Could use _RAM_DF17_HaveFloorTiles?)
   ld a, (_RAM_DB97_TrackType)
   or a
   jr z, + ; TT_0_SportsCars
@@ -3445,319 +3301,265 @@ LABEL_BF0_UpdateFloorTiles:
   ; This effectively means the floor tiles must be colours 0 and 4 - 
   ; or another pair of colours differing only in that bit, but no more than two.
   ; Colours 0 and 4 are the only pair stable across tracks (black and light grey).
-  call LABEL_C81_UpdateFloorTiles_H
-  ; Then flip the bit. This is what makes the floor scroll slower (?).
+  call LABEL_C81_ScrollFloorTiles_X
+
+  ; Then flip the bit. This is what makes the floor scroll slower
+  ; (we use it to scroll half-rate) and also makes any half-motion alternate X and Y between frames.
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   xor $01
   ld (_RAM_DEF8_FloorScrollingRateLimiter), a
+
   ; Then do vertically
-  ld a, (_RAM_DEF6_)
+  ld a, (_RAM_DEF6_FloorScrollingYAmount)
   ld b, a
-  and $80
+  and $80 ; Check sign
   ld l, a
   ld a, b
   and $7F
   or a
-  JrZRet _LABEL_C2F_ret
+  JrZRet @ret ; Nothing to do
   dec a
-  jr z, +
+  jr z, @1
   dec a
-  jr z, ++
+  jr z, @2
   dec a
-  jr z, +++
+  jr z, @3
   dec a
-  jr z, ++++
+  jr z, @4
   dec a
-  jr z, +++++
+  jr z, @5
   dec a
-  jr z, ++++++
+  jr z, @6
   dec a
-  jr z, +++++++
+  jr z, @7
   dec a
-  jr z, LABEL_C75_
-_LABEL_C2F_ret:
+  jr z, @8
+  ; Give up if we go this far(!)
+@ret:
   ret
 
-+:
+@1: ; Shift 50% of the time
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_C2F_ret
-++:
-  jp LABEL_CF8_MoveFloorTilesVertically
+  JrZRet @ret
+  ; fall through
+@2: ; Shift 1 row
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-+++:
-  call LABEL_CF8_MoveFloorTilesVertically
+@3: ; Shift 1 or 2
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_C2F_ret
-  jp LABEL_CF8_MoveFloorTilesVertically
+  JrZRet @ret
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-++++:
-  call LABEL_CF8_MoveFloorTilesVertically
-  jp LABEL_CF8_MoveFloorTilesVertically
+@4: ; Shift 2
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-+++++:
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
+@5: ; Shift 2 or 3
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_C2F_ret
-  jp LABEL_CF8_MoveFloorTilesVertically
+  JrZRet @ret
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-++++++:
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
-  jp LABEL_CF8_MoveFloorTilesVertically
+@6: ; Shift 3
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-+++++++:
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
+@7: ; Shift 3 or 4
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_C2F_ret
-  jp LABEL_CF8_MoveFloorTilesVertically
+  JrZRet @ret
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-LABEL_C75_:
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
-  call LABEL_CF8_MoveFloorTilesVertically
-  jp LABEL_CF8_MoveFloorTilesVertically
+@8: ; Shift 4
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  call LABEL_CF8_ScrollFloorTiles_Y_Row
+  jp LABEL_CF8_ScrollFloorTiles_Y_Row
 
-LABEL_C81_UpdateFloorTiles_H:
-  ld a, (_RAM_DEF7_)
+LABEL_C81_ScrollFloorTiles_X:
+  ld a, (_RAM_DEF7_FloorScrollingXAmount)
   ld b, a
   and $80
   ld l, a ; High bit -> l
   ld a, b
   and $7F
   or a
-  JrZRet _LABEL_CA6_ret ; Nothing to do
+  JrZRet @ret ; Nothing to do
   dec a
-  jr z, +
+  jr z, @1
   dec a
-  jr z, ++
+  jr z, @2
   dec a
-  jr z, +++
+  jr z, @3
   dec a
-  jr z, ++++
+  jr z, @4
   dec a
-  jr z, +++++
+  jr z, @5
   dec a
-  jr z, ++++++
+  jr z, @6
   dec a
-  jr z, +++++++
+  jr z, @7
   dec a
-  jr z, LABEL_CEC_
-_LABEL_CA6_ret:
+  jr z, @8
+  ; Give up if we go this far(!)
+@ret:
   ret
 
-+:; Shift if flag is set
+@1: ; Shift 50% of the time
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_CA6_ret
-++:
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+  JrZRet @ret
+  ; fall though
+@2: ; Shift 1 row
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-+++:
-  call LABEL_DCF_MoveFloorTilesHorizontally
+@3: ; Shift 1 or 2
+  call LABEL_DCF_ScrollFloorTiles_X_Column
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_CA6_ret
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+  JrZRet @ret
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-++++:
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+@4: ; Shift 2
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-+++++:
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
+@5: ; Shift 2 or 3
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_CA6_ret
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+  JrZRet @ret
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-++++++:
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+@6: ; Shift 3
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-+++++++:
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
+@7: ; Shift 3 or 4
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
   ld a, (_RAM_DEF8_FloorScrollingRateLimiter)
   or a
-  JrZRet _LABEL_CA6_ret
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+  JrZRet @ret
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-LABEL_CEC_:
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  call LABEL_DCF_MoveFloorTilesHorizontally
-  jp LABEL_DCF_MoveFloorTilesHorizontally
+@8: ; Shift 4
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  call LABEL_DCF_ScrollFloorTiles_X_Column
+  jp LABEL_DCF_ScrollFloorTiles_X_Column
 
-LABEL_CF8_MoveFloorTilesVertically:
+LABEL_CF8_ScrollFloorTiles_Y_Row:
   push hl
     ld a, l
     cp $80
-    jp z, LABEL_D67_MoveFloorTilesUp
+    jp z, LABEL_D67_ScrollFloorTiles_Y_Row_Up
+
     ; Move the data down
-    ld a, (_RAM_DC59_FloorTiles + 62)
-    ld (_RAM_DE59_), a
-    ld a, (_RAM_DC59_FloorTiles + 58)
-    ld (_RAM_DC59_FloorTiles + 62), a
-    ld a, (_RAM_DC59_FloorTiles + 54)
-    ld (_RAM_DC59_FloorTiles + 58), a
-    ld a, (_RAM_DC59_FloorTiles + 50)
-    ld (_RAM_DC59_FloorTiles + 54), a
-    ld a, (_RAM_DC59_FloorTiles + 46)
-    ld (_RAM_DC59_FloorTiles + 50), a
-    ld a, (_RAM_DC59_FloorTiles + 42)
-    ld (_RAM_DC59_FloorTiles + 46), a
-    ld a, (_RAM_DC59_FloorTiles + 38)
-    ld (_RAM_DC59_FloorTiles + 42), a
-    ld a, (_RAM_DC59_FloorTiles + 34)
-    ld (_RAM_DC59_FloorTiles + 38), a
-    ld a, (_RAM_DC59_FloorTiles + 30)
-    ld (_RAM_DC59_FloorTiles + 34), a
-    ld a, (_RAM_DC59_FloorTiles + 26)
-    ld (_RAM_DC59_FloorTiles + 30), a
-    ld a, (_RAM_DC59_FloorTiles + 22)
-    ld (_RAM_DC59_FloorTiles + 26), a
-    ld a, (_RAM_DC59_FloorTiles + 18)
-    ld (_RAM_DC59_FloorTiles + 22), a
-    ld a, (_RAM_DC59_FloorTiles + 14)
-    ld (_RAM_DC59_FloorTiles + 18), a
-    ld a, (_RAM_DC59_FloorTiles + 10)
-    ld (_RAM_DC59_FloorTiles + 14), a
-    ld a, (_RAM_DC59_FloorTiles + 6)
-    ld (_RAM_DC59_FloorTiles + 10), a
-    ld a, (_RAM_DC59_FloorTiles + 2)
-    ld (_RAM_DC59_FloorTiles + 6), a
-    ld a, (_RAM_DE59_)
-    ld (_RAM_DC59_FloorTiles + 2), a
+    ; We do this by:
+    ; - Reading the bottom row into a temp variable
+    ; - Copying each row from 4 bytes above
+    ; - Filling in the temporary at the end
+    .macro RotateBitplaneVertically args direction, bitplane
+    ; Calculate offset of top/bottom row
+    .if direction == +1
+      .define n BYTES_PER_TILE + BYTES_PER_ROW * 7 + bitplane
+    .else
+      .define n bitplane
+    .endif
+    ; Copy into temp
+    ld a, (_RAM_DC59_FloorTiles + n)
+    ld (_RAM_DE59_FloorTileRotationTemp), a
+    ; Copy all the others from above/below
+    .repeat SPRITE_HEIGHT * 2 - 1 ; (15 rows)
+    ld a, (_RAM_DC59_FloorTiles + n - BYTES_PER_ROW * direction)
+    ld (_RAM_DC59_FloorTiles + n), a
+      .redefine n, n - BYTES_PER_ROW * direction
+    .endr
+    ; And the final one comes from temp
+    ld a, (_RAM_DE59_FloorTileRotationTemp)
+    ld (_RAM_DC59_FloorTiles + n), a
+    .undefine n
+    .endm
+    
+    RotateBitplaneVertically +1, 2
   pop hl
   ret
 
-LABEL_D67_MoveFloorTilesUp:
-    ld a, (_RAM_DC59_FloorTiles + 2)
-    ld (_RAM_DE59_), a
-    ld a, (_RAM_DC59_FloorTiles + 6)
-    ld (_RAM_DC59_FloorTiles + 2), a
-    ld a, (_RAM_DC59_FloorTiles + 10)
-    ld (_RAM_DC59_FloorTiles + 6), a
-    ld a, (_RAM_DC59_FloorTiles + 14)
-    ld (_RAM_DC59_FloorTiles + 10), a
-    ld a, (_RAM_DC59_FloorTiles + 18)
-    ld (_RAM_DC59_FloorTiles + 14), a
-    ld a, (_RAM_DC59_FloorTiles + 22)
-    ld (_RAM_DC59_FloorTiles + 18), a
-    ld a, (_RAM_DC59_FloorTiles + 26)
-    ld (_RAM_DC59_FloorTiles + 22), a
-    ld a, (_RAM_DC59_FloorTiles + 30)
-    ld (_RAM_DC59_FloorTiles + 26), a
-    ld a, (_RAM_DC59_FloorTiles + 34)
-    ld (_RAM_DC59_FloorTiles + 30), a
-    ld a, (_RAM_DC59_FloorTiles + 38)
-    ld (_RAM_DC59_FloorTiles + 34), a
-    ld a, (_RAM_DC59_FloorTiles + 42)
-    ld (_RAM_DC59_FloorTiles + 38), a
-    ld a, (_RAM_DC59_FloorTiles + 46)
-    ld (_RAM_DC59_FloorTiles + 42), a
-    ld a, (_RAM_DC59_FloorTiles + 50)
-    ld (_RAM_DC59_FloorTiles + 46), a
-    ld a, (_RAM_DC59_FloorTiles + 54)
-    ld (_RAM_DC59_FloorTiles + 50), a
-    ld a, (_RAM_DC59_FloorTiles + 58)
-    ld (_RAM_DC59_FloorTiles + 54), a
-    ld a, (_RAM_DC59_FloorTiles + 62)
-    ld (_RAM_DC59_FloorTiles + 58), a
-    ld a, (_RAM_DE59_)
-    ld (_RAM_DC59_FloorTiles + 62), a
+LABEL_D67_ScrollFloorTiles_Y_Row_Up:
+    RotateBitplaneVertically -1, 2
   pop hl
   ret
 
-LABEL_DCF_MoveFloorTilesHorizontally:
+LABEL_DCF_ScrollFloorTiles_X_Column:
   push hl
     ld a, l
     cp $80
-    jp z, LABEL_E3C_MoveFloorTilesRight
+    jp z, LABEL_E3C_ScrollFloorTiles_X_Column_Right
+
     ; Move them left
+    ; We rotate bitplane 2 left by:
+    ; - Rotate +2 into carry
+    ; - Rotate carry into +34 (next tile)
+    ; - Rotate carry into +2
+    ; This is done for 8 rows
+    .macro RotateBitplaneRowLeft args rowNumber, bitplaneNumber
+      ld a, (_RAM_DC59_FloorTiles + (rowNumber * BYTES_PER_ROW) + bitplaneNumber)
+      rla
+      rl (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+      rl (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber)
+    .endm
     ld ix, _RAM_DC59_FloorTiles
-    ld a, (_RAM_DC59_FloorTiles + 2)
-    rla
-    rl (ix+34)
-    rl (ix+2)
-    ld a, (_RAM_DC59_FloorTiles + 6)
-    rla
-    rl (ix+38)
-    rl (ix+6)
-    ld a, (_RAM_DC59_FloorTiles + 10)
-    rla
-    rl (ix+42)
-    rl (ix+10)
-    ld a, (_RAM_DC59_FloorTiles + 14)
-    rla
-    rl (ix+46)
-    rl (ix+14)
-    ld a, (_RAM_DC59_FloorTiles + 18)
-    rla
-    rl (ix+50)
-    rl (ix+18)
-    ld a, (_RAM_DC59_FloorTiles + 22)
-    rla
-    rl (ix+54)
-    rl (ix+22)
-    ld a, (_RAM_DC59_FloorTiles + 26)
-    rla
-    rl (ix+58)
-    rl (ix+26)
-    ld a, (_RAM_DC59_FloorTiles + 30)
-    rla
-    rl (ix+62)
-    rl (ix+30)
+    RotateBitplaneRowLeft 0 2
+    RotateBitplaneRowLeft 1 2
+    RotateBitplaneRowLeft 2 2
+    RotateBitplaneRowLeft 3 2
+    RotateBitplaneRowLeft 4 2
+    RotateBitplaneRowLeft 5 2
+    RotateBitplaneRowLeft 6 2
+    RotateBitplaneRowLeft 7 2
   pop hl
   ret
 
-LABEL_E3C_MoveFloorTilesRight:
+LABEL_E3C_ScrollFloorTiles_X_Column_Right:
+    ; We rotate bitplane 2 right by:
+    ; - Rotate +34 into carry
+    ; - Rotate carry into +2 (previous tile)
+    ; - Rotate carry into +34
+    ; This is done for 8 rows
+    ; (Not necessary to inert the order from above, it works either way)
+    .macro RotateBitplaneRowRight args rowNumber, bitplaneNumber
+      ld a, (_RAM_DC59_FloorTiles + (rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+      rra
+      rr (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber)
+      rr (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+    .endm
     ld ix, _RAM_DC59_FloorTiles
-    ld a, (_RAM_DC59_FloorTiles + 34)
-    rra
-    rr (ix+2)
-    rr (ix+34)
-    ld a, (_RAM_DC59_FloorTiles + 38)
-    rra
-    rr (ix+6)
-    rr (ix+38)
-    ld a, (_RAM_DC59_FloorTiles + 42)
-    rra
-    rr (ix+10)
-    rr (ix+42)
-    ld a, (_RAM_DC59_FloorTiles + 46)
-    rra
-    rr (ix+14)
-    rr (ix+46)
-    ld a, (_RAM_DC59_FloorTiles + 50)
-    rra
-    rr (ix+18)
-    rr (ix+50)
-    ld a, (_RAM_DC59_FloorTiles + 54)
-    rra
-    rr (ix+22)
-    rr (ix+54)
-    ld a, (_RAM_DC59_FloorTiles + 58)
-    rra
-    rr (ix+26)
-    rr (ix+58)
-    ld a, (_RAM_DC59_FloorTiles + 62)
-    rra
-    rr (ix+30)
-    rr (ix+62)
+    RotateBitplaneRowRight 0 2
+    RotateBitplaneRowRight 1 2
+    RotateBitplaneRowRight 2 2
+    RotateBitplaneRowRight 3 2
+    RotateBitplaneRowRight 4 2
+    RotateBitplaneRowRight 5 2
+    RotateBitplaneRowRight 6 2
+    RotateBitplaneRowRight 7 2
   pop hl
   ret
-;;.ends
+.ends
+
+.section "Bank 0 unknown" force
 
 DATA_EA2_: ; Engine velocity related?
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
@@ -3765,9 +3567,14 @@ DATA_EA2_: ; Engine velocity related?
 .db $01 $01 $00 $00 $01 $01 $02 $02 $01 $01 $02 $02 $03 $03 $02 $02
 .db $03 $03 $04 $04 $03 $03 $04 $04 $05 $05 $04 $04 $05 $05 $06 $06
 .db $05 $05 $06 $06
+.ends
 
+.section "Trampolines 3" force
 LABEL_EE6_:
   JumpToPagedFunction LABEL_363D9_
+.ends
+  
+.section "Bank 0 unknown 2" force
 
 LABEL_EF1_:
   ld a, (_RAM_DE90_CarDirection)
@@ -3780,7 +3587,7 @@ LABEL_EF1_:
   jr nz, +
   ld a, (_RAM_DF03_)
   cp $02
-  jr z, LABEL_F6F_
+  jr z, LABEL_F6F_ret
 +:
   ld a, (_RAM_DEA3_)
   or a
@@ -3794,12 +3601,14 @@ LABEL_EF1_:
   jr z, ++
   cp $01
   jr z, +
+  
+  ; Check for L
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_L_MASK ; $04
   jr z, LABEL_F75_
   jp ++
 
-+:
++:; Check for R
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_R_MASK ; $08
   jr z, LABEL_F75_
@@ -3807,13 +3616,14 @@ LABEL_EF1_:
   ld a, (_RAM_DEA3_)
   or a
   jr z, LABEL_F75_
+  
   ld a, (_RAM_DB20_Player1Controls)
   ld l, a
   and BUTTON_L_MASK ; $04
   jr z, +
   ld a, l
   and BUTTON_R_MASK ; $08
-  jr nz, LABEL_F6F_
+  JrNzRet LABEL_F6F_ret
 +:
   ld a, $01
   ld (_RAM_DEA7_), a
@@ -3837,11 +3647,10 @@ LABEL_F58_:
   jr nz, +
   ld a, l
   ld (_RAM_DE96_), a
-LABEL_F6F_:
+LABEL_F6F_ret:
   ret
 
-+:
-  xor a
++:xor a
   ld (_RAM_DE96_), a
   ret
 
@@ -3858,8 +3667,7 @@ LABEL_F75_:
   ld (_RAM_DEA5_), a
   jp LABEL_F58_
 
-+:
-  xor a
++:xor a
   ld (_RAM_DEA5_), a
   ld (_RAM_DEA7_), a
   ld a, (_RAM_DE92_EngineVelocity)
@@ -3868,7 +3676,7 @@ LABEL_F75_:
 
 LABEL_F9B_:
   xor a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
@@ -3932,7 +3740,7 @@ LABEL_1011_:
   ld (_RAM_DE92_EngineVelocity), a
   ld (_RAM_D5A4_IsReversing), a
 +:
-  ld a, (_RAM_DF65_)
+  ld a, (_RAM_DF65_HasFinished)
   or a
   jr z, +
 LABEL_1024_:
@@ -3940,13 +3748,13 @@ LABEL_1024_:
   or a
   jp z, LABEL_109B_
 LABEL_102B_:
-  ld hl, _RAM_DEB4_
+  ld hl, _RAM_DEB4_DecelerationDelayCounter
   inc (hl)
   ld a, (hl)
   cp $07
   jr c, LABEL_1081_
   ld a, $00
-  ld (_RAM_DEB4_), a
+  ld (_RAM_DEB4_DecelerationDelayCounter), a
   ld a, (_RAM_DF00_)
   or a
   jr nz, LABEL_1081_
@@ -3972,13 +3780,13 @@ LABEL_102B_:
   jp z, LABEL_109B_
   ld a, (_RAM_DB9A_DecelerationDelay)
   ld b, a
-  ld hl, _RAM_DEB4_
+  ld hl, _RAM_DEB4_DecelerationDelayCounter
   inc (hl)
   ld a, (hl)
   cp b
   jp c, LABEL_1081_
   ld a, $00
-  ld (_RAM_DEB4_), a
+  ld (_RAM_DEB4_DecelerationDelayCounter), a
   ld a, (_RAM_DF00_)
   or a
   jp nz, LABEL_1081_
@@ -3999,10 +3807,10 @@ LABEL_1081_:
 
 LABEL_109B_:
   ld a, (_RAM_DB9A_DecelerationDelay)
-  sub $01
-  ld (_RAM_DEB4_), a
+  sub 1
+  ld (_RAM_DEB4_DecelerationDelayCounter), a
   ld a, (_RAM_DB99_AccelerationDelay)
-  sub $01
+  sub 1
   ld (_RAM_DEB3_Player1AccelerationDelayCounter), a
   ld hl, _RAM_DEAD_
   inc (hl)
@@ -4095,7 +3903,7 @@ LABEL_1121_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -4113,8 +3921,8 @@ LABEL_1121_:
   adc a, h
   ld h, a
   ld a, (hl)
-  ld (_RAM_DEAF_), a
-  ld hl, DATA_40E5_Sign_
+  ld (_RAM_DEAF_HScrollDelta), a
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -4126,15 +3934,15 @@ LABEL_1121_:
   jr z, +
   xor a
   ld (_RAM_DEB0_), a
-  ld hl, _RAM_DEAF_
+  ld hl, _RAM_DEAF_HScrollDelta
   jp ++
 
 +:
   ld a, $01
   ld (_RAM_DEB0_), a
-  ld hl, _RAM_DEAF_
+  ld hl, _RAM_DEAF_HScrollDelta
 ++:
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -4153,7 +3961,7 @@ LABEL_1121_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DEB1_VScrollDelta), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_D5A3_)
   add a, l
   ld l, a
@@ -4332,6 +4140,9 @@ LABEL_1295_:
   ld (_RAM_DEAB_), a
 ++:ret
 
+.ends
+
+.section "Trampolines 4" force
 LABEL_12BF_:
   JumpToPagedFunction LABEL_35F8A_
 
@@ -4340,8 +4151,10 @@ LABEL_12CA_:
 
 LABEL_12D5_:
   JumpToPagedFunction LABEL_1FA3D_
+.ends
 
-LABEL_12E0_DrawTilemapRectangle:
+.section "Game screen tilemap drawing" force
+_DrawTilemapRectangle:
   ; Look up tile index data pointer into de
   ld hl, DATA_4000_TileIndexPointerLow
   ld a, (_RAM_DEBC_TileDataIndex)
@@ -4490,7 +4303,7 @@ LABEL_1345_DrawGameFullScreen:
     ld (_RAM_DEBC_TileDataIndex), a
     SetTileIndex_RAM_DEC1_VRAMAddress x, y
     push hl
-      call LABEL_12E0_DrawTilemapRectangle
+      call _DrawTilemapRectangle
     pop hl
   .endm
   
@@ -4622,10 +4435,13 @@ LABEL_1583_SetDrawingParameters_FullMetatile:
   ld a, 12
   ld (_RAM_DEC5_RectangleHeight), a
   ret
+.ends
 
+.section "Unknown slot 0" force
+; Scrolling and tilemap updates?
 LABEL_1593_:
   xor a
-  ld (_RAM_DEF6_), a
+  ld (_RAM_DEF6_FloorScrollingYAmount), a
   ld a, (_RAM_DEB2_)
   or a
   jp z, LABEL_162D_
@@ -4647,7 +4463,7 @@ LABEL_1593_:
   JrNzRet - ; ret
   call LABEL_3E24_
   ld a, (_RAM_DEB1_VScrollDelta)
-  ld (_RAM_DEF6_), a
+  ld (_RAM_DEF6_FloorScrollingYAmount), a
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
   and $07
@@ -4722,7 +4538,7 @@ LABEL_162D_:
   call LABEL_7C72_
   ld a, (_RAM_DEB1_VScrollDelta)
   or $80
-  ld (_RAM_DEF6_), a
+  ld (_RAM_DEF6_FloorScrollingYAmount), a
   ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
   ld a, (_RAM_DED4_VScrollValue)
@@ -4778,7 +4594,7 @@ LABEL_162D_:
 
 LABEL_16C0_:
   xor a
-  ld (_RAM_DEF7_), a
+  ld (_RAM_DEF7_FloorScrollingXAmount), a
   ld a, (_RAM_DEB0_)
   or a
   jr z, +
@@ -4802,8 +4618,8 @@ LABEL_16C0_:
   or a
   JrNzRet -
   call LABEL_7C67_
-  ld a, (_RAM_DEAF_)
-  ld (_RAM_DEF7_), a
+  ld a, (_RAM_DEAF_HScrollDelta)
+  ld (_RAM_DEF7_FloorScrollingXAmount), a
   ld l, a
   ld a, (_RAM_DED3_HScrollValue)
   and $07
@@ -4812,7 +4628,7 @@ LABEL_16C0_:
   jr z, +
   jr c, ++
 +:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DED3_HScrollValue)
   add a, l
@@ -4872,17 +4688,17 @@ LABEL_174E_:
   cp $01
   jr nz, -
   call LABEL_3E2F_
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   or $80
-  ld (_RAM_DEF7_), a
-  ld a, (_RAM_DEAF_)
+  ld (_RAM_DEF7_FloorScrollingXAmount), a
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DED3_HScrollValue)
   and $07
   sub l
   jr nc, +
   call ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DED3_HScrollValue)
   sub l
@@ -5030,7 +4846,7 @@ LABEL_188E_:
   or a
   jr z, +
   ld (_RAM_DEF5_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld (_RAM_DEF4_), a
   call LABEL_30EA_
   ld a, (_RAM_DEF1_)
@@ -5092,7 +4908,7 @@ LABEL_18FD_:
   call LABEL_198A_
   xor a
   ld (_RAM_DEC6_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld l, a
   ld a, (_RAM_DED1_MetatilemapPointer.Lo)
   add a, l
@@ -5107,7 +4923,7 @@ LABEL_18FD_:
   JrZRet _LABEL_1989_ret
   xor a
   ld (_RAM_DEC6_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld l, a
   ld a, (_RAM_DED1_MetatilemapPointer.Lo)
   add a, l
@@ -5122,7 +4938,7 @@ LABEL_18FD_:
   JrZRet _LABEL_1989_ret
   xor a
   ld (_RAM_DEC6_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld l, a
   ld a, (_RAM_DED1_MetatilemapPointer.Lo)
   add a, l
@@ -5152,7 +4968,7 @@ LABEL_198A_:
   or a
   jr z, +
   ld (_RAM_DEF5_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld (_RAM_DEF4_), a
   call LABEL_30EA_
   ld a, (_RAM_DEF1_)
@@ -5185,7 +5001,7 @@ LABEL_19CE_:
   ret
 
 DATA_19E2_MultiplesOf12:
-  TimesTableLo 0 12 12
+  TimesTableLo 0, 12, 12
 
 LABEL_19EE_:
   ; Copy 32 bytes from DATA_4105_+_RAM_DB97_TrackType*32 to _RAM_DA00_ ; TODO what is it?
@@ -5310,7 +5126,9 @@ LABEL_1AC8_:
   xor a
   ld (_RAM_DF0E_), a
 +:ret
+.ends
 
+.section "More slot 0" force
 LABEL_1AD8_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -5345,78 +5163,79 @@ LABEL_1AFA_:
 +:ret
 .endif
 
-LABEL_1B0C_:
-  ld a, (ix+22)
-  cp $01
+LABEL_1B0C_DecrementYPosition:
+  ; Subtracts 1 from YPosition if Unknown22_b != 1 (and then sets it to 1)
+  ld a, (ix+CarData.Unknown22_b)
+  cp 1
   JrZRet +
-  ld de, $0001
+  ld de, 1
   or a
-  ld a, (ix+2)
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
-  sbc hl, de
+  sbc hl, de ; could dec hl
   ld a, l
-  ld (ix+2), a
+  ld (ix+CarData.YPosition.Lo), a
   ld a, h
-  ld (ix+3), a
-  ld a, $01
-  ld (ix+22), a
+  ld (ix+CarData.YPosition.Hi), a
+  ld a, 1
+  ld (ix+CarData.Unknown22_b), a
 +:ret
 
-LABEL_1B2F_:
-  ld a, (ix+22)
-  cp $01
+LABEL_1B2F_IncrementYPosition:
+  ld a, (ix+CarData.Unknown22_b)
+  cp 1
   JrZRet +
-  ld de, $0001
-  ld a, (ix+2)
+  ld de, 1
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
   add hl, de
   ld a, l
-  ld (ix+2), a
+  ld (ix+CarData.YPosition.Lo), a
   ld a, h
-  ld (ix+3), a
-  ld a, $01
-  ld (ix+22), a
+  ld (ix+CarData.YPosition.Hi), a
+  ld a, 1
+  ld (ix+CarData.Unknown22_b), a
 +:ret
 
-LABEL_1B50_:
-  ld a, (ix+23)
-  cp $01
+LABEL_1B50_DecrementXPosition:
+  ld a, (ix+CarData.Unknown23_b)
+  cp 1
   JrZRet +
-  ld de, $0001
+  ld de, 1
   or a
-  ld a, (ix+0)
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
   sbc hl, de
   ld a, l
-  ld (ix+0), a
+  ld (ix+CarData.XPosition.Lo), a
   ld a, h
-  ld (ix+1), a
-  ld a, $01
-  ld (ix+23), a
+  ld (ix+CarData.XPosition.Hi), a
+  ld a, 1
+  ld (ix+CarData.Unknown23_b), a
 +:ret
 
-LABEL_1B73_:
-  ld a, (ix+23)
-  cp $01
+LABEL_1B73_IncrementXPosition:
+  ld a, (ix+CarData.Unknown23_b)
+  cp 1
   JrZRet +
-  ld de, $0001
-  ld a, (ix+0)
+  ld de, 1
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
   add hl, de
   ld a, l
-  ld (ix+0), a
+  ld (ix+CarData.XPosition.Lo), a
   ld a, h
-  ld (ix+1), a
-  ld a, $01
-  ld (ix+23), a
+  ld (ix+CarData.XPosition.Hi), a
+  ld a, 1
+  ld (ix+CarData.Unknown23_b), a
 +:ret
 
 LABEL_1B94_:
@@ -5544,7 +5363,7 @@ LABEL_1CBD_:
   and $1F
   jr z, +
   ld (_RAM_DEF5_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld (_RAM_DEF4_), a
   call LABEL_30EA_
 +:
@@ -5560,16 +5379,20 @@ LABEL_1CBD_:
   add hl, de
   ld a, (hl)
   ret
+.ends
 
+.section "Trampolines 5" force
 LABEL_1CF4_:
   JumpToPagedFunction LABEL_1FB35_
+.ends
 
+.section "bank 0 again" force
 LABEL_1CFF_:
   ld a, $01
-  ld (_RAM_DF65_), a
-  ld (_RAM_DCC5_), a
-  ld (_RAM_DD06_), a
-  ld (_RAM_DD47_), a
+  ld (_RAM_DF65_HasFinished), a
+  ld (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished), a
   ld a, (_RAM_DF28_)
   ld (_RAM_DF2A_Positions.Blue), a
   ld a, (_RAM_DF29_)
@@ -5612,13 +5435,14 @@ LABEL_1D45_:
   call LABEL_50CB_
   jp LABEL_511A_
 
+; Split table pointing at ???
 ; Low bytes
 DATA_1D65__Lo:
-.db <_LABEL_4BAC_ <_LABEL_4BCA_ <_LABEL_4BE8_ <_LABEL_4C06_ <_LABEL_4C24_ <_LABEL_4C42_ <_LABEL_4C60_ <_LABEL_4C7E_ <_LABEL_4C9C_ <_LABEL_4CBA_ <_LABEL_4CD8_ <_LABEL_4CF6_ <_LABEL_4D14_ <_LABEL_4D32_ <_LABEL_4D50_ <_LABEL_4D6E_ <_LABEL_4D8C_ 
+.db <Data1d65_0 <Data1d65_1 <Data1d65_2 <Data1d65_3 <Data1d65_4 <Data1d65_5 <Data1d65_6 <Data1d65_7 <Data1d65_8 <Data1d65_9 <Data1d65_10 <Data1d65_11 <Data1d65_12 <Data1d65_13 <Data1d65_14 <Data1d65_15 <Data1d65_16 
 
 ; High bytes
 DATA_1D76__Hi:
-.db >_LABEL_4BAC_ >_LABEL_4BCA_ >_LABEL_4BE8_ >_LABEL_4C06_ >_LABEL_4C24_ >_LABEL_4C42_ >_LABEL_4C60_ >_LABEL_4C7E_ >_LABEL_4C9C_ >_LABEL_4CBA_ >_LABEL_4CD8_ >_LABEL_4CF6_ >_LABEL_4D14_ >_LABEL_4D32_ >_LABEL_4D50_ >_LABEL_4D6E_ >_LABEL_4D8C_ 
+.db >Data1d65_0 >Data1d65_1 >Data1d65_2 >Data1d65_3 >Data1d65_4 >Data1d65_5 >Data1d65_6 >Data1d65_7 >Data1d65_8 >Data1d65_9 >Data1d65_10 >Data1d65_11 >Data1d65_12 >Data1d65_13 >Data1d65_14 >Data1d65_15 >Data1d65_16 
 
 ; Data from 1D87 to 1D96 (16 bytes)
 DATA_1D87_:
@@ -5634,10 +5458,14 @@ DATA_1DA7_:
 .db $04 $02 $00 $0E $0C $0A $08 $06 $03 $01 $0F $0D $0B $09 $07 $05
 .db $00 $0E $0C $0A $08 $06 $04 $02 $0F $0D $0B $09 $07 $05 $03 $01
 .db $08 $06 $04 $02 $00 $0E $0C $0A $07 $05 $03 $01 $0F $0D $0B $09
+.ends
 
-LABEL_AFD_ReadControls:
+.section "Trampolines 6" force
+LABEL_AFD_ReadControls_Trampoline:
   JumpToPagedFunction LABEL_3773B_ReadControls
+.ends
 
+.section "Bank 0 1df2" force
 LABEL_1DF2_:
   ld b, $00
   ld a, (_RAM_DB97_TrackType)
@@ -5645,11 +5473,11 @@ LABEL_1DF2_:
   jr nz, +
   ld b, $07
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DF04_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DF05_), a
-  ld a, (_RAM_DC56_)
+  ld a, (_RAM_DC56_Adjustment1)
   ld c, a
   ld a, (_RAM_DED3_HScrollValue)
   and $07
@@ -5726,7 +5554,7 @@ LABEL_1DF2_:
   and $1F
   jr z, +
   ld (_RAM_DEF5_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld (_RAM_DEF4_), a
   call LABEL_30EA_
 +:
@@ -5852,19 +5680,19 @@ LABEL_1DF2_:
   or a
   jr nz, +
   ld a, SFX_03_Crash
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +:
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   call LABEL_28AC_
   xor a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DE2F_), a
   ld (_RAM_DF7B_), a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DBA6_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DBA7_), a
 LABEL_1FBF_:
   ld a, (_RAM_DF00_)
@@ -5882,14 +5710,14 @@ LABEL_1FBF_:
   jp +
 
 LABEL_1FDC_:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DE5C_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DE5D_), a
   ld a, (_RAM_DBA6_)
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld a, (_RAM_DBA7_)
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
 +:
   ld hl, DATA_25D0_TimesTable36Lo
   ld a, (_RAM_DE7D_)
@@ -6030,12 +5858,12 @@ LABEL_20E4_Behaviour2_Dust
 +:
   ; Behaviour 2 = dust/chalk
   ld a, (_RAM_DE92_EngineVelocity)
-  cp $07
+  cp DUST_MINIMUM_VELOCITY
   JrCRet + ; Only when driving fast enough
   xor a
-  ld (_RAM_DD9A_), a
+  ld (_RAM_DD6E_CarEffects.1.NextType), a
   ld a, $01
-  ld (_RAM_DD9B_), a
+  ld (_RAM_DD6E_CarEffects.1.Member45_Enabled2), a
 +:ret
 
 ++:
@@ -6047,8 +5875,8 @@ LABEL_2128_Behaviour5_Skid
   or a
   JrZRet +++ ; Not using the engine
   ld a, $01
-  ld (_RAM_DD9A_), a ; set ???
-  ld (_RAM_DD9B_), a
+  ld (_RAM_DD6E_CarEffects.1.NextType), a ; set ???
+  ld (_RAM_DD6E_CarEffects.1.Member45_Enabled2), a
   ld a, (_RAM_DB97_TrackType)
   cp TT_3_TurboWheels
   JrZRet +++
@@ -6196,16 +6024,16 @@ LABEL_21F3_Behavour4:
   JrNzRet _LABEL_2222_ret
 LABEL_2200_:
   ld a, (_RAM_DE5C_)
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld a, (_RAM_DE5D_)
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   call LABEL_28AC_
   xor a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DBA6_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DBA7_), a
 _LABEL_2222_ret:
   ret
@@ -6290,13 +6118,13 @@ LABEL_22A9_:
   ld (_RAM_DF07_), a
   ld a, $01
   ld (_RAM_DF00_), a
-  ld hl, (_RAM_D95B_)
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
   ld (_RAM_D58C_), hl
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   JrZRet _LABEL_22CC_ret ; ret
   ld a, SFX_02_HitGround
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 _LABEL_22CC_ret:
   ret
 
@@ -6305,6 +6133,7 @@ LABEL_22CD_:
   ld a, (_RAM_DF00_)
   or a
   JpZRet _LABEL_23C2_ret
+  ; Look up sin((_RAM_DF00_-1)*180/129)*128, i.e. a sin hump from 0..127 on Y for 1..130 on X
   ld hl, DATA_1B232_SinTable ; $B232
   ld e, a
   add hl, de
@@ -6315,17 +6144,18 @@ LABEL_22CD_:
   ld a, (_RAM_DE8E_PageNumber)
   ld (PAGING_REGISTER), a
   ld a, b
+  ; And save the result
   ld (_RAM_DEF5_), a
   ld a, (_RAM_DF0A_)
   ld (_RAM_DEF4_), a
   call LABEL_1B94_
   ld a, (_RAM_DEF2_)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   add a, l
   add a, $04
   ld (_RAM_DE5E_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   add a, l
   add a, $04
   ld (_RAM_DE62_), a
@@ -6341,10 +6171,10 @@ LABEL_22CD_:
   call LABEL_1B94_
   ld a, (_RAM_DEF2_)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
   ld (_RAM_DF06_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   ld (_RAM_DF07_), a
   ld a, (_RAM_DF02_)
@@ -6355,7 +6185,7 @@ LABEL_22CD_:
   cp $82
   JpCRet _LABEL_23C2_ret
   ld hl, (_RAM_D58C_)
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   jr nz, +
@@ -6365,7 +6195,7 @@ LABEL_22CD_:
 +:
   ld a, SFX_02_HitGround
 ++:
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   xor a
   ld (_RAM_DF00_), a
   ld (_RAM_DE66_), a
@@ -6515,7 +6345,7 @@ DATA_24FE_:
 .db $82 $82 $82 $82 $82 $06 $06 $05 $05 $04 $03 $03 $03 $03 $03 $03
 
 ; Data from 250E to 251D (16 bytes)
-DATA_250E_:
+DATA_250E_: ; indexed by _RAM_DE90_CarDirection
 .db $08 $09 $0A $0B $0C $0D $0E $0F $00 $01 $02 $03 $04 $05 $06 $07
 
 ; Data from 251E to 254D (48 bytes)
@@ -6556,32 +6386,32 @@ LABEL_2673_:
   ld a, (_RAM_DEB0_)
 +:cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF0D_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -6590,7 +6420,7 @@ LABEL_2673_:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DF0E_)
   ld l, a
@@ -6677,7 +6507,7 @@ LABEL_2724_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -6696,7 +6526,7 @@ LABEL_2724_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0B_), a
-  ld hl, DATA_40E5_Sign_
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -6714,7 +6544,7 @@ LABEL_2724_:
   ld a, $01
   ld (_RAM_DF0D_), a
 ++:
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -6733,7 +6563,7 @@ LABEL_2724_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0C_), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_DF11_)
   add a, l
   ld l, a
@@ -6762,14 +6592,14 @@ LABEL_27B1_:
   ld a, (_RAM_DEB0_)
   cp $01
   jr z, +
-  ld hl, _RAM_DEAF_
+  ld hl, _RAM_DEAF_HScrollDelta
   ld a, (_RAM_DBA6_)
   sub (hl)
   ld (_RAM_DBA6_), a
   jp ++
 
 +:
-  ld hl, _RAM_DEAF_
+  ld hl, _RAM_DEAF_HScrollDelta
   ld a, (_RAM_DBA6_)
   add a, (hl)
   ld (_RAM_DBA6_), a
@@ -6803,7 +6633,7 @@ LABEL_27FB_:
   JrNzRet _LABEL_284F_ret
   ld a, (_RAM_DB80_)
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   add a, l
   ld l, a
   and $01
@@ -6813,7 +6643,7 @@ LABEL_27FB_:
 -:
   ld a, l
   srl a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp ++
 
 +:
@@ -6847,7 +6677,7 @@ LABEL_2857_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JrNzRet _LABEL_28A4_ret
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld (_RAM_DB7E_), a
   ld a, (_RAM_DB82_)
   ld l, a
@@ -6870,7 +6700,7 @@ LABEL_2857_:
   jp -
 
 ++:
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld (_RAM_DB7F_), a
   ld a, (_RAM_DB83_)
   ld l, a
@@ -6976,7 +6806,7 @@ LABEL_2934_BehaviourF:
   or a
   JrNzRet +
   ld a, SFX_05
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
@@ -7040,7 +6870,7 @@ LABEL_29A3_:
   or a
   JrNzRet ++
   ld a, SFX_09_EnterPoolTableHole
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   jp LABEL_29BC_Behaviour1_FallToFloor
 
 ++:ret
@@ -7063,13 +6893,13 @@ LABEL_29BC_Behaviour1_FallToFloor:
   jr nz, +
   ; Play sound effect
   ld a, SFX_0E_FallToFloor
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
   ; Two player
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jr z, +
   ld a, $01
@@ -7082,10 +6912,10 @@ LABEL_29BC_Behaviour1_FallToFloor:
   jp ++
 +:ld a, CarState_3_Falling
 ++:ld (_RAM_DF59_CarState), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   xor a
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
 LABEL_2A08_:
   ld a, $01
   ld (_RAM_DF58_), a
@@ -7099,7 +6929,7 @@ LABEL_2A08_:
   ld (_RAM_DE2F_), a
   ld (_RAM_DF7B_), a
   ld (_RAM_D5B9_), a
-  ld (_RAM_DD08_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown28_b), a
   ld (_RAM_DF79_CurrentCombinedByte), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
@@ -7113,7 +6943,7 @@ _LABEL_2A36_ret:
   xor a
   ld (_RAM_DB80_), a
   ld (_RAM_DB81_), a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld a, $01
   ld (_RAM_D945_), a
@@ -7127,15 +6957,15 @@ LABEL_2A4A_:
   jr z, -
 LABEL_2A55_:
   xor a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld (_RAM_DE92_EngineVelocity), a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld a, $02
   ld (_RAM_DF80_TwoPlayerWinPhase), a
   ld a, $01
   ld (_RAM_DF81_), a
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   ld e, a
   ld d, $00
   ld hl, (_RAM_DBA9_)
@@ -7147,7 +6977,7 @@ LABEL_2A55_:
   and $FC
   ld l, a
   ld (_RAM_DBAD_), hl
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   cp $F0
   jr c, +
   xor a
@@ -7294,7 +7124,7 @@ LABEL_2BA4_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   ld (_RAM_D5C6_), a
   or a
   jr nz, +
@@ -7302,9 +7132,9 @@ LABEL_2BA4_:
   ld (_RAM_DF56_), hl
 +:
   xor a
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
   ld a, SFX_09_EnterPoolTableHole
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, CarState_3_Falling
   ld (_RAM_DF59_CarState), a
   ld a, $01
@@ -7370,7 +7200,7 @@ LABEL_2C29_Behaviour8_Sticky:
 ++:
   ld (_RAM_DE92_EngineVelocity), a
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +++:ret
 
 ++++:
@@ -7388,7 +7218,7 @@ Behaviour8_Sticky_FourByFour:
 ++:
   ld (_RAM_DE92_EngineVelocity), a
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +++:ret
 
 LABEL_2C69_Behaviour12:
@@ -7399,11 +7229,11 @@ LABEL_2C69_Behaviour12:
   or a
   JrNzRet _LABEL_2CD0_ret
   ld a, SFX_08
-  ld (_RAM_D963_SFXTrigger_Player1), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D963_SFX_Player1.Trigger), a
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   xor a
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -7543,7 +7373,7 @@ LABEL_2D63_:
   add hl, bc
   ld (_RAM_DF8D_), hl
 ++:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   cp $04
   jr z, ++
   ld hl, $0000
@@ -7563,7 +7393,7 @@ LABEL_2D63_:
   add hl, bc
   ld (_RAM_DF8F_), hl
 ++:
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp $04
   jr z, ++
   ld hl, $0000
@@ -7583,7 +7413,7 @@ LABEL_2D63_:
   add hl, bc
   ld (_RAM_DF91_), hl
 ++:
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp $04
   jr z, ++
   ld hl, $0000
@@ -7648,7 +7478,7 @@ LABEL_2D63_:
   jr c, +
 LABEL_2E42_:
   ld a, (_RAM_DB68_HandlingData+2)
-  ld (_RAM_DCDC_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown49_b), a
   ret
 
 +:
@@ -7657,7 +7487,7 @@ LABEL_2E42_:
   jr c, LABEL_2E42_
 ++:
   ld a, (_RAM_DB68_HandlingData+3)
-  ld (_RAM_DCDC_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown49_b), a
   ret
 
 +++:
@@ -7670,12 +7500,12 @@ LABEL_2E42_:
   jr c, ++
 +:
   ld a, (_RAM_DB68_HandlingData+1)
-  ld (_RAM_DCDC_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown49_b), a
   ret
 
 ++:
   ld a, (_RAM_DB68_HandlingData+0)
-  ld (_RAM_DCDC_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown49_b), a
   ret
 
 LABEL_2E71_:
@@ -7683,7 +7513,7 @@ LABEL_2E71_:
   or a
   jr z, +
   ld a, (_RAM_DB98_TopSpeed)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ret
 
 +:ld a, (_RAM_DC4F_Cheat_EasierOpponents)
@@ -7708,7 +7538,7 @@ LABEL_2E71_:
   jr c, +
 LABEL_2EA4_:
   ld a, (_RAM_DB68_HandlingData+6)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ret
 
 +:
@@ -7717,7 +7547,7 @@ LABEL_2EA4_:
   jr c, LABEL_2EA4_
 ++:
   ld a, (_RAM_DB68_HandlingData+7)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ret
 
 +++:
@@ -7730,12 +7560,12 @@ LABEL_2EA4_:
   jr c, ++
 +:
   ld a, (_RAM_DB68_HandlingData+5)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ret
 
 ++:
   ld a, (_RAM_DB68_HandlingData+4)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ret
 
 LABEL_2ED3_:
@@ -7760,7 +7590,7 @@ LABEL_2ED3_:
   jr c, +
 LABEL_2EF8_:
   ld a, (_RAM_DB68_HandlingData+10)
-  ld (_RAM_DD5E_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown49_b), a
   ret
 
 +:
@@ -7770,7 +7600,7 @@ LABEL_2EF8_:
 ++:
   ; Easier opponents cheat is active, or ???
   ld a, (_RAM_DB68_HandlingData+11)
-  ld (_RAM_DD5E_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown49_b), a
   ret
 
 +++:
@@ -7783,12 +7613,12 @@ LABEL_2EF8_:
   jr c, ++
 +:
   ld a, (_RAM_DB68_HandlingData+9)
-  ld (_RAM_DD5E_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown49_b), a
   ret
 
 ++:
   ld a, (_RAM_DB68_HandlingData+8)
-  ld (_RAM_DD5E_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown49_b), a
   ret
 
 DATA_2F27_MultiplesOf32:
@@ -7826,7 +7656,7 @@ DATA_2FBC_:
 .db $38 $3E $4B $00 ; RuffTrux   
                     ; No Helicopters
 
-LABEL_2FDC_:
+LABEL_2FDC_Falling:
   ld a, (_RAM_D5C1_)
   or a
   jr nz, LABEL_3028_
@@ -7870,7 +7700,7 @@ LABEL_3028_:
   ld a, CarState_1_Exploding
   ld (_RAM_DE8A_CarState2), a
   ld a, SFX_15_HitFloor
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +:
   xor a
   ld (_RAM_DE87_), a
@@ -8002,6 +7832,9 @@ DATA_313B_Powerboats_TileHighBytesRunCompressed:
 .db $FF $FF $FF $FF $FF $FE $EF $FF $FC $E7 $FF $FF $FF $7B $FF $FF
 .db $00 $10 $00 $10 $00 $10 $00 $10 $00
 
+.ends
+
+.section "Trampolines 7" force
 LABEL_3164_:
   ld a, (_RAM_D582_)
   cp $01
@@ -8025,15 +7858,17 @@ LABEL_318E_InitialiseVDPRegisters_Trampoline:
 
 LABEL_3199_:
   JumpToPagedFunction LABEL_37529_
+.ends
 
+.section "Floor tiles initialisation" force
 ; Data from 31A4 to 31B5 (18 bytes)
-DATA_31A4_FloorTilesVRAMAddress:
+_FloorTilesVRAMAddresses:
 ; VRAM address of the four floor tiles per track type. $ffff if no floor.
-.dw $4000 | ($20 * $58) ; $4B00
-.dw $4000 | ($20 * $a1) ; $5420
+  TileWriteAddressData $58 ; $4B00
+  TileWriteAddressData $a1 ; $5420
 .dw $FFFF
 .dw $FFFF
-.dw $4000 | ($20 * $13) ; $4260
+  TileWriteAddressData $13 ; $4260
 .dw $FFFF
 .dw $FFFF
 .dw $FFFF
@@ -8047,7 +7882,7 @@ LABEL_31B6_InitialiseFloorTiles:
   or a
   rl a
   ld e, a
-  ld hl, DATA_31A4_FloorTilesVRAMAddress ; Look up per-track-type data from this table
+  ld hl, _FloorTilesVRAMAddresses ; Look up per-track-type data from this table
   add hl, de
   ld a, (hl)
   ld (_RAM_DF18_FloorTilesVRAMAddress), a
@@ -8072,7 +7907,9 @@ LABEL_31B6_InitialiseFloorTiles:
   or c
   jr nz, -
 +:ret
+.ends
 
+.section "Sprite table to VRAM" force
 LABEL_31F1_UpdateSpriteTable:
   ; Sprite table Y
   SetVDPAddressImmediate SPRITE_TABLE_ADDRESS | VRAM_WRITE_MASK
@@ -8108,7 +7945,9 @@ LABEL_3214_BlankSpriteTable:
   or c
   jr nz, -
   ret
+.ends
 
+.section "Car decorator tiles" force
 LABEL_3231_BlankDecoratorTiles:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
@@ -8123,11 +7962,13 @@ LABEL_3231_BlankDecoratorTiles:
   or c
   jr nz, -
 +:ret
+.ends
 
+.section "Per frame tile writes" force
 .macro UpdateTileBitplane args TileIndex, Bitplane
   ; Emits 8 bytes from hl to port c
   ; while setting the VRAM write address to each bitplane byte 
-  ; for the gicen sprite and bitplane number
+  ; for the given sprite and bitplane number
   .define ADDRESS TileIndex * TILE_DATA_SIZE | VRAM_WRITE_MASK + Bitplane
   .repeat 8
     SetVDPAddressImmediate ADDRESS
@@ -8141,7 +7982,7 @@ LABEL_3231_BlankDecoratorTiles:
   ld c, PORT_VDP_DATA
   ld ix, CarData
   ld d, $00
-  ld a, (ix+13) ; Direction?
+  ld a, (ix+CarData.Direction)
   or a ; Multiply by 4
   rl a
   rl a
@@ -8216,23 +8057,27 @@ LABEL_324C_UpdatePerFrameTiles:
   jp --
 
 LABEL_3302_UpdateGreenCarDecorator:
-  UpdateCarDecorators _RAM_DCAB_CarData_Green, SpriteIndex_Decorators.Green, 1 ; Tile $191 = green car "decorator"
+  UpdateCarDecorators _RAM_DCAB_CarData_Green, SpriteIndex_Decorators.Green, 1
   ret
 
 LABEL_336A_UpdateBlueCarDecorator:
-  UpdateCarDecorators _RAM_DCEC_CarData_Blue, SpriteIndex_Decorators.Blue, 2 ; Tile $192 = Blue car "decorator"
+  UpdateCarDecorators _RAM_DCEC_CarData_Blue, SpriteIndex_Decorators.Blue, 2
   ret
 
 LABEL_33D2_UpdateYellowCarDecorator:
-  UpdateCarDecorators _RAM_DD2D_CarData_Yellow, SpriteIndex_Decorators.Yellow, 3 ; Tile $193 = yellow car "decorator"
+  UpdateCarDecorators _RAM_DD2D_CarData_Yellow, SpriteIndex_Decorators.Yellow, 3
   ret
+.ends
 
+.section "Trampolines 8" force
 LABEL_343A_:
   JumpToPagedFunction LABEL_375A0_
 
 LABEL_3445_:
   JumpToPagedFunction LABEL_3766F_
+.ends
 
+.section "Bank 0 3450" force
 LABEL_3450_:
   ld a, $01
   ld (_RAM_DE40_), a
@@ -8413,9 +8258,9 @@ LABEL_3556_:
   inc hl
   dec c
   jr nz, -
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -8425,9 +8270,9 @@ LABEL_3556_:
   ld a, $01
   ld (_RAM_DE44_), a
 +:
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -8437,9 +8282,9 @@ LABEL_3556_:
   ld a, $02
   ld (_RAM_DE45_), a
 +:
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -8449,9 +8294,9 @@ LABEL_3556_:
   ld a, $03
   ld (_RAM_DE46_), a
 +:
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld l, a
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -8461,9 +8306,9 @@ LABEL_3556_:
   ld a, $02
   ld (_RAM_DE47_), a
 +:
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   ld l, a
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -8473,9 +8318,9 @@ LABEL_3556_:
   ld a, $03
   ld (_RAM_DE48_), a
 +:
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   ld l, a
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -8497,9 +8342,9 @@ LABEL_35E0_:
   jp ++
 
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DF08_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DF09_), a
 ++:
   ld ix, _RAM_DA60_SpriteTableXNs.10
@@ -8601,7 +8446,7 @@ LABEL_3674_:
   cp CarState_2_Respawning
   jr nz, +
   ld a, $0A
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
   xor a
   ld (_RAM_DF58_), a
   ld (_RAM_DF74_RuffTruxSubmergedCounter), a
@@ -8634,11 +8479,11 @@ LABEL_370F_:
   jp z, LABEL_37BE_
   ld ix, _RAM_DA60_SpriteTableXNs.20
   ld iy, _RAM_DAE0_SpriteTableYs.20
-  ld a, (_RAM_DCBC_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
   ld (_RAM_DE84_), a
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   ld (_RAM_DE85_), a
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   ld (_RAM_DE86_), a
   ld a, $91
   ld (_RAM_DF1E_), a
@@ -8656,7 +8501,7 @@ LABEL_370F_:
   cp CarState_4_Submerged
   jr nz, ++
 +:
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   or a
   jr z, ++
   call LABEL_3F17_
@@ -8671,11 +8516,11 @@ LABEL_370F_:
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF5A_CarState3)
   ld (_RAM_DE8A_CarState2), a
-  ld a, (_RAM_DCDE_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown51_b)
   ld (_RAM_DE8B_), a
   call LABEL_3B74_
   ld a, (_RAM_DE8B_)
-  ld (_RAM_DCDE_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown51_b), a
   ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF5A_CarState3), a
   ld a, (_RAM_DE88_)
@@ -8689,9 +8534,9 @@ LABEL_370F_:
   cp CarState_2_Respawning
   jr nz, +
   xor a
-  ld (_RAM_DCD9_), a
-  ld a, (_RAM_DCB7_)
-  ld (_RAM_DCB8_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown46_b), a
+  ld a, (_RAM_DCAB_CarData_Green.Unknown12_b)
+  ld (_RAM_DCAB_CarData_Green.Direction), a
 +:
   xor a
   ld (_RAM_DF5A_CarState3), a ; CarState_0_Normal
@@ -8699,7 +8544,7 @@ LABEL_370F_:
   jp LABEL_37BE_
 
 LABEL_37B5_:
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   jr nz, LABEL_37BE_
 LABEL_37BB_:
@@ -8707,11 +8552,11 @@ LABEL_37BB_:
 LABEL_37BE_:
   ld ix, _RAM_DA60_SpriteTableXNs.30
   ld iy, _RAM_DAE0_SpriteTableYs.30
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   ld (_RAM_DE84_), a
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld (_RAM_DE85_), a
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld (_RAM_DE86_), a
   ld a, $92
   ld (_RAM_DF1E_), a
@@ -8736,7 +8581,7 @@ LABEL_37BE_:
   or a
   jr nz, ++
 +:
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   or a
   jr z, +
   call LABEL_48D1_
@@ -8759,7 +8604,7 @@ LABEL_3813_:
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF5B_)
   ld (_RAM_DE8A_CarState2), a
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   ld (_RAM_DE8B_), a
   ld a, (_RAM_D5BE_)
   ld (_RAM_D5C1_), a
@@ -8771,7 +8616,7 @@ LABEL_3813_:
   ld a, (_RAM_D5C1_)
   ld (_RAM_D5BE_), a
   ld a, (_RAM_DE8B_)
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
   ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF5B_), a
   ld a, (_RAM_DE88_)
@@ -8787,21 +8632,21 @@ LABEL_3813_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
-  ld a, $0A
-  ld (_RAM_D96F_), a
+  ld a, MAX_ENGINE_VOLUME
+  ld (_RAM_D96C_EngineSound2.Volume), a
 +:
   xor a
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   ld a, (_RAM_D582_)
   cp $02
   jr nz, +
   ld a, (_RAM_DE55_)
-  ld (_RAM_DCF8_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   xor a
   ld (_RAM_D582_), a
 +:
-  ld a, (_RAM_DCF8_)
-  ld (_RAM_DCF9_), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown12_b)
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
 ++:
   ld a, (_RAM_D5B0_)
   or a
@@ -8817,7 +8662,7 @@ LABEL_38B0_:
   jp ++
 
 LABEL_38B3_:
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jr nz, ++
 LABEL_38B9_:
@@ -8828,11 +8673,11 @@ LABEL_38B9_:
   JpZRet _LABEL_395C_ret
   ld ix, _RAM_DA60_SpriteTableXNs.40
   ld iy, _RAM_DAE0_SpriteTableYs.40
-  ld a, (_RAM_DD3E_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
   ld (_RAM_DE84_), a
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   ld (_RAM_DE85_), a
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   ld (_RAM_DE86_), a
   ld a, $93
   ld (_RAM_DF1E_), a
@@ -8850,7 +8695,7 @@ LABEL_38B9_:
   cp $04
   jr nz, ++
 +:
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   or a
   jr z, ++
   call LABEL_48FC_
@@ -8865,11 +8710,11 @@ LABEL_38B9_:
   ld (_RAM_DE89_), a
   ld a, (_RAM_DF5C_)
   ld (_RAM_DE8A_CarState2), a
-  ld a, (_RAM_DD60_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown51_b)
   ld (_RAM_DE8B_), a
   call LABEL_3B74_
   ld a, (_RAM_DE8B_)
-  ld (_RAM_DD60_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown51_b), a
   ld a, (_RAM_DE8A_CarState2)
   ld (_RAM_DF5C_), a
   ld a, (_RAM_DE88_)
@@ -8883,9 +8728,9 @@ LABEL_38B9_:
   cp $02
   jr nz, +
   xor a
-  ld (_RAM_DD5B_), a
-  ld a, (_RAM_DD39_)
-  ld (_RAM_DD3A_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown46_b), a
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown12_b)
+  ld (_RAM_DD2D_CarData_Yellow.Direction), a
 +:
   xor a
   ld (_RAM_DF5C_), a
@@ -8893,7 +8738,7 @@ _LABEL_395C_ret:
   ret
 
 LABEL_395D_:
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JrNzRet _LABEL_395C_ret
 LABEL_3963_:
@@ -8988,10 +8833,14 @@ LABEL_39AE_:
   add a, l
   ld (iy-1), a
   ret
+.ends
 
+.section "Trampolines 9" force
 LABEL_3A23_:
   JumpToPagedFunction LABEL_36A85_
+.ends
 
+.section "Bank 0 3a2e" force
 LABEL_3A2E_SetShadowSpriteIndices:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
@@ -9053,8 +8902,8 @@ LABEL_3A6B_:
   ld a, (_RAM_DF59_CarState)
   cp CarState_2_Respawning
   jr nz, +
-  ld a, $0A
-  ld (_RAM_D95E_), a
+  ld a, MAX_ENGINE_VOLUME
+  ld (_RAM_D95B_EngineSound1.Volume), a
   xor a
   ld (_RAM_DF58_), a
   ld a, (_RAM_DE55_)
@@ -9147,9 +8996,9 @@ LABEL_3ACF_:
 LABEL_3B74_:
   ld a, (_RAM_DE8A_CarState2)
   cp CarState_3_Falling
-  jp z, LABEL_2FDC_
+  jp z, LABEL_2FDC_Falling
   cp CarState_4_Submerged
-  jp z, LABEL_3E43_
+  jp z, LABEL_3E43_Submerged
   cp CarState_ff
   JrZRet _LABEL_3BEC_ret
   xor a
@@ -9285,17 +9134,17 @@ LABEL_3C54_InitialiseHUDData:
 +:; Not RuffTrux: load lap counter, others TBC
   ld a, CHALLENGE_LAP_COUNT + 1
   ld (_RAM_DF24_LapsRemaining), a
-  ld (_RAM_DD05_), a ; TODO are these different things?
-  ld (_RAM_DD46_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown25_b), a ; TODO are these different things?
+  ld (_RAM_DD2D_CarData_Yellow.Unknown25_b), a
   ld a, $03
-  ld (_RAM_DCC4_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown25_b), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jr z, ++
   ; Not head to head
   ; Change this ???
   ld a, $03
-  ld (_RAM_DD05_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown25_b), a
 ++:
   xor a
   ld (_RAM_DF25_), a
@@ -9342,14 +9191,14 @@ LABEL_3C54_InitialiseHUDData:
   ; Copy original value to various places
   ld a, (_RAM_DF68_)
   ld (_RAM_D587_), a
-  ld (_RAM_DD45_), a
-  ld (_RAM_DD04_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown24_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown24_b), a
   ld (_RAM_DF4F_), a
   ld (_RAM_DF52_), a
   ld (_RAM_DF51_), a
   ; ???
   ld a, $01
-  ld (_RAM_DCC3_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown24_b), a
   ld (_RAM_DF50_), a
   ; Init HUD data?
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -9358,7 +9207,7 @@ LABEL_3C54_InitialiseHUDData:
   ; Head to Head only
   ld a, $01
   ld (_RAM_DF51_), a
-  ld (_RAM_DD04_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown24_b), a
   ; fall through
 +:
   ld a, <SpriteIndex_Digit1
@@ -9399,12 +9248,12 @@ LABEL_3D59_:
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
   JrNzRet _LABEL_3DBC_ret
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   JrZRet _LABEL_3DBC_ret
   cp $3C
   JrZRet _LABEL_3DBC_ret
-  ld a, (_RAM_DD08_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown28_b)
   and $18
   srl a
   or a
@@ -9415,13 +9264,13 @@ LABEL_3D59_:
   and $07
   ld (_RAM_D5BA_), a
   jr z, +
-  ld a, (_RAM_DCF7_)
+  ; Decrement down to 6
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp $06
   jr c, +
   sub $01
-  ld (_RAM_DCF7_), a
-+:
-  ld a, (_RAM_DCF6_)
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
++:ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
   ld e, a
   ld d, $00
@@ -9435,16 +9284,24 @@ LABEL_3D59_:
   ld (_RAM_D5B8_), a
 _LABEL_3DBC_ret:
   ret
+.ends
 
+.section "Trampolines 10" force
 LABEL_3DBD_:
   JumpToPagedFunction LABEL_239C6_
+.ends
 
+.section "Track tiles data pages" force
 DATA_3DC8_TrackTypeTileDataPages:
 .db :DATA_3C000_Sportscars_Tiles :DATA_39C83_FourByFour_Tiles :DATA_3D901_Powerboats_Tiles :DATA_38000_TurboWheels_Tiles :DATA_34000_FormulaOne_Tiles :DATA_3A8FA_Warriors_Tiles :DATA_39168_Tanks_Tiles :DATA_3CD8D_RuffTrux_Tiles :DATA_34000_Helicopters_Tiles_BadReference
+.ends
 
+.section "Trampolines 11" force
 LABEL_3DD1_:
   JumpToPagedFunction LABEL_3636E_
+.ends
 
+.section "Track tiles data pointers" force
 DATA_3DDC_TrackTypeTileDataPointerLo:
 .db <DATA_3C000_Sportscars_Tiles <DATA_39C83_FourByFour_Tiles <DATA_3D901_Powerboats_Tiles <DATA_38000_TurboWheels_Tiles <DATA_34000_FormulaOne_Tiles <DATA_3A8FA_Warriors_Tiles <DATA_39168_Tanks_Tiles <DATA_3CD8D_RuffTrux_Tiles
 
@@ -9468,11 +9325,18 @@ DATA_3E04_:
 .db $00 $03 $06 $09 $0C $0F $12 $15 $48 $4B $4E $51 $54 $57 $5A $5D ; Multiples of 3, jumping in the middle
 .db $00 $04 $08 $0C $10 $14 $18 $1C $80 $84 $88 $8C $90 $94 $98 $9C ; Multiples of 4, jumping in the middle
 
+.ends
+
+.section "Trampolines 12" force
 LABEL_3E24_:
   JumpToPagedFunction LABEL_37817_
 
 LABEL_3E2F_:
   JumpToPagedFunction LABEL_37946_
+
+.ends
+
+.section "Track data pages, +" force
 
 DATA_3E3A_TrackTypeDataPageNumbers:
 .db :DATA_C000_TrackData_SportsCars
@@ -9485,7 +9349,7 @@ DATA_3E3A_TrackTypeDataPageNumbers:
 .db :DATA_28000_TrackData_RuffTrux
 .db :DATA_2C000_TrackData_Helicopters_BadReference
 
-LABEL_3E43_:
+LABEL_3E43_Submerged:
   ld a, (_RAM_DE87_)
   or a
   jr z, ++
@@ -9557,19 +9421,28 @@ DATA_3F05_RuffTrux_:
 .dw DATA_3F63_ DATA_3F6C_ DATA_3F75_ DATA_3F7E_ DATA_3F87_ DATA_3F90_ DATA_3F99_ DATA_3FA2_
 .dw DATA_3FAB_
 
+.ends
+
+.section "Trampolines 13" force
 LABEL_3F17_:
   JumpToPagedFunction LABEL_23BC6_
+.ends
 
+.section "Screen off" force
 LABEL_3F22_ScreenOff:
   ld a, VDP_REGISTER_MODECONTROL2_SCREENOFF
   out (PORT_VDP_REGISTER), a
   ld a, VDP_REGISTER_MODECONTROL2
   out (PORT_VDP_REGISTER), a
   ret
+.ends
 
+.section "Trampolines 14" force
 LABEL_3F2B_BlankGameRAMTrampoline:
   JumpToPagedFunction LABEL_23B98_BlankGameRAM
+.ends
 
+.section "Screen on +" force
 LABEL_3F36_ScreenOn:
   ld a, VDP_REGISTER_MODECONTROL2_SCREENON
   out (PORT_VDP_REGISTER), a
@@ -9585,8 +9458,8 @@ LABEL_3F3F_:
 +:ret
 
 LABEL_3F54_BlankGameRAM:
-  ld bc, _RAM_DF9A_EndOfRAM - _RAM_DCAB_CarData_Green ; $02EF ; Byte count
--:ld hl, _RAM_DCAB_CarData_Green ; Start
+  ld bc, _RAM_DF9A_EndOfRAM - _RAM_DCAB_GameRAMStart ; $02EF ; Byte count
+-:ld hl, _RAM_DCAB_GameRAMStart ; Start
   add hl, bc
   xor a
   ld (hl), a
@@ -9646,34 +9519,60 @@ LABEL_3FB4_UpdateAnimatedPalette:
   ret
 
 ; Data from 3FC3 to 3FD2 (16 bytes)
-DATA_3FC3_:
+DATA_3FC3_HorizontalAmountByDirection:
 ; Multiples of 6 from 0 to 24 to 0 to 24 to ...
+; Indexed by direction
+;                      00
+;                   06    06
+;                0C          0C
+;             12                12
+;          18                      18
+;             12                12
+;                0C          0C
+;                   06    06
+;                      00
 .db $00 $06 $0C $12 $18 $12 $0C $06 $00 $06 $0C $12 $18 $12 $0C $06
 
 ; Data from 3FD3 to 3FFF (45 bytes)
-DATA_3FD3_:
+DATA_3FD3_VerticalAmountByDirection:
 ; Antiphase of the above
+; Indexed by direction
+;                      18
+;                   12    12
+;                0C          0C
+;             06                06
+;          00                      00
+;             06                06
+;                0C          0C
+;                   12    12
+;                      18
 .db $18 $12 $0C $06 $00 $06 $0C $12 $18 $12 $0C $06 $00 $06 $0C $12
 
 .ifdef BLANK_FILL_ORIGINAL
 ; Uninitialised memory containing source code
 .db "D", 9, "A,(BULLON2)", 13, 10, 9, "OR", 9, "A", 13, 10, 9, "JR", 9, "Z,"
 .endif
-;.ends
+.ends
+
+.macro BankMarker
+.section "Bank marker \@" force
+.db :CADDR
+.ends
+.endm
 
 .orga $3fff
-; Bank marker
-.db :CADDR
-;.section "Bank 1"
+  BankMarker
+
+.section "Bank 1" force
 
 ; Metatile tilemaps are stored from $0080 in each track data bank
 ; Each metatile is 12 * 12 = 144 bytes of tile indices
 ; There are up to $41(?) for each track type
 ; So we use our "times table" macro to generate the split pointers
 DATA_4000_TileIndexPointerLow: ; Low bytes of "tile index data pointer table"
-  TimesTableLo $8080 144 $41
+  TimesTableLo $8080, 12*12, $41
 DATA_4041_TileIndexPointerHigh: ; High bytes of "tile index data pointer table"
-  TimesTableHi $8080 144 $41
+  TimesTableHi $8080, 12*12, $41
 
 ; 1st entry of Pointer Table from 40D3 (indexed by _RAM_DE88_)
 ; Data from 4082 to 408A (9 bytes)
@@ -9726,11 +9625,13 @@ DATA_40D3_NotRuffTrux_:
 .dw DATA_40CA_
 
 ; Data from 40E5 to 40F4 (16 bytes)
-DATA_40E5_Sign_: ; Sign bit, 1 = negative, 0 = positive
+DATA_40E5_Sign_Directions_X: ; Sign bit, 1 = negative, 0 = positive
+; For each of the 16 dirctions, 0 for +X (or 0) and 1 for -X
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $01 $01 $01 $01 $01 $01
 
 ; Data from 40F5 to 4104 (16 bytes)
-DATA_40F5_Sign_:
+DATA_40F5_Sign_Directions_Y: ; Similar for Y
+; For each of the 16 dirctions, 0 for +Y (or 0) and 1 for -Y
 .db $01 $01 $01 $01 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $01 $01
 
 ; Data from 4105 to 4224 (288 bytes)
@@ -9860,32 +9761,32 @@ LABEL_44C3_:
   ld a, (_RAM_DEB0_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF82_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF84_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF82_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -9894,7 +9795,7 @@ LABEL_44C3_:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DEB0_)
   or a
@@ -9982,7 +9883,7 @@ LABEL_4595_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -10001,7 +9902,7 @@ LABEL_4595_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF82_), a
-  ld hl, DATA_40E5_Sign_
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -10019,7 +9920,7 @@ LABEL_4595_:
   ld a, $01
   ld (_RAM_DF84_), a
 ++:
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -10038,7 +9939,7 @@ LABEL_4595_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF83_), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_DF7A_)
   add a, l
   ld l, a
@@ -10113,32 +10014,32 @@ LABEL_4682_:
   ld a, (_RAM_DEB0_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF82_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF84_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF82_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 _LABEL_46C8_ret:
@@ -10146,7 +10047,7 @@ _LABEL_46C8_ret:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DF85_)
   ld l, a
@@ -10284,7 +10185,7 @@ LABEL_479E_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JrNzRet _LABEL_479D_ret
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -10300,19 +10201,19 @@ LABEL_479E_:
   call ++
   ld ix, _RAM_DD2D_CarData_Yellow
 ++:
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
   cp $2A
   jr z, ++
   cp $32
   jr z, ++
-  ld a, (ix+4)
+  ld a, (ix+CarData.XMetatile)
   cp $10
   jr z, +
   cp $11
   JrNzRet _LABEL_479D_ret
 +:
-  ld a, (ix+5)
+  ld a, (ix+CarData.YMetatile)
   cp $1D
   jr z, +
   cp $1F
@@ -10325,7 +10226,7 @@ LABEL_479E_:
   jp +++
 
 ++:
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
   cp $2A
   jr z, +
@@ -10337,14 +10238,14 @@ LABEL_479E_:
 ++:
   ld hl, DATA_2652_TimesTable12Lo
   ld d, $00
-  ld a, (ix+8)
+  ld a, (ix+CarData.YMetatileRelative)
   ld e, a
   add hl, de
   ld a, (hl)
   ld l, a
   ld h, $00
   ld d, $00
-  ld a, (ix+6)
+  ld a, (ix+CarData.XMetatileRelative)
   ld e, a
   add hl, de
   add hl, bc
@@ -10371,9 +10272,9 @@ LABEL_479E_:
   ld a, b
   and $80
   jr z, +
-  ld a, (ix+0)
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF87_)
@@ -10381,24 +10282,24 @@ LABEL_479E_:
   or a
   sbc hl, de
   ld a, l
-  ld (ix+0), a
+  ld (ix+CarData.XPosition.Lo), a
   ld a, h
-  ld (ix+1), a
+  ld (ix+CarData.XPosition.Hi), a
   jp ++
 
 +:
-  ld a, (ix+0)
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF87_)
   ld e, a
   add hl, de
   ld a, l
-  ld (ix+0), a
+  ld (ix+CarData.XPosition.Lo), a
   ld a, h
-  ld (ix+1), a
+  ld (ix+CarData.XPosition.Hi), a
 ++:
   ld a, b
   and $10
@@ -10406,9 +10307,9 @@ LABEL_479E_:
   ld a, b
   and $40
   jr z, +
-  ld a, (ix+2)
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF87_)
@@ -10416,24 +10317,24 @@ LABEL_479E_:
   or a
   sbc hl, de
   ld a, l
-  ld (ix+2), a
+  ld (ix+CarData.YPosition.Lo), a
   ld a, h
-  ld (ix+3), a
+  ld (ix+CarData.YPosition.Hi), a
   ret
 
 +:
-  ld a, (ix+2)
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF87_)
   ld e, a
   add hl, de
   ld a, l
-  ld (ix+2), a
+  ld (ix+CarData.YPosition.Lo), a
   ld a, h
-  ld (ix+3), a
+  ld (ix+CarData.YPosition.Hi), a
 ++:ret
 
 LABEL_48BF_:
@@ -10456,15 +10357,15 @@ LABEL_48D1_:
   cp $04
   jr z, +
 --:
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   add a, $01
 -:
   and $0F
-  ld (_RAM_DCF9_), a
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
   ret
 
 +:
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   cp $08
   jr nc, --
   sub $01
@@ -10483,15 +10384,15 @@ LABEL_48FC_:
   cp $04
   jr z, +
 --:
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   add a, $01
 -:
   and $0F
-  ld (_RAM_DD3A_), a
+  ld (_RAM_DD2D_CarData_Yellow.Direction), a
   ret
 
 +:
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   cp $08
   jr nc, --
   sub $01
@@ -10505,29 +10406,29 @@ LABEL_4927_:
   ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld a, $01
-  ld (ix+21), a
+  ld (ix+CarData.EffectsEnabled), a
   ld de, (_RAM_DBA9_)
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr z, +
-  ld a, (ix+41)
+  ld a, (ix+CarData.Unknown41_w.Lo)
   ld l, a
-  ld a, (ix+42)
+  ld a, (ix+CarData.Unknown41_w.Hi)
   ld h, a
   jp ++
 
 +:
-  ld a, (ix+0)
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
 ++:
   or a
   sbc hl, de
-  ld de, (_RAM_DC57_)
+  ld de, (_RAM_DC57_Adjustment2)
   add hl, de
   ld a, l
-  ld (ix+17), a
+  ld (ix+CarData.SpriteX), a
   ld a, h
   or a
   jr nz, +
@@ -10544,27 +10445,27 @@ LABEL_4927_:
   jr c, LABEL_49BF_
 ++:
   ld de, (_RAM_DBAB_)
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr z, +
-  ld a, (ix+43)
+  ld a, (ix+CarData.Unknown43_w.Lo)
   ld l, a
-  ld a, (ix+44)
+  ld a, (ix+CarData.Unknown43_w.Hi)
   ld h, a
   jp ++
 
 +:
-  ld a, (ix+2)
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
 ++:
   or a
   sbc hl, de
-  ld de, (_RAM_DC57_)
+  ld de, (_RAM_DC57_Adjustment2)
   add hl, de
   ld a, l
-  ld (ix+18), a
+  ld (ix+CarData.SpriteY), a
   ld a, h
   or a
   jr z, +
@@ -10587,9 +10488,9 @@ LABEL_4927_:
   JrNcRet -
 LABEL_49BF_:
   ld a, $E4
-  ld (ix+18), a
+  ld (ix+CarData.SpriteY), a
   xor a
-  ld (ix+21), a
+  ld (ix+CarData.EffectsEnabled), a
   ret
 
 LABEL_49C9_:
@@ -10628,50 +10529,52 @@ _LABEL_4B10_:
 
 ; Data pointed to by DATA_1D65__Lo etc
 ; TODO what is it? 0..8 with a weird ramp effect
-_LABEL_4BAC_: .db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-_LABEL_4BCA_: .db 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 1 0 1 0
-_LABEL_4BE8_: .db 0 0 0 0 0 0 1 0 0 1 0 0 1 1 0 1 1 0 1 1 1 1 1 0 1 1 1 1 1 1
-_LABEL_4C06_: .db 0 0 0 0 0 0 1 0 1 0 1 0 1 1 1 1 1 1 2 1 1 2 1 1 2 2 1 2 1 1
-_LABEL_4C24_: .db 0 0 0 0 0 0 1 1 0 1 1 0 2 1 1 2 1 1 2 2 1 2 2 1 2 2 2 2 2 2
-_LABEL_4C42_: .db 0 0 0 0 0 0 1 1 1 1 1 0 2 2 1 2 2 1 3 2 2 2 2 2 3 2 3 2 3 2
-_LABEL_4C60_: .db 0 0 0 0 0 0 1 1 1 1 1 1 2 2 2 2 2 2 3 2 3 2 3 2 3 3 3 3 3 3
-_LABEL_4C7E_: .db 0 0 0 0 0 0 2 1 1 1 1 1 3 2 2 3 2 2 3 3 3 3 3 3 4 3 4 3 4 3
-_LABEL_4C9C_: .db 0 0 0 0 0 0 2 1 1 2 1 1 3 3 2 3 3 2 4 3 3 4 3 3 4 4 4 4 4 4
-_LABEL_4CBA_: .db 0 0 0 0 0 0 2 1 2 1 2 1 3 3 3 3 3 3 4 4 4 4 4 3 5 4 5 4 5 4
-_LABEL_4CD8_: .db 0 0 0 0 0 0 2 2 1 2 2 1 4 3 3 4 3 3 5 4 4 4 4 4 5 5 5 5 5 5
-_LABEL_4CF6_: .db 0 0 0 0 0 0 2 2 2 2 2 1 4 4 3 4 4 3 5 5 4 5 5 4 6 5 6 5 6 5
-_LABEL_4D14_: .db 0 0 0 0 0 0 2 2 2 2 2 2 4 4 4 4 4 4 5 5 5 5 5 5 6 6 6 6 6 6
-_LABEL_4D32_: .db 0 0 0 0 0 0 3 2 2 2 2 2 5 4 4 5 4 4 6 5 6 5 6 5 7 6 7 6 7 6
-_LABEL_4D50_: .db 0 0 0 0 0 0 3 2 2 3 2 2 5 5 4 5 5 4 6 6 6 6 6 5 7 7 7 7 7 7
-_LABEL_4D6E_: .db 0 0 0 0 0 0 3 2 3 2 3 2 5 5 5 5 5 5 7 6 6 7 6 6 8 7 8 7 8 7
-_LABEL_4D8C_: .db 0 0 0 0 0 0 3 3 2 3 3 2 6 5 5 6 5 5 7 7 6 7 7 6 8 8 8 8 8 8
+; row indexed by speed 0..15 + _RAM_DEAD_ (which is 0..5 -> out of range?)
+; column indexed by horizontal/vertical delta for a given speed (0..29)
+Data1d65_0:  .db 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+Data1d65_1:  .db 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 1 0 1 0
+Data1d65_2:  .db 0 0 0 0 0 0 1 0 0 1 0 0 1 1 0 1 1 0 1 1 1 1 1 0 1 1 1 1 1 1
+Data1d65_3:  .db 0 0 0 0 0 0 1 0 1 0 1 0 1 1 1 1 1 1 2 1 1 2 1 1 2 2 1 2 1 1
+Data1d65_4:  .db 0 0 0 0 0 0 1 1 0 1 1 0 2 1 1 2 1 1 2 2 1 2 2 1 2 2 2 2 2 2
+Data1d65_5:  .db 0 0 0 0 0 0 1 1 1 1 1 0 2 2 1 2 2 1 3 2 2 2 2 2 3 2 3 2 3 2
+Data1d65_6:  .db 0 0 0 0 0 0 1 1 1 1 1 1 2 2 2 2 2 2 3 2 3 2 3 2 3 3 3 3 3 3
+Data1d65_7:  .db 0 0 0 0 0 0 2 1 1 1 1 1 3 2 2 3 2 2 3 3 3 3 3 3 4 3 4 3 4 3
+Data1d65_8:  .db 0 0 0 0 0 0 2 1 1 2 1 1 3 3 2 3 3 2 4 3 3 4 3 3 4 4 4 4 4 4
+Data1d65_9:  .db 0 0 0 0 0 0 2 1 2 1 2 1 3 3 3 3 3 3 4 4 4 4 4 3 5 4 5 4 5 4
+Data1d65_10: .db 0 0 0 0 0 0 2 2 1 2 2 1 4 3 3 4 3 3 5 4 4 4 4 4 5 5 5 5 5 5
+Data1d65_11: .db 0 0 0 0 0 0 2 2 2 2 2 1 4 4 3 4 4 3 5 5 4 5 5 4 6 5 6 5 6 5
+Data1d65_12: .db 0 0 0 0 0 0 2 2 2 2 2 2 4 4 4 4 4 4 5 5 5 5 5 5 6 6 6 6 6 6
+Data1d65_13: .db 0 0 0 0 0 0 3 2 2 2 2 2 5 4 4 5 4 4 6 5 6 5 6 5 7 6 7 6 7 6
+Data1d65_14: .db 0 0 0 0 0 0 3 2 2 3 2 2 5 5 4 5 5 4 6 6 6 6 6 5 7 7 7 7 7 7
+Data1d65_15: .db 0 0 0 0 0 0 3 2 3 2 3 2 5 5 5 5 5 5 7 6 6 7 6 6 8 7 8 7 8 7
+Data1d65_16: .db 0 0 0 0 0 0 3 3 2 3 3 2 6 5 5 6 5 5 7 7 6 7 7 6 8 8 8 8 8 8
 
 LABEL_4DAA_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   JpNzRet _LABEL_5A87_ret
   ld hl, DATA_24AE_
   ld d, $00
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   ld e, a
   add hl, de
   ld a, (hl)
-  ld (ix+36), a
+  ld (ix+CarData.Unknown36_b), a
   ld hl, DATA_24BE_
   add hl, de
   ld a, (hl)
-  ld (ix+37), a
+  ld (ix+CarData.Unknown37_b), a
   cp $82
   JpZRet _LABEL_5A87_ret
   ld a, $01
-  ld (ix+38), a
+  ld (ix+CarData.Unknown38_b), a
   jp LABEL_5A77_
 
 LABEL_4DD4_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   ret nz
-  ld a, (ix+45)
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   or a
   jr z, +
   cp $01
@@ -10679,16 +10582,16 @@ LABEL_4DD4_:
   jp LABEL_4EFA_
 
 +:
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   JrNzRet +
   ld a, CarState_3_Falling
   ld (_RAM_DF5A_CarState3), a
   ld a, $01
-  ld (_RAM_DCD9_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown46_b), a
   xor a
-  ld (ix+11), a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE67_), a
   ld (_RAM_DE31_), a
   ld (_RAM_DE32_), a
@@ -10698,14 +10601,14 @@ LABEL_4DD4_:
   ld a, (_RAM_D5B0_)
   or a
   JrNzRet _LABEL_4E7A_ret
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JrNzRet _LABEL_4E7A_ret
   ld a, (_RAM_D5BE_)
   or a
   jr nz, +
   ld a, SFX_0E_FallToFloor
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
@@ -10715,33 +10618,31 @@ LABEL_4DD4_:
   jr z, +
   ld a, $01
   ld (_RAM_D5B0_), a
-+:
-  ld a, (_RAM_D5C0_)
++:ld a, (_RAM_D5C0_)
   or a
   jr z, +
   ld a, $04
   jp ++
-
-+:
-  ld a, $03
++:ld a, $03
 ++:
   ld (_RAM_DF5B_), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D96C_), hl
+  ; Reset engine pitch
+  ld hl, LOWEST_PITCH_ENGINE_TONE ; $03E8
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   xor a
-  ld (_RAM_D96F_), a
+  ld (_RAM_D96C_EngineSound2.Volume), a
 LABEL_4E49_:
   ld a, $01
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   xor a
-  ld (ix+11), a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE68_), a
   ld (_RAM_DE34_), a
   ld (_RAM_DE35_), a
   ld (_RAM_DF7B_), a
   ld (_RAM_D5B9_), a
-  ld (_RAM_DD08_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown28_b), a
   ld (_RAM_DF79_CurrentCombinedByte), a
   ld (_RAM_DEB5_), a
   ld (_RAM_DEB6_), a
@@ -10762,8 +10663,8 @@ _LABEL_4E7A_ret:
   ld (_RAM_DB83_), a
   ld (_RAM_DB7E_), a
   ld (_RAM_DB7F_), a
-  ld (_RAM_DCFB_), a
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ld a, $01
   ld (_RAM_D940_), a
   ret
@@ -10776,16 +10677,16 @@ LABEL_4EA0_:
   jr z, -
 LABEL_4EAB_:
   xor a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DE92_EngineVelocity), a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld (_RAM_D5A4_IsReversing), a
   ld (_RAM_D5A5_), a
   ld a, $01
   ld (_RAM_DF80_TwoPlayerWinPhase), a
   ld (_RAM_DF81_), a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld e, a
   ld d, $00
   ld hl, (_RAM_DBA9_)
@@ -10797,7 +10698,7 @@ LABEL_4EAB_:
   and $FC
   ld l, a
   ld (_RAM_DBAD_), hl
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   cp $F0
   jr c, +
   xor a
@@ -10816,16 +10717,16 @@ LABEL_4EAB_:
   ret
 
 LABEL_4EFA_:
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JrNzRet +
   ld a, $03
   ld (_RAM_DF5C_), a
   ld a, $01
-  ld (_RAM_DD5B_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown46_b), a
   xor a
-  ld (ix+11), a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE69_), a
   ld (_RAM_DE37_), a
   ld (_RAM_DE38_), a
@@ -10906,7 +10807,7 @@ LABEL_4F1B_:
   ld (_RAM_DEC6_), a
   ld a, $01
   ld (_RAM_DEC9_), a
-  ld (_RAM_DECA_), a
+  ld (_RAM_DECA_TilemapUpdate_VerticalNeeded), a
   ret
 
 LABEL_4F8F_:
@@ -10919,7 +10820,7 @@ LABEL_4F8F_:
 -:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   cp l
   jr z, LABEL_4FA7_
   jr c, LABEL_4FBC_
@@ -10932,7 +10833,7 @@ LABEL_4FA7_:
 +:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   cp l
   jr z, LABEL_4FBC_
   jr nc, LABEL_4FA7_
@@ -10945,12 +10846,12 @@ LABEL_4FBC_:
 ++:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   cp l
   jr nz, -
   ld a, (_RAM_D589_)
   ld l, a
-  ld a, (_RAM_DCC6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown27_b)
   cp l
   jr z, LABEL_4FA7_
   jr nc, LABEL_4FBC_
@@ -10966,7 +10867,7 @@ LABEL_4FDE_:
 -:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr z, LABEL_4FF6_
   jr c, LABEL_500B_
@@ -10979,7 +10880,7 @@ LABEL_4FF6_:
 +:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr z, LABEL_500B_
   jr nc, LABEL_4FF6_
@@ -10992,12 +10893,12 @@ LABEL_500B_:
 ++:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr nz, -
   ld a, (_RAM_D589_)
   ld l, a
-  ld a, (_RAM_DD07_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown27_b)
   cp l
   jr z, LABEL_4FF6_
   jr nc, LABEL_500B_
@@ -11013,7 +10914,7 @@ LABEL_502D_:
 -:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_5045_
   jr c, LABEL_505A_
@@ -11026,7 +10927,7 @@ LABEL_5045_:
 +:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_505A_
   jr nc, LABEL_5045_
@@ -11039,12 +10940,12 @@ LABEL_505A_:
 ++:
   ld a, (_RAM_DF24_LapsRemaining)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr nz, -
   ld a, (_RAM_D589_)
   ld l, a
-  ld a, (_RAM_DD48_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown27_b)
   cp l
   jr z, LABEL_5045_
   jr nc, LABEL_505A_
@@ -11058,9 +10959,9 @@ LABEL_507C_:
   jr z, ++
   jr nc, +
 -:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr z, LABEL_5094_
   jr c, LABEL_50A9_
@@ -11071,9 +10972,9 @@ LABEL_5094_:
   ret
 
 +:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr z, LABEL_50A9_
   jr nc, LABEL_5094_
@@ -11084,14 +10985,14 @@ LABEL_50A9_:
   ret
 
 ++:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   cp l
   jr nz, -
-  ld a, (_RAM_DCC6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown27_b)
   ld l, a
-  ld a, (_RAM_DD07_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown27_b)
   cp l
   jr z, LABEL_5094_
   jr nc, LABEL_50A9_
@@ -11105,9 +11006,9 @@ LABEL_50CB_:
   jr z, ++
   jr nc, +
 -:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_50E3_
   jr c, LABEL_50F8_
@@ -11118,9 +11019,9 @@ LABEL_50E3_:
   ret
 
 +:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_50F8_
   jr nc, LABEL_50E3_
@@ -11131,14 +11032,14 @@ LABEL_50F8_:
   ret
 
 ++:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr nz, -
-  ld a, (_RAM_DCC6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown27_b)
   ld l, a
-  ld a, (_RAM_DD48_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown27_b)
   cp l
   jr z, LABEL_50E3_
   jr nc, LABEL_50F8_
@@ -11152,9 +11053,9 @@ LABEL_511A_:
   jr z, ++
   jr nc, +
 -:
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_5132_
   jr c, LABEL_5147_
@@ -11165,9 +11066,9 @@ LABEL_5132_:
   ret
 
 +:
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr z, LABEL_5147_
   jr nc, LABEL_5132_
@@ -11178,14 +11079,14 @@ LABEL_5147_:
   ret
 
 ++:
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   ld l, a
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   cp l
   jr nz, -
-  ld a, (_RAM_DD07_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown27_b)
   ld l, a
-  ld a, (_RAM_DD48_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown27_b)
   cp l
   jr z, LABEL_5132_
   jr nc, LABEL_5147_
@@ -11227,11 +11128,11 @@ LABEL_51B3_:
   or a
   ret nz
   ld ix, _RAM_DCEC_CarData_Blue
-  ld l, (ix+0)
-  ld h, (ix+1)
+  ld l, (ix+CarData.XPosition.Lo)
+  ld h, (ix+CarData.XPosition.Hi)
   ld (_RAM_D59F_), hl
-  ld l, (ix+2)
-  ld h, (ix+3)
+  ld l, (ix+CarData.YPosition.Lo)
+  ld h, (ix+CarData.YPosition.Hi)
   ld (_RAM_D5A1_), hl
   ret
 
@@ -11243,7 +11144,7 @@ LABEL_51DA_:
   or a
   jr nz, +
   ld ix, _RAM_DCEC_CarData_Blue
-  ld a, (ix+12)
+  ld a, (ix+CarData.Unknown12_b)
   ld (_RAM_DE56_), a
   ld a, $01
   ld (_RAM_D59E_), a
@@ -11256,9 +11157,9 @@ LABEL_51DA_:
   xor a
   ld (_RAM_DC3D_IsHeadToHead), a
   ld ix, _RAM_DCEC_CarData_Blue
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   ld (_RAM_DE57_), a
   ld a, $01
   ld (_RAM_D59E_), a
@@ -11275,10 +11176,10 @@ LABEL_51DA_:
 LABEL_522C_:
   ld a, (_RAM_DB99_AccelerationDelay)
   dec a
-  ld (ix+19), a
+  ld (ix+CarData.Unknown19_b), a
   ld a, (_RAM_DB9A_DecelerationDelay)
   dec a
-  ld (ix+61), a
+  ld (ix+CarData.Unknown61_b), a
   ret
 
 LABEL_523B_:
@@ -11320,7 +11221,7 @@ LABEL_5283_:
   ld a, $01
   ld (_RAM_DEB9_), a
   inc a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   xor a
   ld (_RAM_DEB0_), a
 _LABEL_5297_ret:
@@ -11354,21 +11255,21 @@ LABEL_52B7_:
   and $03
   ld (_RAM_D5CA_), a
   ld ix, _RAM_DCAB_CarData_Green
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   ld (_RAM_DE57_), a
   call LABEL_5304_
   ld ix, _RAM_DCEC_CarData_Blue
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   ld (_RAM_DE57_), a
   call LABEL_5304_
   ld ix, _RAM_DD2D_CarData_Yellow
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   ld (_RAM_DE57_), a
 LABEL_5304_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -11377,13 +11278,13 @@ LABEL_5304_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jp z, LABEL_536C_
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jp nz, LABEL_522C_
   jp LABEL_536C_
 
 +:
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jp nz, LABEL_522C_
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -11405,16 +11306,16 @@ LABEL_5304_:
   ld a, (_RAM_D5A5_)
   or a
   jr nz, +
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   or a
   jr nz, ++
 +:
   ld a, $02
   ld (_RAM_DE57_), a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld a, $01
   ld (_RAM_D5A5_), a
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld d, $00
   ld e, a
   ld hl, DATA_250E_
@@ -11428,10 +11329,10 @@ LABEL_536C_:
   or a
   jr z, +
   xor a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld (_RAM_D5A5_), a
 +:
-  ld a, (ix+26)
+  ld a, (ix+CarData.Unknown26_b_HasFinished)
   or a
   jr z, +++
 LABEL_537F_:
@@ -11442,24 +11343,24 @@ LABEL_537F_:
   ld a, (_RAM_DB9A_DecelerationDelay)
   ld b, a
 ++:
-  ld a, (ix+61)
+  ld a, (ix+CarData.Unknown61_b)
   inc a
-  ld (ix+61), a
+  ld (ix+CarData.Unknown61_b), a
   cp b
   jp c, LABEL_544A_
-  ld (ix+61), $00
-  ld a, (ix+11)
+  ld (ix+CarData.Unknown61_b), $00
+  ld a, (ix+CarData.Unknown11_b_Speed)
   or a
   jp z, LABEL_544A_
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jp nz, LABEL_544A_
-  dec (ix+11)
+  dec (ix+CarData.Unknown11_b_Speed)
   jp LABEL_544A_
 
 +++:
-  ld l, (ix+47)
-  ld h, (ix+48)
+  ld l, (ix+CarData.Unknown47_w.Lo)
+  ld h, (ix+CarData.Unknown47_w.Hi)
   ld a, (hl)
   or a
   jr z, +
@@ -11478,7 +11379,7 @@ LABEL_537F_:
   jr +++
 
 ++:
-  ld a, (ix+50)
+  ld a, (ix+CarData.Unknown50_b)
 +++:
   ld b, a
 ++++:
@@ -11497,55 +11398,55 @@ LABEL_537F_:
   ld a, (_RAM_DB21_Player2Controls)
   and BUTTON_1_MASK ; $10
   jr z, ++
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   or a
   jr nz, LABEL_537F_
   ld a, (_RAM_DB99_AccelerationDelay)
   dec a
-  ld (ix+19), a
+  ld (ix+CarData.Unknown19_b), a
   jp LABEL_544A_
 
 ++:
   ld a, (_RAM_DB9A_DecelerationDelay)
   dec a
-  ld (ix+61), a
-  ld a, (ix+19)
+  ld (ix+CarData.Unknown61_b), a
+  ld a, (ix+CarData.Unknown19_b)
   inc a
-  ld (ix+19), a
+  ld (ix+CarData.Unknown19_b), a
   cp b
   jr c, LABEL_544A_
-  ld (ix+19), $00
+  ld (ix+CarData.Unknown19_b), $00
   ld a, (_RAM_D5D0_Player2Handicap)
   or a
   jr z, +
   ld l, a
-  ld a, (ix+49)
+  ld a, (ix+CarData.Unknown49_b)
   sub l
   ld l, a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   cp l
   jr z, LABEL_544A_
   jr c, +++
   jr ++
 
 +:
-  ld l, (ix+11)
-  ld a, (ix+49)
+  ld l, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown49_b)
   cp l
   jr z, LABEL_544A_
   jr nc, +++
 ++:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr nz, LABEL_544A_
-  dec (ix+11)
+  dec (ix+CarData.Unknown11_b_Speed)
   jp LABEL_544A_
 
 +++:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr nz, LABEL_544A_
-  inc (ix+11)
+  inc (ix+CarData.Unknown11_b_Speed)
 LABEL_544A_:
   ld a, (_RAM_D59E_)
   or a
@@ -11559,46 +11460,46 @@ LABEL_5451_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (ix+45)
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   ld l, a
   ld a, (_RAM_D5CA_)
   cp l
   jp nz, LABEL_56C0_
 +:
-  ld l, (ix+0)
-  ld h, (ix+1)
+  ld l, (ix+CarData.XPosition.Lo)
+  ld h, (ix+CarData.XPosition.Hi)
   ld de, $000C
   add hl, de
   ld (_RAM_DF20_), hl
   call LABEL_7A58_
   ld a, (_RAM_DF20_)
-  ld (ix+4), a
+  ld (ix+CarData.XMetatile), a
   ld a, (_RAM_DF21_)
   srl a
   srl a
   srl a
-  ld (ix+6), a
-  ld l, (ix+2)
-  ld h, (ix+3)
+  ld (ix+CarData.XMetatileRelative), a
+  ld l, (ix+CarData.YPosition.Lo)
+  ld h, (ix+CarData.YPosition.Hi)
   ld de, $000C
   add hl, de
   ld (_RAM_DF20_), hl
   call LABEL_7A58_
   ld a, (_RAM_DF20_)
-  ld (ix+5), a
+  ld (ix+CarData.YMetatile), a
   ld a, (_RAM_DF21_)
   srl a
   srl a
   srl a
-  ld (ix+8), a
+  ld (ix+CarData.YMetatileRelative), a
   xor a
   ld (_RAM_DEF1_), a
   ld (_RAM_DEF2_), a
-  ld a, (ix+5)
+  ld a, (ix+CarData.YMetatile)
   or a
   jr z, +
   ld (_RAM_DEF5_), a
-  ld a, (_RAM_DB9C_MetatilemapWidth)
+  ld a, (_RAM_DB9C_MetatilemapWidth.Lo)
   ld (_RAM_DEF4_), a
   call LABEL_30EA_
 +:
@@ -11607,22 +11508,22 @@ LABEL_5451_:
   ld a, (_RAM_DEF2_)
   ld h, a
   ld d, $00
-  ld e, (ix+4)
+  ld e, (ix+CarData.XMetatile)
   add hl, de
   ld (_RAM_D585_), hl
   ld de, _RAM_C400_TrackIndexes
   add hl, de
   ld a, (hl)
-  ld (ix+24), a
+  ld (ix+CarData.Unknown24_b), a
   ld hl, (_RAM_D585_)
   ld de, $C000
   add hl, de
   ld a, (hl)
-  ld (ix+10), a
+  ld (ix+CarData.CurrentMetatile), a
   and $C0
   ld (_RAM_DE53_), a
   ld hl, DATA_254E_TimesTable18Lo
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   ld e, a
   ld d, $00
@@ -11638,12 +11539,12 @@ LABEL_5451_:
   ld c, l
   ld hl, DATA_2652_TimesTable12Lo
   ld d, $00
-  ld e, (ix+8)
+  ld e, (ix+CarData.YMetatileRelative)
   add hl, de
   ld l, (hl)
   ld h, $00
   ld d, $00
-  ld e, (ix+6)
+  ld e, (ix+CarData.XMetatileRelative)
   add hl, de
   ld a, l
   ld (_RAM_DE6D_), a
@@ -11679,7 +11580,7 @@ LABEL_5451_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   jr nz, +
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   jr z, ++
   cp $1A
@@ -11689,13 +11590,13 @@ LABEL_5451_:
   and b
   jp z, LABEL_5608_
 ++:
-  ld l, (ix+47)
-  ld h, (ix+48)
+  ld l, (ix+CarData.Unknown47_w.Lo)
+  ld h, (ix+CarData.Unknown47_w.Hi)
   xor a
   ld (hl), a
-  ld (ix+20), a
-  ld l, (ix+39)
-  ld h, (ix+40)
+  ld (ix+CarData.Unknown20_b), a
+  ld l, (ix+CarData.Unknown39_w.Lo)
+  ld h, (ix+CarData.Unknown39_w.Hi)
   ld de, $0008
   add hl, de
   ld (hl), a
@@ -11709,7 +11610,7 @@ LABEL_5451_:
   ld (PAGING_REGISTER), a
   ld hl, DATA_37232_FourByFour_
   ld d, $00
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   ld e, a
   add hl, de
@@ -11725,21 +11626,21 @@ LABEL_5451_:
   or a
   jr nz, +
   ld a, SFX_03_Crash
-  ld (_RAM_D974_SFXTrigger_Player2), a
-+:
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D974_SFX_Player2), a
++:; Reset engine tone
+  ld hl, LOWEST_PITCH_ENGINE_TONE ; $03E8
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   call LABEL_51CF_
   ld hl, (_RAM_D59F_)
-  ld (ix+0), l
-  ld (ix+1), h
+  ld (ix+CarData.XPosition.Lo), l
+  ld (ix+CarData.XPosition.Hi), h
   ld hl, (_RAM_D5A1_)
-  ld (ix+2), l
-  ld (ix+3), h
+  ld (ix+CarData.YPosition.Lo), l
+  ld (ix+CarData.YPosition.Hi), h
   xor a
-  ld (ix+11), a
-  ld (ix+15), a
-  ld (ix+16), a
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown15_b), a
+  ld (ix+CarData.Unknown16_b), a
   ld (_RAM_DF7D_), a
   ld (_RAM_DF7E_), a
   ld (_RAM_DB7E_), a
@@ -11750,16 +11651,15 @@ LABEL_5451_:
   jp LABEL_5608_
 
 LABEL_55FA_:
-  ld a, (ix+12)
-  cp (ix+13)
+  ld a, (ix+CarData.Unknown12_b)
+  cp (ix+CarData.Direction)
   ld a, $00
   jr nz, +
   inc a
-+:
-  ld (ix+11), a
++:ld (ix+CarData.Unknown11_b_Speed), a
 LABEL_5608_:
   ld hl, DATA_25D0_TimesTable36Lo
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   ld e, a
   ld d, $00
@@ -11791,17 +11691,17 @@ LABEL_5608_:
   ld h, $00
   add hl, bc
   ld a, (hl)
-  ld (ix+28), a
+  ld (ix+CarData.Unknown28_b), a
   ld h, a
   ld l, a
-  ld a, (ix+58)
+  ld a, (ix+CarData.Unknown58_b)
   cp l
   jr z, +
-  ld (ix+59), a
+  ld (ix+CarData.Unknown59_b), a
   ld a, l
-  ld (ix+58), a
+  ld (ix+CarData.Unknown58_b), a
 +:
-  ld a, (ix+46)
+  ld a, (ix+CarData.Unknown46_b)
   or a
   jr nz, +
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -11811,12 +11711,12 @@ LABEL_5608_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   jr nz, +
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $23
   jr nz, +
   ld a, $08
-  ld (ix+12), a
+  ld (ix+CarData.Unknown12_b), a
   jp LABEL_56C0_
 
 +:
@@ -11829,7 +11729,7 @@ LABEL_5608_:
   jr z, +
   and $80
   jr z, +
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   ld c, a
   ld hl, _RAM_D900_
@@ -11849,16 +11749,16 @@ LABEL_5608_:
 ++:
   add hl, de
   ld a, (hl)
-  ld (ix+12), a
+  ld (ix+CarData.Unknown12_b), a
   ld a, (_RAM_DE53_)
   and $40
   jr z, LABEL_56C0_
   ld hl, DATA_1D97_
   ld d, $00
-  ld e, (ix+12)
+  ld e, (ix+CarData.Unknown12_b)
   add hl, de
   ld a, (hl)
-  ld (ix+12), a
+  ld (ix+CarData.Unknown12_b), a
 LABEL_56C0_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
@@ -11870,13 +11770,13 @@ LABEL_56C0_:
   or a
   jp nz, LABEL_5764_
 +:
-  ld a, (ix+46)
+  ld a, (ix+CarData.Unknown46_b)
   or a
   jp nz, LABEL_586B_
-  ld a, (ix+51)
+  ld a, (ix+CarData.Unknown51_b)
   or a
   jr z, +
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr nz, LABEL_5764_
 +:
@@ -11897,9 +11797,9 @@ LABEL_56C0_:
 +++:
   ld a, (_RAM_DF97_)
   ld d, a
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   ld c, a
-  ld a, (ix+12)
+  ld a, (ix+CarData.Unknown12_b)
   cp c
   jr z, LABEL_5764_
   sub c
@@ -11907,34 +11807,34 @@ LABEL_56C0_:
   cp $02
   jr c, ++
   ld b, a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   cp d
   jr c, +
   dec a
-  ld (ix+11), a
+  ld (ix+CarData.Unknown11_b_Speed), a
 +:
   ld a, b
 ++:
   cp $08
   jr nc, LABEL_573C_
 --:
-  ld a, (ix+13)
-  inc a
+  ld a, (ix+CarData.Direction)
+  inc a ; Rotate clockwise
 -:
   and $0F
   ld b, a
-  ld a, (ix+14)
+  ld a, (ix+CarData.Unknown14_b)
   inc a
   and l
-  ld (ix+14), a
+  ld (ix+CarData.Unknown14_b), a
   or a
   jr nz, LABEL_5764_
   ld a, b
-  ld (ix+13), a
+  ld (ix+CarData.Direction), a
   jp LABEL_5764_
 
 LABEL_573C_:
-  ld a, (ix+13)
+  ld a, (ix+CarData.Direction)
   dec a
   jp -
 
@@ -11944,11 +11844,11 @@ LABEL_573C_:
   cp $02
   jr c, ++
   ld b, a
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   cp d
   jr c, +
   dec a
-  ld (ix+11), a
+  ld (ix+CarData.Unknown11_b_Speed), a
 +:
   ld a, b
 ++:
@@ -11970,10 +11870,10 @@ LABEL_5769_:
   ld a, (_RAM_D5A5_)
   or a
   jr nz, +++
-  ld a, (ix+46)
+  ld a, (ix+CarData.Unknown46_b)
   or a
   jp nz, LABEL_586B_
-  ld l, (ix+11)
+  ld l, (ix+CarData.Unknown11_b_Speed)
   ld a, (_RAM_DB98_TopSpeed)
   cp l
   jr nz, +
@@ -12005,7 +11905,7 @@ LABEL_5769_:
   ld d, (hl)
   
   push de
-    ld hl, DATA_3FC3_
+    ld hl, DATA_3FC3_HorizontalAmountByDirection
     ld a, (_RAM_DE56_)
     add a, l
     ld l, a
@@ -12023,8 +11923,8 @@ LABEL_5769_:
     adc a, h
     ld h, a
     ld a, (hl)
-    ld (ix+15), a
-    ld hl, DATA_40E5_Sign_
+    ld (ix+CarData.Unknown15_b), a
+    ld hl, DATA_40E5_Sign_Directions_X
     ld a, (_RAM_DE56_)
     add a, l
     ld l, a
@@ -12034,33 +11934,33 @@ LABEL_5769_:
     ld a, (hl)
     or a
     jr z, +
-    ld (ix+33), $00
-    ld a, (ix+0)
+    ld (ix+CarData.Unknown33_b), $00
+    ld a, (ix+CarData.XPosition.Lo)
     ld l, a
-    ld a, (ix+1)
+    ld a, (ix+CarData.XPosition.Hi)
     ld h, a
     ld d, $00
-    ld a, (ix+15)
+    ld a, (ix+CarData.Unknown15_b)
     ld e, a
     or a
     sbc hl, de
-    ld (ix+0), l
-    ld (ix+1), h
+    ld (ix+CarData.XPosition.Lo), l
+    ld (ix+CarData.XPosition.Hi), h
     jp ++
 
 +:
-    ld (ix+33), $01
-    ld l, (ix+0)
-    ld h, (ix+1)
+    ld (ix+CarData.Unknown33_b), $01
+    ld l, (ix+CarData.XPosition.Lo)
+    ld h, (ix+CarData.XPosition.Hi)
     ld d, $00
-    ld a, (ix+15)
+    ld a, (ix+CarData.Unknown15_b)
     ld e, a
     add hl, de
-    ld (ix+0), l
-    ld (ix+1), h
+    ld (ix+CarData.XPosition.Lo), l
+    ld (ix+CarData.XPosition.Hi), h
 ++:
   pop de
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_DE56_)
   add a, l
   ld l, a
@@ -12078,8 +11978,8 @@ LABEL_5769_:
   adc a, h
   ld h, a
   ld a, (hl)
-  ld (ix+16), a
-  ld hl, DATA_40F5_Sign_
+  ld (ix+CarData.Unknown16_b), a
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_DE56_)
   add a, l
   ld l, a
@@ -12089,30 +11989,30 @@ LABEL_5769_:
   ld a, (hl)
   or a
   jr z, +
-  ld (ix+32), $00
-  ld a, (ix+2)
+  ld (ix+CarData.Unknown32_b), $00
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
   ld d, $00
-  ld a, (ix+16)
+  ld a, (ix+CarData.Unknown16_b)
   ld e, a
   or a
   sbc hl, de
-  ld (ix+2), l
-  ld (ix+3), h
+  ld (ix+CarData.YPosition.Lo), l
+  ld (ix+CarData.YPosition.Hi), h
   jp LABEL_586B_
 
 +:
-  ld (ix+32), $01
-  ld l, (ix+2)
-  ld h, (ix+3)
+  ld (ix+CarData.Unknown32_b), $01
+  ld l, (ix+CarData.YPosition.Lo)
+  ld h, (ix+CarData.YPosition.Hi)
   ld d, $00
-  ld a, (ix+16)
+  ld a, (ix+CarData.Unknown16_b)
   ld e, a
   add hl, de
-  ld (ix+2), l
-  ld (ix+3), h
+  ld (ix+CarData.YPosition.Lo), l
+  ld (ix+CarData.YPosition.Hi), h
 LABEL_586B_:
   ld a, (_RAM_D59E_)
   or a
@@ -12120,7 +12020,7 @@ LABEL_586B_:
   ret
 
 LABEL_5872_:
-  ld a, (ix+28)
+  ld a, (ix+CarData.Unknown28_b)
   and $F0 ; get behaviour nibble
   rr a
   rr a
@@ -12151,18 +12051,18 @@ LABEL_5872_:
   add hl, de
   ld a, (hl)
   ld b, a
-  ld a, (ix+29)
-  ld (ix+30), a
+  ld a, (ix+CarData.Unknown29_b)
+  ld (ix+CarData.Unknown30_b), a
   cp b
   jr z, +
-  ld (ix+31), a
+  ld (ix+CarData.Unknown31_b), a
 +:
   ld a, b
-  ld (ix+29), a
+  ld (ix+CarData.Unknown29_b), a
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
   JrNzRet _LABEL_5902_ret
-  ld a, (ix+29)
+  ld a, (ix+CarData.Unknown29_b)
   or a
   jp z, LABEL_594E_
   cp $06
@@ -12195,12 +12095,12 @@ _LABEL_5902_ret:
   ret
 
 +:
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   cp $07
   JrCRet +
-  ld a, (ix+34)
+  ld a, (ix+CarData.Unknown34_w.Lo)
   ld l, a
-  ld a, (ix+35)
+  ld a, (ix+CarData.Unknown34_w.Hi)
   ld h, a
   ld de, $002C
   add hl, de
@@ -12212,12 +12112,12 @@ _LABEL_5902_ret:
 +:ret
 
 ++:
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   or a
   jr z, +++
-  ld a, (ix+34)
+  ld a, (ix+CarData.Unknown34_w.Lo)
   ld l, a
-  ld a, (ix+35)
+  ld a, (ix+CarData.Unknown34_w.Hi)
   ld h, a
   ld d, $00
   ld e, $2C
@@ -12243,10 +12143,10 @@ _LABEL_5902_ret:
 +++:ret
 
 LABEL_594E_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   JrNzRet _LABEL_5978_ret
-  ld a, (ix+30)
+  ld a, (ix+CarData.Unknown30_b)
   cp $04
   jr z, +
   cp $0B
@@ -12257,27 +12157,27 @@ LABEL_594E_:
   JrNzRet _LABEL_5978_ret
 +:
   ld a, $1C
-  ld (ix+36), a
+  ld (ix+CarData.Unknown36_b), a
   ld a, $08
-  ld (ix+37), a
+  ld (ix+CarData.Unknown37_b), a
   xor a
-  ld (ix+38), a
+  ld (ix+CarData.Unknown38_b), a
   jp LABEL_5A77_
 
 _LABEL_5978_ret:
   ret
 
 LABEL_5979_:
-  ld a, (ix+30)
+  ld a, (ix+CarData.Unknown30_b)
   cp $0D
   JrZRet _LABEL_5978_ret
   jp LABEL_4DAA_
 
 LABEL_5983_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr nz, +
-  ld a, (ix+30)
+  ld a, (ix+CarData.Unknown30_b)
   cp $0B
   jr z, ++
 +:
@@ -12298,10 +12198,10 @@ LABEL_59A4_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrZRet +
-  ld a, (_RAM_DD0A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown30_b)
   cp $07
   jr z, +
-  ld a, (_RAM_DD0B_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown31_b)
   or a
   jr z, LABEL_59FC_
   cp $06
@@ -12315,7 +12215,7 @@ LABEL_59BC_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_1_FourByFour
   JrNzRet +
-  ld a, (_RAM_DD0A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown30_b)
   or a
   jp z, LABEL_59FC_
   cp $06
@@ -12327,17 +12227,17 @@ LABEL_59BC_:
   cp TT_4_FormulaOne
   ret nz
 LABEL_59DC_:
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $1A
   ret z
   JumpToPagedFunction LABEL_1BF17_
 
 LABEL_59EF_:
-  ld a, (ix+30)
+  ld a, (ix+CarData.Unknown30_b)
   cp $07
   jr z, LABEL_5A39_
-  ld a, (ix+31)
+  ld a, (ix+CarData.Unknown31_b)
   or a
   JrNzRet +
 LABEL_59FC_:
@@ -12345,20 +12245,21 @@ LABEL_59FC_:
   or a
   JrZRet +
   ld a, SFX_03_Crash
-  ld (_RAM_D974_SFXTrigger_Player2), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D974_SFX_Player2), a
+  ; Reset engine tone
+  ld hl, LOWEST_PITCH_ENGINE_TONE ; $03E8
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   call LABEL_51CF_
   ld hl, (_RAM_D59F_)
-  ld (ix+0), l
-  ld (ix+1), h
+  ld (ix+CarData.XPosition.Lo), l
+  ld (ix+CarData.XPosition.Hi), h
   ld hl, (_RAM_D5A1_)
-  ld (ix+2), l
-  ld (ix+3), h
+  ld (ix+CarData.YPosition.Lo), l
+  ld (ix+CarData.YPosition.Hi), h
   xor a
-  ld (ix+11), a
-  ld (ix+15), a
-  ld (ix+16), a
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown15_b), a
+  ld (ix+CarData.Unknown16_b), a
   ld (_RAM_DF7D_), a
   ld (_RAM_DF7E_), a
   ld (_RAM_DB7E_), a
@@ -12366,7 +12267,7 @@ LABEL_59FC_:
 +:ret
 
 LABEL_5A39_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   JrNzRet _LABEL_5A87_ret
   ld a, (_RAM_DC54_IsGameGear)
@@ -12381,12 +12282,12 @@ LABEL_5A39_:
   ld a, (_RAM_D5D0_Player2Handicap)
   ld c, a
   ld d, $00
-  ld a, (ix+11)
+  ld a, (ix+CarData.Unknown11_b_Speed)
   add a, c
   ld e, a
   add hl, de
   ld a, (hl)
-  ld (ix+36), a
+  ld (ix+CarData.Unknown36_b), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
@@ -12398,17 +12299,17 @@ LABEL_5A39_:
 ++:
   add hl, de
   ld a, (hl)
-  ld (ix+37), a
+  ld (ix+CarData.Unknown37_b), a
   ld a, $02
-  ld (ix+38), a
+  ld (ix+CarData.Unknown38_b), a
 LABEL_5A77_:
   ld a, $01
-  ld (ix+20), a
-  ld a, (ix+21)
+  ld (ix+CarData.Unknown20_b), a
+  ld a, (ix+CarData.EffectsEnabled)
   or a
   JrZRet _LABEL_5A87_ret
   ld a, SFX_02_HitGround
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 _LABEL_5A87_ret:
   ret
 
@@ -12420,7 +12321,7 @@ LABEL_5A88_:
   ld ix, _RAM_DD2D_CarData_Yellow
 +:
   ld d, $00
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   JpZRet _LABEL_5B77_ret
   ld hl, DATA_1B232_SinTable
@@ -12434,16 +12335,16 @@ LABEL_5A88_:
   ld (PAGING_REGISTER), a
   ld a, b
   ld (_RAM_DEF5_), a
-  ld a, (ix+36)
+  ld a, (ix+CarData.Unknown36_b)
   ld (_RAM_DEF4_), a
   call LABEL_1B94_
-  ld a, (ix+39)
+  ld a, (ix+CarData.Unknown39_w.Lo)
   ld e, a
-  ld a, (ix+40)
+  ld a, (ix+CarData.Unknown39_w.Hi)
   ld d, a
   ld a, (_RAM_DEF2_)
   ld l, a
-  ld a, (ix+17)
+  ld a, (ix+CarData.SpriteX)
   add a, l
   add a, $04
   ld (de), a
@@ -12453,7 +12354,7 @@ LABEL_5A88_:
   ld a, d
   adc a, $00
   ld d, a
-  ld a, (ix+18)
+  ld a, (ix+CarData.SpriteY)
   add a, l
   add a, $04
   ld (de), a
@@ -12463,7 +12364,7 @@ LABEL_5A88_:
   ld a, d
   adc a, $00
   ld d, a
-  ld a, (ix+21)
+  ld a, (ix+CarData.EffectsEnabled)
   or a
   jr z, +
   ld a, $01
@@ -12472,7 +12373,7 @@ LABEL_5A88_:
 +:
   ld a, b
   ld (_RAM_DEF5_), a
-  ld a, (ix+36)
+  ld a, (ix+CarData.Unknown36_b)
   and $FC
   rr a
   rr a
@@ -12481,46 +12382,46 @@ LABEL_5A88_:
   ld d, $00
   ld a, (_RAM_DEF2_)
   ld e, a
-  ld a, (ix+0)
+  ld a, (ix+CarData.XPosition.Lo)
   ld l, a
-  ld a, (ix+1)
+  ld a, (ix+CarData.XPosition.Hi)
   ld h, a
   or a
   sbc hl, de
   ld a, l
-  ld (ix+41), a
+  ld (ix+CarData.Unknown41_w.Lo), a
   ld a, h
-  ld (ix+42), a
-  ld a, (ix+2)
+  ld (ix+CarData.Unknown41_w.Hi), a
+  ld a, (ix+CarData.YPosition.Lo)
   ld l, a
-  ld a, (ix+3)
+  ld a, (ix+CarData.YPosition.Hi)
   ld h, a
   or a
   sbc hl, de
   ld a, l
-  ld (ix+43), a
+  ld (ix+CarData.Unknown43_w.Lo), a
   ld a, h
-  ld (ix+44), a
-  ld a, (ix+37)
+  ld (ix+CarData.Unknown43_w.Hi), a
+  ld a, (ix+CarData.Unknown37_b)
   ld l, a
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   add a, l
-  ld (ix+20), a
+  ld (ix+CarData.Unknown20_b), a
   cp $82
   JrCRet _LABEL_5B77_ret
-  ld a, (ix+21)
+  ld a, (ix+CarData.EffectsEnabled)
   or a
   jr z, +
   ld a, SFX_02_HitGround
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:
   xor a
-  ld (ix+20), a
-  ld (ix+51), a
+  ld (ix+CarData.Unknown20_b), a
+  ld (ix+CarData.Unknown51_b), a
   ld (_RAM_D5D9_), a
   ld de, (_RAM_DF8A_)
   ld (de), a
-  ld a, (ix+36)
+  ld a, (ix+CarData.Unknown36_b)
   cp $1E
   jr c, +
   cp $60
@@ -12528,7 +12429,7 @@ LABEL_5A88_:
   jp +++
 
 +:
-  ld a, (ix+38)
+  ld a, (ix+CarData.Unknown38_b)
   cp $02
   JrNzRet _LABEL_5B77_ret
   ; Nothing happens!
@@ -12538,31 +12439,35 @@ _LABEL_5B77_ret:
   ret
 
 ; Data from 5B78 to 5B7F (8 bytes)
-; Unreachable code?
-.db $3E $8E $32 $00 $80 $C3 $03 $A0
+; Unreachable code
+.ifdef UNNECESSARY_CODE
+  ld a,$8e ; ??? High bit set
+  ld (PAGING_REGISTER),a
+  jp $a003 ; ???
+.endif
 
 ++:
   ld a, $0A
-  ld (ix+36), a
+  ld (ix+CarData.Unknown36_b), a
   ld a, $0C
-  ld (ix+37), a
+  ld (ix+CarData.Unknown37_b), a
   jp LABEL_5A77_
 
 +++:
   ld a, $20
-  ld (ix+36), a
+  ld (ix+CarData.Unknown36_b), a
   ld a, $08
-  ld (ix+37), a
+  ld (ix+CarData.Unknown37_b), a
   jp LABEL_5A77_
 
 LABEL_5B9A_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   or a
   jr z, +
   ret
 
 +:
-  ld a, (ix+51)
+  ld a, (ix+CarData.Unknown51_b)
   or a
   JpNzRet _LABEL_5E24_ret
   ld a, (_RAM_DB96_TrackIndexForThisType)
@@ -12570,29 +12475,29 @@ LABEL_5B9A_:
   jp z, LABEL_5CFC_
   cp $01
   jp z, LABEL_5CAF_
-  ld a, (ix+59)
+  ld a, (ix+CarData.Unknown59_b)
   and $10
   jp nz, LABEL_4DD4_
-  ld a, (ix+60)
+  ld a, (ix+CarData.Unknown60_b)
   or a
   jr z, ++
   cp $01
   jr z, +
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $3A
   jp nz, LABEL_4DD4_
   jp +++
 
 +:
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $3A
   jp nz, LABEL_4DD4_
   jp LABEL_5C31_
 
 ++:
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $1D
   jp z, LABEL_5C70_
@@ -12602,118 +12507,119 @@ LABEL_5B9A_:
 
 +++:
   xor a
-  ld (ix+60), a
+  ld (ix+CarData.Unknown60_b), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld (ix+53), $88
-  ld (ix+54), $0B
-  ld (ix+55), $88
-  ld (ix+56), $0B
+  ld (ix+CarData.Unknown53_w.Lo), $88
+  ld (ix+CarData.Unknown53_w.Hi), $0B
+  ld (ix+CarData.Unknown55_w.Lo), $88
+  ld (ix+CarData.Unknown55_w.Hi), $0B
   jp ++
 
 +:
-  ld (ix+53), $B0
-  ld (ix+54), $0B
-  ld (ix+55), $B0
-  ld (ix+56), $0B
+  ld (ix+CarData.Unknown53_w.Lo), $B0
+  ld (ix+CarData.Unknown53_w.Hi), $0B
+  ld (ix+CarData.Unknown55_w.Lo), $B0
+  ld (ix+CarData.Unknown55_w.Hi), $0B
 ++:
   ld a, $0E
-  ld (ix+52), a
+  ld (ix+CarData.Unknown52_b), a
   ld a, $4D
-  ld (ix+51), a
+  ld (ix+CarData.Unknown51_b), a
   ld a, $01
-  ld (ix+57), a
+  ld (ix+CarData.Unknown57_b), a
   jp LABEL_5D4A_
 
 LABEL_5C31_:
   ld a, $02
-  ld (ix+60), a
+  ld (ix+CarData.Unknown60_b), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
-  jr z, +
-  ld (ix+53), $40
-  ld (ix+54), $08
-  ld (ix+55), $58
-  ld (ix+56), $06
+  jr z, @SMS
+@GG:
+  ld (ix+CarData.Unknown53_w.Lo), $40
+  ld (ix+CarData.Unknown53_w.Hi), $08
+  ld (ix+CarData.Unknown55_w.Lo), $58
+  ld (ix+CarData.Unknown55_w.Hi), $06
   jp ++
 
-+:
-  ld (ix+53), $68
-  ld (ix+54), $08
-  ld (ix+55), $80
-  ld (ix+56), $06
+@SMS:
+  ld (ix+CarData.Unknown53_w.Lo), $68
+  ld (ix+CarData.Unknown53_w.Hi), $08
+  ld (ix+CarData.Unknown55_w.Lo), $80
+  ld (ix+CarData.Unknown55_w.Hi), $06
 ++:
   ld a, $04
-  ld (ix+52), a
+  ld (ix+CarData.Unknown52_b), a
   ld a, $4E
-  ld (ix+51), a
+  ld (ix+CarData.Unknown51_b), a
   xor a
-  ld (ix+57), a
+  ld (ix+CarData.Unknown57_b), a
   jp LABEL_5D4A_
 
 LABEL_5C70_:
   ld a, $01
-  ld (ix+60), a
+  ld (ix+CarData.Unknown60_b), a
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld (ix+53), $08
-  ld (ix+54), $07
-  ld (ix+55), $80
-  ld (ix+56), $01
+  ld (ix+CarData.Unknown53_w.Lo), $08
+  ld (ix+CarData.Unknown53_w.Hi), $07
+  ld (ix+CarData.Unknown55_w.Lo), $80
+  ld (ix+CarData.Unknown55_w.Hi), $01
   jp ++
 
 +:
-  ld (ix+53), $30
-  ld (ix+54), $07
-  ld (ix+55), $A8
-  ld (ix+56), $01
+  ld (ix+CarData.Unknown53_w.Lo), $30
+  ld (ix+CarData.Unknown53_w.Hi), $07
+  ld (ix+CarData.Unknown55_w.Lo), $A8
+  ld (ix+CarData.Unknown55_w.Hi), $01
 ++:
   ld a, $0A
-  ld (ix+52), a
+  ld (ix+CarData.Unknown52_b), a
   ld a, $60
-  ld (ix+51), a
+  ld (ix+CarData.Unknown51_b), a
   xor a
-  ld (ix+57), a
+  ld (ix+CarData.Unknown57_b), a
   jp LABEL_5D4A_
 
 LABEL_5CAF_:
-  ld a, (ix+59)
+  ld a, (ix+CarData.Unknown59_b)
   and $10
   jp nz, LABEL_4DD4_
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $39
   jp nz, LABEL_4DD4_
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld (ix+53), $50
-  ld (ix+54), $01
-  ld (ix+55), $18
-  ld (ix+56), $01
+  ld (ix+CarData.Unknown53_w.Lo), $50
+  ld (ix+CarData.Unknown53_w.Hi), $01
+  ld (ix+CarData.Unknown55_w.Lo), $18
+  ld (ix+CarData.Unknown55_w.Hi), $01
   jp ++
 
 +:
-  ld (ix+53), $78
-  ld (ix+54), $01
-  ld (ix+55), $40
-  ld (ix+56), $01
+  ld (ix+CarData.Unknown53_w.Lo), $78
+  ld (ix+CarData.Unknown53_w.Hi), $01
+  ld (ix+CarData.Unknown55_w.Lo), $40
+  ld (ix+CarData.Unknown55_w.Hi), $01
 ++:
   ld a, $06
-  ld (ix+52), a
+  ld (ix+CarData.Unknown52_b), a
   ld a, $23
-  ld (ix+51), a
+  ld (ix+CarData.Unknown51_b), a
   ld a, $01
-  ld (ix+57), a
+  ld (ix+CarData.Unknown57_b), a
   jp LABEL_5D4A_
 
 LABEL_5CFC_:
-  ld a, (ix+59)
+  ld a, (ix+CarData.Unknown59_b)
   and $10
   jp nz, LABEL_4DD4_
-  ld a, (ix+10)
+  ld a, (ix+CarData.CurrentMetatile)
   and $3F
   cp $34
   jr z, +
@@ -12723,29 +12629,29 @@ LABEL_5CFC_:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld (ix+53), $68
-  ld (ix+54), $06
-  ld (ix+55), $38
-  ld (ix+56), $05
+  ld (ix+CarData.Unknown53_w.Lo), $68
+  ld (ix+CarData.Unknown53_w.Hi), $06
+  ld (ix+CarData.Unknown55_w.Lo), $38
+  ld (ix+CarData.Unknown55_w.Hi), $05
   jp ++
 
 +:
-  ld (ix+53), $90
-  ld (ix+54), $06
-  ld (ix+55), $60
-  ld (ix+56), $05
+  ld (ix+CarData.Unknown53_w.Lo), $90
+  ld (ix+CarData.Unknown53_w.Hi), $06
+  ld (ix+CarData.Unknown55_w.Lo), $60
+  ld (ix+CarData.Unknown55_w.Hi), $05
 ++:
   ld a, $0C
-  ld (ix+52), a
+  ld (ix+CarData.Unknown52_b), a
   ld a, $1D
-  ld (ix+51), a
+  ld (ix+CarData.Unknown51_b), a
   ld a, $01
-  ld (ix+57), a
+  ld (ix+CarData.Unknown57_b), a
 LABEL_5D4A_:
-  ld a, (ix+46)
+  ld a, (ix+CarData.Unknown46_b)
   or a
   JpNzRet _LABEL_5E24_ret
-  ld a, (ix+45)
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   or a
   jr z, LABEL_5DAD_
   cp $01
@@ -12769,12 +12675,12 @@ LABEL_5D4A_:
   xor a
   ld (_RAM_DF7D_), a
   ld (_RAM_DF7E_), a
-  ld (_RAM_DCFB_), a
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ld (_RAM_DB82_), a
   ld (_RAM_DB83_), a
   ld a, SFX_09_EnterPoolTableHole
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
   ld a, (_RAM_DF56_)
   ld b, a
   ld a, (_RAM_DF57_)
@@ -12794,7 +12700,7 @@ LABEL_5DAD_:
   ld (_RAM_DF5A_CarState3), a
 LABEL_5DB9_:
   ld a, $01
-  ld (ix+46), a
+  ld (ix+CarData.Unknown46_b), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
@@ -12802,11 +12708,11 @@ LABEL_5DB9_:
   ld (_RAM_D5D9_), a
 +:
   xor a
-  ld (ix+11), a
-  ld (ix+20), a
-  ld a, (ix+53)
+  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown20_b), a
+  ld a, (ix+CarData.Unknown53_w.Lo)
   ld (_RAM_DEF1_), a
-  ld a, (ix+54)
+  ld a, (ix+CarData.Unknown53_w.Hi)
   ld (_RAM_DEF2_), a
   ld a, (_RAM_DC54_IsGameGear)
   cp $01
@@ -12821,12 +12727,12 @@ LABEL_5DB9_:
   or a
   sbc hl, de
   ld a, l
-  ld (ix+53), a
+  ld (ix+CarData.Unknown53_w.Lo), a
   ld a, h
-  ld (ix+54), a
-  ld a, (ix+55)
+  ld (ix+CarData.Unknown53_w.Hi), a
+  ld a, (ix+CarData.Unknown55_w.Lo)
   ld (_RAM_DEF1_), a
-  ld a, (ix+56)
+  ld a, (ix+CarData.Unknown55_w.Hi)
   ld (_RAM_DEF2_), a
   ld a, (_RAM_DC54_IsGameGear)
   cp $01
@@ -12841,14 +12747,14 @@ LABEL_5DB9_:
   or a
   sbc hl, de
   ld a, l
-  ld (ix+55), a
+  ld (ix+CarData.Unknown55_w.Lo), a
   ld a, h
-  ld (ix+56), a
+  ld (ix+CarData.Unknown55_w.Hi), a
 _LABEL_5E24_ret:
   ret
 
 LABEL_5E25_:
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   cp $16
   jp z, LABEL_59FC_
@@ -12864,12 +12770,12 @@ LABEL_5E3A_:
   cp TT_7_RuffTrux
   JrZRet +
   xor a
-  ld (_RAM_DCC1_), a
-  ld (_RAM_DCC2_), a
-  ld (_RAM_DD02_), a
-  ld (_RAM_DD03_), a
-  ld (_RAM_DD43_), a
-  ld (_RAM_DD44_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown22_b), a
+  ld (_RAM_DCAB_CarData_Green.Unknown23_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown22_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown23_b), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown22_b), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown23_b), a
   call LABEL_5F5E_
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
@@ -12885,7 +12791,7 @@ LABEL_5E3A_:
 ++:
   ld ix, _RAM_DCAB_CarData_Green
   ld bc, $0000
-  ld a, (_RAM_DCC0_)
+  ld a, (_RAM_DCAB_CarData_Green.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_5F52_ret
   ld a, (_RAM_DE8C_)
@@ -12894,12 +12800,12 @@ LABEL_5E3A_:
   ld a, (_RAM_DF58_)
   or a
   JpNzRet _LABEL_5F52_ret
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   JpNzRet _LABEL_5F52_ret
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -12907,9 +12813,9 @@ LABEL_5E3A_:
 +:
   cp $10
   JpNcRet _LABEL_5F52_ret
-  ld a, (_RAM_DCBC_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
   jr nc, +
   xor $FF
@@ -12920,20 +12826,20 @@ LABEL_5E3A_:
   ld a, $01
   cp b
   jr z, +
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   jp ++
 
 +:
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
 ++:
   ld a, $01
   cp c
   jr z, +
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   jp ++
 
 +:
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
 ++:
   call LABEL_6571_
   ld a, (_RAM_DE32_)
@@ -12942,10 +12848,10 @@ LABEL_5E3A_:
   cp l
   jr c, ++
   ld d, a
-  ld a, (_RAM_DC4A_Cheat_ExtraLives)
+  ld a, (_RAM_DC4A_Cheat_ExtraLivesAndLeadCar)
   or a
   jr z, +
-  ld d, $0D
+  ld d, CHEAT_LEAD_CAR_VALUE
 +:
   ld a, d
   cp $02
@@ -12958,7 +12864,7 @@ LABEL_5E3A_:
 ++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -12966,7 +12872,7 @@ LABEL_5E3A_:
   ld a, $02
 +:
   ld (_RAM_DE2F_), a
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   ld (_RAM_DE2E_), a
   ld a, $06
   ld (_RAM_DEB3_Player1AccelerationDelayCounter), a
@@ -12974,12 +12880,13 @@ LABEL_5E3A_:
   ld a, (_RAM_DC49_Cheat_ExplosiveOpponents)
   or a
   jr nz, +++
+_Normal:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
   ld a, (_RAM_DE92_EngineVelocity)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -12995,7 +12902,7 @@ LABEL_5E3A_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCB6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
   ld (_RAM_DE92_EngineVelocity), a
 _LABEL_5F52_ret:
   ret
@@ -13009,7 +12916,7 @@ _LABEL_5F52_ret:
 LABEL_5F5E_:
   ld ix, _RAM_DCEC_CarData_Blue
   ld bc, $0000
-  ld a, (_RAM_DD01_)
+  ld a, (_RAM_DCEC_CarData_Blue.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_609C_ret
   ld a, (_RAM_DE8C_)
@@ -13018,12 +12925,12 @@ LABEL_5F5E_:
   ld a, (_RAM_DF58_)
   or a
   JpNzRet _LABEL_609C_ret
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JpNzRet _LABEL_609C_ret
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -13031,9 +12938,9 @@ LABEL_5F5E_:
 +:
   cp $10
   JpNcRet _LABEL_609C_ret
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
   jr nc, +
   xor $FF
@@ -13044,23 +12951,23 @@ LABEL_5F5E_:
   ld a, $01
   cp b
   jr z, +
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   call LABEL_1AD8_
   jp ++
 
 +:
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   call LABEL_1AC8_
 ++:
   ld a, $01
   cp c
   jr z, +
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   call LABEL_1AFA_
   jp ++
 
 +:
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   call LABEL_1AE7_
 ++:
   call LABEL_6571_
@@ -13073,14 +12980,14 @@ LABEL_5F5E_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (_RAM_DC4A_Cheat_ExtraLives)
+  ld a, (_RAM_DC4A_Cheat_ExtraLivesAndLeadCar)
   or a
   jr z, +
-  ld a, $0D
+  ld a, CHEAT_LEAD_CAR_VALUE
   jr ++
 
 +:
-  ld a, d
+  ld a, d ; pointless?
   ld d, a
   ld a, (_RAM_DEB5_)
   or a
@@ -13107,7 +13014,7 @@ LABEL_5F5E_:
 +++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp l
   jr c, +++
   ld c, a
@@ -13132,7 +13039,7 @@ LABEL_5F5E_:
   jp ++
 
 +:
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
 ++:
   ld (_RAM_DE2E_), a
   ld a, $06
@@ -13147,7 +13054,7 @@ LABEL_6054_:
   jr nz, ++
   ld a, (_RAM_DE92_EngineVelocity)
   ld l, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -13174,7 +13081,7 @@ LABEL_6054_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld (_RAM_DE92_EngineVelocity), a
 _LABEL_609C_ret:
   ret
@@ -13191,7 +13098,7 @@ LABEL_609D_:
 LABEL_60AE_:
   ld ix, _RAM_DD2D_CarData_Yellow
   ld bc, $0000
-  ld a, (_RAM_DD42_)
+  ld a, (_RAM_DD2D_CarData_Yellow.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_618F_ret
   ld a, (_RAM_DE8C_)
@@ -13200,12 +13107,12 @@ LABEL_60AE_:
   ld a, (_RAM_DF58_)
   or a
   JpNzRet _LABEL_618F_ret
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JpNzRet _LABEL_618F_ret
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   xor $FF
@@ -13213,9 +13120,9 @@ LABEL_60AE_:
 +:
   cp $10
   JpNcRet _LABEL_618F_ret
-  ld a, (_RAM_DD3E_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
   jr nc, +
   xor $FF
@@ -13226,20 +13133,20 @@ LABEL_60AE_:
   ld a, $01
   cp b
   jr z, +
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   jp ++
 
 +:
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
 ++:
   ld a, $01
   cp c
   jr z, +
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   jp ++
 
 +:
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
 ++:
   call LABEL_6571_
   ld a, (_RAM_DE38_)
@@ -13248,10 +13155,10 @@ LABEL_60AE_:
   cp l
   jr c, ++
   ld d, a
-  ld a, (_RAM_DC4A_Cheat_ExtraLives)
+  ld a, (_RAM_DC4A_Cheat_ExtraLivesAndLeadCar)
   or a
   jr z, +
-  ld d, $0D
+  ld d, CHEAT_LEAD_CAR_VALUE
 +:
   ld a, d
   cp $02
@@ -13264,7 +13171,7 @@ LABEL_60AE_:
 ++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13272,7 +13179,7 @@ LABEL_60AE_:
   ld a, $02
 +:
   ld (_RAM_DE2F_), a
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   ld (_RAM_DE2E_), a
   ld a, $06
   ld (_RAM_DEB3_Player1AccelerationDelayCounter), a
@@ -13285,7 +13192,7 @@ LABEL_60AE_:
   jr nz, ++
   ld a, (_RAM_DE92_EngineVelocity)
   ld l, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -13301,7 +13208,7 @@ LABEL_60AE_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DD38_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
   ld (_RAM_DE92_EngineVelocity), a
 _LABEL_618F_ret:
   ret
@@ -13314,21 +13221,21 @@ _LABEL_618F_ret:
 
 LABEL_619B_:
   ld bc, $0001
-  ld a, (_RAM_DCC0_)
+  ld a, (_RAM_DCAB_CarData_Green.EffectsEnabled)
   cp $01
   jp nz, LABEL_6295_
-  ld a, (_RAM_DD01_)
+  ld a, (_RAM_DCEC_CarData_Blue.EffectsEnabled)
   cp $01
   jp nz, LABEL_6295_
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   jp nz, LABEL_6295_
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jp nz, LABEL_6295_
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   ld l, a
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -13336,9 +13243,9 @@ LABEL_619B_:
 +:
   cp $10
   jp nc, LABEL_6295_
-  ld a, (_RAM_DCBC_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
   ld l, a
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   sub l
   jr nc, +
   xor $FF
@@ -13350,36 +13257,36 @@ LABEL_619B_:
   cp b
   jr z, +
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   jp ++
 
 +:
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
 ++:
   ld a, $01
   cp c
   jr z, +
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   jp ++
 
 +:
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
 ++:
   call LABEL_6582_
   ld a, (_RAM_DE32_)
   ld l, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13387,12 +13294,12 @@ LABEL_619B_:
   ld a, $02
 +:
   ld (_RAM_DE32_), a
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld (_RAM_DE31_), a
 ++:
   ld a, (_RAM_DE35_)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13400,15 +13307,15 @@ LABEL_619B_:
   ld a, $02
 +:
   ld (_RAM_DE35_), a
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   ld (_RAM_DE34_), a
 ++:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -13425,8 +13332,8 @@ LABEL_619B_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCB6_), a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ret
 
 LABEL_6295_:
@@ -13436,21 +13343,21 @@ LABEL_6295_:
 
 LABEL_629A_:
   ld bc, $0000
-  ld a, (_RAM_DCC0_)
+  ld a, (_RAM_DCAB_CarData_Green.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_6393_ret
-  ld a, (_RAM_DD42_)
+  ld a, (_RAM_DD2D_CarData_Yellow.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_6393_ret
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   JpNzRet _LABEL_6393_ret
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JpNzRet _LABEL_6393_ret
-  ld a, (_RAM_DCBD_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteY)
   ld l, a
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -13458,9 +13365,9 @@ LABEL_629A_:
 +:
   cp $10
   JpNcRet _LABEL_6393_ret
-  ld a, (_RAM_DCBC_)
+  ld a, (_RAM_DCAB_CarData_Green.SpriteX)
   ld l, a
-  ld a, (_RAM_DD3E_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
   sub l
   jr nc, +
   xor $FF
@@ -13472,36 +13379,36 @@ LABEL_629A_:
   cp b
   jr z, +
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   jp ++
 
 +:
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
 ++:
   ld a, $01
   cp c
   jr z, +
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   jp ++
 
 +:
   ld ix, _RAM_DCAB_CarData_Green
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
 ++:
   call LABEL_6582_
   ld a, (_RAM_DE32_)
   ld l, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13509,12 +13416,12 @@ LABEL_629A_:
   ld a, $02
 +:
   ld (_RAM_DE32_), a
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   ld (_RAM_DE31_), a
 ++:
   ld a, (_RAM_DE38_)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13522,15 +13429,15 @@ LABEL_629A_:
   ld a, $02
 +:
   ld (_RAM_DE38_), a
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   ld (_RAM_DE37_), a
 ++:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   ld l, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -13547,28 +13454,28 @@ LABEL_629A_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCB6_), a
-  ld (_RAM_DD38_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
 _LABEL_6393_ret:
   ret
 
 LABEL_6394_:
   ld bc, $0000
-  ld a, (_RAM_DD01_)
+  ld a, (_RAM_DCEC_CarData_Blue.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_648D_ret
-  ld a, (_RAM_DD42_)
+  ld a, (_RAM_DD2D_CarData_Yellow.EffectsEnabled)
   cp $01
   JpNzRet _LABEL_648D_ret
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JpNzRet _LABEL_648D_ret
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JpNzRet _LABEL_648D_ret
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld l, a
-  ld a, (_RAM_DD3F_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteY)
   sub l
   jr nc, +
   xor $FF
@@ -13576,9 +13483,9 @@ LABEL_6394_:
 +:
   cp $10
   JpNcRet _LABEL_648D_ret
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   ld l, a
-  ld a, (_RAM_DD3E_)
+  ld a, (_RAM_DD2D_CarData_Yellow.SpriteX)
   sub l
   jr nc, +
   xor $FF
@@ -13590,36 +13497,36 @@ LABEL_6394_:
   cp b
   jr z, +
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   jp ++
 
 +:
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B2F_
+  call LABEL_1B2F_IncrementYPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B0C_
+  call LABEL_1B0C_DecrementYPosition
 ++:
   ld a, $01
   cp c
   jr z, +
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   jp ++
 
 +:
   ld ix, _RAM_DCEC_CarData_Blue
-  call LABEL_1B73_
+  call LABEL_1B73_IncrementXPosition
   ld ix, _RAM_DD2D_CarData_Yellow
-  call LABEL_1B50_
+  call LABEL_1B50_DecrementXPosition
 ++:
   call LABEL_6582_
   ld a, (_RAM_DE35_)
   ld l, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13627,12 +13534,12 @@ LABEL_6394_:
   ld a, $02
 +:
   ld (_RAM_DE35_), a
-  ld a, (_RAM_DD3A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Direction)
   ld (_RAM_DE34_), a
 ++:
   ld a, (_RAM_DE38_)
   ld l, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp l
   jr c, ++
   cp $02
@@ -13640,15 +13547,15 @@ LABEL_6394_:
   ld a, $02
 +:
   ld (_RAM_DE38_), a
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld (_RAM_DE37_), a
 ++:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   ld l, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   sub l
   jr nc, +
   xor $FF
@@ -13665,8 +13572,8 @@ LABEL_6394_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCF7_), a
-  ld (_RAM_DD38_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
 _LABEL_648D_ret:
   ret
 
@@ -13691,12 +13598,12 @@ LABEL_648E_:
   JumpToPagedFunction LABEL_1BCE2_
 
 LABEL_64C9_:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   cp $F3
   jr nc, +
   cp $03
   jr c, +
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   cp $E8
   JrCRet ++
   cp $F0
@@ -13732,11 +13639,39 @@ LABEL_64E5_SetDrawingParameters_PartialMetatile:
 
 ; Data from 650C to 653F (52 bytes)
 DATA_650C_SoundInitialisationData:
-; TODO: could label with the meanings/RAM labels
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $E8
-.db $03 $03 $0A $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $E8 $03 $03 $00 $00 $15 $0B $15 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $FF $07 $08
+; Most important thing is the last 4 bytes of each engine sound
+
+.dstruct SoundChannel1Init instanceof SoundChannel data 0, 0 ; _RAM_D94C_SoundChannels.1
+.dstruct SoundChannel2Init instanceof SoundChannel data 0, 0 ; _RAM_D94C_SoundChannels.2
+.dw $0000 ; _RAM_D952_EngineSound1ActualTone
+.dw $0000 ; _RAM_D954_EngineSound2ActualTone
+.db $00 ; _RAM_D956_Sound_ToneEngineSoundsIndex
+.db $00 ; _RAM_D957_Sound_HelicopterEngineIndex
+.db $00 ; _RAM_D958_Sound_LastAttenuation
+.db $00 ; _RAM_D959_Unused
+.db $00 ; _RAM_D95A_Sound_IsHelicopterEngine
+
+;.dstruct EngineSound1Init instanceof EngineSound data <LOWEST_PITCH_ENGINE_TONE, >LOWEST_PITCH_ENGINE_TONE, 3, MAX_ENGINE_VOLUME, $00, $15, $0B, $15 ; _RAM_D95B_EngineSound1
+; Can't .dstruct structs with dsb members
+.dw LOWEST_PITCH_ENGINE_TONE ; Engine sound 1 tone
+.db $03 ; Engine sound 1 unused
+.db MAX_ENGINE_VOLUME ; Engine sound 1 volume
+.db $00 $15 $0B $15 ; Engine sound 1 Fluctuations
+
+.dstruct SFX_Player1_Init instanceof SFXData data 0, 0, 0, 0, 0, 0 ; _RAM_D963_SFX_Player1
+
+; _RAM_D96C_EngineSound2
+.dw LOWEST_PITCH_ENGINE_TONE ; Engine sound 2 tone
+.db $03 ; Engine sound 2 unused
+.db $00 ; Engine sound 2 volume
+.db $00 $15 $0B $15 ; Engine sound 2 Fluctuations
+
+.dstruct SFX_Player2_Init instanceof SFXData data 0, 0, 0, 0, 0, 0 ; _RAM_D974_SFX_Player2
+
+.db SFX_DATA_END ; _RAM_D97D_Sound_SFXNoiseData
+.db $07 ; _RAM_D97E_Player1SFX_Unused
+.db $08 ; _RAM_D97F_Player2SFX_Unused
+
 DATA_650C_SoundInitialisationData_End:
 
 LABEL_6540_:
@@ -13777,7 +13712,7 @@ LABEL_6571_:
   xor a
   ld (_RAM_D948_), a
   ld a, SFX_0D
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 +:ret
 
 LABEL_6582_:
@@ -13787,7 +13722,7 @@ LABEL_6582_:
   xor a
   ld (_RAM_D949_), a
   ld a, SFX_0D
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:ret
 
 LABEL_6593_:
@@ -13813,7 +13748,7 @@ LABEL_6593_:
   jr z, +
   ld a, SFX_0F_Skid1
 -:
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 _LABEL_65C2_ret:
   ret
 
@@ -13834,12 +13769,12 @@ LABEL_65D0_BehaviourE:
   ld a, (_RAM_DF58_)
   or a
   JrNzRet +
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   xor a
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
   ld a, SFX_08
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, CarState_3_Falling
   ld (_RAM_DF59_CarState), a
   ld a, $01
@@ -13857,17 +13792,17 @@ LABEL_65D0_BehaviourE:
 
 +:ret
 
-LABEL_6611_Tanks:
-  JumpToPagedFunction LABEL_37A75_
+LABEL_6611_Tanks_Red_Trampoline:
+  JumpToPagedFunction LABEL_37A75_Tanks_Red
 
-LABEL_661C_:
-  JumpToPagedFunction LABEL_37C45_
+LABEL_661C_Tanks_Green_Trampoline:
+  JumpToPagedFunction LABEL_37C45_Tanks_Green
 
-LABEL_6627_:
-  JumpToPagedFunction LABEL_37C4F_
+LABEL_6627_Tanks_Blue_Trampoline:
+  JumpToPagedFunction LABEL_37C4F_Tanks_Blue
 
-LABEL_6632_:
-  JumpToPagedFunction LABEL_37C59_
+LABEL_6632_Tanks_Yellow_Trampoline:
+  JumpToPagedFunction LABEL_37C59_Tanks_Yellow
 
 LABEL_663D_InitialisePlugholeTiles:
   ld a, (_RAM_DB97_TrackType)
@@ -13922,7 +13857,7 @@ LABEL_6677_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -13941,7 +13876,7 @@ LABEL_6677_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0B_), a
-  ld hl, DATA_40E5_Sign_
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -13959,7 +13894,7 @@ LABEL_6677_:
   ld a, $01
   ld (_RAM_DF0D_), a
 ++:
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -13978,7 +13913,7 @@ LABEL_6677_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF0C_), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_DE2E_)
   add a, l
   ld l, a
@@ -14063,7 +13998,7 @@ LABEL_6756_:
   ld a, (_RAM_DE8C_)
   or a
   jr z, +
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   JpZRet _LABEL_6895_ret
   ld a, (_RAM_DF59_CarState)
@@ -14079,7 +14014,7 @@ LABEL_6756_:
   jp ++
 
 +:
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   jr z, +
   JpRet _LABEL_6895_ret
@@ -14144,13 +14079,13 @@ LABEL_67AB_:
 +:
   ld a, $04
 ++:
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp ++++++
 
 +++++:
   xor a
   ld (_RAM_DEBB_), a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 ++++++:
   ld a, (_RAM_DBAC_)
   cp $FF
@@ -14214,12 +14149,12 @@ LABEL_67AB_:
   xor a
   ld (_RAM_D946_), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, $74
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   ld a, $64
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
 _LABEL_6895_ret:
   ret
@@ -14233,20 +14168,21 @@ _LABEL_6895_ret:
   ld a, $01
   ld (_RAM_DF7F_), a
   ld a, SFX_13_HeadToHeadWinPoint
-  ld (_RAM_D963_SFXTrigger_Player1), a
-  ld a, $00
-  ld (_RAM_D95E_), a
-  ld (_RAM_D96F_), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
-  ld (_RAM_D96C_), hl
-  ld (_RAM_D58A_), hl
-  ld (_RAM_D58E_), hl
-  ld (_RAM_D590_), hl
+  ld (_RAM_D963_SFX_Player1.Trigger), a
+  ; Reset both engine tones
+  ld a, 0
+  ld (_RAM_D95B_EngineSound1.Volume), a
+  ld (_RAM_D96C_EngineSound2.Volume), a
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
+  ld (_RAM_D96C_EngineSound2.Tone), hl
+  ld (_RAM_D58A_LowestPitchEngineTone), hl
+  ld (_RAM_D58E_OtherCar_EngineTone), hl
+  ld (_RAM_D590_Unused_EngineTone), hl
   ld (_RAM_D58C_), hl
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld (_RAM_DF06_), a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld (_RAM_DF07_), a
   ld a, (_RAM_D5B0_)
   or a
@@ -14261,45 +14197,45 @@ _LABEL_6895_ret:
 +:
   ld a, (_RAM_D5CB_)
   or a
-  jp nz, LABEL_7AC4_
+  jp nz, LABEL_7AC4_HeadToHead_RedWins
   ld a, $01
   ld (_RAM_DF00_), a
   ld a, $78
   ld (_RAM_DF0A_), a
   ld a, $03
   ld (_RAM_DF02_), a
-  ld a, (_RAM_D947_)
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
-  ld a, (_RAM_DB7B_)
-  add a, $01
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  add a, 1
   ld (_RAM_D583_), a
 +:
   xor a
-  ld (_RAM_DCEE_), a
-  ld (_RAM_DCEF_), a
-  jp LABEL_B2B_
+  ld (_RAM_DCEC_CarData_Blue.YPosition), a
+  ld (_RAM_DCEC_CarData_Blue.YPosition+1), a
+  jp LABEL_B2B_HeadToHead_RedWins
 
 ++:
   ld a, (_RAM_D5CB_)
   or a
-  jp nz, LABEL_7AAF_
+  jp nz, LABEL_7AAF_HeadToHead_BlueWins
   ld a, $01
-  ld (_RAM_DD00_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown20_b), a
   ld a, $78
-  ld (_RAM_DD10_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown36_b), a
   ld a, $03
-  ld (_RAM_DD11_), a
-  ld a, (_RAM_D947_)
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
-  ld a, (_RAM_DB7B_)
-  sub $01
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  sub 1
   ld (_RAM_D583_), a
 +:
   xor a
-  ld (_RAM_DBA5_), a
-  jp LABEL_B13_
+  ld (_RAM_DBA5_CarY), a
+  jp LABEL_B13_HeadToHead_BlueWins
 
 LABEL_693F_:
   ld a, (_RAM_DF7F_)
@@ -14327,14 +14263,14 @@ LABEL_6947_:
   ld (_RAM_DB81_), a
   ld (_RAM_DB82_), a
   ld (_RAM_DB83_), a
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DB7E_), a
   ld (_RAM_DB7F_), a
-  ld (_RAM_DCFB_), a
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ld (_RAM_DF79_CurrentCombinedByte), a
-  ld (_RAM_DD08_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown28_b), a
   ld (_RAM_DF74_RuffTruxSubmergedCounter), a
   ld a, $01
   ld (_RAM_D582_), a
@@ -14349,18 +14285,18 @@ LABEL_6947_:
   ld e, $64
   ld d, $00
   add hl, de
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   xor a
   ld (_RAM_D946_), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, $74
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   ld a, $64
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
   ret
 
@@ -14380,9 +14316,9 @@ LABEL_69DB_:
 +:
   ld a, $10
 ++:
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
   xor a
-  ld (_RAM_DD25_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown57_b), a
   ld a, $02
   ld (_RAM_D5C5_), a
   ld a, (_RAM_D5C6_)
@@ -14402,12 +14338,12 @@ LABEL_6A11_:
   ld (_RAM_DF58_), a
   ld (_RAM_DF59_CarState), a ; CarState_0_Normal
   ld hl, 500 ; $01F4
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ld (_RAM_D58C_), hl
-  ld a, $0A
-  ld (_RAM_D95E_), a
+  ld a, MAX_ENGINE_VOLUME
+  ld (_RAM_D95B_EngineSound1.Volume), a
   ld a, SFX_0C_LeavePoolTableHole
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, (_RAM_DE8D_)
   ld (_RAM_DE90_CarDirection), a
   ld (_RAM_DE91_CarDirectionPrevious), a
@@ -14426,12 +14362,12 @@ LABEL_6A11_:
 
 LABEL_6A4F_:
   ld a, $74
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   ld (_RAM_DF06_), a
   ld (_RAM_DF04_), a
   ld a, $64
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
   ld (_RAM_DF07_), a
   ld (_RAM_DF05_), a
@@ -14487,66 +14423,66 @@ LABEL_6A97_:
 +:
   call LABEL_71C7_
 +++:
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   or a
   jp z, LABEL_6B34_
   ld a, (_RAM_DF5A_CarState3)
   or a
   jp nz, LABEL_6B34_
   ; CarState_0_Normal
-  ld a, (_RAM_DCDE_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown51_b)
   or a
   jr nz, +
   ld a, CarState_2_Respawning
   ld (_RAM_DF5A_CarState3), a
   xor a
-  ld (_RAM_DCB6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
   jp LABEL_7295_
 
 +:
   cp $01
   jr z, +
   sub $01
-  ld (_RAM_DCDE_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown51_b), a
   jp LABEL_6B34_
 
 +:
-  ld a, (_RAM_DCE4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown57_b)
   cp $01
   jr nz, +
   ld a, $FF
-  ld (_RAM_DCDE_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown51_b), a
   xor a
-  ld (_RAM_DCE4_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown57_b), a
   jp LABEL_6B34_
 
 +:
-  ld hl, (_RAM_DCE0_)
-  ld (_RAM_DCAB_CarData_Green), hl
-  ld hl, (_RAM_DCE2_)
-  ld (_RAM_DCAD_), hl
+  ld hl, (_RAM_DCAB_CarData_Green.Unknown53_w)
+  ld (_RAM_DCAB_CarData_Green.XPosition), hl
+  ld hl, (_RAM_DCAB_CarData_Green.Unknown55_w)
+  ld (_RAM_DCAB_CarData_Green.YPosition), hl
   xor a
-  ld (_RAM_DCD9_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown46_b), a
   ld (_RAM_DF5A_CarState3), a ; CarState_0_Normal
-  ld a, (_RAM_DCDF_)
-  ld (_RAM_DCB7_), a
-  ld (_RAM_DCB8_), a
+  ld a, (_RAM_DCAB_CarData_Green.Unknown52_b)
+  ld (_RAM_DCAB_CarData_Green.Unknown12_b), a
+  ld (_RAM_DCAB_CarData_Green.Direction), a
   ld a, $01
-  ld (_RAM_DCBF_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown20_b), a
   ld a, $38
-  ld (_RAM_DCCF_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown36_b), a
   ld a, $05
-  ld (_RAM_DCD0_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown37_b), a
   ld a, $09
-  ld (_RAM_DCB6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
 LABEL_6B34_:
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   jp z, LABEL_6BC2_
   ld a, (_RAM_DF5B_)
   or a
   jp nz, LABEL_6BC2_
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   jr nz, +
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -14555,7 +14491,7 @@ LABEL_6B34_:
   ld a, $02
   ld (_RAM_DF5B_), a
   xor a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   jp LABEL_72CA_
 
 +:
@@ -14563,64 +14499,64 @@ LABEL_6B34_:
   or a
   jr nz, LABEL_6BC2_
 LABEL_6B60_:
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   jr z, LABEL_6BC2_
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   cp $01
   jr z, +
   sub $01
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
   jp LABEL_6BC2_
 
 +:
-  ld a, (_RAM_DD25_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown57_b)
   cp $01
   jr nz, +
   ld a, $FF
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
   xor a
-  ld (_RAM_DD25_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown57_b), a
   jp LABEL_6B34_
 
 +:
-  ld hl, (_RAM_DD21_)
+  ld hl, (_RAM_DCEC_CarData_Blue.Unknown53_w)
   ld (_RAM_DCEC_CarData_Blue), hl
-  ld hl, (_RAM_DD23_)
-  ld (_RAM_DCEE_), hl
+  ld hl, (_RAM_DCEC_CarData_Blue.Unknown55_w)
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   xor a
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   ld (_RAM_DF5B_), a
-  ld a, (_RAM_DD20_)
-  ld (_RAM_DCF8_), a
-  ld (_RAM_DCF9_), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown52_b)
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
   ld a, $01
-  ld (_RAM_DD00_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown20_b), a
   ld a, $38
-  ld (_RAM_DD10_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown36_b), a
   ld a, $05
-  ld (_RAM_DD11_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
   ld a, $09
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, LABEL_6BC2_
   xor a
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
 LABEL_6BC2_:
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   or a
   JpZRet +
   ld a, (_RAM_DF5C_)
   or a
   JpNzRet +
-  ld a, (_RAM_DD60_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown51_b)
   or a
   jr nz, ++
   ld a, $02
   ld (_RAM_DF5C_), a
   xor a
-  ld (_RAM_DD38_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
   jp LABEL_7332_
 
 +:ret
@@ -14629,38 +14565,38 @@ LABEL_6BC2_:
   cp $01
   jr z, +
   sub $01
-  ld (_RAM_DD60_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown51_b), a
   ret
 
 +:
-  ld a, (_RAM_DD66_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown57_b)
   cp $01
   jr nz, +
   ld a, $FF
-  ld (_RAM_DD60_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown51_b), a
   xor a
-  ld (_RAM_DD66_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown57_b), a
   jp LABEL_6B34_
 
 +:
-  ld hl, (_RAM_DD62_)
+  ld hl, (_RAM_DD2D_CarData_Yellow.Unknown53_w)
   ld (_RAM_DD2D_CarData_Yellow), hl
-  ld hl, (_RAM_DD64_)
-  ld (_RAM_DD2F_), hl
+  ld hl, (_RAM_DD2D_CarData_Yellow.Unknown55_w)
+  ld (_RAM_DD2D_CarData_Yellow.YPosition), hl
   xor a
-  ld (_RAM_DD5B_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown46_b), a
   ld (_RAM_DF5C_), a
-  ld a, (_RAM_DD61_)
-  ld (_RAM_DD39_), a
-  ld (_RAM_DD3A_), a
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown52_b)
+  ld (_RAM_DD2D_CarData_Yellow.Unknown12_b), a
+  ld (_RAM_DD2D_CarData_Yellow.Direction), a
   ld a, $01
-  ld (_RAM_DD41_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown20_b), a
   ld a, $38
-  ld (_RAM_DD51_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown36_b), a
   ld a, $05
-  ld (_RAM_DD52_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown37_b), a
   ld a, $09
-  ld (_RAM_DD38_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
   ret
 
 ; Data from 6C31 to 6C38 (8 bytes)
@@ -14696,7 +14632,7 @@ LABEL_6C39_:
   ld (_RAM_D5E0_), a
   ld a, (_RAM_DF69_)
   ld c, a
-  ld a, (_RAM_DF65_)
+  ld a, (_RAM_DF65_HasFinished)
   or a
   jp nz, LABEL_6E00_
   ld a, (_RAM_DF58_)
@@ -14797,12 +14733,12 @@ LABEL_6D08_:
   ld a, CarState_1_Exploding
   ld (_RAM_DF59_CarState), a
   ld (_RAM_DF58_), a
-  ld hl, 1000 ; $03E8
-  ld (_RAM_D95B_), hl
+  ld hl, LOWEST_PITCH_ENGINE_TONE
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   xor a
-  ld (_RAM_D95E_), a
+  ld (_RAM_D95B_EngineSound1.Volume), a
   ld a, SFX_05
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   xor a
   ld (_RAM_DE92_EngineVelocity), a
   ld (_RAM_DF00_), a
@@ -14835,37 +14771,49 @@ LABEL_6D43_Powerboats:
   ld (_RAM_DE51_), a
   ld a, $01
   ld (_RAM_DE52_), a
+  ; Decrement laps remaining counter
   ld a, (_RAM_DF24_LapsRemaining)
-  sub $01
+  sub 1
   ld (_RAM_DF24_LapsRemaining), a
-  cp $00
+  cp 0
   jr z, +
-  ld a, (_RAM_DC55_TrackIndex_Game) ; Qualifying early win?
-  cp $00
+
+  ; If >0 (i.e not finished yet)
+  ; And track 0 (qualifying race)
+  ld a, (_RAM_DC55_TrackIndex_Game)
+  cp Track_00_QualifyingRace
   jr nz, LABEL_6DDB_
+  ; And single-player
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jr nz, LABEL_6DDB_
+  ; And red car is in first place
   ld a, (_RAM_DF2A_Positions.Red)
-  cp $00
+  cp 0
   jr nz, LABEL_6DDB_
-+:
+  
++:; If head to head then end the race now (end or first place in qualifying)
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jp nz, LABEL_7AA6_
+  jp nz, LABEL_7AA6_HeadToHead_RaceEnded
+  
+  ; Else if the car is reversing
   ld a, (_RAM_D5A4_IsReversing)
   or a
   jr z, +
+  ; And track 0 (qualifying race)
   ld a, (_RAM_DC55_TrackIndex_Game) ; Track 0 = qualifying
   or a
   jr nz, +
+  ; Then it's the faster vehicles cheat
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, $01
   ld (_RAM_DC50_Cheat_FasterVehicles), a
-+:
++:; Either way, end the race now
   ld a, $01
-  ld (_RAM_DF65_), a
+  ld (_RAM_DF65_HasFinished), a
+  
   ld a, $F0
   ld (_RAM_DF6A_), a
   ld a, (_RAM_DF25_)
@@ -14888,7 +14836,7 @@ LABEL_6DD3_:
   add a, $01
   ld (_RAM_DF24_LapsRemaining), a
 LABEL_6DDB_:
-  ld a, (_RAM_DF65_)
+  ld a, (_RAM_DF65_HasFinished)
   cp $01
   jr z, LABEL_6E00_
   call LABEL_1CBD_
@@ -14910,18 +14858,18 @@ LABEL_6E00_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   JpZRet _LABEL_7171_ret
-  ld a, (_RAM_DCC5_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished)
   cp $00
   jp nz, LABEL_6F10_
   ld a, (_RAM_DF50_)
   ld l, a
-  ld a, (_RAM_DCC3_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown24_b)
   cp $00
   jp z, LABEL_6F10_
   cp l
   jp z, LABEL_6F10_
   ld b, $00
-  ld a, (_RAM_DCC3_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown24_b)
   ld l, a
   ld a, (_RAM_DF50_)
   sub l
@@ -14938,13 +14886,13 @@ LABEL_6E00_:
   ld a, b
   cp $01
   jr z, +
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   sub $01
-  ld (_RAM_DCC4_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown25_b), a
   cp $00
   jr nz, LABEL_6E79_
   ld a, $01
-  ld (_RAM_DCC5_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished), a
   ld a, (_RAM_DF25_)
   ld e, a
   ld d, $00
@@ -14961,14 +14909,14 @@ LABEL_6E00_:
   jp LABEL_6E79_
 
 +:
-  ld a, (_RAM_DCC4_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown25_b)
   add a, $01
-  ld (_RAM_DCC4_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown25_b), a
 LABEL_6E79_:
-  ld a, (_RAM_DCC5_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished)
   cp $01
   jp z, LABEL_6F10_
-  ld a, (_RAM_DCB5_)
+  ld a, (_RAM_DCAB_CarData_Green.CurrentMetatile)
   and $3F
   ld c, a
   ld hl, _RAM_D900_
@@ -14977,15 +14925,15 @@ LABEL_6E79_:
   ld a, (hl)
   and $80
   jr nz, +
-  ld a, (_RAM_DCC8_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown29_b)
   cp $0A
   jr z, +
   call LABEL_7176_
 +:
-  ld a, (_RAM_DCC3_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown24_b)
   ld (_RAM_DF50_), a
   xor a
-  ld (_RAM_DCC6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown27_b), a
   jp LABEL_6F10_
 
 LABEL_6EA9_:
@@ -15012,7 +14960,7 @@ LABEL_6EA9_:
   ld hl, $49FA
   ld (_RAM_DF53_), hl
 +++:
-  ld a, (_RAM_DD04_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown24_b)
   ld e, a
   ld d, $00
   ld hl, (_RAM_DF53_)
@@ -15031,7 +14979,7 @@ LABEL_6EF3_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jp z, LABEL_6FFF_
-  ld a, (_RAM_DD04_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown24_b)
   cp $FF
   jr z, +
   ld (_RAM_DF51_), a
@@ -15046,12 +14994,12 @@ LABEL_6F10_:
   ld d, a
   ld a, (_RAM_DF69_)
   ld c, a
-  ld a, (_RAM_DD06_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished)
   cp $00
   jp nz, LABEL_6FFF_
   ld a, (_RAM_DF51_)
   ld l, a
-  ld a, (_RAM_DD04_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown24_b)
   cp $FF
   jr z, LABEL_6EF3_
   cp $00
@@ -15096,7 +15044,7 @@ LABEL_6F10_:
 
 LABEL_6F6D_:
   ld b, $00
-  ld a, (_RAM_DD04_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown24_b)
   ld l, a
   ld a, (_RAM_DF51_)
   sub l
@@ -15113,16 +15061,16 @@ LABEL_6F6D_:
   ld a, b
   cp $01
   jr z, +
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   sub $01
-  ld (_RAM_DD05_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown25_b), a
   cp $00
   jr nz, LABEL_6FCD_
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
-  jp nz, LABEL_7AA6_
+  jp nz, LABEL_7AA6_HeadToHead_RaceEnded
   ld a, $01
-  ld (_RAM_DD06_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished), a
   ld a, (_RAM_DF25_)
   ld e, a
   ld d, $00
@@ -15139,14 +15087,14 @@ LABEL_6F6D_:
   jp LABEL_6FCD_
 
 +:
-  ld a, (_RAM_DD05_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown25_b)
   add a, $01
-  ld (_RAM_DD05_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown25_b), a
 LABEL_6FCD_:
-  ld a, (_RAM_DD06_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished)
   cp $01
   jr z, LABEL_6FFF_
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   ld c, a
   ld hl, _RAM_D900_
@@ -15158,29 +15106,29 @@ LABEL_6FCD_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (_RAM_DD09_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown29_b)
   cp $0A
   jr z, ++
 +:
   call LABEL_718B_
 ++:
-  ld a, (_RAM_DD04_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown24_b)
   ld (_RAM_DF51_), a
   xor a
-  ld (_RAM_DD07_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown27_b), a
 LABEL_6FFF_:
-  ld a, (_RAM_DD47_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished)
   cp $00
   jp nz, LABEL_709C_
   ld a, (_RAM_DF52_)
   ld l, a
-  ld a, (_RAM_DD45_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown24_b)
   cp $00
   jp z, LABEL_709C_
   cp l
   jp z, LABEL_709C_
   ld b, $00
-  ld a, (_RAM_DD45_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown24_b)
   ld l, a
   ld a, (_RAM_DF52_)
   sub l
@@ -15197,13 +15145,13 @@ LABEL_6FFF_:
   ld a, b
   cp $01
   jr z, +
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   sub $01
-  ld (_RAM_DD46_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown25_b), a
   cp $00
   jr nz, LABEL_7070_
   ld a, $01
-  ld (_RAM_DD47_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished), a
   ld a, (_RAM_DF25_)
   ld e, a
   ld d, $00
@@ -15220,14 +15168,14 @@ LABEL_6FFF_:
   jp LABEL_7070_
 
 +:
-  ld a, (_RAM_DD46_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown25_b)
   add a, $01
-  ld (_RAM_DD46_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown25_b), a
 LABEL_7070_:
-  ld a, (_RAM_DD47_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished)
   cp $01
   jr z, LABEL_709C_
-  ld a, (_RAM_DD37_)
+  ld a, (_RAM_DD2D_CarData_Yellow.CurrentMetatile)
   and $3F
   ld c, a
   ld hl, _RAM_D900_
@@ -15236,15 +15184,15 @@ LABEL_7070_:
   ld a, (hl)
   and $80
   jr nz, +
-  ld a, (_RAM_DD4A_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown29_b)
   cp $0A
   jr z, +
   call LABEL_71A0_
 +:
-  ld a, (_RAM_DD45_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown24_b)
   ld (_RAM_DF52_), a
   xor a
-  ld (_RAM_DD48_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown27_b), a
 LABEL_709C_:
   ld a, (_RAM_DE52_)
   cp $00
@@ -15266,7 +15214,7 @@ LABEL_709C_:
   or a
   jr z, +
   ld a, SFX_01
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:
   ld a, (_RAM_DE51_)
   cp $00
@@ -15317,7 +15265,7 @@ _TooMany:
   ld a, (_RAM_DF2A_Positions.Red) ; position
   ld e, a
   add hl, de
-  ld a, (_RAM_DF65_) ; has finished
+  ld a, (_RAM_DF65_HasFinished) ; has finished
   cp $00
   jr z, +
   ld a, <SpriteIndex_FinishedIndicators.Red
@@ -15331,7 +15279,7 @@ _TooMany:
   ld a, (_RAM_DF2A_Positions.Green)
   ld e, a
   add hl, de
-  ld a, (_RAM_DCC5_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown26_b_HasFinished)
   cp $00
   jr z, +
   ld a, <SpriteIndex_FinishedIndicators.Green
@@ -15345,7 +15293,7 @@ _TooMany:
   ld a, (_RAM_DF2A_Positions.Blue)
   ld e, a
   add hl, de
-  ld a, (_RAM_DD06_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown26_b_HasFinished)
   cp $00
   jr z, +
   ld a, $9E
@@ -15360,7 +15308,7 @@ _TooMany:
   ld a, (_RAM_DF2A_Positions.Yellow)
   ld e, a
   add hl, de
-  ld a, (_RAM_DD47_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown26_b_HasFinished)
   cp $00
   jr z, +
   ld a, $9F
@@ -15378,31 +15326,31 @@ DATA_7172_:
 .db $09 $07 $05 $03
 
 LABEL_7176_:
-  ld a, (_RAM_DCAF_)
+  ld a, (_RAM_DCAB_CarData_Green.XMetatile)
   ld (_RAM_DBB6_), a
-  ld a, (_RAM_DCB0_)
+  ld a, (_RAM_DCAB_CarData_Green.YMetatile)
   ld (_RAM_DBB7_), a
-  ld a, (_RAM_DCB5_)
+  ld a, (_RAM_DCAB_CarData_Green.CurrentMetatile)
   and $3F
   ld (_RAM_DBB8_), a
   ret
 
 LABEL_718B_:
-  ld a, (_RAM_DCF0_)
+  ld a, (_RAM_DCEC_CarData_Blue.XMetatile)
   ld (_RAM_DBB9_), a
-  ld a, (_RAM_DCF1_)
+  ld a, (_RAM_DCEC_CarData_Blue.YMetatile)
   ld (_RAM_DBBA_), a
-  ld a, (_RAM_DCF6_)
+  ld a, (_RAM_DCEC_CarData_Blue.CurrentMetatile)
   and $3F
   ld (_RAM_DBBB_), a
   ret
 
 LABEL_71A0_:
-  ld a, (_RAM_DD31_)
+  ld a, (_RAM_DD2D_CarData_Yellow.XMetatile)
   ld (_RAM_DBBC_), a
-  ld a, (_RAM_DD32_)
+  ld a, (_RAM_DD2D_CarData_Yellow.YMetatile)
   ld (_RAM_DBBD_), a
-  ld a, (_RAM_DD37_)
+  ld a, (_RAM_DD2D_CarData_Yellow.CurrentMetatile)
   and $3F
   ld (_RAM_DBBE_), a
   ret
@@ -15423,13 +15371,13 @@ LABEL_71C7_:
   ret
 
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld e, a
   ld d, $00
   ld hl, (_RAM_DBA9_)
   add hl, de
   ld (_RAM_D941_), hl
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld e, a
   ld d, $00
   ld hl, (_RAM_DBAB_)
@@ -15524,7 +15472,7 @@ LABEL_7295_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBB8_)
   call LABEL_7367_
-  ld (_RAM_DCAB_CarData_Green), hl
+  ld (_RAM_DCAB_CarData_Green.XPosition), hl
   ld a, (_RAM_DBB7_)
   ld (_RAM_DEF5_), a
   ld a, $60
@@ -15533,7 +15481,7 @@ LABEL_7295_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBB8_)
   call LABEL_7393_
-  ld (_RAM_DCAD_), hl
+  ld (_RAM_DCAB_CarData_Green.YPosition), hl
   ret
 
 LABEL_72CA_:
@@ -15551,7 +15499,7 @@ LABEL_72CA_:
   ld (_RAM_DF5B_), a
   ld hl, (_RAM_DCEC_CarData_Blue)
   ld (_RAM_D941_), hl
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   ld (_RAM_D943_), hl
 ++:
   ld a, (_RAM_DBB9_)
@@ -15571,7 +15519,7 @@ LABEL_72CA_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBBB_)
   call LABEL_7393_
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   ld a, (_RAM_D940_)
   cp $01
   jp z, +
@@ -15598,7 +15546,7 @@ LABEL_7332_:
   ld hl, (_RAM_DEF1_)
   ld a, (_RAM_DBBE_)
   call LABEL_7393_
-  ld (_RAM_DD2F_), hl
+  ld (_RAM_DD2D_CarData_Yellow.YPosition), hl
   ret
 
 LABEL_7367_:
@@ -15785,7 +15733,7 @@ LABEL_7476_PrepareResultsScreen:
 -:
   ld a, MenuIndex_2_FourPlayerResults ; Four player results
   ld (_RAM_DBCD_MenuIndex), a
-  jp LABEL_14_EnterMenus
+  jp EnterMenus
 
 +:; Always first place cheat
   ; Actually always 1st, 2nd, 3rd, 4th this way
@@ -15810,14 +15758,14 @@ LABEL_74E6_HeadToHeadResults:
   ld a, (_RAM_DC55_TrackIndex_Game)
   or a
   jr nz, +
+  ; Qualifying race only
+  ; Set player qualified flag?
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   cp $01
   jr z, ++
   xor a
--:
-  ld (_RAM_DBCE_Player1Qualified), a
-+:
-  ld a, MenuIndex_5
+-:ld (_RAM_DBCE_Player1Qualified), a
++:ld a, MenuIndex_5
   jr ++++
 
 ++:
@@ -15828,12 +15776,12 @@ LABEL_74E6_HeadToHeadResults:
   ld a, MenuIndex_4_TwoPlayerResults
 ++++:
   ld (_RAM_DBCD_MenuIndex), a
-  jp LABEL_14_EnterMenus
+  jp EnterMenus
 
 LABEL_7519_BackToTitleSreen:
   xor a ; MenuIndex_0_TitleScreen
   ld (_RAM_DBCD_MenuIndex), a
-  jp LABEL_14_EnterMenus
+  jp EnterMenus
 
 LABEL_7520_RuffTruxResults:
   ; Next track next time
@@ -15856,7 +15804,7 @@ LABEL_7520_RuffTruxResults:
 ++:
   ld (_RAM_DC38_LifeWonOrLost_Mode), a
   ; And go to the menu
-  jp LABEL_14_EnterMenus
+  jp EnterMenus
 
 LABEL_7545_QualifyingResults:
   ld a, MenuIndex_1_QualificationResults
@@ -15871,7 +15819,7 @@ LABEL_7545_QualifyingResults:
 -:
   ld (_RAM_DBCE_Player1Qualified), a
   call LABEL_173_LoadEnterMenuTrampolineToRAM
-  jp LABEL_14_EnterMenus
+  jp EnterMenus
 
 ++:
   xor a
@@ -15884,7 +15832,9 @@ LABEL_7564_SetControlsToNoButtons:
   ld (_RAM_DB20_Player1Controls), a
   ld (_RAM_DB21_Player2Controls), a
   ret
-
+;.ends
+;
+;.section "Enter game part 1" force
 LABEL_7573_EnterGame:
   di
 .ifdef GAME_GEAR_CHECKS
@@ -15902,7 +15852,7 @@ LABEL_7573_EnterGame:
 .endif
 .endif
   ; Bug: should use a different address (and data size) for SMS. 
-  ; Seems to work out OK anyway as we probably load a proepr palette soon anyway.
+  ; Seems to work out OK anyway as we probably load a proper palette soon anyway.
   SetPaletteAddressImmediateGG $10
   xor a ; Set to black
   out (PORT_VDP_DATA), a
@@ -16016,7 +15966,9 @@ LABEL_7573_EnterGame:
   ld (PAGING_REGISTER), a
   
   jp LABEL_383_EnterGame_Part2
-
+;.ends
+;
+;.section "Track data" force
 ; Track list: track type for each track
 DATA_766A_TrackList_TrackTypes:
 .db TT_2_Powerboats
@@ -16340,6 +16292,9 @@ DATA_776F_TrackList_SteeringDelay_GG:
 .db $07 ; $06 ; RuffTrux    0 (7, 7, 7)     (SMS + 1)
 .db $07 ; $06 ; RuffTrux    1
 .db $07 ; $06 ; RuffTrux    2
+;.ends
+
+;.section "Screen control" force
 
 LABEL_778C_ScreenOn:
   ld a, VDP_REGISTER_MODECONTROL2_SCREENON
@@ -16558,20 +16513,21 @@ LABEL_784D_:
   ld (_RAM_DEBF_ScreenHScrollColumn.Lo), a
   ret
 
-LABEL_78CE_:
-  ld a, (_RAM_DECB_)
+LABEL_78CE_TilemapUpdate_Horizontal:
+  ld a, (_RAM_DECB_TilemapUpdate_HorizontalNeeded)
   or a
   ret z
   ld a, (_RAM_DC54_IsGameGear)
-  ld b, $20
+  ld b, 32 ; Tile count (SMS)
   or a
   jr z, +
-  ld b, $16
+  ld b, 22 ; (GG)
 +:
+  ; Clear the flag
   xor a
-  ld (_RAM_DECB_), a
-  ld de, _RAM_DB22_
-  ld h, $D8
+  ld (_RAM_DECB_TilemapUpdate_HorizontalNeeded), a
+  ld de, _RAM_DB22_TilemapUpdate_HorizontalTileNumbers
+  ld h, >_RAM_D800_TileHighBytes
   ld c, PORT_VDP_DATA
   exx
     ld hl, (_RAM_DEC3_ScreenTilemapAddress)
@@ -16590,7 +16546,7 @@ LABEL_78CE_:
   ld a, (de)
   out (c), a
   ld l, a
-  ld a, (hl)
+  ld a, (hl) ; Index into _RAM_D800_TileHighBytes
   out (c), a
   inc de
   exx
@@ -16605,26 +16561,26 @@ LABEL_78CE_:
   exx
   ret
 
-LABEL_7916_:
-  ld a, (_RAM_DECA_)
+LABEL_7916_TilemapUpdate_Vertical:
+  ld a, (_RAM_DECA_TilemapUpdate_VerticalNeeded)
   or a
   ret z
   ld a, (_RAM_DC54_IsGameGear)
-  ld b, $1D
+  ld b, $1D ; How many tilemap entries to update (SMS)
   or a
   jr z, +
-  ld b, $13
+  ld b, $13 ; (GG)
 +:
   xor a
-  ld (_RAM_DECA_), a
-  ld de, _RAM_DB42_
-  ld h, $D8
+  ld (_RAM_DECA_TilemapUpdate_VerticalNeeded), a
+  ld de, _RAM_DB42_TilemapUpdate_VerticalTileNumbers
+  ld h, >_RAM_D800_TileHighBytes ; $D8
   exx
     ld hl, (_RAM_DEC1_VRAMAddress)
     ld c, PORT_VDP_ADDRESS
-    ld b, $40
-    ld d, $7F ; If the high byte of the VRAM address gets here...
-    ld e, $77 ; ...then we wrap it to this
+    ld b, TILEMAP_ROW_SIZE
+    ld d, >(VRAM_WRITE_MASK | SPRITE_TABLE_ADDRESS) ; $7F ; If the high byte of the VRAM address gets here...
+    ld e, >(VRAM_WRITE_MASK | NAME_TABLE_ADDRESS) ; $77 ; ...then we wrap it to this
   exx
   ld c, PORT_VDP_DATA
 -:
@@ -16632,7 +16588,7 @@ LABEL_7916_:
     ; Set VRAM address
     out (c), l
     out (c), h
-    ; Add b to it
+    ; Move down one row
     ld a, b
     add a, l
     ld l, a
@@ -16716,17 +16672,17 @@ LABEL_795E_:
   exx
   ld a, $01
   ld (_RAM_DECD_), a
-  ld (_RAM_DECB_), a
+  ld (_RAM_DECB_TilemapUpdate_HorizontalNeeded), a
   ret
 
 LABEL_79C8_:
-  ld a, (ix+20)
+  ld a, (ix+CarData.Unknown20_b)
   cp $00
   jr z, +
   ret
 
 +:
-  ld a, (ix+45)
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $00
   jr z, +
   cp $01
@@ -16734,23 +16690,23 @@ LABEL_79C8_:
   jp LABEL_7A38_
 
 +:
-  ld a, (_RAM_DCD9_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown46_b)
   cp $00
   JrNzRet +
   ld a, CarState_4_Submerged
   ld (_RAM_DF5A_CarState3), a
   ld a, $01
-  ld (_RAM_DCD9_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown46_b), a
   xor a
-  ld (ix+11), a
+  ld (ix+CarData.Unknown11_b_Speed), a
   xor a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE67_), a
   ld (_RAM_DE32_), a
 +:ret
 
 ++:
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   cp $00
   JrNzRet ++
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -16765,11 +16721,11 @@ LABEL_79C8_:
   ld a, $04
   ld (_RAM_DF5B_), a
   ld a, $01
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   xor a
-  ld (ix+11), a
+  ld (ix+CarData.Unknown11_b_Speed), a
   xor a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE68_), a
   ld (_RAM_DE35_), a
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -16781,17 +16737,17 @@ LABEL_79C8_:
   jp LABEL_4EA0_
 
 LABEL_7A38_:
-  ld a, (_RAM_DD5B_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown46_b)
   cp $00
   JrNzRet +
   ld a, $04
   ld (_RAM_DF5C_), a
   ld a, $01
-  ld (_RAM_DD5B_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown46_b), a
   xor a
-  ld (ix+11), a
+  ld (ix+CarData.Unknown11_b_Speed), a
   xor a
-  ld (ix+20), a
+  ld (ix+CarData.Unknown20_b), a
   ld (_RAM_DE69_), a
   ld (_RAM_DE38_), a
 +:ret
@@ -16843,35 +16799,40 @@ LABEL_7A9F_SetBackdropColour:
   out (PORT_VDP_REGISTER), a
   ret
 
-LABEL_7AA6_:
-  ld a, (_RAM_DB7B_)
-  cp $04
-  jr z, LABEL_7AF2_
-  jr nc, LABEL_7AC4_
-LABEL_7AAF_:
+LABEL_7AA6_HeadToHead_RaceEnded:
+  ; Head to head race ended
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
+  cp HEAD_TO_HEAD_TOTAL_POINTS / 2
+  jr z, LABEL_7AF2_InitiatePlayoff ; Playoff
+  jr nc, LABEL_7AC4_HeadToHead_RedWins ; Red wins
+  
+LABEL_7AAF_HeadToHead_BlueWins:
   call +
+  ; Red car explodes, position 1
   ld a, CarState_1_Exploding
   ld (_RAM_DF2A_Positions.Player1), a
   ld (_RAM_DF59_CarState), a
+  ; Blue car position 0
   xor a
   ld (_RAM_DF2A_Positions.Player2), a
   ld (_RAM_D5CB_), a
   jp LABEL_2A08_
 
-LABEL_7AC4_:
+LABEL_7AC4_HeadToHead_RedWins:
   call +
+  ; Red car position 0
   xor a
   ld (_RAM_DF2A_Positions.Player1), a
   ld (_RAM_D5CB_), a
-  ld a, $01
+  ; Blue car explodes, position 1
+  ld a, CarState_1_Exploding
   ld (_RAM_DF2A_Positions.Player2), a
   ld (_RAM_DF5B_), a
   ld ix, _RAM_DCEC_CarData_Blue
   jp LABEL_4E49_
 
-+:
-  ld a, $01
-  ld (_RAM_D947_), a
++:ld a, $01
+  ld (_RAM_D947_PlayoffWon), a
   ld a, $F0
   ld (_RAM_DF6A_), a
   xor a
@@ -16880,7 +16841,7 @@ LABEL_7AC4_:
   ld (_RAM_DF81_), a
 -:ret
 
-LABEL_7AF2_:
+LABEL_7AF2_InitiatePlayoff:
   ld a, (_RAM_D5CB_)
   or a
   JrNzRet -
@@ -16888,12 +16849,12 @@ LABEL_7AF2_:
   ld (_RAM_D5CB_), a
   ld (_RAM_D5CC_PlayoffTileLoadFlag), a
   ld a, SFX_14_Playoff
-  ld (_RAM_D963_SFXTrigger_Player1), a
-  ld (_RAM_D974_SFXTrigger_Player2), a
-  jp LABEL_B2B_
+  ld (_RAM_D963_SFX_Player1.Trigger), a
+  ld (_RAM_D974_SFX_Player2), a
+  jp LABEL_B2B_HeadToHead_RedWins
 
 LABEL_7B0B_:
-  ld a, (_RAM_D581_)
+  ld a, (_RAM_D581_OverlayTextScrollAmount)
   cp $A0
   JrNcRet +
   ld a, (_RAM_D5CB_)
@@ -16901,44 +16862,53 @@ LABEL_7B0B_:
   ld (_RAM_D5CB_), a
   cp $80
   jr c, +
-  call LABEL_B63_
+  call LABEL_B63_UpdateOverlayText
 +:ret
+.ends
 
-.org $7b21
+.section "Decompressor" force
 LABEL_7B21_Decompress:
-; We need a .section to allow us to include it twice...
-.section "Decompressor section" force
 .include "decompressor.asm"
 .ends
 
+.section "Trampolines 15" force
 LABEL_7C67_:
   JumpToPagedFunction LABEL_36E6B_
 
 LABEL_7C72_:
   JumpToPagedFunction LABEL_36F9E_
+.ends
 
+.section "Track loader" force
 LABEL_7C7D_LoadTrack:
   call LABEL_3214_BlankSpriteTable
 
+@LoadTileHighBytes
   ; Load tile high bytes
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jr z, +++
+  jr z, @@Powerboats
   cp TT_4_FormulaOne
   jr nz, +
-  ; F1
+
+@@FormulaOne:
   ld de, DATA_3116_F1_TileHighBytesRunCompressed
-  jp ++++
+  jp ++
+  
 +:cp TT_7_RuffTrux
-  jr nz, +
-  ; RuffTrux -> all 1 (low 256 are used for sprites)
+  jr nz, @@OtherCars
+  
+@@RuffTrux:
+  ; all 1 (low 256 are used for sprites)
   ld a, $01
   ld (_RAM_DF1D_TileHighBytes_ConstantValue), a
-  jp ++
-+:; Other cars -> all 0 (no priority bits)
+  jp +
+ 
+@@OtherCars: 
+  ; all 0 (no priority bits)
   xor a
   ld (_RAM_DF1D_TileHighBytes_ConstantValue), a
-++:; Fill with constant
++:; Fill with constant
   ld hl, _RAM_D800_TileHighBytes
   ld bc, 256 ; Byte count
 -:ld a, (_RAM_DF1D_TileHighBytes_ConstantValue)
@@ -16948,10 +16918,11 @@ LABEL_7C7D_LoadTrack:
   ld a, b
   or c
   jr nz, -
-  jp +++++
-+++: ; Powerboats
+  jp @LoadTrackTiles
+  
+@@Powerboats:
   ld de, DATA_313B_Powerboats_TileHighBytesRunCompressed
-++++: ; Fill with compressed date
+++:; Fill with compressed data
   ld hl, 256 / 8 ; 256 bits
   add hl, de
   ld b, h
@@ -16962,8 +16933,9 @@ LABEL_7C7D_LoadTrack:
   ld (_RAM_DF16_RunCompressedRawDataStartHi), a
   ld hl, _RAM_D800_TileHighBytes
   call LABEL_7EBE_DecompressRunCompressed
-+++++:
-
+  ; fall through
+  
+@LoadTrackTiles:
   ; Load tile data
   ; First page it in...
   ld hl, DATA_3DC8_TrackTypeTileDataPages
@@ -17001,9 +16973,11 @@ LABEL_7C7D_LoadTrack:
   ; Then to VRAM
   call LABEL_7F02_Copy3bppTileDataToVRAM
 
+@LoadExtraTrackTiles:
   ; Then extra tiles
   call LABEL_663D_InitialisePlugholeTiles
 
+@LoadCarTiles:
   ; Car tiles
   ; Page...
   ld hl, DATA_3EF4_CarTilesDataLookup_PageNumber
@@ -17039,19 +17013,22 @@ LABEL_7C7D_LoadTrack:
   jr nz, +
   ld hl, $0300                ; Add $300 for RuffTrux, $96 for other types -> this is the size of the bitmask block
   jp ++                       ; $96 bytes = 150 bytes = 1200 bits = 400 rows = 50 tiles
-+:ld hl, $0096                ; $300 bytes = 256 tiles?
++:ld hl, $0096                ; $300 bytes = 256 tiles
 ++:add hl, de
   ld b, h                     ; -> bc
   ld c, l
   ld a, c
-  ld (_RAM_DF15_RunCompressedRawDataStartLo), a          ; then to RAM
+  ld (_RAM_DF15_RunCompressedRawDataStartLo), a ; then to RAM
   ld a, b
   ld (_RAM_DF16_RunCompressedRawDataStartHi), a
   ld hl, _RAM_C000_DecompressionTemporaryBuffer
   call LABEL_7EBE_DecompressRunCompressed
   call LABEL_7F4E_CarAndShadowSpriteTilesToVRAM
+
+@LoadHUDTiles:
   call LABEL_6704_LoadHUDTiles
 
+@LoadBehaviourData:
   ; Look up the page number and page it in
   ld hl, DATA_3E3A_TrackTypeDataPageNumbers
   ld a, (_RAM_DB97_TrackType)
@@ -17447,10 +17424,11 @@ LABEL_7FC9_EmitTileData3bpp:
   jr nz, -
   ret
 
-; Data from 7FDB to 7FEF (21 bytes)
+.ifdef BLANK_FILL_ORIGINAL
 .dsb 5 $FF
+.endif
 
-;.ends
+.ends
 
 .BANK 1 SLOT 1
 .ORG $0000
@@ -17471,15 +17449,24 @@ Unused dsb 6
 
 .dstruct Header instanceof CodemastersHeader DATA 16 /* pages */ $24 $11 $93 /* Date */ $13 $11 /* Time */ $B5B4 ($10000 - $B5B4) /* Checksum and complement */
 
+.define SEGA_HEADER_REGION_SMS_EXPORT $4
+.define SEGA_HEADER_SIZE_256KB $0
+/*
+.smsheader
+  productcode 0,0,0
+  version 0
+  regioncode SEGA_HEADER_REGION_SMS_EXPORT
+  reservedspace $ff, $ff
+.endsms
+*/
+
 ; Data from 7FF0 to 7FFF (16 bytes)
 ; Sega header
-.define SEGA_HEADER_REGION_SMS_EXPORT $4
-.define SEGA_HEADER_SIXE_256KB $0
 .db "TMR SEGA", $FF, $FF
 .dw $E352 ; checksum
 .dw $0000 ; Product number
 .db $00 ; Version
-.db SEGA_HEADER_REGION_SMS_EXPORT << 4 | SEGA_HEADER_SIXE_256KB ; SMS export, 256KB checksum
+.db SEGA_HEADER_REGION_SMS_EXPORT << 4 | SEGA_HEADER_SIZE_256KB ; SMS export, 256KB checksum
 ;.ends
 
 .BANK 2
@@ -17503,7 +17490,7 @@ LABEL_8000_Main:
   call LABEL_AFAE_RamCodeLoader ; Maybe the splash screen broke it?
   call LABEL_B01D_SquinkyTennisHook
 
-LABEL_8021_MenuScreenEntryPoint:
+MenuScreenEntryPoint:
   ; Menu screen changes start here
   call LABEL_AFAE_RamCodeLoader
   ld a, 1
@@ -20679,7 +20666,7 @@ LABEL_97AF_:
 
 ; Data from 97DF to 97E9 (11 bytes)
 DATA_97DF_8TimesTable:
-  TimesTableLo 0 8 11
+  TimesTableLo 0, 8, 11
 
 LABEL_97EA_DrawDriverPortraitColumn:
 ; Seems to be what it does, not clear how yet
@@ -20758,7 +20745,7 @@ LABEL_988D_LoadCursorSprites:
   ; defining the cursor position in the order top,
   ; left, right, bottom in each section.
   ; X top
-  TimesTableLo x 8 w
+  TimesTableLo x, 8, w
   .if w < 8
     .dsb 8-w $ff
   .endif
@@ -20773,7 +20760,7 @@ LABEL_988D_LoadCursorSprites:
     .dsb 10-h $ff
   .endif
   ; X bottom
-  TimesTableLo x 8 w
+  TimesTableLo x, 8, w
   .if w < 8
     .dsb 8-w $ff
   .endif
@@ -20799,7 +20786,7 @@ LABEL_988D_LoadCursorSprites:
   .endif
   ; Y left, right
   .repeat 2
-    TimesTableLo y+8 8 h-2
+    TimesTableLo y+8, 8, h-2
     .if h < 10
       .dsb 10-h $ff
     .endif
@@ -25766,11 +25753,11 @@ DATA_BF80_MenuPalette_GG: ; GG menu palette
 
 .orga $bfff
 DATA_BFFF_Page2PageNumber:
-.db :CADDR
+  BankMarker
 
 .BANK 3
 .ORG $0000
-;.section "Bank 3"
+.section "Sports cars data part 1" force
 
 /*
 ; Track data format:
@@ -25807,13 +25794,12 @@ EffectsTiles    dw
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $FF $FF $FF $FF $BF $FF $FF $FF $FF $FF $FF $FF $BF $FF $FF $FF $7F $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $EF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $ED $45 $FF $DF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FF $FE $FF $FF $FF $FF $FF
 .endif
-;.ends
+.ends
 
 .orga $8080
-;.section "Sportscars metatiles" force
+.section "Sports car data part 2" force
+DATA_C080_SportsCarsMetatiles:
 .incbin "Assets/Sportscars/Metatiles.tilemap" ; 64 metatiles
-
-; Pretty much all this could be split up to optimise packing
 
 DATA_E480_SportsCars_BehaviourData:
 .incbin "Assets/Sportscars/Behaviour data.compressed"
@@ -25866,7 +25852,9 @@ DATA_F215_SportsCarsDATA:
 .db $22 $00 $5D $4D $6F $7B $00 $00 $00 $00 $22 $22 $22 $22 $80 $C0 $C0 $C0 $C0 $E0 $E0 $C0 $E0 $C0 $80 $A0 $A0 $A0 $A0 $A0 $22 $C0 $22 $C0 $A0 $A0 $C0 $C0 $C0 $C0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $80 $80 $C0 $A0 $80 $C0 $00 $00
 DATA_F255_SportsCars_EffectsTiles:
 .incbin "Assets/Sportscars/Effects.3bpp"
+.ends
 
+.section "Bank 3 other data" force
 ; And these could be superfree sections
 DATA_F35D_Tiles_Portrait_FourByFour:
 .incbin "Assets/Four By Four/Portrait.3bpp.compressed"
@@ -25905,6 +25893,7 @@ DATA_FF79_TrackName_22: .asc " CHALK-DUST CHICANE "
 DATA_FF8D_TrackName_23: .asc "     GO FOR IT!     "
 DATA_FFA2_TrackName_24: .asc " WIN THIS RACE TO BE CHAMPION!" ; Special case for length
 DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
+.ends
 
 ; blank fill
 .ifdef BLANK_FILL_ORIGINAL
@@ -26653,7 +26642,7 @@ LABEL_1BAFD_:
   ld a, (_RAM_DF58_)
   or a
   JrNzRet -
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JrNzRet -
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
@@ -26662,13 +26651,13 @@ LABEL_1BAFD_:
   ld a, (_RAM_DF00_)
   or a
   JrNzRet -
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   or a
   JrNzRet -
   ld b, $01
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
   jr nc, +
   ld b, $00
@@ -26683,11 +26672,11 @@ LABEL_1BAFD_:
   ld a, b
   or a
   jr z, +
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   jr ++
 
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
 ++:
   ld l, a
   ld a, (_RAM_D5D2_)
@@ -26755,9 +26744,9 @@ LABEL_1BBAF_:
   ld (_RAM_DF0B_), a
 +++:
   ld b, $01
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
   jr nc, +
   ld b, $00
@@ -26772,11 +26761,11 @@ LABEL_1BBAF_:
   ld a, b
   or a
   jr z, +
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   jr ++
 
 +:
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
 ++:
   ld l, a
   ld a, (_RAM_D5D3_)
@@ -26848,32 +26837,32 @@ LABEL_1BC3F_:
   ld a, (_RAM_DEB0_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF0D_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -26882,7 +26871,7 @@ LABEL_1BC3F_:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DF0E_)
   ld l, a
@@ -26972,7 +26961,7 @@ LABEL_1BCE2_:
   ld h, a
   ld d, (hl)
   push de
-    ld hl, DATA_3FC3_
+    ld hl, DATA_3FC3_HorizontalAmountByDirection
     ld a, (iy+0)
     add a, l
     ld l, a
@@ -26992,7 +26981,7 @@ LABEL_1BCE2_:
     ld a, (hl)
     ld (ix+15), a
     ld (_RAM_DF7D_), a
-    ld hl, DATA_40E5_Sign_
+    ld hl, DATA_40E5_Sign_Directions_X
     ld a, (iy+0)
     add a, l
     ld l, a
@@ -27035,7 +27024,7 @@ LABEL_1BCE2_:
     ld (ix+1), a
 ++:
   pop de
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (iy+0)
   add a, l
   ld l, a
@@ -27055,7 +27044,7 @@ LABEL_1BCE2_:
   ld a, (hl)
   ld (ix+16), a
   ld (_RAM_DF7E_), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (iy+0)
   add a, l
   ld l, a
@@ -27105,32 +27094,32 @@ LABEL_1BDF3_:
   ld a, (_RAM_DEB0_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF0D_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -27139,7 +27128,7 @@ LABEL_1BDF3_:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DF0E_)
   ld l, a
@@ -27436,7 +27425,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   jr nz, +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, $01
   ld (_RAM_DC49_Cheat_ExplosiveOpponents), a
   ret
@@ -27456,7 +27445,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   cp CarState_3_Falling
   jr nz, +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
   ld a, $01
   ld (_RAM_DC4B_Cheat_InfiniteLives), a
   ret
@@ -27470,7 +27459,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   cp $05
   jr nz, +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
   ld a, $01
   ld (_RAM_DC4C_Cheat_AlwaysFirstPlace), a
   ret
@@ -27493,7 +27482,7 @@ LABEL_1F8D8_InGameCheatHandler: ; Cheats!
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   JrNzRet _LABEL_1F996_ret
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a ; Play sound effect
+  ld (_RAM_D974_SFX_Player2), a ; Play sound effect
   ld a, $01
   ld (_RAM_DC4E_Cheat_SuperSkids), a ; And this
 _LABEL_1F996_ret:
@@ -27526,7 +27515,7 @@ _LABEL_1F996_ret:
   or a
   JrZRet +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
   ld a, $01
   ld (_RAM_DC4F_Cheat_EasierOpponents), a
 +:ret
@@ -27536,24 +27525,24 @@ LABEL_1F9D4_Cheats_SportsCars:
   or a
   JrNzRet +
   ; Sports Cars 0 = Desktop Drop-off
-  ld a, (_RAM_DC4A_Cheat_ExtraLives) ; Laps done?
+  ld a, (_RAM_DC4A_Cheat_ExtraLivesAndLeadCar) ; If cheat was already used, don't check for it again
   or a
   JrNzRet +
   ; Tile 5, 24 = bottom half of pencil far to the left of the start position, and 4 laps remaining
   ld a, (_RAM_D5C8_MetatileX) ; 5, 24
-  cp $05
+  cp 5
   JrNzRet +
   ld a, (_RAM_D5C9_MetatileY)
-  cp $18
+  cp 24
   JrNzRet +
   ld a, (_RAM_DF24_LapsRemaining) ; Haven't crossed the start line yet
   cp $04
   JrNzRet +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D974_SFXTrigger_Player2), a
-  ld a, $01
-  ld (_RAM_DC4A_Cheat_ExtraLives), a
-  ld a, $05
+  ld (_RAM_D974_SFX_Player2), a
+  ld a, 1
+  ld (_RAM_DC4A_Cheat_ExtraLivesAndLeadCar), a
+  ld a, CHEAT_EXTRA_LIVES_COUNT ; Set lives count to 5
   ld (_RAM_DC09_Lives), a
 +:ret
 
@@ -27570,7 +27559,7 @@ LABEL_1FA05_NoSkidCheatCheck:
   and BUTTON_U_MASK | BUTTON_1_MASK | BUTTON_2_MASK ; $31
   JrNzRet +
   ld a, SFX_12_WinOrCheat
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld a, $01
   ld (_RAM_DC4D_Cheat_NoSkidding), a
 +:ret
@@ -27755,7 +27744,7 @@ LABEL_1FB35_:
   or a
   JrZRet +++
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +++:ret
 
 ++++:
@@ -27775,7 +27764,7 @@ LABEL_1FB35_:
   or a
   JrZRet +++
   ld a, SFX_07_EnterSticky
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +++:ret
 
 .ifdef BLANK_FILL_ORIGINAL
@@ -27866,37 +27855,37 @@ DATA_23656_Tiles_VsCPUPatch:
 
 LABEL_237E2_:
   xor a
-  ld (_RAM_DCD8_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown45_b_TankShotSpritesIndex), a
   ld a, $01
-  ld (_RAM_DD19_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown45_b_TankShotSpritesIndex), a
   ld a, $02
-  ld (_RAM_DD5A_), a
-  ld hl, _RAM_DD9E_
-  ld (_RAM_DCCD_), hl
-  ld hl, _RAM_DDCE_
-  ld (_RAM_DD0E_), hl
-  ld hl, _RAM_DDFE_
-  ld (_RAM_DD4F_), hl
+  ld (_RAM_DD2D_CarData_Yellow.Unknown45_b_TankShotSpritesIndex), a
+  ld hl, _RAM_DD6E_CarEffects.2.Sprites.1.Data.1.X
+  ld (_RAM_DCAB_CarData_Green.Unknown34_w), hl
+  ld hl, _RAM_DD6E_CarEffects.3.Sprites.1.Data.1.X
+  ld (_RAM_DCEC_CarData_Blue.Unknown34_w), hl
+  ld hl, _RAM_DD6E_CarEffects.4.Sprites.1.Data.1.X
+  ld (_RAM_DD2D_CarData_Yellow.Unknown34_w), hl
   ld a, $38
-  ld (_RAM_DD80_), a
+  ld (_RAM_DD6E_CarEffects.1.TileBaseIndex), a
   ld a, $3A
-  ld (_RAM_DDB0_), a
+  ld (_RAM_DD6E_CarEffects.2.TileBaseIndex), a
   ld a, $3C
-  ld (_RAM_DDE0_), a
+  ld (_RAM_DD6E_CarEffects.3.TileBaseIndex), a
   ld a, $3E
-  ld (_RAM_DE10_), a
+  ld (_RAM_DD6E_CarEffects.4.TileBaseIndex), a
   ld hl, _RAM_DE5F_
-  ld (_RAM_DCD2_), hl
+  ld (_RAM_DCAB_CarData_Green.Unknown39_w), hl
   ld hl, _RAM_DE60_
-  ld (_RAM_DD13_), hl
+  ld (_RAM_DCEC_CarData_Blue.Unknown39_w), hl
   ld hl, _RAM_DE61_
-  ld (_RAM_DD54_), hl
+  ld (_RAM_DD2D_CarData_Yellow.Unknown39_w), hl
   ld hl, _RAM_DE32_
-  ld (_RAM_DCDA_), hl
+  ld (_RAM_DCAB_CarData_Green.Unknown47_w), hl
   ld hl, _RAM_DE35_
-  ld (_RAM_DD1B_), hl
+  ld (_RAM_DCEC_CarData_Blue.Unknown47_w), hl
   ld hl, _RAM_DE38_
-  ld (_RAM_DD5C_), hl
+  ld (_RAM_DD2D_CarData_Yellow.Unknown47_w), hl
 
   ld a, (_RAM_DC55_TrackIndex_Game)
   sla a
@@ -27963,11 +27952,11 @@ LABEL_237E2_:
   ; Loop over 6 bytes -> 12 nibbles
   jr nz, -
   ld a, (_RAM_DB68_HandlingData+1)
-  ld (_RAM_DCDC_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown49_b), a
   ld a, (_RAM_DB68_HandlingData+5)
-  ld (_RAM_DD1D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown49_b), a
   ld a, (_RAM_DB68_HandlingData+9)
-  ld (_RAM_DD5E_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown49_b), a
   ld a, (_RAM_DB97_TrackType)
   ld e, a
   ld d, $00
@@ -27989,11 +27978,11 @@ LABEL_237E2_:
 +++:
   ld a, (_RAM_DB99_AccelerationDelay)
   sub b
-  ld (_RAM_DD5F_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown50_b), a
   sub b
-  ld (_RAM_DCDD_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown50_b), a
   sub b
-  ld (_RAM_DD1E_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown50_b), a
   ret
 
 ; Data from 238D5 to 238DD (9 bytes)
@@ -28009,8 +27998,8 @@ DATA_238DE_: ; indexed by _RAM_DC55_TrackIndex_Game*2 and copied to _RAM_DB66_, 
 .db $02 $02 $02 $02 $02 $02 $02 $02 $02 $02
 DATA_23918_: ; indexed by _RAM_DC55_TrackIndex_Game*6, split to nibbles and sent to _RAM_DB68_HandlingData+
 ;    ,,--,,-- End up in _RAM_DB68_
-;    ||  ||  ,,--,,-- End up in _RAM_DD1D_
-;    ||  ||  ||  ||  ,,--,,-- End up in _RAM_DD5E_
+;    ||  ||  ,,--,,-- End up in _RAM_DCEC_CarData_Blue.Unknown49_b
+;    ||  ||  ||  ||  ,,--,,-- End up in _RAM_DD2D_CarData_Yellow.Unknown49_b
 .db $54 $42 $65 $53 $54 $42
 .db $54 $43 $65 $54 $54 $43
 .db $86 $63 $75 $52 $75 $52
@@ -28074,35 +28063,35 @@ LABEL_239C6_:
   call LABEL_23A91_
   ld a, (_RAM_DF84_)
   ld l, a
-  ld a, (_RAM_DD0D_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown33_b)
   cp l
   jr z, ++
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld l, a
   ld a, (_RAM_DF82_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   sub l
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   ld a, (_RAM_DF84_)
-  ld (_RAM_DD0D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown33_b), a
   jp +++
 
 ++:
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld l, a
   ld a, (_RAM_DF82_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -28111,22 +28100,22 @@ LABEL_239C6_:
 
 +:
   ld a, $07
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
 +++:
   ld a, (_RAM_DF85_)
   ld l, a
-  ld a, (_RAM_DD0C_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown32_b)
   cp l
   jr z, ++
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld l, a
   ld a, (_RAM_DF83_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   sub l
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   JpRet +++
 
 .ifdef UNNECESSARY_CODE
@@ -28135,9 +28124,9 @@ LABEL_239C6_:
 
 +:
   sub l
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ld a, (_RAM_DF85_)
-  ld (_RAM_DD0C_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown32_b), a
   JpRet +++
 
 .ifdef UNNECESSARY_CODE
@@ -28145,13 +28134,13 @@ LABEL_239C6_:
 .endif
 
 ++:
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld l, a
   ld a, (_RAM_DF83_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   JpRet +++
 
 .ifdef UNNECESSARY_CODE
@@ -28160,7 +28149,7 @@ LABEL_239C6_:
 
 +:
   ld a, $07
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   JpRet +++
 
 .ifdef UNNECESSARY_CODE
@@ -28186,7 +28175,7 @@ LABEL_23A91_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -28205,7 +28194,7 @@ LABEL_23A91_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF82_), a
-  ld hl, DATA_40E5_Sign_
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -28219,7 +28208,7 @@ LABEL_23A91_:
   ld (_RAM_DF84_), a
   ld a, (_RAM_DCEC_CarData_Blue)
   ld l, a
-  ld a, (_RAM_DCED_)
+  ld a, (_RAM_DCEC_CarData_Blue.XPosition+1)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF82_)
@@ -28229,7 +28218,7 @@ LABEL_23A91_:
   ld a, l
   ld (_RAM_DCEC_CarData_Blue), a
   ld a, h
-  ld (_RAM_DCED_), a
+  ld (_RAM_DCEC_CarData_Blue.XPosition+1), a
   jp ++
 
 +:
@@ -28237,7 +28226,7 @@ LABEL_23A91_:
   ld (_RAM_DF84_), a
   ld a, (_RAM_DCEC_CarData_Blue)
   ld l, a
-  ld a, (_RAM_DCED_)
+  ld a, (_RAM_DCEC_CarData_Blue.XPosition+1)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF82_)
@@ -28246,7 +28235,7 @@ LABEL_23A91_:
   ld a, l
   ld (_RAM_DCEC_CarData_Blue), a
   ld a, h
-  ld (_RAM_DCED_), a
+  ld (_RAM_DCEC_CarData_Blue.XPosition+1), a
 ++:
   ld hl, DATA_1D65__Lo
   ld a, (_RAM_D5B9_)
@@ -28264,7 +28253,7 @@ LABEL_23A91_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -28283,7 +28272,7 @@ LABEL_23A91_:
   ld h, a
   ld a, (hl)
   ld (_RAM_DF83_), a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_D5B8_)
   add a, l
   ld l, a
@@ -28295,9 +28284,9 @@ LABEL_23A91_:
   jr z, +
   xor a
   ld (_RAM_DF85_), a
-  ld a, (_RAM_DCEE_)
+  ld a, (_RAM_DCEC_CarData_Blue.YPosition)
   ld l, a
-  ld a, (_RAM_DCEF_)
+  ld a, (_RAM_DCEC_CarData_Blue.YPosition+1)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF83_)
@@ -28305,26 +28294,26 @@ LABEL_23A91_:
   or a
   sbc hl, de
   ld a, l
-  ld (_RAM_DCEE_), a
+  ld (_RAM_DCEC_CarData_Blue.YPosition), a
   ld a, h
-  ld (_RAM_DCEF_), a
+  ld (_RAM_DCEC_CarData_Blue.YPosition+1), a
   ret
 
 +:
   ld a, $01
   ld (_RAM_DF85_), a
-  ld a, (_RAM_DCEE_)
+  ld a, (_RAM_DCEC_CarData_Blue.YPosition)
   ld l, a
-  ld a, (_RAM_DCEF_)
+  ld a, (_RAM_DCEC_CarData_Blue.YPosition+1)
   ld h, a
   ld d, $00
   ld a, (_RAM_DF83_)
   ld e, a
   add hl, de
   ld a, l
-  ld (_RAM_DCEE_), a
+  ld (_RAM_DCEC_CarData_Blue.YPosition), a
   ld a, h
-  ld (_RAM_DCEF_), a
+  ld (_RAM_DCEC_CarData_Blue.YPosition+1), a
   ret
 
 LABEL_23B98_BlankGameRAM:
@@ -28375,15 +28364,15 @@ LABEL_23BC6_:
   cp CarState_4_Submerged
   jr z, +
 --:
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   add a, $01
 -:
   and $0F
-  ld (_RAM_DCB8_), a
+  ld (_RAM_DCAB_CarData_Green.Direction), a
   ret
 
 +:
-  ld a, (_RAM_DCB8_)
+  ld a, (_RAM_DCAB_CarData_Green.Direction)
   cp $08
   jr nc, --
   sub $01
@@ -28396,7 +28385,7 @@ LABEL_23BF1_:
   ld hl, (_RAM_DBA9_)
   ld de, $0074
   add hl, de
-  ld (_RAM_DCAB_CarData_Green), hl
+  ld (_RAM_DCAB_CarData_Green.XPosition), hl
   ld hl, (_RAM_DBA9_)
   ld de, $0090
   add hl, de
@@ -28405,23 +28394,23 @@ LABEL_23BF1_:
   ld hl, (_RAM_DBAB_)
   ld de, $0040
   add hl, de
-  ld (_RAM_DCAD_), hl
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCAB_CarData_Green.YPosition), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   ld hl, (_RAM_DBAB_)
   ld de, $0068
   add hl, de
-  ld (_RAM_DD2F_), hl
+  ld (_RAM_DD2D_CarData_Yellow.YPosition), hl
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrZRet +
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
 +:ret
 
 ++:
   ld hl, (_RAM_DBA9_)
   ld de, $0014
   add hl, de
-  ld (_RAM_DCAB_CarData_Green), hl
+  ld (_RAM_DCAB_CarData_Green.XPosition), hl
   ld hl, (_RAM_DBA9_)
   ld de, $0030
   add hl, de
@@ -28430,16 +28419,16 @@ LABEL_23BF1_:
   ld hl, (_RAM_DBAB_)
   ld de, $0040
   add hl, de
-  ld (_RAM_DCAD_), hl
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCAB_CarData_Green.YPosition), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   ld hl, (_RAM_DBAB_)
   ld de, $0068
   add hl, de
-  ld (_RAM_DD2F_), hl
+  ld (_RAM_DD2D_CarData_Yellow.YPosition), hl
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   JrZRet +
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
 +:ret
 
 LABEL_23C68_ReadGGPauseButton:
@@ -28489,14 +28478,10 @@ _UseStart:
   ld (_RAM_D599_IsPaused), a
   
   ; Mute PSG
-  ld a, $FF
-  out (PORT_PSG), a
-  ld a, $9F
-  out (PORT_PSG), a
-  ld a, $BF
-  out (PORT_PSG), a
-  ld a, $DF
-  out (PORT_PSG), a
+  SetPSGVolumeImmediate 3, 0
+  SetPSGVolumeImmediate 0, 0
+  SetPSGVolumeImmediate 1, 0
+  SetPSGVolumeImmediate 2, 0
   ret
 
 ++:
@@ -28864,17 +28849,17 @@ DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 
 .BANK 10
 .ORG $0000
-;.section "Bank 10" force
+.section "Bank 10" force
 
 .dstruct DATA_28000_TrackData_RuffTrux instanceof TrackData data  DATA_A1B0_RuffTrux_BehaviourData DATA_A396_RuffTrux_WallData DATA_A420_RuffTrux_Track0Layout DATA_A5F0_RuffTrux_Track1Layout DATA_A7A8_RuffTrux_Track2Layout DATA_A7A8_RuffTrux_Track3Layout DATA_A9C5_RuffTrux_GGPalette DATA_A9C5_RuffTrux_DecoratorTiles DATA_AA05_RuffTruxDATA DATA_AA45_RuffTrux_EffectsTiles
 
 .ifdef BLANK_FILL_ORIGINAL
 .db $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $ED $45 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $ED $45 $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF $FF $00 $00 $FF
 .endif
-;.ends
+.ends
 
 .orga $8080
-;.section "RuffTrux metatiles" force
+.section "RuffTrux data" force
 
 ; Metatiles
 .incbin "Assets/RuffTrux/Metatiles.tilemap" ; 64 metatiles
@@ -28928,7 +28913,9 @@ DATA_AA05_RuffTruxDATA:
 .db $C0 $C0 $00 $00 $22 $22 $49 $45 $73 $77 $80 $00 $22 $22 $A0 $C0 $C0 $C0 $C0 $22 $E0 $A0 $A0 $A0 $A0 $A0 $A0 $E0 $E0 $A0 $00 $A0 $E0 $C0 $A0 $80 $80 $A0 $A0 $A0 $C0 $C0 $E0 $E0 $A0 $A0 $80 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $A0 $22 $22 $A0 $00 $00 $00 $00 $00
 DATA_AA45_RuffTrux_EffectsTiles:
 .incbin "Assets/RuffTrux/Effects.3bpp"
+.ends
 
+.section "Various data bank 10" force
 DATA_2AB4D_Tiles_Portrait_RuffTrux:
 .incbin "Assets/RuffTrux/Portrait.3bpp.compressed"
 
@@ -28968,420 +28955,453 @@ DATA_2B4CA_Tiles_HeadToHeadText:
 
 DATA_2B5BE_Tilemap_HeadToHeadText:
 .incbin "Assets/Menu/Text-HeadtoHead.tilemap"
+.ends
 
-
+.section "Game sound effects" force
 LABEL_2B5D2_GameVBlankUpdateSoundTrampoline:
-  jp LABEL_2B616_Sound
+  jp LABEL_2B616_GameVBlankUpdateSound
 
 LABEL_2B5D5_SilencePSG:
-  ld a, $FF
-  out (PORT_PSG), a
-  ld a, $9F
-  out (PORT_PSG), a
-  ld a, $BF
-  out (PORT_PSG), a
-  ld a, $DF
-  out (PORT_PSG), a
+  SetPSGVolumeImmediate 3, 0
+  SetPSGVolumeImmediate 0, 0
+  SetPSGVolumeImmediate 1, 0
+  SetPSGVolumeImmediate 2, 0
   ret
 
 .ifdef UNNECESSARY_CODE
 LABEL_2B5E6_Player1SFX_Unused:
   ld a, (_RAM_D97E_Player1SFX_Unused)
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ret
 
 LABEL_2B5ED_Player2SFX_Unused:
   ld a, (_RAM_D97F_Player2SFX_Unused)
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
   ret
 
-LABEL_2B5F4_:
-  ; _RAM_D95B_ -= 4
-  ld hl, (_RAM_D95B_)
+LABEL_2B5F4_Engine1Lower_Unused:
+  ; _RAM_D95B_EngineSound1.Tone -= 4
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
   ld bc, 4
   and a
   sbc hl, bc
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ret
 
-LABEL_2B601_:
-  ; _RAM_D96C_ += 4
-  ld hl, (_RAM_D96C_)
+LABEL_2B601_Engine2Lower_Unused:
+  ; _RAM_D96C_EngineSound2.Tone -= 4
+  ld hl, (_RAM_D96C_EngineSound2.Tone)
   ld bc, 4
   and a
   sbc hl, bc
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   ret
 
-LABEL_2B60E_:
-  ; _RAM_D95B_ += 1
-  ld hl, (_RAM_D95B_)
+LABEL_2B60E_Engine1Higher_Unused:
+  ; _RAM_D95B_EngineSound1.Tone += 1
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
   inc hl
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ret
 .endif
 
-LABEL_2B616_Sound:
-  ld a, (_RAM_D957_SoundIndex)
+LABEL_2B616_GameVBlankUpdateSound:
+  ; Generate some cycling numbers
+  ld a, (_RAM_D957_Sound_HelicopterEngineIndex)
   ld c, a
   inc a
-  and $07
-  ld (_RAM_D957_SoundIndex), a
+  and $07 ; range 0..7
+  ld (_RAM_D957_Sound_HelicopterEngineIndex), a
+  
   ld a, c
   and $03
-  ld (_RAM_D956_), a
-  ld ix, _RAM_D963_SFXTrigger_Player1
-  ld bc, _RAM_D94C_Sound1Channel0Volume
-  call LABEL_2B7A1_SoundFunction
-  call +
-  ld ix, _RAM_D974_SFXTrigger_Player2
-  ld bc, _RAM_D94F_Sound2Channel0Volume
-  call LABEL_2B7A1_SoundFunction
-  call ++
-  ld a, (_RAM_D95A_)
+  ld (_RAM_D956_Sound_ToneEngineSoundsIndex), a
+  
+  ; Update SFX #1
+  ld ix, _RAM_D963_SFX_Player1.Trigger
+  ld bc, _RAM_D94C_SoundChannels.1
+  call LABEL_2B7A1_Sound_GetSFXData
+  call _UpdateSFXChannel1
+  
+  ; And #2
+  ld ix, _RAM_D974_SFX_Player2
+  ld bc, _RAM_D94C_SoundChannels.2
+  call LABEL_2B7A1_Sound_GetSFXData
+  call _UpdateSFXChannel2
+  
+.ifdef UNNECESSARY_CODE
+  ; Select between helicopter and regular engine sounds
+  ld a, (_RAM_D95A_Sound_IsHelicopterEngine)
   or a
-  jr nz, LABEL_2B699_Sound
-  call LABEL_2B6C9_Sound
-  call LABEL_2B70D_
-  jp LABEL_2B751_
+  jr nz, LABEL_2B699_Sound_HelicopterEngine
+.endif
+  
+  ; And engine sounds (only two)
+  call LABEL_2B6C9_Sound_UpdateEngineSound1
+  call LABEL_2B70D_Sound_UpdateEngineSound2
+  ; The third tone channel is used to make the engine sound a bit randomised
+  jp LABEL_2B751_Sound_UpdateTone2WithRandomisedEngineTone ; and ret
 
-+:
-  ld a, (_RAM_D964_Sound1Control)
-  or a
-  ret z
-  ld a, (_RAM_D94C_Sound1Channel0Volume)
-  and $0F
-  or $90
-  out (PORT_PSG), a
-  ld a, (_RAM_D94D_Sound1Channel1Volume)
-  or $80
-  out (PORT_PSG), a
-  ld a, (_RAM_D94E_Sound1Channel2Volume)
-  out (PORT_PSG), a
-  ld a, (_RAM_D964_Sound1Control)
-  cp $02
-  ret nz
-  xor a
-  ld (_RAM_D964_Sound1Control), a
-  ret
-
-++:
-  ld a, (_RAM_D975_Sound2Control)
+_UpdateSFXChannel1:
+  ld a, (_RAM_D963_SFX_Player1.Control)
   or a
   ret z
-  ld a, (_RAM_D94F_Sound2Channel0Volume)
-  and $0F
-  or $B0
+  
+  ld a, (_RAM_D94C_SoundChannels.1.Attenuation)
+  and PSG_VOLUME_MASK
+  or PSG_ATTENUATION_CONTROL_MASK | (0 << PSG_CHANNEL_SHIFT)
   out (PORT_PSG), a
-  ld a, (_RAM_D950_Sound2_Channel1Volume)
-  or $A0
+  
+  ld a, (_RAM_D94C_SoundChannels.1.Tone.Lo)
+  or PSG_TONE_CONTROL_MASK | (0 << PSG_CHANNEL_SHIFT)
   out (PORT_PSG), a
-  ld a, (_RAM_D951_Sound2_Channel2Volume)
+  
+  ld a, (_RAM_D94C_SoundChannels.1.Tone.Hi)
   out (PORT_PSG), a
-  ld a, (_RAM_D975_Sound2Control)
+  
+  ld a, (_RAM_D963_SFX_Player1.Control)
   cp $02
   ret nz
+
   xor a
-  ld (_RAM_D975_Sound2Control), a
+  ld (_RAM_D963_SFX_Player1.Control), a
   ret
 
-LABEL_2B699_Sound:
-  ld a, (_RAM_D96B_SoundMask)
+_UpdateSFXChannel2:
+  ld a, (_RAM_D974_SFX_Player2.Control)
+  or a
+  ret z
+
+  ld a, (_RAM_D94C_SoundChannels.2.Attenuation)
+  and PSG_VOLUME_MASK
+  or PSG_ATTENUATION_CONTROL_MASK | (1 << PSG_CHANNEL_SHIFT)
+  out (PORT_PSG), a
+
+  ld a, (_RAM_D94C_SoundChannels.2.Tone.Lo)
+  or PSG_TONE_CONTROL_MASK | (1 << PSG_CHANNEL_SHIFT)
+  out (PORT_PSG), a
+
+  ld a, (_RAM_D94C_SoundChannels.2.Tone.Hi)
+  out (PORT_PSG), a
+
+  ld a, (_RAM_D974_SFX_Player2.Control)
+  cp $02
+  ret nz
+
+  xor a
+  ld (_RAM_D974_SFX_Player2.Control), a
+  ret
+
+.ifdef UNNECESSARY_CODE
+
+LABEL_2B699_Sound_HelicopterEngine:
+  ; SFX noise overrides this
+  ld a, (_RAM_D963_SFX_Player1.Noise)
   ld c, a
-  ld a, (_RAM_D97C_Sound)
+  ld a, (_RAM_D974_SFX_Player2.Noise)
   or c
   ret nz
-  ld a, (_RAM_D957_SoundIndex)
+  
+  ld a, (_RAM_D957_Sound_HelicopterEngineIndex)
   add a, a
   ld c, a
   ld b, $00
-  ld hl, DATA_2B791_SoundTable
+  ld hl, DATA_2B791_HelicopterEngineSoundData
   add hl, bc
   ld a, (hl)
+  ; Table contains no 0s
   or a
   jr z, +
-  ld a, $E0
-  out (PORT_PSG), a
+  SetPSGNoiseImmediate 0 ; Noise mode (two-byte write)
   ld a, (hl)
   out (PORT_PSG), a
 +:inc hl
-  ld a, (hl)
-  cpl
-  and $0F
-  or $F0
+  ld a, (hl) ; Volume
+  cpl ; -> attenuation
+  and PSG_VOLUME_MASK
+  or PSG_ATTENUATION_CONTROL_MASK | (PSG_CHANNEL_NOISE << PSG_CHANNEL_SHIFT) ; Noise channel volume
   out (PORT_PSG), a
-  ld a, $C0
+  ld a, PSG_TONE_CONTROL_MASK | (PSG_CHANNEL_TONE2 << PSG_CHANNEL_SHIFT) | 0 ; Channel 2 tone -> 0
   out (PORT_PSG), a
   xor a
   out (PORT_PSG), a
   ret
-
-LABEL_2B6C9_Sound:
-  ld hl, _RAM_D95B_
-  ld a, (_RAM_D964_Sound1Control)
+.endif
+  
+; Repetitive code...
+.macro UpdateEngineSound args Control, EngineSound, Channel, Tone
+  ld hl, EngineSound
+  ; SFX tones override this
+  ld a, (Control)
   or a
   ret nz
-  ld e, (hl)
+  ; Load values from 0..1 to de, +4 to a
+  ld e, (hl) ; Tone
   inc hl
-  ld d, (hl)
+  ld d, (hl) ; Tone
   inc hl
+  ; Skipped unused byte
   inc hl
-  ld a, (hl)
+  ld a, (hl) ; Volume
   cpl
-  and $0F
-  or $90
+  and PSG_VOLUME_MASK ; To attenuation
+  or PSG_ATTENUATION_CONTROL_MASK | (Channel << PSG_CHANNEL_SHIFT)
   out (PORT_PSG), a
   inc hl
-  ld a, (_RAM_D956_)
+
+  ; Next comes from +5..+8, rotating each frame
+  ld a, (_RAM_D956_Sound_ToneEngineSoundsIndex)
   ld c, a
   ld b, $00
   add hl, bc
   ld l, (hl)
   ld h, $00
-  add hl, de
+  add hl, de ; Add to tone
   ld a, l
+  ; split to PSG 6+4 bits
+  .repeat 4
   rl l
   rl h
-  rl l
-  rl h
-  rl l
-  rl h
-  rl l
-  rl h
-  and $0F
-  ld (_RAM_D953_), a
-  ld a, $80
+  .endr
+  and PSG_TONE_LO_MASK
+  ld (Tone+BigEndianWord.Lo), a
+  ; We don't actually emit the high bits
+  ld a, PSG_TONE_CONTROL_MASK | (Channel << PSG_CHANNEL_SHIFT) | 0
   out (PORT_PSG), a
   ld a, h
-  and $3F
-  ld (_RAM_D952_), a
+  and PSG_TONE_HI_MASK
+  ld (Tone+BigEndianWord.Hi), a
   out (PORT_PSG), a
   ret
+.endm
 
-LABEL_2B70D_:
-  ld hl, _RAM_D96C_
-  ld a, (_RAM_D975_Sound2Control)
-  or a
-  ret nz
-  ld e, (hl)
-  inc hl
-  ld d, (hl)
-  inc hl
-  inc hl
-  ld a, (hl)
-  cpl
-  and $0F
-  or $B0
-  out (PORT_PSG), a
-  inc hl
-  ld a, (_RAM_D956_)
-  ld c, a
-  ld b, $00
-  add hl, bc
-  ld l, (hl)
-; Executed in RAM at d954
-LABEL_2B72B_:
-  ld h, $00
-  add hl, de
-  ld a, l
-  rl l
-  rl h
-  rl l
-  rl h
-  rl l
-  rl h
-  rl l
-  rl h
-  and $0F
-  ld (_RAM_D955_), a
-  ld a, $A0
-  out (PORT_PSG), a
-  ld a, h
-  and $3F
-  ld (_RAM_D954_), a
-  out (PORT_PSG), a
-  ret
+LABEL_2B6C9_Sound_UpdateEngineSound1:
+  UpdateEngineSound _RAM_D963_SFX_Player1.Control, _RAM_D95B_EngineSound1, PSG_CHANNEL_TONE0, _RAM_D952_EngineSound1ActualTone
 
-LABEL_2B751_:
-  ld a, (_RAM_D956_)
+LABEL_2B70D_Sound_UpdateEngineSound2:
+  UpdateEngineSound _RAM_D974_SFX_Player2.Control, _RAM_D96C_EngineSound2, PSG_CHANNEL_TONE1, _RAM_D954_EngineSound2ActualTone
+
+LABEL_2B751_Sound_UpdateTone2WithRandomisedEngineTone:
+  ld a, (_RAM_D956_Sound_ToneEngineSoundsIndex)
   and $01
   jp z, +
-  ld a, (_RAM_D964_Sound1Control)
+  
+.macro RandomiseEngineSoundTone args Control, ActualTone
+  ld a, (Control)
   or a
   ret nz
+  ; If an SFX is not playing
+  ; Randomly add 0..3 to the low bits of the tone
+  ; Does not handle overflow!
   ld a, r
-  and $07
+  and %00000111
   ld c, a
-  ld a, (_RAM_D953_)
+  ld a, (ActualTone + BigEndianWord.Lo)
   add a, c
-  and $0F
-  or $C0
+  and PSG_TONE_LO_MASK
+  or PSG_TONE_CONTROL_MASK | (PSG_CHANNEL_TONE2 << PSG_CHANNEL_SHIFT)
   out (PORT_PSG), a
-  ld a, (_RAM_D952_)
-  and $3F
+  ld a, (ActualTone + BigEndianWord.Hi)
+  and PSG_TONE_HI_MASK
   out (PORT_PSG), a
   ret
+.endm 
 
-+:
-  ld a, (_RAM_D975_Sound2Control)
-  or a
-  ret nz
-  ld a, r
-  and $07
-  ld c, a
-  ld a, (_RAM_D955_)
-  add a, c
-  and $0F
-  or $C0
-  out (PORT_PSG), a
-  ld a, (_RAM_D954_)
-  and $3F
-  out (PORT_PSG), a
-  ret
+  ; Every odd frame, do it for player 1
+  RandomiseEngineSoundTone _RAM_D963_SFX_Player1.Control _RAM_D952_EngineSound1ActualTone
+
++:; Every even frame, do it for player 2
+  RandomiseEngineSoundTone _RAM_D974_SFX_Player2.Control _RAM_D954_EngineSound2ActualTone
 
 ; Data from 2B791 to 2B7A0 (16 bytes)
-DATA_2B791_SoundTable:
-.db $02 $0F
-.db $07 $0B
-.db $00 $07
-.db $00 $03
-.db $02 $0F
-.db $07 $0B
-.db $00 $07
-.db $00 $03
+DATA_2B791_HelicopterEngineSoundData:
+; first is a noise channel mode control byte, or zero to not change it
+; second is a volume (not attenuation, so $f = loudest)
+; Helicopter engine sound? Never enabled TODO test it
+.repeat 2
+.db PSG_NOISE_PERIODIC_FAST    $0F
+.db PSG_NOISE_TONE2            $0B
+.db PSG_NOISE_PERIODIC_SLOWEST $07
+.db PSG_NOISE_PERIODIC_SLOWEST $03
+.endr
 
-LABEL_2B7A1_SoundFunction:
-  ld a, (ix+0)
+LABEL_2B7A1_Sound_GetSFXData:
+; ix points at an instance of SFXData
+; bc points at an instance of SoundChannel
+.define SFX_DATA_END $ff
+  ld a, (ix+SFXData.Trigger)
   or a
-  jr z, +
+  jr z, _CheckSFXControl
+  
+_LoadSFXPointers:
+  ; If non-zero, look it up
   dec a ; Make 0-indexed
   add a, a ; Multiply by 6
   ld e, a
   add a, a
   add a, e
   ld e, a ; Look up
-  ld d, $00
-  ld hl, DATA_2B911_SoundData_
+  ld d, 0
+  ld hl, DATA_2B911_SFXData
   add hl, de
+  ; Point de at SFXData.VolumePointer
   push ix
   pop de
   inc de
   inc de
+  ; And load 6 bytes (3 pointers) there
   push bc
+    .repeat 5
     ldi
-    ldi
-    ldi
-    ldi
-    ldi
+    .endr
   pop bc
+  ; Skip the increments on the last byte (not necessary?)
   ld a, (hl)
   ld (de), a
+  ; Clear the trigger
   xor a
-  ld (ix+0), a
+  ld (ix+SFXData.Trigger), a
+  ; And set the control byte to 1
   inc a
-  ld (ix+1), a
-+:ld a, (ix+1)
+  ld (ix+SFXData.Control), a
+  
+_CheckSFXControl:
+  ; Check the control byte
+  ld a, (ix+SFXData.Control)
   or a
   ret z
-  ld l, (ix+2)
-  ld h, (ix+3)
+  
+_UpdateVolume:
+  ; Get next volume byte
+  ld l, (ix+SFXData.VolumePointer.Lo)
+  ld h, (ix+SFXData.VolumePointer.Hi)
   ld a, (hl)
   inc hl
-  ld (ix+2), l
-  ld (ix+3), h
+  ld (ix+SFXData.VolumePointer.Lo), l
+  ld (ix+SFXData.VolumePointer.Hi), h
+  ; Convert to attenuation
   cpl
-  and $0F
+  and PSG_VOLUME_MASK
   ld (bc), a
-  ld (_RAM_D958_), a
-  ld l, (ix+4)
-  ld h, (ix+5)
+  ld (_RAM_D958_Sound_LastAttenuation), a
+  
+_UpdateTone:
+  ; Next note
+  ld l, (ix+SFXData.NotePointer.Lo)
+  ld h, (ix+SFXData.NotePointer.Hi)
   ld a, (hl)
   inc hl
-  cp $FF
+  cp SFX_DATA_END
   jr nz, +
-  ld a, $0F
+
+_EndOfSFX:
+.define VOLUME_MUTE $0f
+  ld a, VOLUME_MUTE ; Mute volume
   ld (bc), a
-  inc bc
+  inc bc    ; Zero tone
   ld (bc), a
   inc bc
   ld (bc), a
   ld a, $02
-  ld (ix+1), a
-  jp +++
+  ld (ix+SFXData.Control), a
+  ; Do not move pointer on
+  jp _UpdateNoise
 
-+:or a
++:; Not end
+  or a
   jr nz, +
-  ld a, $0F
+  ; Zero note -> mute volume
+  ld a, VOLUME_MUTE
   ld (bc), a
   jr ++
 
-+:inc bc
++:; Else get PSG values for note
+  inc bc
   push hl
+    ; Convert note index to PSG values
     add a, a
     ld e, a
-    ld d, $00
+    ld d, 0
     ld hl, DATA_2B87B_PSGNotes
     add hl, de
+    ; Retrieve it
     ld e, (hl)
     ld a, e
-    and $3F
+.ifdef UNNECESSARY_CODE
+    and $3F ; Unnecessary because we mask to $0f below - maybe meant to mask the high bits
+.endif
     inc hl
     ld d, (hl)
+    ; Shift left by 4 so we have the high 6/10 bits in d
+    .repeat 4
     rl e
     rl d
-    rl e
-    rl d
-    rl e
-    rl d
-    rl e
-    rl d
-    and $0F
+    .endr
+    ; And the low 4 bits are here
+    and $0f
+    ; Put them into the SoundChannel structure
     ld (bc), a
     inc bc
     ld a, d
     ld (bc), a
   pop hl
 ++:
-  ld (ix+4), l
-  ld (ix+5), h
-+++:
-  ld l, (ix+6)
-  ld h, (ix+7)
+  ; Save moved-on pointer
+  ld (ix+SFXData.NotePointer.Lo), l
+  ld (ix+SFXData.NotePointer.Hi), h
+
+_UpdateNoise:
+  ; Get noise data
+  ld l, (ix+SFXData.NoisePointer.Lo)
+  ld h, (ix+SFXData.NoisePointer.Hi)
   ld a, (hl)
-  cp $FF
+  cp SFX_DATA_END
   jr nz, +
-  inc a
-  ld (ix+8), a
-  ld a, (_RAM_D96B_SoundMask)
+  
+_EndOfNoise:
+  ; Stop noise only if both noises are now zero
+  inc a ; to zero
+  ld (ix+SFXData.Noise), a
+  ld a, (_RAM_D963_SFX_Player1.Noise)
   ld c, a
-  ld a, (_RAM_D97C_Sound)
+  ld a, (_RAM_D974_SFX_Player2.Noise)
   or c
   ret nz
-  ld a, $FF
-  out (PORT_PSG), a
-  ld a, $E0
-  out (PORT_PSG), a
+  ; Mute noise
+  SetPSGVolumeImmediate PSG_CHANNEL_NOISE 0
+.ifdef UNNECESSARY_CODE
+  ; And set it the mode
+  SetPSGNoiseImmediate PSG_NOISE_PERIODIC_SLOWEST
+  ; And follow it up with a second write - which sets the same thing redundantly
   xor a
   out (PORT_PSG), a
+.endif
   ret
 
-+:
-  inc hl
++:; Some noise data
+  inc hl ; move pointer on
   or a
-  jr z, +
+  jr z, + ; zero -> do nothing (no change)
+  
+  ; Non-zero
   ex af, af'
-  ld a, (_RAM_D958_)
-  or $F0
-  out (PORT_PSG), a
-  ld a, $E3
-  out (PORT_PSG), a
+    ; Apply the tone volume to the noise channel
+    ld a, (_RAM_D958_Sound_LastAttenuation)
+    or PSG_ATTENUATION_CONTROL_MASK | (PSG_CHANNEL_NOISE << PSG_CHANNEL_SHIFT) ; Apply to channel 3
+    out (PORT_PSG), a
+    ; And select tone2 periodic noise
+    SetPSGNoiseImmediate PSG_NOISE_PERIODIC_TONE2
   ex af, af'
+  ; Followed by a second noise write (!) with the data value
   out (PORT_PSG), a
+  
+  ; Then set the noise flag for this channel
   ld a, $01
-  ld (ix+8), a
-+:
-  ld (ix+6), l
-  ld (ix+7), h
+  ld (ix+SFXData.Noise), a
+
++:; Save the moved-on pointer
+  ld (ix+SFXData.NoisePointer.Lo), l
+  ld (ix+SFXData.NoisePointer.Hi), h
   ret
 
 DATA_2B87B_PSGNotes:
@@ -29389,99 +29409,133 @@ DATA_2B87B_PSGNotes:
   PSGNotes 0, 74
 
 ; Data from 2B911 to 2BFFF (1775 bytes)
-DATA_2B911_SoundData_:
-; 6-byte table of pointers into data pairs/triplets?
-; Some point to _RAM_D97D_ instead
+DATA_2B911_SFXData:
+; Table of triplets of pointers into data per SFX
 ; Pointers point to various lengths of data following the table
-.dw DATA_2B995_SoundData_ DATA_2B99D_SoundData_ _RAM_D97D_
-.dw DATA_2B9A5_SoundData_ DATA_2B9AB_SoundData_ DATA_2B9B1_SoundData_
-.dw DATA_2B9B6_SoundData_ DATA_2B9BE_SoundData_ DATA_2B9C6_SoundData_
-.dw DATA_2B9CE_SoundData_ DATA_2B9D8_SoundData_ DATA_2B9E1_SoundData_
-.dw DATA_2B9EA_SoundData_ DATA_2BA00_SoundData_ DATA_2BA15_SoundData_
-.dw DATA_2BA29_SoundData_ DATA_2BA33_SoundData_ DATA_2BA3D_SoundData_
-.dw DATA_2BA46_SoundData_ DATA_2BA50_SoundData_ DATA_2BA5A_SoundData_
-.dw DATA_2BA63_SoundData_ DATA_2BA7A_SoundData_ DATA_2BA90_SoundData_
-.dw DATA_2BAA6_SoundData_ DATA_2BAD3_SoundData_ _RAM_D97D_
-.dw DATA_2BAF6_SoundData_ DATA_2BAFF_SoundData_ DATA_2BB07_SoundData_
-.dw DATA_2BB0F_SoundData_ DATA_2BB18_SoundData_ DATA_2BB21_SoundData_
-.dw DATA_2BB2A_SoundData_ DATA_2BB3A_SoundData_ _RAM_D97D_
-.dw DATA_2BB4B_SoundData_ DATA_2BB54_SoundData_ DATA_2BB5D_SoundData_
-.dw DATA_2BB66_SoundData_ DATA_2BB93_SoundData_ _RAM_D97D_
-.dw DATA_2BBC1_SoundData_ DATA_2BBC9_SoundData_ _RAM_D97D_
-.dw DATA_2BBD1_SoundData_ DATA_2BBD8_SoundData_ DATA_2BBDF_SoundData_
-.dw DATA_2BBE6_SoundData_ DATA_2BBEF_SoundData_ DATA_2BBF8_SoundData_
-.dw DATA_2BC01_SoundData_ DATA_2BC92_SoundData_ _RAM_D97D_
-.dw DATA_2BD25_SoundData_ DATA_2BD76_SoundData_ _RAM_D97D_
-.dw DATA_2BDC7_SoundData_ DATA_2BE08_SoundData_ _RAM_D97D_
-.dw DATA_2BE49_SoundData_ DATA_2BE51_SoundData_ DATA_2BE59_SoundData_
-.dw DATA_2BE61_SoundData_ DATA_2BE6F_SoundData_ DATA_2BE7D_SoundData_
+; First pointer is the volume envelope, one byte per frame, $0 = silent, $f = loudest
+; Second pointer is the note indexes, one byte per frame, $0 = no change, SFX_DATA_END = end
+; Third pointer is the noise data, one byte per frame, $0 = no change, SFX_DATA_END = end
+; Sometimes the noise points at _RAM_D97D_Sound_SFXNoiseData, which just holds $ff (and could be in ROM)
+.dw _SFX_01_Volumes                     _SFX_01_Notes                     _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_02_HitGround_Volumes           _SFX_02_HitGround_Notes           _SFX_02_HitGround_Noise
+.dw _SFX_03_Crash_Volumes               _SFX_03_Crash_Notes               _SFX_03_Crash_Noise
+.dw _SFX_04_TankMiss_Volumes            _SFX_04_TankMiss_Notes            _SFX_04_TankMiss_Noise
+.dw _SFX_05_Volumes                     _SFX_05_Notes                     _SFX_05_Noise
+.dw _SFX_06_Volumes                     _SFX_06_Notes                     _SFX_06_Noise
+.dw _SFX_07_EnterSticky_Volumes         _SFX_07_EnterSticky_Notes         _SFX_07_EnterSticky_Noise
+.dw _SFX_08_Volumes                     _SFX_08_Notes                     _SFX_08_Noise
+.dw _SFX_09_EnterPoolTableHole_Volumes  _SFX_09_EnterPoolTableHole_Notes  _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_0A_TankShoot_Volumes           _SFX_0A_TankShoot_Notes           _SFX_0A_TankShoot_Noise
+.dw _SFX_0B_Volumes                     _SFX_0B_Notes                     _SFX_0B_Noise
+.dw _SFX_0C_LeavePoolTableHole_Volumes  _SFX_0C_LeavePoolTableHole_Notes  _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_0D_Volumes                     _SFX_0D_Notes                     _SFX_0D_Noise
+.dw _SFX_0E_FallToFloor_Volumes         _SFX_0E_FallToFloor_Notes         _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_0F_Skid1_Volumes               _SFX_0F_Skid1_Notes               _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_10_Skid2_Volumes               _SFX_10_Skid2_Notes               _SFX_10_Skid2_Noise
+.dw _SFX_11_Volumes                     _SFX_11_Notes                     _SFX_11_Noise
+.dw _SFX_12_WinOrCheat_Volumes          _SFX_12_WinOrCheat_Notes          _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_13_HeadToHeadWinPoint_Volumes  _SFX_13_HeadToHeadWinPoint_Notes  _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_14_Playoff_Volumes             _SFX_14_Playoff_Notes             _RAM_D97D_Sound_SFXNoiseData
+.dw _SFX_15_HitFloor_Volumes            _SFX_15_HitFloor_Notes            _SFX_15_HitFloor_Noise
+.dw _SFX_16_Respawn_Volumes             _SFX_16_Respawn_Notes             _SFX_16_Respawn_Noise
 
-; Most data seems terminated by a $00 or $ff, bt not all
-DATA_2B995_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $00
-DATA_2B99D_SoundData_: .db $18 $18 $18 $18 $18 $18 $18 $FF
-DATA_2B9A5_SoundData_: .db $0F $0C $09 $06 $03 $00
-DATA_2B9AB_SoundData_: .db $01 $05 $01 $05 $00 $FF
-DATA_2B9B1_SoundData_: .db $07 $06 $00 $00 $FF
-DATA_2B9B6_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $00
-DATA_2B9BE_SoundData_: .db $06 $05 $04 $03 $02 $01 $00 $FF
-DATA_2B9C6_SoundData_: .db $06 $00 $04 $00 $07 $00 $00 $FF
-DATA_2B9CE_SoundData_: .db $0F $0E $0D $0C $0B $0A $09 $08 $07 $00
-DATA_2B9D8_SoundData_: .db $05 $00 $00 $04 $00 $03 $00 $00 $FF
-DATA_2B9E1_SoundData_: .db $05 $00 $00 $06 $00 $07 $00 $00 $FF
-DATA_2B9EA_SoundData_: .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B $0A $0A $09 $09 $09 $08 $08 $08 $00
-DATA_2BA00_SoundData_: .db $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $01 $00 $00 $00 $00 $FF
-DATA_2BA15_SoundData_: .db $05 $00 $00 $00 $06 $00 $00 $00 $00 $04 $00 $00 $00 $00 $07 $00 $00 $00 $00 $FF
-DATA_2BA29_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
-DATA_2BA33_SoundData_: .db $1E $0A $0A $0C $0E $10 $12 $14 $00 $FF
-DATA_2BA3D_SoundData_: .db $06 $00 $05 $00 $04 $00 $07 $00 $FF
-DATA_2BA46_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
-DATA_2BA50_SoundData_: .db $02 $04 $08 $10 $20 $00 $00 $00 $00 $FF
-DATA_2BA5A_SoundData_: .db $05 $00 $00 $00 $07 $00 $00 $00 $FF
-DATA_2BA63_SoundData_: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $08 $07 $07 $06 $06 $06 $06 $06 $06 $06 $06 $06 $06 $00
-DATA_2BA7A_SoundData_: .db $18 $00 $16 $00 $14 $00 $12 $00 $10 $00 $0E $00 $0C $00 $00 $00 $00 $00 $00 $00 $00 $FF
-DATA_2BA90_SoundData_: .db $06 $00 $00 $00 $05 $00 $00 $00 $04 $00 $00 $00 $07 $00 $00 $00 $00 $00 $00 $00 $00 $FF
-DATA_2BAA6_SoundData_: .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
-DATA_2BAD3_SoundData_: .db $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $0A $09 $08 $07 $FF
-DATA_2BAF6_SoundData_: .db $0F $0E $0D $0C $0A $09 $08 $07 $00
-DATA_2BAFF_SoundData_: .db $05 $04 $03 $02 $01 $00 $00 $FF
-DATA_2BB07_SoundData_: .db $05 $00 $04 $00 $06 $00 $00 $FF
-DATA_2BB0F_SoundData_: .db $0F $0D $0B $09 $07 $05 $03 $01 $00
-DATA_2BB18_SoundData_: .db $14 $12 $10 $0E $0C $0A $08 $06 $FF
-DATA_2BB21_SoundData_: .db $06 $00 $05 $00 $00 $07 $00 $00 $FF
-DATA_2BB2A_SoundData_: .db $00 $01 $02 $03 $04 $05 $06 $07 $08 $09 $0A $0B $0C $0D $0E $0F
-DATA_2BB3A_SoundData_: .db $28 $2A $2C $2E $30 $32 $0A $0F $14 $19 $1E $23 $28 $2D $32 $37 $FF
-DATA_2BB4B_SoundData_: .db $0F $0E $0C $0A $08 $06 $04 $02 $00
-DATA_2BB54_SoundData_: .db $0A $09 $08 $07 $06 $05 $00 $00 $FF
-DATA_2BB5D_SoundData_: .db $06 $00 $05 $00 $06 $00 $04 $00 $FF
-DATA_2BB66_SoundData_: .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
-DATA_2BB93_SoundData_: .db $22 $22 $22 $21 $21 $21 $20 $20 $20 $1F $1F $1F $1E $1E $1E $1D $1D $1D $1C $1C $1C $1B $1B $1B $1A $1A $1A $19 $19 $19 $18 $18 $18 $17 $17 $17 $16 $16 $16 $15 $15 $15 $14 $14 $14 $FF
-DATA_2BBC1_SoundData_: .db $0F $0F $0F $0F $0F $0F $0F $00
-DATA_2BBC9_SoundData_: .db $28 $27 $28 $29 $28 $27 $28 $FF
-DATA_2BBD1_SoundData_: .db $0F $0F $0F $0F $0F $0F $00
-DATA_2BBD8_SoundData_: .db $1E $1D $1E $1F $1E $1D $FF
-DATA_2BBDF_SoundData_: .db $07 $00 $00 $00 $00 $00 $FF
-DATA_2BBE6_SoundData_: .db $0F $0F $0E $0D $0C $0A $08 $06 $00
-DATA_2BBEF_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $00 $FF
-DATA_2BBF8_SoundData_: .db $07 $00 $04 $00 $07 $00 $00 $00 $FF
-DATA_2BC01_SoundData_: .db $01 $01 $02 $02 $03 $03 $04 $04 $05 $05 $06 $06 $07 $07 $08 $08 $09 $09 $0A $0A $0B $0B $0C $0C $0D $0D $0E $0E $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0D $0D $0C $0C $0B $0B $0A $0A $09 $09 $08 $08 $07 $07 $06 $06 $05 $05 $04 $04 $03 $03 $02 $02 $01 $01 $00
-DATA_2BC92_SoundData_: .db $0A $0B $0C $0D $0E $0F $10 $11 $12 $13 $14 $15 $16 $17 $18 $19 $1A $1B $1C $1D $1E $1F $20 $21 $22 $23 $24 $25 $26 $27 $28 $29 $2A $2B $2C $2D $2E $2F $30 $31 $32 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $14 $13 $12 $11 $10 $0F $0E $0D $0C $0B $0A $FF
-DATA_2BD25_SoundData_: .db $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0E $0E $0E $0E $0E $0E $0D $0D $0D $0D $0D $0D $0D $0D $0C $0C $0C $0C $0C $0C $0C $0C $0B $0B $0B $0B $0B $0B $0B $0B $0A $0A $0A $0A $0A $0A $0A $0A $08 $08 $08 $08 $08 $08 $08 $08 $06 $06 $06 $06 $06 $06 $06 $06 $04 $04 $04 $04 $04 $04 $04 $04 $02 $02 $02 $02 $02 $02 $02 $02 $00
-DATA_2BD76_SoundData_: .db $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $FF
-DATA_2BDC7_SoundData_: .db $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $00
-DATA_2BE08_SoundData_: .db $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $FF
-DATA_2BE49_SoundData_: .db $00 $04 $08 $0C $0F $0F $0F $00
-DATA_2BE51_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $FF
-DATA_2BE59_SoundData_: .db $06 $00 $05 $00 $04 $07 $00 $FF
-DATA_2BE61_SoundData_: .db $07 $08 $09 $0A $0B $0C $0D $0E $0F $0F $0F $0F $0F $00
-DATA_2BE6F_SoundData_: .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $FF
-DATA_2BE7D_SoundData_: .db $07 $00 $00 $04 $00 $00 $05 $00 $00 $06 $00 $00 $00 $FF
+; Volumes tend to terminate with 0
+; Notes and noise terminate with SFX_DATA_END and no-op with 0
+; Streams tend to be the same length but don't have to be; volumes should be at least as long as the longest one - 1
+_SFX_01_Volumes:  .db $0F $0E $0D $0C $0B $0A $08 $00
+_SFX_01_Notes:    .db $18 $18 $18 $18 $18 $18 $18 SFX_DATA_END
+
+_SFX_02_HitGround_Volumes: .db $0F $0C $09 $06 $03 $00
+_SFX_02_HitGround_Notes:   .db $01 $05 $01 $05   0 SFX_DATA_END
+_SFX_02_HitGround_Noise:   .db PSG_NOISE_TONE2 PSG_NOISE_FAST 0 0 SFX_DATA_END
+
+_SFX_03_Crash_Volumes:  .db $0F $0E $0D $0C $0B $0A $09 $00
+_SFX_03_Crash_Notes:    .db $06 $05 $04 $03 $02 $01   0 SFX_DATA_END
+_SFX_03_Crash_Noise:    .db PSG_NOISE_FAST 0 PSG_NOISE_SLOW 0 PSG_NOISE_TONE2 0   0 SFX_DATA_END
+
+_SFX_04_TankMiss_Volumes: .db $0F $0E $0D $0C $0B $0A $09 $08 $07 $00
+_SFX_04_TankMiss_Notes:   .db $05   0   0 $04   0 $03   0   0 SFX_DATA_END
+_SFX_04_TankMiss_Noise:   .db PSG_NOISE_MEDIUM 0 0 PSG_NOISE_FAST 0 PSG_NOISE_TONE2 0 0 SFX_DATA_END
+
+_SFX_05_Volumes:  .db $0F $0F $0F $0E $0E $0D $0D $0D $0C $0C $0B $0B $0B $0A $0A $09 $09 $09 $08 $08 $08 $00
+_SFX_05_Notes:    .db $01   0   0   0   0 $01   0   0   0   0 $01   0   0   0   0 $01   0   0   0   0 SFX_DATA_END
+_SFX_05_Noise:    .db PSG_NOISE_MEDIUM 0 0 0 PSG_NOISE_FAST 0 0 0 0 PSG_NOISE_SLOW 0 0 0 0 PSG_NOISE_TONE2 0 0 0 0 SFX_DATA_END
+
+_SFX_06_Volumes:  .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
+_SFX_06_Notes:    .db $1E $0A $0A $0C $0E $10 $12 $14   0 SFX_DATA_END
+_SFX_06_Noise:    .db PSG_NOISE_FAST 0 PSG_NOISE_MEDIUM 0 PSG_NOISE_SLOW 0 PSG_NOISE_TONE2 0 SFX_DATA_END
+
+_SFX_07_EnterSticky_Volumes: .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $00
+_SFX_07_EnterSticky_Notes:   .db $02 $04 $08 $10 $20   0   0   0   0 SFX_DATA_END
+_SFX_07_EnterSticky_Noise:   .db PSG_NOISE_MEDIUM 0 0 0 PSG_NOISE_TONE2 0 0 0 SFX_DATA_END
+
+_SFX_08_Volumes:  .db $0F $0F $0E $0E $0C $0C $0A $0A $08 $08 $07 $07 $06 $06 $06 $06 $06 $06 $06 $06 $06 $06 $00
+_SFX_08_Notes:    .db $18   0 $16   0 $14   0 $12   0 $10   0 $0E   0 $0C   0   0   0   0   0   0   0   0 SFX_DATA_END
+_SFX_08_Noise:    .db PSG_NOISE_FAST 0 0 0 PSG_NOISE_MEDIUM 0 0 0 PSG_NOISE_SLOW 0 0 0 PSG_NOISE_TONE2 0 0 0 0 0 0 0 0 SFX_DATA_END
+
+; Volumes are quite a bit longer
+_SFX_09_EnterPoolTableHole_Volumes: .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
+_SFX_09_EnterPoolTableHole_Notes:   .db $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $0A $09 $08 $07 SFX_DATA_END
+
+_SFX_0A_TankShoot_Volumes:  .db $0F $0E $0D $0C $0A $09 $08 $07 $00
+_SFX_0A_TankShoot_Notes:    .db $05 $04 $03 $02 $01   0   0 SFX_DATA_END
+_SFX_0A_TankShoot_Noise:    .db PSG_NOISE_MEDIUM 0 PSG_NOISE_SLOW 0 PSG_NOISE_FAST 0 0 SFX_DATA_END
+
+_SFX_0B_Volumes:  .db $0F $0D $0B $09 $07 $05 $03 $01 $00
+_SFX_0B_Notes:    .db $14 $12 $10 $0E $0C $0A $08 $06 SFX_DATA_END
+_SFX_0B_Noise:    .db PSG_NOISE_FAST 0 PSG_NOISE_MEDIUM 0 0 PSG_NOISE_TONE2 0 0 SFX_DATA_END
+
+; Volumes are 1 byte shorter, but actually that doesn't matter
+; since the note SFX_DATA_SFX_DATA_END mutes it anyway
+_SFX_0C_LeavePoolTableHole_Volumes: .db $00 $01 $02 $03 $04 $05 $06 $07 $08 $09 $0A $0B $0C $0D $0E $0F
+_SFX_0C_LeavePoolTableHole_Notes:   .db $28 $2A $2C $2E $30 $32 $0A $0F $14 $19 $1E $23 $28 $2D $32 $37 SFX_DATA_END
+
+_SFX_0D_Volumes:  .db $0F $0E $0C $0A $08 $06 $04 $02 $00
+_SFX_0D_Notes:    .db $0A $09 $08 $07 $06 $05   0   0 SFX_DATA_END
+_SFX_0D_Noise:    .db PSG_NOISE_FAST 0 PSG_NOISE_MEDIUM 0 PSG_NOISE_FAST 0 PSG_NOISE_SLOW 0 SFX_DATA_END
+
+_SFX_0E_FallToFloor_Volumes:  .db $0F $0F $0F $0F $0E $0E $0E $0E $0D $0D $0D $0D $0C $0C $0C $0C $0B $0B $0B $0B $0A $0A $0A $0A $08 $08 $08 $08 $06 $06 $06 $06 $04 $04 $04 $04 $03 $03 $03 $03 $02 $02 $02 $02 $00
+_SFX_0E_FallToFloor_Notes:    .db $22 $22 $22 $21 $21 $21 $20 $20 $20 $1F $1F $1F $1E $1E $1E $1D $1D $1D $1C $1C $1C $1B $1B $1B $1A $1A $1A $19 $19 $19 $18 $18 $18 $17 $17 $17 $16 $16 $16 $15 $15 $15 $14 $14 $14 SFX_DATA_END
+
+_SFX_0F_Skid1_Volumes:  .db $0F $0F $0F $0F $0F $0F $0F $00
+_SFX_0F_Skid1_Notes:    .db $28 $27 $28 $29 $28 $27 $28 SFX_DATA_END
+
+_SFX_10_Skid2_Volumes:  .db $0F $0F $0F $0F $0F $0F $00
+_SFX_10_Skid2_Notes:    .db $1E $1D $1E $1F $1E $1D SFX_DATA_END
+_SFX_10_Skid2_Noise:    .db PSG_NOISE_TONE2 0 0 0 0 0 SFX_DATA_END
+
+_SFX_11_Volumes:  .db $0F $0F $0E $0D $0C $0A $08 $06 $00
+_SFX_11_Notes:    .db   0   0   0   0   0   0   0   0 SFX_DATA_END
+_SFX_11_Noise:    .db PSG_NOISE_TONE2 0 PSG_NOISE_SLOW 0 PSG_NOISE_TONE2 0 0 0 SFX_DATA_END
+
+; Not enough volumes?
+_SFX_12_WinOrCheat_Volumes: .db $01 $01 $02 $02 $03 $03 $04 $04 $05 $05 $06 $06 $07 $07 $08 $08 $09 $09 $0A $0A $0B $0B $0C $0C $0D $0D $0E $0E $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0D $0D $0C $0C $0B $0B $0A $0A $09 $09 $08 $08 $07 $07 $06 $06 $05 $05 $04 $04 $03 $03 $02 $02 $01 $01 $00
+_SFX_12_WinOrCheat_Notes:   .db $0A $0B $0C $0D $0E $0F $10 $11 $12 $13 $14 $15 $16 $17 $18 $19 $1A $1B $1C $1D $1E $1F $20 $21 $22 $23 $24 $25 $26 $27 $28 $29 $2A $2B $2C $2D $2E $2F $30 $31 $32 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $28 $28 $28 $28 $14 $14 $14 $14 $32 $31 $30 $2F $2E $2D $2C $2B $2A $29 $28 $27 $26 $25 $24 $23 $22 $21 $20 $1F $1E $1D $1C $1B $1A $19 $18 $17 $16 $15 $14 $13 $12 $11 $10 $0F $0E $0D $0C $0B $0A SFX_DATA_END
+
+_SFX_13_HeadToHeadWinPoint_Volumes: .db $0F $0F $0F $0F $0F $0F $0F $0F $0E $0E $0E $0E $0E $0E $0E $0E $0D $0D $0D $0D $0D $0D $0D $0D $0C $0C $0C $0C $0C $0C $0C $0C $0B $0B $0B $0B $0B $0B $0B $0B $0A $0A $0A $0A $0A $0A $0A $0A $08 $08 $08 $08 $08 $08 $08 $08 $06 $06 $06 $06 $06 $06 $06 $06 $04 $04 $04 $04 $04 $04 $04 $04 $02 $02 $02 $02 $02 $02 $02 $02 $00
+_SFX_13_HeadToHeadWinPoint_Notes:   .db $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E $1E $20 $22 $24 $28 $2A $2C $2E SFX_DATA_END
+
+_SFX_14_Playoff_Volumes:  .db $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $0F $0E $0D $0C $0B $0A $08 $06 $00
+_SFX_14_Playoff_Notes:    .db $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 $28 $28 $28 $28 $20 $20 $20 $20 SFX_DATA_END
+
+; Noise only...
+_SFX_15_HitFloor_Volumes: .db $00 $04 $08 $0C $0F $0F $0F $00
+_SFX_15_HitFloor_Notes:   .db   0   0   0   0   0   0   0 SFX_DATA_END
+_SFX_15_HitFloor_Noise:   .db PSG_NOISE_FAST 0 PSG_NOISE_MEDIUM 0 PSG_NOISE_SLOW PSG_NOISE_TONE2 0 SFX_DATA_END
+
+; Noise only...
+_SFX_16_Respawn_Volumes:  .db $07 $08 $09 $0A $0B $0C $0D $0E $0F $0F $0F $0F $0F $00
+_SFX_16_Respawn_Notes:    .db   0   0   0   0   0   0   0   0   0   0   0   0   0 SFX_DATA_END
+_SFX_16_Respawn_Noise:    .db PSG_NOISE_TONE2 0 0 PSG_NOISE_SLOW 0 0 PSG_NOISE_MEDIUM 0 0 PSG_NOISE_FAST 0 0 0 SFX_DATA_END
+.ends
 
 .ifdef BLANK_FILL_ORIGINAL
+.section "Blank fill end bank 10" force
 .repeat $174/4
 .db $ff $ff $00 $00 ; Uninitialised data
 .endr
+.ends
 .endif
-;.ends
 
 .orga $bfff
 .db :CADDR ; Page number marker
@@ -30549,7 +30603,7 @@ LABEL_33AE9_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -30577,7 +30631,7 @@ LABEL_33B25_:
   cp $25
   jr nz, ++
   ld a, SFX_04_TankMiss
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 LABEL_33B35_:
   xor a
   ld (_RAM_D5A6_), a
@@ -30640,7 +30694,7 @@ DATA_33B5E_:
   ld a, $01
   ld (_RAM_D5A6_), a
   ld a, SFX_0A_TankShoot
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld ix, _RAM_DA60_SpriteTableXNs.57.x
   ld iy, _RAM_DAE0_SpriteTableYs.57
   ld (ix+$01), <SpriteIndex_Bullet
@@ -30652,14 +30706,14 @@ DATA_33B5E_:
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   add a, l
   ld (ix+$00), a
   ld hl, DATA_33C1A_
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   add a, l
   ld (iy+$00), a
 _LABEL_33BEE_ret:
@@ -30703,32 +30757,32 @@ DATA_33C2A_:
 +:ld ix, _RAM_DD2D_CarData_Yellow
   ld iy, _RAM_DA60_SpriteTableXNs.63.x
 ++:
-  ld a, (ix+$3f)
+  ld a, (ix+CarData.Unknown63_b_TankShotState)
   or a
   jp z, LABEL_34D9C_
   cp $1a
   jp nc, LABEL_34D87_
-  ; e = DATA_1D65__Lo[ix+$40]
+  ; e = DATA_1D65__Lo[Unknown64_b_ShotSpeed]
   ld hl, DATA_1D65__Lo
-  ld a, (ix+$40)
+  ld a, (ix+CarData.Unknown64_b_ShotSpeed)
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
   ld e, (hl)
-  ; d = DATA_1D76__Hi[ix+$40]
+  ; d = DATA_1D76__Hi[Unknown64_b_ShotSpeed]
   ld hl, DATA_1D76__Hi
-  ld a, (ix+$40)
+  ld a, (ix+CarData.Unknown64_b_ShotSpeed)
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
   ld d, (hl)
-  ; a = DATA_3FC3_[ix+$3e] (one of 0, 6, 12, 18, 24)
-  ld hl, DATA_3FC3_
-  ld a, (ix+$3e)
+  ; a = DATA_3FC3_HorizontalAmountByDirection[Unknown62_b_ShotDirection] (one of 0, 6, 12, 18, 24)
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -30747,9 +30801,9 @@ DATA_33C2A_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ; Read DATA_40E5_Sign_[ix+$3e] and add or subtract c accordingly
-  ld hl, DATA_40E5_Sign_
-  ld a, (ix+$3e)
+  ; Read DATA_40E5_Sign_Directions_X[Unknown62_b_ShotDirection] and add or subtract c accordingly
+  ld hl, DATA_40E5_Sign_Directions_X
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -30758,7 +30812,7 @@ DATA_33C2A_:
   ld a, (hl)
   or a
   jr z, +
-  ld a, (iy+$00)
+  ld a, (iy+$00) ; Sprite X
   sub c ; Subtract
   ld (iy+$00), a
   jr ++
@@ -30768,11 +30822,11 @@ DATA_33C2A_:
   ld (iy+$00), a
 ++:
   cp $f8
-  jr nc, LABEL_33D49_ ; Offscreen?
-  ld (_RAM_D5A9_), iy
+  jr nc, LABEL_33D49_HideShotSprite ; Offscreen?
+  ld (_RAM_D5A9_TankShotTileXN), iy
 
   ; Selects which sprite to move
-  ld a, (ix+$2d)
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $01
   jr z, +
   cp $02
@@ -30786,8 +30840,8 @@ DATA_33C2A_:
   ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
   ; Similar to previous phase...
-  ld hl, DATA_3FD3_
-  ld a, (ix+$3e)
+  ld hl, DATA_3FD3_VerticalAmountByDirection
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -30805,8 +30859,8 @@ DATA_33C2A_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, DATA_40F5_Sign_
-  ld a, (ix+$3e)
+  ld hl, DATA_40F5_Sign_Directions_Y
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -30824,23 +30878,25 @@ DATA_33C2A_:
   ld (iy+$00), a
 ++:
   cp $f8
-  jr nc, LABEL_33D49_
+  jr nc, LABEL_33D49_HideShotSprite
   call LABEL_33E62_
 LABEL_33D33:
-  ld a, (ix+$3f)
+  ld a, (ix+CarData.Unknown63_b_TankShotState)
   inc a
-  ld (ix+$3f), a
+  ld (ix+CarData.Unknown63_b_TankShotState), a
   cp $25
   jr nz, LABEL_34D84_
-  ld a, (ix+$15)
+  ld a, (ix+CarData.EffectsEnabled)
   or a
-  jr z, LABEL_33D49_
+  jr z, LABEL_33D49_HideShotSprite
   ld a, SFX_04_TankMiss
-  ld (_RAM_D974_SFXTrigger_Player2), a
-LABEL_33D49_:
+  ld (_RAM_D974_SFX_Player2), a
+LABEL_33D49_HideShotSprite:
+  ; State = 0
   xor a
-  ld (ix+$3f), a
-  ld a, (ix+$2d)
+  ld (ix+CarData.Unknown63_b_TankShotState), a
+  ; X, Y = 0
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $01
   jr z, +
   cp $02
@@ -30862,8 +30918,10 @@ LABEL_33D49_:
   ld (iy+$00), a
   ld (iy+$01), a
   ret
+  
 LABEL_34D84_:
   jp LABEL_33E81_
+
 LABEL_34D87_:
   sub $1a
   ld e, a
@@ -30932,7 +30990,7 @@ LABEL_33DF4_:
   or a
   jr z, +
   ld a, SFX_0A_TankShoot
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:ld (iy+$01), $ad
   ld (iy+$03), $ae
   ld hl, DATA_33C0A_
@@ -30945,7 +31003,7 @@ LABEL_33DF4_:
   ld a, (ix+$11)
   add a, l
   ld (iy+$00), a
-  ld (_RAM_D5A9_), iy
+  ld (_RAM_D5A9_TankShotTileXN), iy
   ld a, (ix+$2d)
   cp $01
   jr z, +
@@ -30978,7 +31036,7 @@ LABEL_33E62_:
   ld a, (iy+$00)
   add a, l
   ld (iy+$01), a
-  ld iy, (_RAM_D5A9_)
+  ld iy, (_RAM_D5A9_TankShotTileXN)
   ld a, (iy+$00)
   add a, l
   ld (iy+$02), a
@@ -31015,14 +31073,14 @@ LABEL_33E81_:
   ld a, (_RAM_DF58_)
   or a
   JrNzRet _LABEL_33F10_ret
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld l, a
   ld a, (de)
   sub l
   JrCRet _LABEL_33F10_ret
   cp $18
   JrNcRet _LABEL_33F10_ret
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld l, a
   ld a, (bc)
   sub l
@@ -31040,7 +31098,7 @@ LABEL_33E81_:
   call LABEL_2934_BehaviourF
 ++:
   xor a
-  ld (_RAM_DD2B_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState), a
   ld (_RAM_DA60_SpriteTableXNs.61.x), a
   ld (_RAM_DAE0_SpriteTableYs.61), a
   ld (_RAM_DA60_SpriteTableXNs.62.x), a
@@ -31067,7 +31125,7 @@ LABEL_33F11_:
   cp $18
   JrNcRet _LABEL_33F39_ret
   call LABEL_2961_
-  jp LABEL_33D49_
+  jp LABEL_33D49_HideShotSprite
 _LABEL_33F39_ret:
   ret
 
@@ -31093,7 +31151,7 @@ LABEL_33F3A_:
   cp $18
   JrNcRet _LABEL_33F68_ret
   call LABEL_2961_
-  jp LABEL_33D49_
+  jp LABEL_33D49_HideShotSprite
 _LABEL_33F68_ret:
   ret
 
@@ -31116,7 +31174,7 @@ LABEL_33F69_:
   cp $18
   jr nc, LABEL_33D91_
   call LABEL_2961_
-  jp LABEL_33D49_
+  jp LABEL_33D49_HideShotSprite
 LABEL_33D91_:
   ret
 
@@ -31843,7 +31901,7 @@ DATA_35D2D_HeadToHeadHUDTiles:
 LABEL_35F0D_:
   ld a, $00
   ld (_RAM_DB7C_), a
-  ld a, (_RAM_DB7B_)
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
   ld c, a
   ld hl, _RAM_DF37_HUDSpriteNs.FirstPlace
 -:
@@ -31956,7 +32014,7 @@ LABEL_35F8A_:
   ld a, (_RAM_DE4F_)
   cp $80
   JrNzRet _LABEL_35FEB_ret
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   or a
   JrNzRet _LABEL_35FEB_ret
   ld a, (_RAM_DC54_IsGameGear)
@@ -32027,7 +32085,7 @@ _LABEL_35FEB_ret:
   add a, $01
 ++:
   ld (_RAM_DEA4_), a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   or a
   jr nz, +
   ld a, $07
@@ -32037,11 +32095,11 @@ _LABEL_35FEB_ret:
   ld a, (_RAM_DB9B_SteeringDelay)
 ++:
   ld (_RAM_DEA1_), a
-  ld hl, _RAM_DCF9_
+  ld hl, _RAM_DCEC_CarData_Blue.Direction
   dec (hl)
   ld a, (hl)
   and $0F
-  ld (_RAM_DCF9_), a
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
   jp LABEL_3608C_
 
 LABEL_3603C_:
@@ -32072,7 +32130,7 @@ LABEL_3603C_:
   add a, $01
 ++:
   ld (_RAM_DEA4_), a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   or a
   jr nz, +
   ld a, $07
@@ -32082,17 +32140,17 @@ LABEL_3603C_:
   ld a, (_RAM_DB9B_SteeringDelay)
 ++:
   ld (_RAM_DEA1_), a
-  ld hl, _RAM_DCF9_
+  ld hl, _RAM_DCEC_CarData_Blue.Direction
   inc (hl)
   ld a, (hl)
   and $0F
-  ld (_RAM_DCF9_), a
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
   jp LABEL_3608C_
 
 LABEL_3608C_:
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld l, a
-  ld a, (_RAM_DCF8_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown12_b)
   cp l
   jr nz, +
   ld a, $00
@@ -32136,32 +32194,32 @@ LABEL_360B9_:
   ld a, (_RAM_DEB0_)
   cp l
   jr z, ++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld a, (_RAM_DF0D_)
   ld (_RAM_DEB0_), a
   jp +++
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DF0B_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -32170,7 +32228,7 @@ LABEL_360B9_:
 
 +:
   ld a, $07
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
 +++:
   ld a, (_RAM_DF0E_)
   ld l, a
@@ -32215,9 +32273,9 @@ LABEL_36152_:
   ld (_RAM_DF0B_), a
   ld a, (_RAM_DB7F_)
   ld (_RAM_DF0C_), a
-  ld a, (_RAM_DD0C_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown32_b)
   ld (_RAM_DF0E_), a
-  ld a, (_RAM_DD0D_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown33_b)
   ld (_RAM_DF0D_), a
   ret
 
@@ -32225,35 +32283,35 @@ LABEL_3616B_:
   call LABEL_361F0_
   ld a, (_RAM_DF0D_)
   ld l, a
-  ld a, (_RAM_DD0D_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown33_b)
   cp l
   jr z, ++
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld l, a
   ld a, (_RAM_DF0B_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   sub l
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   jp +++
 
 +:
   sub l
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   ld a, (_RAM_DF0D_)
-  ld (_RAM_DD0D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown33_b), a
   jp +++
 
 ++:
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld l, a
   ld a, (_RAM_DF0B_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   jp +++
 
 .ifdef UNNECESSARY_CODE
@@ -32262,44 +32320,44 @@ LABEL_3616B_:
 
 +:
   ld a, $07
-  ld (_RAM_DCFB_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
 +++:
   ld a, (_RAM_DF0E_)
   ld l, a
-  ld a, (_RAM_DD0C_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown32_b)
   cp l
   jr z, ++
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld l, a
   ld a, (_RAM_DF0C_)
   cp l
   jr nc, +
   ld l, a
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   sub l
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ret
 
 +:
   sub l
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ld a, (_RAM_DF0E_)
-  ld (_RAM_DD0C_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown32_b), a
   ret
 
 ++:
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld l, a
   ld a, (_RAM_DF0C_)
   add a, l
   cp $07
   jr nc, +
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ret
 
 +:
   ld a, $07
-  ld (_RAM_DCFC_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   ret
 
 LABEL_361F0_:
@@ -32326,7 +32384,7 @@ LABEL_36209_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JrNzRet +
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   or a
   jr z, ++
   ld a, (_RAM_DE9B_)
@@ -32339,8 +32397,8 @@ LABEL_36209_:
 +:ret
 
 ++:
-  ld a, (_RAM_DCF9_)
-  ld (_RAM_DCF8_), a
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   ld a, $00
   ld (_RAM_DEA4_), a
   ld (_RAM_DEA2_), a
@@ -32348,7 +32406,7 @@ LABEL_36209_:
   ret
 
 +++:
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   or a
   JrNzRet +
   ld a, (_RAM_D5B7_)
@@ -32378,15 +32436,15 @@ _LABEL_3625F_ret:
   call LABEL_362C7_
 ++:
   ld (_RAM_DEA2_), a
-  ld hl, _RAM_DCF8_
+  ld hl, _RAM_DCEC_CarData_Blue.Unknown12_b
   dec (hl)
   ld a, (hl)
   and $0F
-  ld (_RAM_DCF8_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   jp LABEL_3608C_
 
 LABEL_36287_:
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   or a
   JrNzRet +
   ld a, (_RAM_D5B7_)
@@ -32413,16 +32471,16 @@ LABEL_36287_:
   call LABEL_362C7_
 ++:
   ld (_RAM_DEA2_), a
-  ld hl, _RAM_DCF8_
+  ld hl, _RAM_DCEC_CarData_Blue.Unknown12_b
   inc (hl)
   ld a, (hl)
   and $0F
-  ld (_RAM_DCF8_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   jp LABEL_3608C_
 
 LABEL_362C7_:
   ld hl, _RAM_DB86_HandlingData
-  ld de, (_RAM_DCF7_)
+  ld de, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   ld d, $00
   add hl, de
   ld a, (hl)
@@ -32474,7 +32532,7 @@ LABEL_362D3_:
   cp c
   jr nc, +
   ld a, $03
-  ld (_RAM_DCB6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
 +:
   ld a, (_RAM_DF51_)
   cp b
@@ -32482,7 +32540,7 @@ LABEL_362D3_:
   cp c
   jr nc, +
   ld a, $03
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
 +:
   ld a, (_RAM_DF52_)
   cp b
@@ -32490,7 +32548,7 @@ LABEL_362D3_:
   cp c
   JrNcRet +
   ld a, $03
-  ld (_RAM_DD38_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
 +:ret
 
 LABEL_36338_:
@@ -32509,7 +32567,7 @@ LABEL_36343_:
   cp c
   jr nc, +
   ld a, $0C
-  ld (_RAM_DCB6_), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
 +:
   ld a, (_RAM_DF51_)
   cp b
@@ -32517,7 +32575,7 @@ LABEL_36343_:
   cp c
   jr nc, +
   ld a, $0C
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
 +:
   ld a, (_RAM_DF52_)
   cp b
@@ -32525,7 +32583,7 @@ LABEL_36343_:
   cp c
   JrNcRet +
   ld a, $0C
-  ld (_RAM_DD38_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
 +:ret
 
 LABEL_3636E_:
@@ -32560,10 +32618,10 @@ LABEL_3639C_:
   ld a, (_RAM_D5BC_)
   cp $04
   JrCRet _LABEL_363CB_ret
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   or a
   JrNzRet _LABEL_363CB_ret
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp $06
   JrCRet _LABEL_363CB_ret
   ld a, (_RAM_DB97_TrackType)
@@ -32578,7 +32636,7 @@ LABEL_3639C_:
   cp TT_5_Warriors
   jr z, +
   ld a, SFX_0F_Skid1
--:ld (_RAM_D974_SFXTrigger_Player2), a
+-:ld (_RAM_D974_SFX_Player2), a
 _LABEL_363CB_ret:
   ret
 
@@ -32596,21 +32654,22 @@ LABEL_363D9_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JrNzRet _LABEL_36454_ret
-  ld a, (_RAM_DD00_)
+  
+  ; Head to head only
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   or a
   jr z, +
-  ld a, (_RAM_DD12_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown38_b)
   cp $02
   JrZRet _LABEL_36454_ret
-+:
-  ld a, (_RAM_DEA4_)
+
++:ld a, (_RAM_DEA4_)
   or a
   jr z, ++
   cp $01
   jr z, +
   call LABEL_3639C_
-+:
-  ld a, (_RAM_DE9B_)
++:ld a, (_RAM_DE9B_)
   cp $00
   jr z, ++
   cp $01
@@ -32651,7 +32710,7 @@ LABEL_3643D_:
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   sub l
   ld l, a
   and $80
@@ -32683,7 +32742,7 @@ LABEL_3645B_:
   ld a, $00
   ld (_RAM_DEA8_), a
   ld (_RAM_DEAA_), a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   ld (_RAM_DE57_), a
   ret
 
@@ -32723,9 +32782,10 @@ LABEL_36484_PatchForLevel:
   ret
 
 +:; Turbo Wheels
+  ; Tile 43 top left -> f, 2, 2, 1
   PatchBehaviourData 43, 1, 1, $0f
   PatchBehaviourData 43, 1, 2, $02
-  PatchBehaviourData 43, 1, 3
+  PatchBehaviourData 43, 1, 3; $02
   PatchBehaviourData 43, 1, 4, $01
   ret
 
@@ -32835,7 +32895,8 @@ LABEL_3665F_Tanks:
   jr z, +
   ret
 
-+:; Tanks 1
++:; Tanks 1 - Wide-Awake Warzone
+  ; Replace marbles+dice at top-left corner of track with empty space
   PatchLayout 8, 5, $19
   ret
 
@@ -32864,7 +32925,8 @@ LABEL_3666D_Powerboats:
   PatchLayout 8, 23, $B7
   ret
 
-+:; Race 2
++:; Race 2 - Soap-Lake City!
+  ; Change soap in tray over track to empty tray
   PatchLayout 8, 8, $9D
   ret
 
@@ -32886,7 +32948,7 @@ LABEL_366CB_SportsCars:
   ret
 
 +:; Track 2 - Crayon Canyons - layout error at bottom right corner of track
-  PatchLayout 0, 0, $34
+  PatchLayout 0,  0, $34
   PatchLayout 0, 31, $32
   ret
 
@@ -32899,7 +32961,7 @@ LABEL_366DE_:
   ret
 
 +:
-  ld a, (_RAM_D947_)
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
   ld b, $02
@@ -32909,7 +32971,7 @@ LABEL_366DE_:
 +:
   ld b, $03
 ++:
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   cp $00
   jr nz, +
   ld a, (_RAM_DF7F_)
@@ -32918,22 +32980,22 @@ LABEL_366DE_:
   add a, $01
   ld (_RAM_DF7F_), a
   ld a, $78
-  ld (_RAM_DD10_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown36_b), a
   ld a, $03
-  ld (_RAM_DD11_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
   ld a, $01
-  ld (_RAM_DD00_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown20_b), a
 +:
   ld a, (_RAM_DF99_)
   add a, $01
   ld (_RAM_DF99_), a
   and $01
   jr nz, LABEL_36736_
-  ld a, (_RAM_DCF9_)
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
   add a, $01
   and $0F
-  ld (_RAM_DCF9_), a
-  ld (_RAM_DCF8_), a
+  ld (_RAM_DCEC_CarData_Blue.Direction), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
 LABEL_36736_:
   ld a, (_RAM_DF99_)
   and $0F
@@ -32941,29 +33003,29 @@ LABEL_36736_:
   ret
 
 +:
-  ld a, (_RAM_DB7B_)
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
   ld l, a
   ld a, (_RAM_D583_)
   cp l
   jr z, +
-  ld (_RAM_DB7B_), a
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ret
 
 +:
   add a, $01
-  ld (_RAM_DB7B_), a
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ret
 
 LABEL_36752_:
-  call LABEL_B63_
-  ld a, (_RAM_D581_)
+  call LABEL_B63_UpdateOverlayText
+  ld a, (_RAM_D581_OverlayTextScrollAmount)
   cp $A0
   jr c, LABEL_36736_
   ld a, (_RAM_D583_)
-  ld (_RAM_DB7B_), a
-  cp $00
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
+  cp 0 ; Blue win
   jr z, +
-  cp $08
+  cp HEAD_TO_HEAD_TOTAL_POINTS ; Red win
   jr nz, ++
 +:
   ld a, $01
@@ -32979,7 +33041,7 @@ LABEL_36752_:
   ld a, $05
   ld (_RAM_DF7F_), a
   ld a, $01
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   ld (_RAM_DF5B_), a
   jp LABEL_71B5_
 
@@ -32990,7 +33052,7 @@ LABEL_36752_:
   ret
 
 LABEL_36798_:
-  ld a, (_RAM_D947_)
+  ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
   ld b, $02
@@ -33032,29 +33094,29 @@ LABEL_367E3_:
   ret
 
 +:
-  ld a, (_RAM_DB7B_)
+  ld a, (_RAM_DB7B_HeadToHead_RedPoints)
   ld l, a
   ld a, (_RAM_D583_)
   cp l
   jr z, +
-  ld (_RAM_DB7B_), a
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ret
 
 +:
-  sub $01
-  ld (_RAM_DB7B_), a
+  sub 1
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ret
 
 LABEL_367FF_:
-  call LABEL_B63_
-  ld a, (_RAM_D581_)
+  call LABEL_B63_UpdateOverlayText
+  ld a, (_RAM_D581_OverlayTextScrollAmount)
   cp $A0
   jr c, LABEL_367E3_
   ld a, (_RAM_D583_)
-  ld (_RAM_DB7B_), a
-  cp $00
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
+  cp 0 ; Blue win
   jr z, +
-  cp $08
+  cp HEAD_TO_HEAD_TOTAL_POINTS ; Red win
   jr nz, ++
 +:
   ld a, $01
@@ -33086,16 +33148,16 @@ LABEL_3682E_:
   ld a, c
   and $7F
   ld c, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub c
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   jp ++
 
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   add a, c
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
 ++:
   ld a, b
@@ -33144,14 +33206,14 @@ LABEL_3682E_:
   ld a, c
   and $7F ; Remove sign bit
   ld c, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub c ; Subtract
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
   jp ++
-+:ld a, (_RAM_DBA5_)
++:ld a, (_RAM_DBA5_CarY)
   add a, c ; Add
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
 ++:
   ld a, b
@@ -33160,67 +33222,67 @@ LABEL_3682E_:
   ld a, b
   and $7F
   ld c, a
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   ld b, $00
   or a
   sbc hl, bc
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   jp ++
 
 +:
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   ld c, b
   ld b, $00
   add hl, bc
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
 ++:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   JrZRet +
   ld de, $0028
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   or a
   sbc hl, de
-  ld (_RAM_DCEE_), hl
+  ld (_RAM_DCEC_CarData_Blue.YPosition), hl
 +:ret
 
 DATA_368F7_:
-  ; Delta pairs applied to _RAM_DBA4_ and _RAM_DCEC_CarData_Blue, indexed by _RAM_DE55_
-  SignAndMagnitude  12, -12
-  SignAndMagnitude  12, -12
-  SignAndMagnitude   9,  -9
-  SignAndMagnitude  -6,   6
-  SignAndMagnitude   0,   0
-  SignAndMagnitude  -6,   6
-  SignAndMagnitude   9,  -9
-  SignAndMagnitude -12,  12
-  SignAndMagnitude  12, -12
-  SignAndMagnitude -12,  12
-  SignAndMagnitude  -9,   9
-  SignAndMagnitude   6,  -6
-  SignAndMagnitude   0,   0
-  SignAndMagnitude   6,  -6
-  SignAndMagnitude  -9,   9
-  SignAndMagnitude  12, -12
+  ; Delta pairs applied to _RAM_DBA4_CarX and _RAM_DCEC_CarData_Blue, indexed by _RAM_DE55_
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude,   9,  -9
+.dbm SignAndMagnitude,  -6,   6
+.dbm SignAndMagnitude,   0,   0
+.dbm SignAndMagnitude,  -6,   6
+.dbm SignAndMagnitude,   9,  -9
+.dbm SignAndMagnitude, -12,  12
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude, -12,  12
+.dbm SignAndMagnitude,  -9,   9
+.dbm SignAndMagnitude,   6,  -6
+.dbm SignAndMagnitude,   0,   0
+.dbm SignAndMagnitude,   6,  -6
+.dbm SignAndMagnitude,  -9,   9
+.dbm SignAndMagnitude,  12, -12
 
 DATA_36917_:
-  ; Delta pairs applied to _RAM_DBA5_ and _RAM_DCEE_, indexed by _RAM_DE55_
-  SignAndMagnitude   0,   0
-  SignAndMagnitude   6,  -6
-  SignAndMagnitude   9,  -9
-  SignAndMagnitude -12,  12
-  SignAndMagnitude  12, -12
-  SignAndMagnitude  12, -12
-  SignAndMagnitude  -9,   9
-  SignAndMagnitude   6,  -6
-  SignAndMagnitude   0,   0
-  SignAndMagnitude  -6,   6
-  SignAndMagnitude  -9,   9
-  SignAndMagnitude  12, -12
-  SignAndMagnitude  12, -12
-  SignAndMagnitude -12,  12
-  SignAndMagnitude   9,  -9
-  SignAndMagnitude  -6,   6
+  ; Delta pairs applied to _RAM_DBA5_CarY and _RAM_DCEC_CarData_Blue.YPosition, indexed by _RAM_DE55_
+.dbm SignAndMagnitude,   0,   0
+.dbm SignAndMagnitude,   6,  -6
+.dbm SignAndMagnitude,   9,  -9
+.dbm SignAndMagnitude, -12,  12
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude,  -9,   9
+.dbm SignAndMagnitude,   6,  -6
+.dbm SignAndMagnitude,   0,   0
+.dbm SignAndMagnitude,  -6,   6
+.dbm SignAndMagnitude,  -9,   9
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude,  12, -12
+.dbm SignAndMagnitude, -12,  12
+.dbm SignAndMagnitude,   9,  -9
+.dbm SignAndMagnitude,  -6,   6
   ; Since they're always matched, it could be stored as a single byte...
 
 LABEL_36937_:
@@ -33236,13 +33298,13 @@ LABEL_36937_:
   ld a, (_RAM_DE8C_)
   or a
   jr z, +
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   JrNzRet +++
   jp ++
 
 +:
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   JrZRet +++
 ++:
@@ -33275,22 +33337,22 @@ LABEL_36971_:
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   cp $CA
   jr nc, LABEL_369EE_
   cp $28
   jr c, LABEL_369EE_
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   cp $AA
   jr nc, LABEL_369EE_
   cp $12
   jr c, LABEL_369EE_
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   cp $CA
   jr nc, LABEL_369EE_
   cp $28
   jr c, LABEL_369EE_
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   cp $12
   jr c, LABEL_369EE_
   cp $AA
@@ -33298,20 +33360,20 @@ LABEL_36971_:
   jp LABEL_369EE_
 
 +:
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   cp $EA
   jr nc, LABEL_369EE_
   cp $08
   jr c, LABEL_369EE_
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   cp $C6
   jr nc, LABEL_369EE_
-  ld a, (_RAM_DCFD_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
   cp $EA
   jr nc, LABEL_369EE_
   cp $08
   jr c, LABEL_369EE_
-  ld a, (_RAM_DCFE_)
+  ld a, (_RAM_DCEC_CarData_Blue.SpriteY)
   cp $C6
   JrCRet _LABEL_369ED_ret
   jp LABEL_369EE_
@@ -33334,7 +33396,7 @@ LABEL_369EE_:
   ld a, (_RAM_DE8C_)
   or a
   jr nz, LABEL_36A6D_
-  ld a, (_RAM_DD1F_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   jr nz, LABEL_36A5D_
   ld a, (_RAM_DF8E_)
@@ -33362,7 +33424,7 @@ LABEL_36A2C_:
   jp LABEL_4E49_
 
 LABEL_36A3F_:
-  ld a, (_RAM_DD1A_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b)
   cp $00
   JrNzRet +
 -:
@@ -33384,16 +33446,16 @@ LABEL_36A56_:
 
 LABEL_36A5D_:
   xor a
-  ld (_RAM_DD1A_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown46_b), a
   ld a, (_RAM_DF55_)
-  ld (_RAM_DD28_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown60_b), a
   call +
   jp LABEL_36A3F_
 
 LABEL_36A6D_:
   xor a
   ld (_RAM_DF58_), a
-  ld a, (_RAM_DD28_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown60_b)
   ld (_RAM_DF55_), a
   call +
   jp LABEL_36A2C_
@@ -33401,7 +33463,7 @@ LABEL_36A6D_:
 +:
   xor a
   ld (_RAM_DE8C_), a
-  ld (_RAM_DD1F_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown51_b), a
   ret
 
 LABEL_36A85_:
@@ -33536,7 +33598,7 @@ LABEL_36B36_:
   ld (_RAM_DEB2_), a
   ld (_RAM_D5C4_), a
 ++:
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   ld b, h
   ld c, l
   ld de, (_RAM_DBAF_)
@@ -33602,7 +33664,7 @@ LABEL_36BE6_:
   sbc hl, de
   jr nc, +
   ld a, $00
-  ld (_RAM_DD0D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown33_b), a
   ld hl, (_RAM_D941_)
   ld de, (_RAM_DCEC_CarData_Blue)
   or a
@@ -33613,17 +33675,17 @@ LABEL_36BE6_:
 +:
   ld (_RAM_D941_), hl
   ld a, $01
-  ld (_RAM_DD0D_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown33_b), a
 ++:
   ld de, (_RAM_D943_)
-  ld hl, (_RAM_DCEE_)
+  ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   or a
   sbc hl, de
   jr nc, +
   ld a, $00
-  ld (_RAM_DD0C_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown32_b), a
   ld hl, (_RAM_D943_)
-  ld de, (_RAM_DCEE_)
+  ld de, (_RAM_DCEC_CarData_Blue.YPosition)
   or a
   sbc hl, de
   ld (_RAM_D943_), hl
@@ -33632,16 +33694,16 @@ LABEL_36BE6_:
 +:
   ld (_RAM_D943_), hl
   ld a, $01
-  ld (_RAM_DD0C_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown32_b), a
 ++:
   ld hl, (_RAM_DBAB_)
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld e, a
   ld d, $00
   add hl, de
   ld b, h
   ld c, l
-  ld de, (_RAM_DCEE_)
+  ld de, (_RAM_DCEC_CarData_Blue.YPosition)
   or a
   sbc hl, de
   jr nc, +
@@ -33667,7 +33729,7 @@ LABEL_36C72_:
 
 +:
   ld hl, (_RAM_DBA9_)
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld e, a
   ld d, $00
   add hl, de
@@ -33695,7 +33757,7 @@ LABEL_36C72_:
 LABEL_36CA5_:
   ld a, (_RAM_DF59_CarState)
   or a
-  JrNzRet _LABEL_36D06_ret
+  JrNzRet _LABEL_36D06_ret ; Do nothing if normal
   ld a, (_RAM_D5C3_)
   ld (_RAM_DEB0_), a
   ld a, (_RAM_D5C4_)
@@ -33706,14 +33768,10 @@ LABEL_36CA5_:
   sub $04
   ld (_RAM_D941_), a
   ld a, $04
--:
-  ld (_RAM_DEAF_), a
+-:ld (_RAM_DEAF_HScrollDelta), a
   jp ++
-
-+:
-  ld a, $00
++:ld a, $00
   jp -
-
 ++:
   ld a, (_RAM_D943_)
   and $FC
@@ -33721,16 +33779,13 @@ LABEL_36CA5_:
   sub $04
   ld (_RAM_D943_), a
   ld a, $04
--:
-  ld (_RAM_DEB1_VScrollDelta), a
+-:ld (_RAM_DEB1_VScrollDelta), a
   jp ++
-
-+:
-  ld a, $00
++:ld a, $00
   jp -
 
 ++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   cp $00
   JrNzRet _LABEL_36D06_ret
   ld a, (_RAM_DEB1_VScrollDelta)
@@ -33741,7 +33796,7 @@ LABEL_36CA5_:
   ld a, CarState_2_Respawning
   ld (_RAM_DF59_CarState), a
   ld a, SFX_16_Respawn
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 _LABEL_36D06_ret:
   ret
 
@@ -33752,14 +33807,10 @@ LABEL_36D07_:
   sub $04
   ld (_RAM_D941_), a
   ld a, $04
--:
-  ld (_RAM_DCFB_), a
+-:ld (_RAM_DCEC_CarData_Blue.Unknown15_b), a
   jp ++
-
-+:
-  ld a, $00
++:ld a, $00
   jp -
-
 ++:
   ld a, (_RAM_D943_)
   and $FC
@@ -33767,19 +33818,15 @@ LABEL_36D07_:
   sub $04
   ld (_RAM_D943_), a
   ld a, $04
--:
-  ld (_RAM_DCFC_), a
+-:ld (_RAM_DCEC_CarData_Blue.Unknown16_b), a
   jp ++
-
-+:
-  ld a, $00
++:ld a, $00
   jp -
-
 ++:
-  ld a, (_RAM_DCFB_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   cp $00
   JrNzRet +
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   cp $00
   JrNzRet +
   ld a, $00
@@ -33853,7 +33900,7 @@ LABEL_36DFF_RuffTrux_DecrementTimer:
   ld a, (_RAM_D599_IsPaused)
   or a
   JrNzRet _LABEL_36E6A_ret
-  ld a, (_RAM_DF65_)
+  ld a, (_RAM_DF65_HasFinished)
   cp $01
   JrZRet _LABEL_36E6A_ret
   ld a, (_RAM_DE4F_)
@@ -33896,7 +33943,7 @@ LABEL_36DFF_RuffTrux_DecrementTimer:
 
   ; Ran out of time!
   ld a, $01
-  ld (_RAM_DF65_), a
+  ld (_RAM_DF65_HasFinished), a
   ld (_RAM_DF8C_RuffTruxRanOutOfTime), a
   ld a, $F0
   ld (_RAM_DF6A_), a
@@ -33908,98 +33955,104 @@ _LABEL_36E6A_ret:
   ret
 
 LABEL_36E6B_:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   add a, l
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld a, (_RAM_DBA6_)
   add a, l
   ld (_RAM_DBA6_), a
   ld a, (_RAM_DB97_TrackType)
   cp TT_6_Tanks
   jp z, LABEL_36F4B_
+  
   ld a, (_RAM_DF88_)
   add a, $01
   and $01
   ld (_RAM_DF88_), a
   cp $00
-  jr z, LABEL_36EEA_
-  ld a, (_RAM_DD6E_)
+  jr z, @EvenFrames
+  
+@OddFrames:
+  ; Effects 1 and 2
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.X)
   add a, l
-  ld (_RAM_DD6E_), a
-  ld a, (_RAM_DD71_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.X)
   add a, l
-  ld (_RAM_DD71_), a
-  ld a, (_RAM_DD74_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.X)
   add a, l
-  ld (_RAM_DD74_), a
-  ld a, (_RAM_DD77_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.X)
   add a, l
-  ld (_RAM_DD77_), a
-  ld a, (_RAM_DD7A_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.X)
   add a, l
-  ld (_RAM_DD7A_), a
-  ld a, (_RAM_DD7D_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.X)
   add a, l
-  ld (_RAM_DD7D_), a
-  ld a, (_RAM_DD9E_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.X)
   add a, l
-  ld (_RAM_DD9E_), a
-  ld a, (_RAM_DDA1_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.X)
   add a, l
-  ld (_RAM_DDA1_), a
-  ld a, (_RAM_DDA4_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.X)
   add a, l
-  ld (_RAM_DDA4_), a
-  ld a, (_RAM_DDA7_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.X)
   add a, l
-  ld (_RAM_DDA7_), a
-  ld a, (_RAM_DDAA_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.X)
   add a, l
-  ld (_RAM_DDAA_), a
-  ld a, (_RAM_DDAD_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.X)
   add a, l
-  ld (_RAM_DDAD_), a
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.X), a
   jp LABEL_36F3E_
 
-LABEL_36EEA_:
-  ld a, (_RAM_DDCE_)
+@EvenFrames:
+  ; Effects 3 and 4
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.X)
   add a, l
-  ld (_RAM_DDCE_), a
-  ld a, (_RAM_DDD1_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.X)
   add a, l
-  ld (_RAM_DDD1_), a
-  ld a, (_RAM_DDD4_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.X)
   add a, l
-  ld (_RAM_DDD4_), a
-  ld a, (_RAM_DDD7_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.X)
   add a, l
-  ld (_RAM_DDD7_), a
-  ld a, (_RAM_DDDA_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.X)
   add a, l
-  ld (_RAM_DDDA_), a
-  ld a, (_RAM_DDDD_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.X)
   add a, l
-  ld (_RAM_DDDD_), a
-  ld a, (_RAM_DDFE_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.X)
   add a, l
-  ld (_RAM_DDFE_), a
-  ld a, (_RAM_DE01_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.X)
   add a, l
-  ld (_RAM_DE01_), a
-  ld a, (_RAM_DE04_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.X)
   add a, l
-  ld (_RAM_DE04_), a
-  ld a, (_RAM_DE07_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.X)
   add a, l
-  ld (_RAM_DE07_), a
-  ld a, (_RAM_DE0A_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.X)
   add a, l
-  ld (_RAM_DE0A_), a
-  ld a, (_RAM_DE0D_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.X)
   add a, l
-  ld (_RAM_DE0D_), a
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.X), a
+
 LABEL_36F3E_:
   or a
   ld d, $00
@@ -34020,7 +34073,7 @@ LABEL_36F4B_:
   add a, l
   ld (_RAM_DA60_SpriteTableXNs.58.x), a
 +:
-  ld a, (_RAM_DCEA_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DA60_SpriteTableXNs.59.x)
@@ -34030,7 +34083,7 @@ LABEL_36F4B_:
   add a, l
   ld (_RAM_DA60_SpriteTableXNs.60.x), a
 +:
-  ld a, (_RAM_DD2B_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DA60_SpriteTableXNs.61.x)
@@ -34040,7 +34093,7 @@ LABEL_36F4B_:
   add a, l
   ld (_RAM_DA60_SpriteTableXNs.62.x), a
 +:
-  ld a, (_RAM_DD6C_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown63_b_TankShotState)
   or a
   jr z, LABEL_36F3E_
   ld a, (_RAM_DA60_SpriteTableXNs.63.x)
@@ -34054,9 +34107,9 @@ LABEL_36F4B_:
 LABEL_36F9E_:
   ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   add a, l
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld a, (_RAM_DBA7_)
   add a, l
   ld (_RAM_DBA7_), a
@@ -34069,81 +34122,82 @@ LABEL_36F9E_:
   ld (_RAM_DF89_), a
   cp $00
   jr z, LABEL_3701D_
-  ld a, (_RAM_DD70_)
+  ; Add l to a bunch of things
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.Y)
   add a, l
-  ld (_RAM_DD70_), a
-  ld a, (_RAM_DD73_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.Y)
   add a, l
-  ld (_RAM_DD73_), a
-  ld a, (_RAM_DD76_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.Y)
   add a, l
-  ld (_RAM_DD76_), a
-  ld a, (_RAM_DD79_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.Y)
   add a, l
-  ld (_RAM_DD79_), a
-  ld a, (_RAM_DD7C_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.Y)
   add a, l
-  ld (_RAM_DD7C_), a
-  ld a, (_RAM_DD7F_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.Y)
   add a, l
-  ld (_RAM_DD7F_), a
-  ld a, (_RAM_DDA0_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.Y)
   add a, l
-  ld (_RAM_DDA0_), a
-  ld a, (_RAM_DDA3_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.Y)
   add a, l
-  ld (_RAM_DDA3_), a
-  ld a, (_RAM_DDA6_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.Y)
   add a, l
-  ld (_RAM_DDA6_), a
-  ld a, (_RAM_DDA9_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.Y)
   add a, l
-  ld (_RAM_DDA9_), a
-  ld a, (_RAM_DDAC_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.Y)
   add a, l
-  ld (_RAM_DDAC_), a
-  ld a, (_RAM_DDAF_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.Y)
   add a, l
-  ld (_RAM_DDAF_), a
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.Y), a
   jp LABEL_37071_
 
 LABEL_3701D_:
-  ld a, (_RAM_DDD0_)
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.Y)
   add a, l
-  ld (_RAM_DDD0_), a
-  ld a, (_RAM_DDD3_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.Y)
   add a, l
-  ld (_RAM_DDD3_), a
-  ld a, (_RAM_DDD6_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.Y)
   add a, l
-  ld (_RAM_DDD6_), a
-  ld a, (_RAM_DDD9_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.Y)
   add a, l
-  ld (_RAM_DDD9_), a
-  ld a, (_RAM_DDDC_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.Y)
   add a, l
-  ld (_RAM_DDDC_), a
-  ld a, (_RAM_DDDF_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.Y)
   add a, l
-  ld (_RAM_DDDF_), a
-  ld a, (_RAM_DE00_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.Y)
   add a, l
-  ld (_RAM_DE00_), a
-  ld a, (_RAM_DE03_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.Y)
   add a, l
-  ld (_RAM_DE03_), a
-  ld a, (_RAM_DE06_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.Y)
   add a, l
-  ld (_RAM_DE06_), a
-  ld a, (_RAM_DE09_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.Y)
   add a, l
-  ld (_RAM_DE09_), a
-  ld a, (_RAM_DE0C_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.Y)
   add a, l
-  ld (_RAM_DE0C_), a
-  ld a, (_RAM_DE0F_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.Y)
   add a, l
-  ld (_RAM_DE0F_), a
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.Y), a
 LABEL_37071_:
   or a
   ld d, $00
@@ -34164,7 +34218,7 @@ LABEL_3707E_:
   add a, l
   ld (_RAM_DAE0_SpriteTableYs.58.y), a
 +:
-  ld a, (_RAM_DCEA_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DAE0_SpriteTableYs.59.y)
@@ -34174,7 +34228,7 @@ LABEL_3707E_:
   add a, l
   ld (_RAM_DAE0_SpriteTableYs.60.y), a
 +:
-  ld a, (_RAM_DD2B_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DAE0_SpriteTableYs.61.y)
@@ -34184,7 +34238,7 @@ LABEL_3707E_:
   add a, l
   ld (_RAM_DAE0_SpriteTableYs.62.y), a
 +:
-  ld a, (_RAM_DD6C_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown63_b_TankShotState)
   or a
   jr z, LABEL_37071_
   ld a, (_RAM_DAE0_SpriteTableYs.63.y)
@@ -34222,7 +34276,7 @@ DATA_37161_:
 .db $C1 $C1 $C1 $00 $63 $C3 $C3 $C3 $C2 $C2 $C2 $C1 $C1 $C1 $00 $00
 
 LABEL_371F1_:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
   ld a, (_RAM_DEB1_VScrollDelta)
   ld c, a
@@ -34230,30 +34284,30 @@ LABEL_371F1_:
   add a, l
   add a, c
   ld (_RAM_D589_), a
-  ld a, (_RAM_DCBA_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown15_b)
   ld l, a
-  ld a, (_RAM_DCBB_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown16_b)
   ld c, a
-  ld a, (_RAM_DCC6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown27_b)
   add a, l
   add a, c
-  ld (_RAM_DCC6_), a
-  ld a, (_RAM_DCFB_)
+  ld (_RAM_DCAB_CarData_Green.Unknown27_b), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown15_b)
   ld l, a
-  ld a, (_RAM_DCFC_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown16_b)
   ld c, a
-  ld a, (_RAM_DD07_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown27_b)
   add a, l
   add a, c
-  ld (_RAM_DD07_), a
-  ld a, (_RAM_DD3C_)
+  ld (_RAM_DCEC_CarData_Blue.Unknown27_b), a
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown15_b)
   ld l, a
-  ld a, (_RAM_DD3D_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown16_b)
   ld c, a
-  ld a, (_RAM_DD48_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown27_b)
   add a, l
   add a, c
-  ld (_RAM_DD48_), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown27_b), a
   ret
 
 ; Data from 37232 to 37271 (64 bytes)
@@ -34265,85 +34319,90 @@ DATA_37232_FourByFour_:
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 
 ; Data from 37272 to 37291 (32 bytes)
-; indexed by _RAM_DE92_EngineVelocity, value stored at _RAM_D58A_
+; indexed by _RAM_DE92_EngineVelocity, value stored at _RAM_D58A_LowestPitchEngineTone
+; Steps from LOWEST_PITCH_ENGINE_TONE to HIGHEST_PITCH_ENGINE_TONE with 16 values total
 ; 1000, 960, 920, ... , 440, 400
-DATA_37272_:
-  TimesTable16 1000, -40, 16
-
+DATA_37272_EngineTonesByVelocity:
+  TimesTable16 LOWEST_PITCH_ENGINE_TONE, (HIGHEST_PITCH_ENGINE_TONE - LOWEST_PITCH_ENGINE_TONE) / 15, 16
+  
 LABEL_37292_GameVBlankEngineUpdate:
-  ; Look up 16-bit value in table
+  ; Look up engine tone for this velocity
   ld a, (_RAM_DE92_EngineVelocity)
   sla a
   ld e, a
   ld d, $00
-  ld hl, DATA_37272_
+  ld hl, DATA_37272_EngineTonesByVelocity
   add hl, de
   ld a, (hl)
-  ld (_RAM_D58A_.Lo), a
+  ; Save it to RAM
+  ld (_RAM_D58A_LowestPitchEngineTone.Lo), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D58A_.Hi), a
+  ld (_RAM_D58A_LowestPitchEngineTone.Hi), a
+.ifdef UNNECESSARY_CODE
   ld l, a ; Does nothing
-  ; Subtract $10 for some reason
+.endif
+  ; Subtract $10 for some reason - maybe so peturbations don't exceed the limit?
   ld bc, $0010
-  ld hl, (_RAM_D58A_)
+  ld hl, (_RAM_D58A_LowestPitchEngineTone)
   or a
   sbc hl, bc
-  ld (_RAM_D58A_), hl
+  ld (_RAM_D58A_LowestPitchEngineTone), hl
   ; Then grab the high byte
-  ld a, (_RAM_D58A_.Hi)
+  ld a, (_RAM_D58A_LowestPitchEngineTone.Hi)
   ld l, a
   ld a, (_RAM_DF00_)
   or a
   jr nz, ++
-  ld a, (_RAM_D95C_)
+  ld a, (_RAM_D95B_EngineSound1.Tone.Hi)
   cp l
   jr z, +
   jr c, LABEL_372D3_
 -:
   ld de, $0004
-  ld hl, (_RAM_D95B_)
-  ; _RAM_D95B_ -= 4
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
+  ; _RAM_D95B_EngineSound1.Tone -= 4
   or a
   sbc hl, de
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ret
 
 LABEL_372D3_:
-  ; _RAM_D95B_ += 2
-  ld hl, (_RAM_D95B_)
+  ; _RAM_D95B_EngineSound1.Tone += 2
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
   ld de, $0002
   add hl, de
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
   ret
 
 +:
-  ld a, (_RAM_D58A_.Lo)
+  ld a, (_RAM_D58A_LowestPitchEngineTone.Lo)
   ld l, a
-  ld a, (_RAM_D95B_)
+  ld a, (_RAM_D95B_EngineSound1.Tone.Lo)
   cp l
   JrZRet +
+  ; Only if not the same
   jr c, LABEL_372D3_
   jp -
 
 +:ret
 
 ++:
-  ld a, (_RAM_D95C_)
-  cp $01
+  ld a, (_RAM_D95B_EngineSound1.Tone.Hi)
+  cp >HIGHEST_PITCH_ENGINE_TONE
   jr z, +
 --:
-  ; _RAM_D95B_ -= 4
+  ; _RAM_D95B_EngineSound1.Tone -= 4
   ld de, $0004
-  ld hl, (_RAM_D95B_)
+  ld hl, (_RAM_D95B_EngineSound1.Tone)
   or a
   sbc hl, de
-  ld (_RAM_D95B_), hl
+  ld (_RAM_D95B_EngineSound1.Tone), hl
 -:ret
 
 +:
-  ld a, (_RAM_D95B_)
-  cp $90
+  ld a, (_RAM_D95B_EngineSound1.Tone.Lo)
+  cp <HIGHEST_PITCH_ENGINE_TONE 
   JrCRet -
   jp --
 
@@ -34351,7 +34410,7 @@ LABEL_3730C_GameVBlankPart3:
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, +
-  ld a, (_RAM_D96F_)
+  ld a, (_RAM_D96C_EngineSound2.Volume)
   ld (_RAM_D595_), a
   jp LABEL_37408_
 
@@ -34379,7 +34438,7 @@ LABEL_3730C_GameVBlankPart3:
 +:
   ld (_RAM_D593_), a
   ld l, a
-  ld a, (_RAM_DCB0_)
+  ld a, (_RAM_DCAB_CarData_Green.YMetatile)
   sub l
   jr c, +
   cp $0A
@@ -34390,7 +34449,7 @@ LABEL_3730C_GameVBlankPart3:
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
-  ld a, (_RAM_DCAF_)
+  ld a, (_RAM_DCAB_CarData_Green.XMetatile)
   sub c
   jr c, +
   cp $0A
@@ -34407,7 +34466,7 @@ LABEL_3730C_GameVBlankPart3:
 +:
   ld a, (_RAM_D593_)
   ld l, a
-  ld a, (_RAM_DCF1_)
+  ld a, (_RAM_DCEC_CarData_Blue.YMetatile)
   sub l
   jr c, +
   cp $0A
@@ -34418,7 +34477,7 @@ LABEL_3730C_GameVBlankPart3:
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
-  ld a, (_RAM_DCF0_)
+  ld a, (_RAM_DCEC_CarData_Blue.XMetatile)
   sub c
   jr c, +
   cp $0A
@@ -34435,7 +34494,7 @@ LABEL_3730C_GameVBlankPart3:
 +:
   ld a, (_RAM_D593_)
   ld l, a
-  ld a, (_RAM_DD32_)
+  ld a, (_RAM_DD2D_CarData_Yellow.YMetatile)
   sub l
   jr c, +
   cp $0A
@@ -34446,7 +34505,7 @@ LABEL_3730C_GameVBlankPart3:
   add hl, de
   ld a, (_RAM_D592_)
   ld c, a
-  ld a, (_RAM_DD31_)
+  ld a, (_RAM_DD2D_CarData_Yellow.XMetatile)
   sub c
   jr c, +
   cp $0A
@@ -34469,17 +34528,17 @@ LABEL_3730C_GameVBlankPart3:
   ld a, (_RAM_D596_)
   cp l
   jr nc, LABEL_373F3_
-  ld a, (_RAM_DCBF_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown20_b)
   ld b, a
-  ld a, (_RAM_DCB6_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
   ex af, af'
   ld a, (_RAM_D594_)
   jp ++
 
 LABEL_373F3_:
-  ld a, (_RAM_DD41_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown20_b)
   ld b, a
-  ld a, (_RAM_DD38_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
   ex af, af'
   ld a, (_RAM_D596_)
   jp ++
@@ -34489,77 +34548,75 @@ LABEL_373F3_:
   ld a, (_RAM_D596_)
   cp l
   jr nc, LABEL_373F3_
+  
 LABEL_37408_:
-  ld a, (_RAM_DD00_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b)
   ld b, a
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   ex af, af'
-  ld a, (_RAM_D595_)
-++:
-  ld (_RAM_D597_), a
-  or a
-  jr z, +++
-  ld l, a
-  ld a, (_RAM_D96F_)
-  cp l
-  jr z, ++
-  jr nc, +
-  inc a
-  ld (_RAM_D96F_), a
-  jp ++
-
-+:
-  dec a
-  ld (_RAM_D96F_), a
+    ld a, (_RAM_D595_)
+++: ld (_RAM_D597_), a
+    or a
+    jr z, +++
+    ld l, a
+    ld a, (_RAM_D96C_EngineSound2.Volume)
+    cp l
+    jr z, ++
+    jr nc, +
+    inc a
+    ld (_RAM_D96C_EngineSound2.Volume), a
+    jp ++
++:  dec a
+    ld (_RAM_D96C_EngineSound2.Volume), a
 ++:
   ex af, af'
   sla a
   ld e, a
   ld d, $00
-  ld hl, DATA_37272_
+  ld hl, DATA_37272_EngineTonesByVelocity
   add hl, de
   ld a, (hl)
-  ld (_RAM_D58E_), a
+  ld (_RAM_D58E_OtherCar_EngineTone.Lo), a
   inc hl
   ld a, (hl)
-  ld (_RAM_D58F_), a
+  ld (_RAM_D58E_OtherCar_EngineTone.Hi), a
   jp ++++
 
 +++:
   ex af, af'
   xor a
-  ld (_RAM_D96F_), a
+  ld (_RAM_D96C_EngineSound2.Volume), a
   ret
 
 ++++:
   ld a, b
   or a
   jr nz, ++
-  ld a, (_RAM_D58F_)
+  ld a, (_RAM_D58E_OtherCar_EngineTone.Hi)
   ld l, a
-  ld a, (_RAM_D96D_)
+  ld a, (_RAM_D96C_EngineSound2.Tone.Hi)
   cp l
   jr z, +
   jr c, LABEL_37466_
 -:
   ld de, $0004
-  ld hl, (_RAM_D96C_)
+  ld hl, (_RAM_D96C_EngineSound2.Tone)
   or a
   sbc hl, de
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   ret
 
 LABEL_37466_:
-  ld hl, (_RAM_D96C_)
+  ld hl, (_RAM_D96C_EngineSound2.Tone)
   ld de, $0002
   add hl, de
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D96C_EngineSound2.Tone), hl
   ret
 
 +:
-  ld a, (_RAM_D58E_)
+  ld a, (_RAM_D58E_OtherCar_EngineTone.Lo)
   ld l, a
-  ld a, (_RAM_D96C_)
+  ld a, (_RAM_D96C_EngineSound2.Tone.Lo)
   cp l
   JrZRet +
   jr c, LABEL_37466_
@@ -34571,20 +34628,20 @@ LABEL_37466_:
   ld a, (_RAM_DF7F_)
   or a
   JrNzRet _LABEL_3749A_ret
-  ld a, (_RAM_D96D_)
+  ld a, (_RAM_D96C_EngineSound2.Tone.Hi)
   cp $01
   jr z, +
 -:
   ld de, $0004
-  ld hl, (_RAM_D96C_)
+  ld hl, (_RAM_D96C_EngineSound2.Tone)
   or a
   sbc hl, de
-  ld (_RAM_D96C_), hl
+  ld (_RAM_D96C_EngineSound2.Tone), hl
 _LABEL_3749A_ret:
   ret
 
 +:
-  ld a, (_RAM_D96C_)
+  ld a, (_RAM_D96C_EngineSound2.Tone.Lo)
   cp $90
   JrCRet _LABEL_3749A_ret
   jp -
@@ -34603,7 +34660,7 @@ DATA_374A5_:
 ; Data from 3751E to 37528 (11 bytes)
 DATA_3751E_11TimesTable:
   ; 11, 22, ... 133
-  TimesTableLo 11 11 11
+  TimesTableLo 11, 11, 11
 
 LABEL_37529_: ; initialises some stuff, TODO
   ld a, (_RAM_DC54_IsGameGear)
@@ -34617,15 +34674,15 @@ LABEL_37529_: ; initialises some stuff, TODO
 +:ld a, (_RAM_DC3D_IsHeadToHead)
 ++:
   ld (_RAM_D59D_), a ; !IsGameGear || GearToGearActive || IsHeadToHead
-  ld a, $04
-  ld (_RAM_DB7B_), a
+  ld a, HEAD_TO_HEAD_TOTAL_POINTS / 2
+  ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ld a, $01
-  ld (_RAM_DBA8_), a
+  ld (_RAM_DBA8_SkipNextGameVBlankVDPUpdate), a
   ld a, (_RAM_DB99_AccelerationDelay)
-  sub $01
-  ld (_RAM_DCBE_), a
-  ld (_RAM_DCFF_), a
-  ld (_RAM_DD40_), a
+  sub $01 ; Other cars can accelerate faster?!?
+  ld (_RAM_DCAB_CarData_Green.Unknown19_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown19_b), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown19_b), a
 
   ld a, (_RAM_DC54_IsGameGear)
   cp $01
@@ -34633,28 +34690,28 @@ LABEL_37529_: ; initialises some stuff, TODO
 
 @SMS:
   ld a, $74
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   ld a, $68
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
   ret
 
 @GG:
   ld a, $3C
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld (_RAM_DBA6_), a
   ld a, $8F
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld (_RAM_DBA7_), a
   ret
 
 ; Data from 37580 to 3758F (16 bytes)
-DATA_37580_:
+DATA_37580_: ; Indexed by car direction
 .db $74 $68 $58 $58 $58 $58 $58 $68 $74 $80 $90 $90 $90 $90 $90 $80
 
 ; Data from 37590 to 3759F (16 bytes)
-DATA_37590_:
+DATA_37590_: ; Indexed by car direction
 .db $7F $7F $7F $6F $63 $57 $47 $47 $47 $47 $47 $57 $63 $6F $7F $7F
 
 LABEL_375A0_:
@@ -34820,11 +34877,11 @@ LABEL_3766F_:
   cp b
   jr z, +
   jr c, +++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   cp $00
   jr z, ++
   sub $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ret
 
 +:
@@ -34836,16 +34893,16 @@ LABEL_3766F_:
 
 ++:
   ld a, $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB9_), a
   ld a, $01
   ld (_RAM_DEB0_), a
   ret
 
 +++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   add a, $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   cp $01
   JrNzRet +
   ld (_RAM_DEB9_), a
@@ -34858,11 +34915,11 @@ LABEL_376FA_:
   cp b
   jr z, +
   jr nc, +++
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   or a
   jr z, ++
   sub $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ret
 
 +:
@@ -34874,16 +34931,16 @@ LABEL_376FA_:
 
 ++:
   ld a, $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB9_), a
   ld a, $00
   ld (_RAM_DEB0_), a
   ret
 
 +++:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   add a, $01
-  ld (_RAM_DEAF_), a
+  ld (_RAM_DEAF_HScrollDelta), a
   cp $01
   JrNzRet +
   ld (_RAM_DEB9_), a
@@ -34963,7 +35020,7 @@ LABEL_3779F_:
   ld a, (_RAM_D5A5_)
   or a
   jr z, +
-  ld a, (_RAM_DCF8_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown12_b)
   ld l, a
   ld h, $00
   ld de, DATA_250E_
@@ -34973,7 +35030,7 @@ LABEL_3779F_:
   jr ++
 
 +:
-  ld a, (_RAM_DCF8_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown12_b)
   ld c, a
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
@@ -34992,25 +35049,25 @@ LABEL_3779F_:
   jr +++++
 
 ++++:
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
   cp $04
   jr nc, +
   ld a, $00
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld (_RAM_DE35_), a
-  ld a, (_RAM_DCF9_)
-  ld (_RAM_DCF8_), a
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   ret
 
 +:
-  ld a, (_RAM_DCF7_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
 +++++:
   and $FE
   rr a
   ld (_RAM_DE35_), a
   and $FE
   rr a
-  ld (_RAM_DCF7_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld d, $00
   ld a, c
   ld e, a
@@ -35018,16 +35075,16 @@ LABEL_3779F_:
   add hl, de
   ld a, (hl)
   ld (_RAM_DE34_), a
-  ld a, (_RAM_DCF9_)
-  ld (_RAM_DCF8_), a
+  ld a, (_RAM_DCEC_CarData_Blue.Direction)
+  ld (_RAM_DCEC_CarData_Blue.Unknown12_b), a
   ret
 
 LABEL_37817_:
   ld a, (_RAM_DEB1_VScrollDelta)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   sub l
-  ld (_RAM_DBA5_), a
+  ld (_RAM_DBA5_CarY), a
   ld a, (_RAM_DBA7_)
   sub l
   ld (_RAM_DBA7_), a
@@ -35040,81 +35097,81 @@ LABEL_37817_:
   ld (_RAM_DF89_), a
   cp $00
   jr z, LABEL_37895_
-  ld a, (_RAM_DD70_)
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.Y)
   sub l
-  ld (_RAM_DD70_), a
-  ld a, (_RAM_DD73_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.Y)
   sub l
-  ld (_RAM_DD73_), a
-  ld a, (_RAM_DD76_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.Y)
   sub l
-  ld (_RAM_DD76_), a
-  ld a, (_RAM_DD79_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.Y)
   sub l
-  ld (_RAM_DD79_), a
-  ld a, (_RAM_DD7C_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.Y)
   sub l
-  ld (_RAM_DD7C_), a
-  ld a, (_RAM_DD7F_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.Y)
   sub l
-  ld (_RAM_DD7F_), a
-  ld a, (_RAM_DDA0_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.Y)
   sub l
-  ld (_RAM_DDA0_), a
-  ld a, (_RAM_DDA3_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.Y)
   sub l
-  ld (_RAM_DDA3_), a
-  ld a, (_RAM_DDA6_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.Y)
   sub l
-  ld (_RAM_DDA6_), a
-  ld a, (_RAM_DDA9_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.Y)
   sub l
-  ld (_RAM_DDA9_), a
-  ld a, (_RAM_DDAC_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.Y)
   sub l
-  ld (_RAM_DDAC_), a
-  ld a, (_RAM_DDAF_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.Y)
   sub l
-  ld (_RAM_DDAF_), a
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.Y), a
   jr LABEL_378E9_
 
 LABEL_37895_:
-  ld a, (_RAM_DDD0_)
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.Y)
   sub l
-  ld (_RAM_DDD0_), a
-  ld a, (_RAM_DDD3_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.Y)
   sub l
-  ld (_RAM_DDD3_), a
-  ld a, (_RAM_DDD6_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.Y)
   sub l
-  ld (_RAM_DDD6_), a
-  ld a, (_RAM_DDD9_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.Y)
   sub l
-  ld (_RAM_DDD9_), a
-  ld a, (_RAM_DDDC_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.Y)
   sub l
-  ld (_RAM_DDDC_), a
-  ld a, (_RAM_DDDF_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.Y)
   sub l
-  ld (_RAM_DDDF_), a
-  ld a, (_RAM_DE00_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.Y)
   sub l
-  ld (_RAM_DE00_), a
-  ld a, (_RAM_DE03_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.Y)
   sub l
-  ld (_RAM_DE03_), a
-  ld a, (_RAM_DE06_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.Y)
   sub l
-  ld (_RAM_DE06_), a
-  ld a, (_RAM_DE09_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.Y)
   sub l
-  ld (_RAM_DE09_), a
-  ld a, (_RAM_DE0C_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.Y)
   sub l
-  ld (_RAM_DE0C_), a
-  ld a, (_RAM_DE0F_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.Y), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.Y)
   sub l
-  ld (_RAM_DE0F_), a
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.Y), a
 LABEL_378E9_:
   ld d, $00
   ld e, l
@@ -35134,7 +35191,7 @@ LABEL_378F4_:
   sub l
   ld (_RAM_DAE0_SpriteTableYs.58.y), a
 +:
-  ld a, (_RAM_DCEA_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DAE0_SpriteTableYs.59.y)
@@ -35144,7 +35201,7 @@ LABEL_378F4_:
   sub l
   ld (_RAM_DAE0_SpriteTableYs.60.y), a
 +:
-  ld a, (_RAM_DD2B_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DAE0_SpriteTableYs.61.y)
@@ -35154,7 +35211,7 @@ LABEL_378F4_:
   sub l
   ld (_RAM_DAE0_SpriteTableYs.62.y), a
 +:
-  ld a, (_RAM_DD6C_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown63_b_TankShotState)
   or a
   jr z, LABEL_378E9_
   ld a, (_RAM_DAE0_SpriteTableYs.63.y)
@@ -35166,11 +35223,11 @@ LABEL_378F4_:
   jr LABEL_378E9_
 
 LABEL_37946_:
-  ld a, (_RAM_DEAF_)
+  ld a, (_RAM_DEAF_HScrollDelta)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   sub l
-  ld (_RAM_DBA4_), a
+  ld (_RAM_DBA4_CarX), a
   ld a, (_RAM_DBA6_)
   sub l
   ld (_RAM_DBA6_), a
@@ -35183,81 +35240,81 @@ LABEL_37946_:
   ld (_RAM_DF88_), a
   or a
   jr z, LABEL_379C4_
-  ld a, (_RAM_DD6E_)
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.X)
   sub l
-  ld (_RAM_DD6E_), a
-  ld a, (_RAM_DD71_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.X)
   sub l
-  ld (_RAM_DD71_), a
-  ld a, (_RAM_DD74_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.X)
   sub l
-  ld (_RAM_DD74_), a
-  ld a, (_RAM_DD77_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.X)
   sub l
-  ld (_RAM_DD77_), a
-  ld a, (_RAM_DD7A_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.X)
   sub l
-  ld (_RAM_DD7A_), a
-  ld a, (_RAM_DD7D_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.X)
   sub l
-  ld (_RAM_DD7D_), a
-  ld a, (_RAM_DD9E_)
+  ld (_RAM_DD6E_CarEffects.1.Sprites.3.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.X)
   sub l
-  ld (_RAM_DD9E_), a
-  ld a, (_RAM_DDA1_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.X)
   sub l
-  ld (_RAM_DDA1_), a
-  ld a, (_RAM_DDA4_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.X)
   sub l
-  ld (_RAM_DDA4_), a
-  ld a, (_RAM_DDA7_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.X)
   sub l
-  ld (_RAM_DDA7_), a
-  ld a, (_RAM_DDAA_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.X)
   sub l
-  ld (_RAM_DDAA_), a
-  ld a, (_RAM_DDAD_)
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.X)
   sub l
-  ld (_RAM_DDAD_), a
+  ld (_RAM_DD6E_CarEffects.2.Sprites.3.Data.2.X), a
   jp LABEL_37A18_
 
 LABEL_379C4_:
-  ld a, (_RAM_DDCE_)
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.X)
   sub l
-  ld (_RAM_DDCE_), a
-  ld a, (_RAM_DDD1_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.X)
   sub l
-  ld (_RAM_DDD1_), a
-  ld a, (_RAM_DDD4_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.X)
   sub l
-  ld (_RAM_DDD4_), a
-  ld a, (_RAM_DDD7_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.X)
   sub l
-  ld (_RAM_DDD7_), a
-  ld a, (_RAM_DDDA_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.X)
   sub l
-  ld (_RAM_DDDA_), a
-  ld a, (_RAM_DDDD_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.X)
   sub l
-  ld (_RAM_DDDD_), a
-  ld a, (_RAM_DDFE_)
+  ld (_RAM_DD6E_CarEffects.3.Sprites.3.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.X)
   sub l
-  ld (_RAM_DDFE_), a
-  ld a, (_RAM_DE01_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.X)
   sub l
-  ld (_RAM_DE01_), a
-  ld a, (_RAM_DE04_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.1.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.X)
   sub l
-  ld (_RAM_DE04_), a
-  ld a, (_RAM_DE07_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.X)
   sub l
-  ld (_RAM_DE07_), a
-  ld a, (_RAM_DE0A_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.2.Data.2.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.X)
   sub l
-  ld (_RAM_DE0A_), a
-  ld a, (_RAM_DE0D_)
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.1.X), a
+  ld a, (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.X)
   sub l
-  ld (_RAM_DE0D_), a
+  ld (_RAM_DD6E_CarEffects.4.Sprites.3.Data.2.X), a
 LABEL_37A18_:
   ld d, $00
   ld e, l
@@ -35277,7 +35334,7 @@ LABEL_37A23_:
   sub l
   ld (_RAM_DA60_SpriteTableXNs.58.x), a
 +:
-  ld a, (_RAM_DCEA_)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DA60_SpriteTableXNs.59.x)
@@ -35287,7 +35344,7 @@ LABEL_37A23_:
   sub l
   ld (_RAM_DA60_SpriteTableXNs.60.x), a
 +:
-  ld a, (_RAM_DD2B_)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState)
   or a
   jr z, +
   ld a, (_RAM_DA60_SpriteTableXNs.61.x)
@@ -35297,7 +35354,7 @@ LABEL_37A23_:
   sub l
   ld (_RAM_DA60_SpriteTableXNs.62.x), a
 +:
-  ld a, (_RAM_DD6C_)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown63_b_TankShotState)
   or a
   jr z, LABEL_37A18_
   ld a, (_RAM_DA60_SpriteTableXNs.63.x)
@@ -35308,7 +35365,7 @@ LABEL_37A23_:
   ld (_RAM_DA60_SpriteTableXNs.64.x), a
   jr LABEL_37A18_
 
-LABEL_37A75_:
+LABEL_37A75_Tanks_Red:
   ld a, (_RAM_D5A6_)
   or a
   jp z, LABEL_37B6B_
@@ -35332,7 +35389,7 @@ LABEL_37A75_:
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -35351,7 +35408,7 @@ LABEL_37A75_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, DATA_40E5_Sign_
+  ld hl, DATA_40E5_Sign_Directions_X
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -35373,7 +35430,7 @@ LABEL_37A75_:
 ++:
   cp $F8
   jr nc, LABEL_37B35_
-  ld hl, DATA_3FD3_
+  ld hl, DATA_3FD3_VerticalAmountByDirection
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -35392,7 +35449,7 @@ LABEL_37A75_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, DATA_40F5_Sign_
+  ld hl, DATA_40F5_Sign_Directions_Y
   ld a, (_RAM_D5A7_)
   add a, l
   ld l, a
@@ -35422,7 +35479,7 @@ LABEL_37A75_:
   cp $25
   jr nz, +
   ld a, SFX_04_TankMiss
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
 LABEL_37B35_:
   xor a
   ld (_RAM_D5A6_), a
@@ -35490,26 +35547,26 @@ LABEL_37B6B_:
   ld a, $01
   ld (_RAM_D5A6_), a
   ld a, SFX_0A_TankShoot
-  ld (_RAM_D963_SFXTrigger_Player1), a
+  ld (_RAM_D963_SFX_Player1.Trigger), a
   ld ix, _RAM_DA60_SpriteTableXNs.57
   ld iy, _RAM_DAE0_SpriteTableYs.57
   ld (ix+1), $AD
   ld (ix+3), $AE
-  ld hl, DATA_37C0A_
+  ld hl, DATA_37C0A_TankShotXOffsets
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld e, a
   ld d, $00
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   add a, l
   ld (ix+0), a
-  ld hl, DATA_37C1A_
+  ld hl, DATA_37C1A_TankShotYOffsets
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   add a, l
   ld (iy+0), a
 _LABEL_37BEE_ret:
@@ -35532,11 +35589,12 @@ LABEL_37BEF_:
   ret
 
 ; Data from 37C0A to 37C19 (16 bytes)
-DATA_37C0A_:
+DATA_37C0A_TankShotXOffsets:
+; X offset to start a shot at, for each car direction
 .db $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03 $00 $03 $05 $08
 
 ; Data from 37C1A to 37C29 (16 bytes)
-DATA_37C1A_:
+DATA_37C1A_TankShotYOffsets:
 .db $00 $03 $05 $08 $0A $0D $0F $12 $14 $12 $0F $0D $0A $08 $05 $03
 
 ; Data from 37C2A to 37C44 (27 bytes)
@@ -35544,17 +35602,18 @@ DATA_37C2A_:
 .db $00 $07 $08 $09 $0A $0B $0C $0D $0E $0F $10 $0F $0E $0D $0C $0B
 .db $0A $09 $08 $07 $06 $05 $04 $03 $02 $01 $00
 
-LABEL_37C45_:
+LABEL_37C45_Tanks_Green:
   ld ix, _RAM_DCAB_CarData_Green
   ld iy, _RAM_DA60_SpriteTableXNs.59
   jr ++
 
-LABEL_37C4F_:
+LABEL_37C4F_Tanks_Blue:
   ld ix, _RAM_DCEC_CarData_Blue
   ld iy, _RAM_DA60_SpriteTableXNs.61
   jr ++
 
-LABEL_37C59_:
+LABEL_37C59_Tanks_Yellow:
+  ; Timer to delay something?
   ld a, (_RAM_D5AB_)
   cp $A0
   jr z, +
@@ -35562,17 +35621,24 @@ LABEL_37C59_:
   ld (_RAM_D5AB_), a
   ret
 
-+:
-  ld ix, _RAM_DD2D_CarData_Yellow
++:ld ix, _RAM_DD2D_CarData_Yellow
   ld iy, _RAM_DA60_SpriteTableXNs.63
+  ; fall through
+  
+  ; Common code for green, blue, yellow
 ++:
-  ld a, (ix+63)
+  ld a, (ix+CarData.Unknown63_b_TankShotState)
   or a
-  jp z, LABEL_37D9C_
+  jp z, LABEL_37D9C_CheckForInitiateShot_OtherPlayers
+  
+  ; If not zero, a shot must be in the air
   cp $1A
-  jp nc, LABEL_37D87_
+  jp nc, LABEL_37D87_ShotHitGround
+  
+  ; If we get here then it is still moving
+  ; Look up data for the speed
   ld hl, DATA_1D65__Lo
-  ld a, (ix+64)
+  ld a, (ix+CarData.Unknown64_b_ShotSpeed)
   add a, l
   ld l, a
   ld a, $00
@@ -35580,34 +35646,39 @@ LABEL_37C59_:
   ld h, a
   ld e, (hl)
   ld hl, DATA_1D76__Hi
-  ld a, (ix+64)
+  ld a, (ix+CarData.Unknown64_b_ShotSpeed)
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
   ld d, (hl)
-  ld hl, DATA_3FC3_
-  ld a, (ix+62)
+  ; And the direction
+  ld hl, DATA_3FC3_HorizontalAmountByDirection
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
   ld a, (hl)
+  ; Then add _RAM_DEAD_
   ld hl, _RAM_DEAD_
   add a, (hl)
+  ; Get speed data pointer
   ld h, d
   ld l, e
+  ; Index by horizontal amount + _RAM_DEAD_
   add a, l
   ld l, a
   ld a, $00
   adc a, h
   ld h, a
-  ld a, (hl)
+  ld a, (hl) ; Get byte to c
   ld c, a
-  ld hl, DATA_40E5_Sign_
-  ld a, (ix+62)
+  ; Look up if that's + or -
+  ld hl, DATA_40E5_Sign_Directions_X
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -35616,36 +35687,40 @@ LABEL_37C59_:
   ld a, (hl)
   or a
   jr z, +
+  ; 1 => subtract c from X coordinate
   ld a, (iy+0)
   sub c
   ld (iy+0), a
   jr ++
 
-+:
++:; 0 => add c to X coordinate
   ld a, (iy+0)
   add a, c
   ld (iy+0), a
+  
 ++:
+  ; If it gets to the right of the screen then kill it
   cp $F8
-  jr nc, LABEL_37D49_
-  ld (_RAM_D5A9_), iy
-  ld a, (ix+45)
+  jr nc, LABEL_37D49_TankShotDone
+
+  ; Save the coordinates pointer
+  ld (_RAM_D5A9_TankShotTileXN), iy
+
+  ; Look up the Y coordinate
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $01
   jr z, +
   cp $02
   jr z, ++
   ld iy, _RAM_DAE0_SpriteTableYs.59
   jr +++
-
-+:
-  ld iy, _RAM_DAE0_SpriteTableYs.61
++:ld iy, _RAM_DAE0_SpriteTableYs.61
   jr +++
-
 ++:
   ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
-  ld hl, DATA_3FD3_
-  ld a, (ix+62)
+  ld hl, DATA_3FD3_VerticalAmountByDirection
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -35663,8 +35738,8 @@ LABEL_37C59_:
   ld h, a
   ld a, (hl)
   ld c, a
-  ld hl, DATA_40F5_Sign_
-  ld a, (ix+62)
+  ld hl, DATA_40F5_Sign_Directions_Y
+  ld a, (ix+CarData.Unknown62_b_ShotDirection)
   add a, l
   ld l, a
   ld a, $00
@@ -35684,23 +35759,28 @@ LABEL_37C59_:
   ld (iy+0), a
 ++:
   cp $F8
-  jr nc, LABEL_37D49_
+  jr nc, LABEL_37D49_TankShotDone
   call LABEL_37E62_
 LABEL_37D33_:
-  ld a, (ix+63)
+  ld a, (ix+CarData.Unknown63_b_TankShotState)
   inc a
-  ld (ix+63), a
+  ld (ix+CarData.Unknown63_b_TankShotState), a
   cp $25
   jr nz, LABEL_37D84_
-  ld a, (ix+21)
+  ld a, (ix+CarData.EffectsEnabled)
   or a
-  jr z, LABEL_37D49_
+  jr z, LABEL_37D49_TankShotDone
   ld a, SFX_04_TankMiss
-  ld (_RAM_D974_SFXTrigger_Player2), a
-LABEL_37D49_:
+  ld (_RAM_D974_SFX_Player2), a
+  ; fall through
+  
+LABEL_37D49_TankShotDone:
+  ; Kill shot
+  ; Set state to 0
   xor a
-  ld (ix+63), a
-  ld a, (ix+45)
+  ld (ix+CarData.Unknown63_b_TankShotState), a
+  ; Set sprite Xs, Ys to 0
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $01
   jr z, +
   cp $02
@@ -35708,19 +35788,18 @@ LABEL_37D49_:
   ld iy, _RAM_DAE0_SpriteTableYs.59
   ld ix, _RAM_DA60_SpriteTableXNs.59
   jp +++
-
-+:
-  ld iy, _RAM_DAE0_SpriteTableYs.61
++:ld iy, _RAM_DAE0_SpriteTableYs.61
   ld ix, _RAM_DA60_SpriteTableXNs.61
   jp +++
-
 ++:
   ld iy, _RAM_DAE0_SpriteTableYs.63
   ld ix, _RAM_DA60_SpriteTableXNs.63
 +++:
   xor a
+  ; Xs
   ld (ix+0), a
   ld (ix+2), a
+  ; Ys
   ld (iy+0), a
   ld (iy+1), a
   ret
@@ -35728,7 +35807,7 @@ LABEL_37D49_:
 LABEL_37D84_:
   jp LABEL_37E81_
 
-LABEL_37D87_:
+LABEL_37D87_ShotHitGround:
   sub $1A
   ld e, a
   ld d, $00
@@ -35740,7 +35819,8 @@ LABEL_37D87_:
   ld (iy+3), a
   jp LABEL_37D33_
 
-LABEL_37D9C_:
+LABEL_37D9C_CheckForInitiateShot_OtherPlayers:
+  ; Check if player 2 is in control of shots...
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, ++
@@ -35753,87 +35833,105 @@ LABEL_37D9C_:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr z, ++
-+:
-  ld a, (_RAM_DB21_Player2Controls) ; If 1+2 are pressed, skip the rest
++:; If head to head and 2-player and (SMS or Gear-to-Gear)
+  ld a, (_RAM_DB21_Player2Controls) ; If 1+2 are not pressed, skip the rest
   and BUTTON_1_MASK | BUTTON_2_MASK ; $30
   JpNzRet _LABEL_37E61_ret
 ++:
+  ; If we get here than either player 2 is not there, or he has pressed 1+2
+  ; (so CPU cars shoot continuously(!))
+  ; We still do nothing if:
+  ; - high bit of _RAM_DE4F_ is set
   ld a, (_RAM_DE4F_)
   cp $80
   JpNzRet _LABEL_37E61_ret
-  ld a, (ix+21)
+  ; - Effects are disabled (car is off-screen)
+  ld a, (ix+CarData.EffectsEnabled)
   or a
   JpZRet _LABEL_37E61_ret
-  ld a, (ix+46)
+  ; - Unknown46_b is set
+  ld a, (ix+CarData.Unknown46_b)
   or a
   JpNzRet _LABEL_37E61_ret
+
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr nz, +
-  ld a, (ix+17)
-  cp $E0
+  ; Challenge
+  ; Car can't shoot if not on-screen enough
+.define ON_SCREEN_MIN_X $20 ; TODO are these used anywhere else?
+.define ON_SCREEN_MAX_X $E0
+.define ON_SCREEN_MIN_Y $20
+.define ON_SCREEN_MAX_Y $E0
+  ld a, (ix+CarData.SpriteX)
+  cp ON_SCREEN_MAX_X
   JpNcRet _LABEL_37E61_ret
-  cp $20
+  cp ON_SCREEN_MIN_X
   JpCRet _LABEL_37E61_ret
-  ld a, (ix+18)
-  cp $20
+  ld a, (ix+CarData.SpriteY)
+  cp ON_SCREEN_MIN_Y
   JpCRet _LABEL_37E61_ret
-  cp $E0
+  cp ON_SCREEN_MAX_Y
   JpNcRet _LABEL_37E61_ret
   jr ++
 
-+:
++:; Head to head
+  ; Can't shoot during "win phase"
   ld a, (_RAM_DF80_TwoPlayerWinPhase)
   or a
   JrNzRet _LABEL_37E61_ret
+  
 ++:
-  ld a, (ix+13)
-  ld (ix+62), a
-  ld a, (ix+11)
-  add a, $06
-  and $0F
-  ld (ix+64), a
+  ; Let's initiate a shot
+  ; It inherits the car direction
+  ld a, (ix+CarData.Direction)
+  ld (ix+CarData.Unknown62_b_ShotDirection), a
+  ; And the car's speed + 6 (subject to an upper bound)
+  ld a, (ix+CarData.Unknown11_b_Speed)
+  add a, TANK_SHOT_RELATIVE_SPEED
+  and MAXIMUM_SPEED_MASK
+  ld (ix+CarData.Unknown64_b_ShotSpeed), a
   ld a, $01
-  ld (ix+63), a
-  ld a, (ix+21)
+  ld (ix+CarData.Unknown63_b_TankShotState), a
+  ld a, (ix+CarData.EffectsEnabled)
   or a
   jr z, +
   ld a, SFX_0A_TankShoot
-  ld (_RAM_D974_SFXTrigger_Player2), a
+  ld (_RAM_D974_SFX_Player2), a
 +:
-  ld (iy+1), $AD
-  ld (iy+3), $AE
-  ld hl, DATA_37C0A_
-  ld a, (ix+13)
+  ; Show the sprite
+  ld (iy+1), <SpriteIndex_Bullet
+  ld (iy+3), <SpriteIndex_BulletShadow
+  ; Compute the coordinates: X...
+  ld hl, DATA_37C0A_TankShotXOffsets
+  ld a, (ix+CarData.Direction)
   ld e, a
   ld d, $00
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (ix+17)
+  ld a, (ix+CarData.SpriteX)
   add a, l
   ld (iy+0), a
-  ld (_RAM_D5A9_), iy
-  ld a, (ix+45)
+  ld (_RAM_D5A9_TankShotTileXN), iy
+  ; And Y...
+  ld a, (ix+CarData.Unknown45_b_TankShotSpritesIndex)
   cp $01
   jr z, +
   cp $02
   jr z, ++
   ld iy, _RAM_DAE0_SpriteTableYs.59
   jr +++
-
-+:
-  ld iy, _RAM_DAE0_SpriteTableYs.61
++:ld iy, _RAM_DAE0_SpriteTableYs.61
   jr +++
-
 ++:
   ld iy, _RAM_DAE0_SpriteTableYs.63
 +++:
-  ld hl, DATA_37C1A_
+  ld hl, DATA_37C1A_TankShotYOffsets
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (ix+18)
+  ld a, (ix+CarData.SpriteY)
   add a, l
   ld (iy+0), a
 _LABEL_37E61_ret:
@@ -35850,7 +35948,7 @@ LABEL_37E62_:
   ld a, (iy+0)
   add a, l
   ld (iy+1), a
-  ld iy, (_RAM_D5A9_)
+  ld iy, (_RAM_D5A9_TankShotTileXN)
   ld a, (iy+0)
   add a, l
   ld (iy+2), a
@@ -35890,14 +35988,14 @@ LABEL_37E81_:
   ld a, (_RAM_DF58_)
   or a
   JrNzRet +++
-  ld a, (_RAM_DBA4_)
+  ld a, (_RAM_DBA4_CarX)
   ld l, a
   ld a, (de)
   sub l
   JrCRet +++
   cp $18
   JrNcRet +++
-  ld a, (_RAM_DBA5_)
+  ld a, (_RAM_DBA5_CarY)
   ld l, a
   ld a, (bc)
   sub l
@@ -35916,7 +36014,7 @@ LABEL_37E81_:
   call LABEL_2934_BehaviourF
 ++:
   xor a
-  ld (_RAM_DD2B_), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown63_b_TankShotState), a
   ld (_RAM_DA60_SpriteTableXNs.61.x), a
   ld (_RAM_DAE0_SpriteTableYs.61.y), a
   ld (_RAM_DA60_SpriteTableXNs.62.x), a
@@ -35942,7 +36040,7 @@ LABEL_37F11_:
   cp $18
   JrNcRet +
   call LABEL_2961_
-  jp LABEL_37D49_
+  jp LABEL_37D49_TankShotDone
 
 .ifdef JUMP_TO_RET
 +:ret
@@ -35970,7 +36068,7 @@ LABEL_37F3A_:
   cp $18
   JrNcRet +
   call LABEL_2961_
-  jp LABEL_37D49_
+  jp LABEL_37D49_TankShotDone
 
 .ifdef JUMP_TO_RET
 +:ret
@@ -35995,7 +36093,7 @@ LABEL_37F69_:
   cp $18
   JrNcRet +
   call LABEL_2961_
-  jp LABEL_37D49_
+  jp LABEL_37D49_TankShotDone
 
 .ifdef JUMP_TO_RET
 +:ret
@@ -36567,12 +36665,12 @@ TEXT_3ED39_Vehicle_Name_Rufftrux:
 
 ;.section "Splash screen" force
 DATA_3ED49_SplashScreenCompressed:
-.incbin "Assets/SplashScreen/SplashScreen.compressed"
+.incbin "Assets/Splash screen/SplashScreen.bin.compressed"
 ;.ends
 
 ;.section "Jon's Squinky Tennis" force
 DATA_3F753_JonsSquinkyTennisCompressed:
-.incbin "Assets/JonsSquinkyTennis.compressed"
+.incbin "Assets/Jon's Squinky Tennis/JonsSquinkyTennis.gg.compressed"
 ;.ends
 
 .ifdef BLANK_FILL_ORIGINAL
@@ -36587,4 +36685,5 @@ DATA_3F753_JonsSquinkyTennisCompressed:
 
 .orga $bfff
 .db :CADDR ; Page number marker
+
 

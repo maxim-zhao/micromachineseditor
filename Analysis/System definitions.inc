@@ -69,8 +69,12 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
 .define TILEMAP_HFLIP 1<<9
 .define TILEMAP_VFLIP 1<<10
 
-; SN76489 notes, assuming NTSC timings
+.define SPRITE_WIDTH 8
+.define SPRITE_HEIGHT 8
+.define BYTES_PER_ROW 4
+.define BYTES_PER_TILE BYTES_PER_ROW * SPRITE_HEIGHT
 
+; SN76489 notes, assuming NTSC timings
 .macro PSGNote args index
 ; index = 0.. where 0 = A2
 ; frequency = 2^(index / 12 - 2) * 440
@@ -86,4 +90,39 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
   .redefine x x+1
 .endr
 .undefine x
+.endm
+
+.define PSG_TONE_CONTROL_MASK %10000000
+.define PSG_ATTENUATION_CONTROL_MASK %10010000
+.define PSG_CHANNEL_SHIFT 5 ; channel is shifted left 5
+.define PSG_VOLUME_MASK %00001111
+.define PSG_TONE_HI_MASK %00111111
+.define PSG_TONE_LO_MASK %00001111
+
+.enum 0
+  PSG_NOISE_PERIODIC_SLOWEST db ; 0 -> freq 0x10
+  PSG_NOISE_PERIODIC_SLOW    db ; 1 -> freq 0x20
+  PSG_NOISE_PERIODIC_FAST    db ; 2 -> freq 0x40
+  PSG_NOISE_PERIODIC_TONE2   db ; 3 -> freq from tone2
+  PSG_NOISE_SLOW             db ; 4 -> freq 0x10
+  PSG_NOISE_MEDIUM           db ; 5 -> freq 0x20
+  PSG_NOISE_FAST             db ; 6 -> freq 0x40
+  PSG_NOISE_TONE2            db ; 7 -> freq from tone2
+.ende
+
+.enum 0
+  PSG_CHANNEL_TONE0 db ; 0
+  PSG_CHANNEL_TONE1 db ; 1
+  PSG_CHANNEL_TONE2 db ; 2
+  PSG_CHANNEL_NOISE db ; 3
+.ende
+
+.macro SetPSGVolumeImmediate args channel, volume
+  ld a, PSG_ATTENUATION_CONTROL_MASK | (channel << PSG_CHANNEL_SHIFT) | ((volume & PSG_VOLUME_MASK) ~ PSG_VOLUME_MASK)
+  out (PORT_PSG), a
+.endm
+
+.macro SetPSGNoiseImmediate args type
+  ld a, PSG_TONE_CONTROL_MASK | (PSG_CHANNEL_NOISE << PSG_CHANNEL_SHIFT) | type
+  out (PORT_PSG), a
 .endm
