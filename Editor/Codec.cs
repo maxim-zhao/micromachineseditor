@@ -142,17 +142,17 @@ namespace MicroMachinesEditor
             {
                 var h = data.Next();
                 var l = data.Next();
-                sb.Append($"{h:X2} {l:X2} ");
+                sb?.Append($"{h:X2} {l:X2} ");
                 runOffset = h * 256 + l + 1;
             }
             else
             {
                 var o = data.Next();
-                sb.Append($"{o:X2} ");
+                sb?.Append($"{o:X2} ");
                 runOffset = lowNibble * 256 + o + 1;
             }
             var b = data.Next();
-            sb.Append($"{b:X2} ");
+            sb?.Append($"{b:X2} ");
             int runLength = b + 4;
             LZCopy(result, runLength, runOffset, sb);
         }
@@ -165,7 +165,7 @@ namespace MicroMachinesEditor
             var b = data.Next();
             int runLength = lowNibble + 3;
             int runOffset = b + shift;
-            sb.Append($"{b:X2} ");
+            sb?.Append($"{b:X2} ");
             LZCopy(result, runLength, runOffset, sb);
         }
 

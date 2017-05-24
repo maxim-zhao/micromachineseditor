@@ -58,6 +58,7 @@
             // 
             // toolStrip1
             // 
+            this.toolStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.btnTrackRotateUp,
             this.btnTrackRotateDown,
@@ -73,7 +74,7 @@
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Padding = new System.Windows.Forms.Padding(0, 0, 2, 0);
-            this.toolStrip1.Size = new System.Drawing.Size(1459, 38);
+            this.toolStrip1.Size = new System.Drawing.Size(1206, 39);
             this.toolStrip1.TabIndex = 6;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -83,7 +84,7 @@
             this.btnTrackRotateUp.Image = global::MicroMachinesEditor.Properties.Resources.UpArrow;
             this.btnTrackRotateUp.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnTrackRotateUp.Name = "btnTrackRotateUp";
-            this.btnTrackRotateUp.Size = new System.Drawing.Size(23, 35);
+            this.btnTrackRotateUp.Size = new System.Drawing.Size(36, 36);
             this.btnTrackRotateUp.Text = "Rotate map upwards";
             this.btnTrackRotateUp.Click += new System.EventHandler(this.btnTrackRotateUp_Click);
             // 
@@ -93,7 +94,7 @@
             this.btnTrackRotateDown.Image = global::MicroMachinesEditor.Properties.Resources.DownArrow;
             this.btnTrackRotateDown.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnTrackRotateDown.Name = "btnTrackRotateDown";
-            this.btnTrackRotateDown.Size = new System.Drawing.Size(23, 35);
+            this.btnTrackRotateDown.Size = new System.Drawing.Size(36, 36);
             this.btnTrackRotateDown.Text = "Rotate map downwards";
             this.btnTrackRotateDown.Click += new System.EventHandler(this.btnTrackRotateDown_Click);
             // 
@@ -103,7 +104,7 @@
             this.btnTrackRotateLeft.Image = global::MicroMachinesEditor.Properties.Resources.LeftArrow;
             this.btnTrackRotateLeft.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnTrackRotateLeft.Name = "btnTrackRotateLeft";
-            this.btnTrackRotateLeft.Size = new System.Drawing.Size(23, 35);
+            this.btnTrackRotateLeft.Size = new System.Drawing.Size(36, 36);
             this.btnTrackRotateLeft.Text = "Rotate map left";
             this.btnTrackRotateLeft.Click += new System.EventHandler(this.btnTrackRotateLeft_Click);
             // 
@@ -113,14 +114,14 @@
             this.btnTrackRotateRight.Image = global::MicroMachinesEditor.Properties.Resources.RightArrow;
             this.btnTrackRotateRight.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnTrackRotateRight.Name = "btnTrackRotateRight";
-            this.btnTrackRotateRight.Size = new System.Drawing.Size(23, 35);
+            this.btnTrackRotateRight.Size = new System.Drawing.Size(36, 36);
             this.btnTrackRotateRight.Text = "Rotate map right";
             this.btnTrackRotateRight.Click += new System.EventHandler(this.btnTrackRotateRight_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 38);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 39);
             // 
             // tbBlank
             // 
@@ -128,14 +129,14 @@
             this.tbBlank.Image = global::MicroMachinesEditor.Properties.Resources.BlankPage;
             this.tbBlank.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tbBlank.Name = "tbBlank";
-            this.tbBlank.Size = new System.Drawing.Size(23, 35);
+            this.tbBlank.Size = new System.Drawing.Size(36, 36);
             this.tbBlank.Text = "Blank map";
             this.tbBlank.Click += new System.EventHandler(this.tbBlank_Click);
             // 
             // toolStripSeparator3
             // 
             this.toolStripSeparator3.Name = "toolStripSeparator3";
-            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 38);
+            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 39);
             // 
             // tbGrid
             // 
@@ -144,7 +145,7 @@
             this.tbGrid.Image = global::MicroMachinesEditor.Properties.Resources.Grid;
             this.tbGrid.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tbGrid.Name = "tbGrid";
-            this.tbGrid.Size = new System.Drawing.Size(23, 35);
+            this.tbGrid.Size = new System.Drawing.Size(36, 36);
             this.tbGrid.Text = "Show grid";
             this.tbGrid.Click += new System.EventHandler(this.tbGrid_Click);
             // 
@@ -155,7 +156,7 @@
             this.tbMetatileFlags.Image = ((System.Drawing.Image)(resources.GetObject("tbMetatileFlags.Image")));
             this.tbMetatileFlags.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tbMetatileFlags.Name = "tbMetatileFlags";
-            this.tbMetatileFlags.Size = new System.Drawing.Size(23, 35);
+            this.tbMetatileFlags.Size = new System.Drawing.Size(36, 36);
             this.tbMetatileFlags.Text = "toolStripButton1";
             this.tbMetatileFlags.Click += new System.EventHandler(this.tbMetatileFlags_Click);
             // 
@@ -166,7 +167,7 @@
             this.tbTogglePositions.Image = global::MicroMachinesEditor.Properties.Resources._123;
             this.tbTogglePositions.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tbTogglePositions.Name = "tbTogglePositions";
-            this.tbTogglePositions.Size = new System.Drawing.Size(23, 35);
+            this.tbTogglePositions.Size = new System.Drawing.Size(36, 36);
             this.tbTogglePositions.Text = "Show track positions";
             this.tbTogglePositions.Click += new System.EventHandler(this.tbTogglePositions_Click);
             // 
@@ -177,13 +178,13 @@
             this.tbEyeDropper.Image = global::MicroMachinesEditor.Properties.Resources.EyeDropper;
             this.tbEyeDropper.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tbEyeDropper.Name = "tbEyeDropper";
-            this.tbEyeDropper.Size = new System.Drawing.Size(23, 35);
+            this.tbEyeDropper.Size = new System.Drawing.Size(36, 36);
             this.tbEyeDropper.Text = "Tile eyedropper (Ctrl+click)";
             // 
             // splitContainer1
             // 
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer1.Location = new System.Drawing.Point(0, 38);
+            this.splitContainer1.Location = new System.Drawing.Point(0, 39);
             this.splitContainer1.Margin = new System.Windows.Forms.Padding(6);
             this.splitContainer1.Name = "splitContainer1";
             // 
@@ -194,8 +195,8 @@
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.metaTileSelector);
-            this.splitContainer1.Size = new System.Drawing.Size(1459, 594);
-            this.splitContainer1.SplitterDistance = 1061;
+            this.splitContainer1.Size = new System.Drawing.Size(1206, 593);
+            this.splitContainer1.SplitterDistance = 877;
             this.splitContainer1.SplitterWidth = 8;
             this.splitContainer1.TabIndex = 7;
             // 
@@ -206,7 +207,7 @@
             this.mouseLocation});
             this.statusStrip1.Location = new System.Drawing.Point(0, 632);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(1459, 37);
+            this.statusStrip1.Size = new System.Drawing.Size(1206, 37);
             this.statusStrip1.TabIndex = 8;
             this.statusStrip1.Text = "statusStrip1";
             // 
@@ -224,7 +225,7 @@
             this.scrollingPanel1.Location = new System.Drawing.Point(0, 0);
             this.scrollingPanel1.Margin = new System.Windows.Forms.Padding(6);
             this.scrollingPanel1.Name = "scrollingPanel1";
-            this.scrollingPanel1.Size = new System.Drawing.Size(1061, 594);
+            this.scrollingPanel1.Size = new System.Drawing.Size(877, 593);
             this.scrollingPanel1.TabIndex = 1;
             // 
             // trackRenderer
@@ -253,8 +254,9 @@
             this.metaTileSelector.MetaTiles = null;
             this.metaTileSelector.Name = "metaTileSelector";
             this.metaTileSelector.SelectedMetaTileIndex = -1;
-            this.metaTileSelector.Size = new System.Drawing.Size(390, 594);
+            this.metaTileSelector.Size = new System.Drawing.Size(321, 593);
             this.metaTileSelector.TabIndex = 1;
+            this.metaTileSelector.OnHover += new System.EventHandler<int>(this.metaTileSelector_OnHover);
             // 
             // TrackEditor
             // 
@@ -265,7 +267,7 @@
             this.Controls.Add(this.statusStrip1);
             this.Margin = new System.Windows.Forms.Padding(6);
             this.Name = "TrackEditor";
-            this.Size = new System.Drawing.Size(1459, 669);
+            this.Size = new System.Drawing.Size(1206, 669);
             this.toolStrip1.ResumeLayout(false);
             this.toolStrip1.PerformLayout();
             this.splitContainer1.Panel1.ResumeLayout(false);

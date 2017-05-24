@@ -8,6 +8,13 @@ namespace MicroMachinesEditor
 {
     public sealed partial class MetaTileSelector : ScrollableControl
     {
+        #region events
+
+        public event EventHandler<int> OnHover;
+
+        #endregion
+
+
         #region constants
 
         private const int TileSizeInPixels = 96;
@@ -100,7 +107,7 @@ namespace MicroMachinesEditor
                 return;
             }
             // Set the row/column count
-            _columnCount = (Width - SystemInformation.VerticalScrollBarWidth) / TileSizeInPixels;
+            _columnCount = Math.Max(1, (Width - SystemInformation.VerticalScrollBarWidth) / TileSizeInPixels);
             _rowCount = (int)Math.Ceiling((double)_metaTiles.Count / _columnCount);
             AutoScrollMinSize = new Size(_columnCount * TileSizeInPixels, _rowCount * TileSizeInPixels);
         }
@@ -172,6 +179,8 @@ namespace MicroMachinesEditor
             Invalidate(ScreenRectFromIndex(_hoveredIndex));
             _hoveredIndex = index;
             Invalidate(ScreenRectFromIndex(_hoveredIndex));
+
+            OnHover?.Invoke(this, index);
         }
 
         // Returns the bounding rect for the given metatile, in screen coordinates.

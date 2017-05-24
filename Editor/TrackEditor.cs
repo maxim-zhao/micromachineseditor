@@ -166,5 +166,10 @@ namespace MicroMachinesEditor
         {
             trackRenderer.ShowMetaTileFlags = tbMetatileFlags.Checked;
         }
+
+        private void metaTileSelector_OnHover(object sender, int index)
+        {
+            mouseLocation.Text = $"Metatile {index} = ${index:X2}";
+        }
     }
 }

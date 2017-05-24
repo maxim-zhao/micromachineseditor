@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -30,28 +30,10 @@ namespace MicroMachinesEditor
 
         // The tracks themselved
         private readonly List<Track> _tracks = new List<Track>();
-        private TrackLayout _track;
 
         // We use this to invoke things on the UI thread
         private TaskScheduler _uiContext;
 
-        /*
-                private void log(string text, params object[] args)
-                {
-                    _logStringBuilder.AppendFormat(text, args);
-                }
-
-                private void log(IEnumerable<byte> buffer, int limit = 0)
-                {
-                    StringBuilder sb = new StringBuilder();
-                    foreach (byte b in buffer)
-                    {
-                        sb.AppendFormat("{0:X2} ", b);
-                    }
-                    log(sb.ToString().PadRight(limit));
-                }
-        */
-        
         #region Raw tab
 
         private void btnDecode_Click(object sender, EventArgs e)
@@ -269,7 +251,7 @@ namespace MicroMachinesEditor
             _metaTiles = Codec.LoadMetaTiles(file, trackType, _tiles); 
 
             // Then the track
-            _track = LoadTrack(file, offsetTrack);
+            LoadTrack(file, offsetTrack);
 
             // And the track attributes
             // These are defined in the track order table so I need to feed off that? Maybe
@@ -308,7 +290,7 @@ namespace MicroMachinesEditor
             }
             else
             {
-                base.OnPaint(e);
+                OnPaint(e);
             }
         }
 
@@ -358,7 +340,7 @@ namespace MicroMachinesEditor
                 Task.Factory.StartNew(
                     () => track1.GetThumbnail(lvTracks.LargeImageList.ImageSize.Width)
                 ).ContinueWith(
-                    (t) =>
+                    t =>
                     {
                         int index = il.Images.Count;
                         il.Images.Add(t.Result);
@@ -597,7 +579,7 @@ namespace MicroMachinesEditor
 
         private void Compress(bool exhaustive)
         {
-            using (var ofd = new OpenFileDialog() {Filter = "All files|*.*"})
+            using (var ofd = new OpenFileDialog {Filter = "All files|*.*"})
             {
                 if (ofd.ShowDialog(this) != DialogResult.OK)
                 {
@@ -611,7 +593,7 @@ namespace MicroMachinesEditor
                     File.WriteAllBytes(ofd.FileName + ".compressed", compressed.ToArray());
                     tbOutput.AppendText($"Compressed {data.Length} bytes to {compressed.Count}\r\n");
                     // Then see if it was lossy (!)
-                    var sha1 = System.Security.Cryptography.SHA1.Create();
+                    var sha1 = SHA1.Create();
                     var originalChecksum = BitConverter.ToString(sha1.ComputeHash(data)).Replace("-", "");
                     // Decompress to check validity
                     var uncompressed = Codec.Decompress(compressed, 0, sb);
@@ -658,6 +640,19 @@ namespace MicroMachinesEditor
         private void exhaustiveToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Compress(true);
+        }
+
+        private void lvTracks_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            var item = lvTracks.HitTest(e.X, e.Y).Item;
+            if (item == null)
+            {
+                return;
+            }
+            // Show it in the track tab
+            var track = item.Tag as Track;
+            trackEditor.Track = track;
+            tabControl1.SelectedTab = tabTrack;
         }
     }
 }
