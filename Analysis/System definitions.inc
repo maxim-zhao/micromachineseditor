@@ -92,12 +92,14 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
 .undefine x
 .endm
 
-.define PSG_TONE_CONTROL_MASK %10000000
-.define PSG_ATTENUATION_CONTROL_MASK %10010000
+.define PSG_TONE_CONTROL_MASK         %10000000
+.define PSG_ATTENUATION_CONTROL_MASK  %10010000
 .define PSG_CHANNEL_SHIFT 5 ; channel is shifted left 5
-.define PSG_VOLUME_MASK %00001111
-.define PSG_TONE_HI_MASK %00111111
-.define PSG_TONE_LO_MASK %00001111
+.define PSG_TONE_LO_MASK              %00001111
+.define PSG_TONE_HI_MASK              %00111111
+.define PSG_NOISE_MODE_MASK           %00000111
+.define PSG_ATTENUATION_MASK          %00001111
+.define PSG_ATTENUATION_SILENCE       %00001111
 
 .enum 0
   PSG_NOISE_PERIODIC_SLOWEST db ; 0 -> freq 0x10
@@ -117,8 +119,8 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
   PSG_CHANNEL_NOISE db ; 3
 .ende
 
-.macro SetPSGVolumeImmediate args channel, volume
-  ld a, PSG_ATTENUATION_CONTROL_MASK | (channel << PSG_CHANNEL_SHIFT) | ((volume & PSG_VOLUME_MASK) ~ PSG_VOLUME_MASK)
+.macro SetPSGAttenuationImmediate args channel, attenuation
+  ld a, PSG_ATTENUATION_CONTROL_MASK | (channel << PSG_CHANNEL_SHIFT) | ((attenuation & PSG_ATTENUATION_MASK) ~ PSG_ATTENUATION_MASK)
   out (PORT_PSG), a
 .endm
 
