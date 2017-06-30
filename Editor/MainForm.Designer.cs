@@ -40,7 +40,6 @@
             this.editTrackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pgTrack = new System.Windows.Forms.PropertyGrid();
             this.tabTrack = new System.Windows.Forms.TabPage();
-            this.trackEditor = new MicroMachinesEditor.TrackEditor();
             this.tabMetaTiles = new System.Windows.Forms.TabPage();
             this.panelMetaTiles = new System.Windows.Forms.Panel();
             this.pbMetaTiles = new System.Windows.Forms.PictureBox();
@@ -81,6 +80,9 @@
             this.cbLevelType = new System.Windows.Forms.ComboBox();
             this.tbFilename = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.trackEditor = new MicroMachinesEditor.TrackEditor();
+            this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabTrackList.SuspendLayout();
@@ -182,6 +184,9 @@
             // 
             // lvTracks
             // 
+            this.lvTracks.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
+            this.columnHeader1,
+            this.columnHeader2});
             this.lvTracks.ContextMenuStrip = this.trackListMenu;
             this.lvTracks.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lvTracks.HideSelection = false;
@@ -193,6 +198,7 @@
             this.lvTracks.Size = new System.Drawing.Size(1405, 529);
             this.lvTracks.TabIndex = 0;
             this.lvTracks.UseCompatibleStateImageBehavior = false;
+            this.lvTracks.View = System.Windows.Forms.View.Details;
             this.lvTracks.SelectedIndexChanged += new System.EventHandler(this.lvTracks_SelectedIndexChanged);
             this.lvTracks.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvTracks_MouseDoubleClick);
             // 
@@ -233,16 +239,6 @@
             this.tabTrack.TabIndex = 4;
             this.tabTrack.Text = "Track";
             this.tabTrack.UseVisualStyleBackColor = true;
-            // 
-            // trackEditor
-            // 
-            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.trackEditor.Location = new System.Drawing.Point(6, 6);
-            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
-            this.trackEditor.Name = "trackEditor";
-            this.trackEditor.Size = new System.Drawing.Size(1702, 529);
-            this.trackEditor.TabIndex = 0;
-            this.trackEditor.Track = null;
             // 
             // tabMetaTiles
             // 
@@ -712,6 +708,16 @@
             this.panel1.Size = new System.Drawing.Size(1730, 100);
             this.panel1.TabIndex = 6;
             // 
+            // trackEditor
+            // 
+            this.trackEditor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.trackEditor.Location = new System.Drawing.Point(6, 6);
+            this.trackEditor.Margin = new System.Windows.Forms.Padding(12);
+            this.trackEditor.Name = "trackEditor";
+            this.trackEditor.Size = new System.Drawing.Size(1702, 529);
+            this.trackEditor.TabIndex = 0;
+            this.trackEditor.Track = null;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
@@ -821,6 +827,8 @@
         private System.Windows.Forms.ToolStripMenuItem fastToolStripMenuItem;
         private System.Windows.Forms.TextBox tbFilename;
         private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.ColumnHeader columnHeader1;
+        private System.Windows.Forms.ColumnHeader columnHeader2;
     }
 }
 

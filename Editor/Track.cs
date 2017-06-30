@@ -63,14 +63,14 @@ namespace MicroMachinesEditor
         [SuppressMessage("ReSharper", "UnusedMember.Global")]
         public enum VehicleTypes
         {
-            Desk = 0,
-            Breakfast = 1,
-            Bathtub = 2,
-            Sandpit = 3,
-            F1 = 4,
-            Garage = 5,
+            Sportscars = 0,
+            FourByFour = 1,
+            Powerboats = 2,
+            TurboWheels = 3,
+            FormulaOne = 4,
+            Warriors = 5,
             Tanks = 6,
-            Bonus = 7
+            RuffTrux = 7
         }
 
         [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]

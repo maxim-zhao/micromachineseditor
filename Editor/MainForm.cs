@@ -323,7 +323,7 @@ namespace MicroMachinesEditor
         {
             lvTracks.BeginUpdate();
             lvTracks.Items.Clear();
-            var il = new ImageList { ImageSize = new Size(128, 128), ColorDepth = ColorDepth.Depth24Bit };
+            var il = new ImageList { ImageSize = new Size(64, 64), ColorDepth = ColorDepth.Depth32Bit };
             lvTracks.LargeImageList = il;
             foreach (var track in _tracks)
             {
@@ -333,24 +333,28 @@ namespace MicroMachinesEditor
                 displayName = displayName.ToLowerInvariant(); // Lowercase
                 displayName = Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(displayName); // Title case
                 var item = new ListViewItem(displayName) {Tag = track};
+                item.SubItems.Add($"Track {lvTracks.Items.Count}");
+                item.SubItems.Add($"{track.VehicleType} track {track.TrackIndex}"); // TODO how to show this?
                 lvTracks.Items.Add(item);
 
                 // Do the bitmap creation on a worker thread, but the UI stuff on this thread
-                Track track1 = track;
-                Task.Factory.StartNew(
-                    () => track1.GetThumbnail(lvTracks.LargeImageList.ImageSize.Width)
-                ).ContinueWith(
-                    t =>
+                //Track track1 = track;
+                Task.Factory.StartNew(() =>
+                {
+                    var thumbnail = track.GetThumbnail(lvTracks.LargeImageList.ImageSize.Width);
+                    lvTracks.Invoke(new Action(() =>
                     {
                         int index = il.Images.Count;
-                        il.Images.Add(t.Result);
+                        il.Images.Add(thumbnail);
                         item.ImageIndex = index;
                         Log($"Loaded {index + 1}/{_tracks.Count} thumbnails...");
-                    },
-                    _uiContext
-                );
+                    }));
+                });
             }
             lvTracks.EndUpdate();
+
+            lvTracks.LabelWrap = true;
+            lvTracks.View = View.Tile;
         }
 
         private void LoadTracks()
