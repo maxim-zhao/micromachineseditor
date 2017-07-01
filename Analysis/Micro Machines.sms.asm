@@ -9514,14 +9514,18 @@ DATA_3FD3_VerticalAmountByDirection:
 .endif
 .ends
 
-.macro BankMarker
+.macro BankMarker args offset
+.if nargs == 1
+.orga offset
+.else
+.orga $bfff ; default offset
+.endif
 .section "Bank marker \@" force
 .db :CADDR
 .ends
 .endm
 
-.orga $3fff
-  BankMarker
+  BankMarker $3fff ; not actually used?
 
 .section "Bank 1" force
 
@@ -25812,7 +25816,7 @@ DATA_BF80_MenuPalette_GG: ; GG menu palette
 .endif
 ;.ends
 
-.orga $bfff
+.orga $bfff ; so the label ends up in the right place
 DATA_BFFF_Page2PageNumber:
   BankMarker
 
@@ -25962,8 +25966,7 @@ DATA_FFBF_TrackName_25: .asc "RUFFTRUX BONUS STAGE"
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 4
 .ORG $0000
@@ -26061,8 +26064,7 @@ DATA_13F50_Tilemap_MicroMachinesText:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 5
 .ORG $0000
@@ -26513,8 +26515,7 @@ DATA_17FB2_SMSPalette_RuffTrux:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 6
 .ORG $0000
@@ -27367,8 +27368,7 @@ LABEL_1BF17_:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 7
 .ORG $0000
@@ -27835,8 +27835,7 @@ LABEL_1FB35_:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 8
 .ORG $0000
@@ -28815,8 +28814,7 @@ DATA_23ECF_HandlingData_GG:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 9
 .ORG $0000
@@ -28913,8 +28911,7 @@ DATA_27A12_Tiles_TwoPlayersOnOneGameGear_Icon:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 10
 .ORG $0000
@@ -29606,8 +29603,7 @@ _SFX_16_Respawn_Noise:    .db PSG_NOISE_TONE2 0 0 PSG_NOISE_SLOW 0 0 PSG_NOISE_M
 .ends
 .endif
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 11
 .ORG $0000
@@ -29673,8 +29669,7 @@ DATA_2FF6F_Tilemap:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 12
 .ORG $0000
@@ -30378,10 +30373,7 @@ _LABEL_33FF7_ret:
 .ends
 .endif
 
-.orga $bfff
-.section "Page number marker for slot 12" force
-.db :CADDR ; Page number marker
-.ends
+  BankMarker
 
 .BANK 13
 .ORG $0000
@@ -31915,7 +31907,6 @@ LABEL_36484_PatchForLevel:
   ld (_RAM_CC80_BehaviourData + index * _sizeof_BehaviourDataMetaTile + y * 6 + x), a
 .endm
 
-  ; Also patches other stuff - code?
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   jp z, @Powerboats
@@ -35307,31 +35298,42 @@ _LABEL_37FF7_ret:
 .endif
 ;.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 14
 .ORG $0000
-;.section "Bank 14"
 
+.section "DATA_38000_TurboWheels_Tiles" force
 DATA_38000_TurboWheels_Tiles:
 .incbin "Assets/Turbo Wheels/Tiles.compressed"
+.ends
 
+.section "DATA_39168_Tanks_Tiles" force
 DATA_39168_Tanks_Tiles:
 .incbin "Assets/Tanks/Tiles.compressed"
+.ends
 
+.section "DATA_39C83_FourByFour_Tiles" force
 DATA_39C83_FourByFour_Tiles:
 .incbin "Assets/Four By Four/Tiles.compressed"
+.ends
 
+.section "DATA_3A8FA_Warriors_Tiles" force
 DATA_3A8FA_Warriors_Tiles:
 .incbin "Assets/Warriors/Tiles.compressed"
+.ends
 
+.section "DATA_3B32F_DisplayCaseTilemapCompressed" force
 DATA_3B32F_DisplayCaseTilemapCompressed:
 .incbin "Assets/Menu/DisplayCase.tilemap.compressed"
+.ends
 
+.section "DATA_3B37F_Tiles_DisplayCase" force
 DATA_3B37F_Tiles_DisplayCase:
 .incbin "Assets/Menu/DisplayCase.3bpp.compressed"
+.ends
 
+.section "RAM code" force
 LABEL_3B971_RamCodeLoaderStage2:
   ; Copy more code into RAM...
   ld hl, LABEL_3B97D_RamCodeStart  ; Loading Code into RAM
@@ -35355,10 +35357,32 @@ LABEL_3B989_Decompress:
 .include "decompressor.asm"
 
 ; This is RAM data (!) for the menu music engine
-; TODO document it
-.db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $07 $0F $0F $0F $0F $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-.db $00 $00
+.db $00                     ; _RAM_D90F_MenuSound_Counter2
+.db $00                     ; _RAM_D910_MenuSound_Counter4
+.db $00                     ; _RAM_D911_MenuSound_Counter8
+.db $00                     ; _RAM_D912_MenuSound_Counter16
+.db $00                     ; _RAM_D913_MenuSound_NoiseGlobalAttenuation
+.db $00                     ; _RAM_D914_MenuSound_GlobalAttenuation
+.db $00                     ; _RAM_D915_MenuSound_RowDurationOverride
+.db $00                     ; _RAM_D916_MenuSound_OffsetDownTone0
+.db $00                     ; _RAM_D917_MenuSound_OffsetUpTone1
+.db $00                     ; _RAM_D918_MenuSound_OffsetTone2_Always0
+.db $00                     ; _RAM_D919_MenuSound_NoteOffset
+.dw $0000                   ; _RAM_D91A_MenuSoundData.Tone0
+.dw $0000                   ; _RAM_D91A_MenuSoundData.Tone1
+.dw $0000                   ; _RAM_D91A_MenuSoundData.Tone2
+.db PSG_NOISE_TONE2         ; _RAM_D91A_MenuSoundData.NoiseModeControl
+.db PSG_ATTENUATION_SILENCE ; _RAM_D91A_MenuSoundData.NoiseAttenuation
+.db PSG_ATTENUATION_SILENCE ; _RAM_D91A_MenuSoundData.Attenuation0
+.db PSG_ATTENUATION_SILENCE ; _RAM_D91A_MenuSoundData.Attenuation1
+.db PSG_ATTENUATION_SILENCE ; _RAM_D91A_MenuSoundData.Attenuation2
+.dsb 4 $00                  ; _RAM_D91A_MenuSoundData.Unused
+.dw $0000                   ; _RAM_D929_MenuSound_SequencePointer
+.db $00                     ; _RAM_D92B_MenuSound_RowDurationCounter
+.db $00                     ; _RAM_D92C_MenuSound_RowDuration
+.dw $0000                   ; _RAM_D92D_MenuSound_PatternPointer
+.db $00                     ; _RAM_D92F_MenuSound_PatternRowCounter
+.db $00                     ; _RAM_D930_MenuSound_NoiseData
 
 ; Executed in RAM at d931
 LABEL_3BAF1_MenusVBlank:
@@ -35761,16 +35785,17 @@ LABEL_3BD08_BackToSlot2:
 .endif
 
 LABEL_3BD0F_RamCodeEnd:
+.ends
 
 .ifdef BLANK_FILL_ORIGINAL
+.section "Bank 14 blank fill" force
 .repeat 188
 .db $FF $FF $00 $00
 .endr
 .endif
-;.ends
+.ends
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 .BANK 15
 .ORG $0000
@@ -35826,16 +35851,14 @@ DATA_3F753_JonsSquinkyTennisCompressed:
 .ends
 
 .ifdef BLANK_FILL_ORIGINAL
-;.section "Bank 15 blank fill" force
-; Blank fill
+.section "Bank 15 blank fill" force
 .repeat 33
 .dw $0000, $ffff
 .endr
 .dw $0000
-;.ends
+.ends
 .endif
 
-.orga $bfff
-.db :CADDR ; Page number marker
+  BankMarker
 
 
