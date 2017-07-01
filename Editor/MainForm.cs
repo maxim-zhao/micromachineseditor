@@ -31,9 +31,6 @@ namespace MicroMachinesEditor
         // The tracks themselved
         private readonly List<Track> _tracks = new List<Track>();
 
-        // We use this to invoke things on the UI thread
-        private TaskScheduler _uiContext;
-
         #region Raw tab
 
         private void btnDecode_Click(object sender, EventArgs e)
