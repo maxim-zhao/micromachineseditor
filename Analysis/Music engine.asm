@@ -94,7 +94,7 @@ _RAM_D930_MenuSound_NoiseData db ; Temporary storage during some processing
 .ende
 
 .section "Music engine" force
-LABEL_30CE8_MenuSound_StartTrack:
+LABEL_30CE8_Music_Start:
 ; a = music index (1+)
   or a
   jr nz, +
@@ -140,7 +140,7 @@ LABEL_30CE8_MenuSound_StartTrack:
   ld (_RAM_D78E_MenuSound_Channel2.ChannelDisabled), a
   ret
 
-LABEL_30D28_StopMenuMusic:
+LABEL_30D28_StopMusic:
   ld hl, _MusicStopData
   ld de, _RAM_D91A_MenuSoundData
   ld bc, _sizeof_OutputSoundData

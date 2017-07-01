@@ -104,8 +104,21 @@ TT_4_FormulaOne   db ; 4
 TT_5_Warriors     db ; 5
 TT_6_Tanks        db ; 6
 TT_7_RuffTrux     db ; 7
-TT_8_Helicopters  db ; 8 - Incomplete support
+TT_8_Choppers     db ; 8 - Incomplete support
 TT_9_Unknown      db ; 9 - for portrait drawing only?
+.ende
+
+.enum 0 ; Track types, in menus
+MenuTT_0_Blank        db ; 0
+MenuTT_1_SportsCars   db ; 1
+MenuTT_2_Powerboats   db ; 2
+MenuTT_3_FormulaOne   db ; 3
+MenuTT_4_FourByFour   db ; 4
+MenuTT_5_Warriors     db ; 5
+MenuTT_6_Choppers     db ; 6 - not used
+MenuTT_7_TurboWheels  db ; 7
+MenuTT_8_Tanks        db ; 8
+MenuTT_9_RuffTrux     db ; 9
 .ende
 
 .enum -1 ; Car states
@@ -129,19 +142,19 @@ Track_06_TheCueBallCircuit        db
 Track_07_HandymansCurve           db
 Track_08_BermudaBathtub           db
 Track_09_SaharaSandpit            db
-Track_0A_ThePottedPassage         db ; Helicopter!
+Track_0A_ThePottedPassage         db ; Chopper!
 Track_0B_FruitJuiceFollies        db
 Track_0C_FoamyFjords              db
 Track_0D_BedroomBattlefield       db
 Track_0E_PitfallPockets           db
 Track_0F_PencilPlateaux           db
 Track_10_TheDareDevilDunes        db
-Track_11_TheShrubberyTwist        db ; Helicopter!
+Track_11_TheShrubberyTwist        db ; Chopper!
 Track_12_PerilousPitStop          db
 Track_13_WideAwakeWarZone         db
 Track_14_CrayonCanyons            db
 Track_15_SoapLakeCity             db
-Track_16_TheLeafyBends            db ; Helicopter!
+Track_16_TheLeafyBends            db ; Chopper!
 Track_17_ChalkDustChicane         db
 Track_18_GoForIt                  db
 Track_19_WinThisRaceToBeChampion  db
@@ -917,7 +930,7 @@ _RAM_D6C8_HeaderTilesIndexOffset db
 _RAM_D6C9_ControllingPlayersLR1Buttons db ; Combination of player 1 and 2 when applicable, else player 1
 _RAM_D6CA_ db
 _RAM_D6CB_MenuScreenState db ; Meaning depends on which menu screen we are on?
-_RAM_D6CC_TwoPlayerTrackSelectIndex db
+_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based db ; 1-based track select index, or 0 for null state
 _RAM_D6CD_ db
 _RAM_D6CE_ db
 _RAM_D6CF_GearToGearTrackSelectIndex db
@@ -1027,10 +1040,10 @@ _RAM_D94C_SoundChannels instanceof SoundChannel 2
 _RAM_D952_EngineSound1ActualTone instanceof BigEndianWord
 _RAM_D954_EngineSound2ActualTone instanceof BigEndianWord
 _RAM_D956_Sound_ToneEngineSoundsIndex db
-_RAM_D957_Sound_HelicopterEngineIndex db
+_RAM_D957_Sound_ChopperEngineIndex db
 _RAM_D958_Sound_LastAttenuation db
 _RAM_D959_Unused db
-_RAM_D95A_Sound_IsHelicopterEngine db
+_RAM_D95A_Sound_IsChopperEngine db
 _RAM_D95B_EngineSound1 instanceof EngineSound
 _RAM_D963_SFX_Player1 instanceof SFXData
 _RAM_D96C_EngineSound2 instanceof EngineSound
@@ -5397,7 +5410,7 @@ LABEL_1CFF_:
   ld (_RAM_DF6A_), a
 +:ret
 
-DATA_1D25_HelicoptersAnimatedPalette_GG:
+DATA_1D25_ChoppersAnimatedPalette_GG:
 .rept 2
   GGCOLOUR $0000ee
   GGCOLOUR $4444ee
@@ -7522,7 +7535,7 @@ DATA_2FBC_ProgressTilesPerLapPerTrack:
 .db $42 $72 $6A $00 ; Warriors   
 .db $2C $40 $53 $00 ; Tanks      
 .db $38 $3E $4B $00 ; RuffTrux   
-                    ; No Helicopters
+                    ; No Choppers
 
 LABEL_2FDC_Falling:
   ld a, (_RAM_D5C1_)
@@ -9179,7 +9192,7 @@ LABEL_3DBD_:
 
 .section "Track tiles data pages" force
 DATA_3DC8_TrackTypeTileDataPages:
-.db :DATA_3C000_Sportscars_Tiles :DATA_39C83_FourByFour_Tiles :DATA_3D901_Powerboats_Tiles :DATA_38000_TurboWheels_Tiles :DATA_34000_FormulaOne_Tiles :DATA_3A8FA_Warriors_Tiles :DATA_39168_Tanks_Tiles :DATA_3CD8D_RuffTrux_Tiles :DATA_34000_Helicopters_Tiles_BadReference
+.db :DATA_3C000_Sportscars_Tiles :DATA_39C83_FourByFour_Tiles :DATA_3D901_Powerboats_Tiles :DATA_38000_TurboWheels_Tiles :DATA_34000_FormulaOne_Tiles :DATA_3A8FA_Warriors_Tiles :DATA_39168_Tanks_Tiles :DATA_3CD8D_RuffTrux_Tiles :DATA_34000_Choppers_Tiles_BadReference
 .ends
 
 .section "Trampolines 11" force
@@ -9235,7 +9248,7 @@ DATA_3E3A_TrackTypeDataPageNumbers:
 .db :DATA_20000_TrackData_Warriors
 .db :DATA_24000_TrackData_Tanks
 .db :DATA_28000_TrackData_RuffTrux
-.db :DATA_2C000_TrackData_Helicopters_BadReference
+.db :DATA_2C000_TrackData_Choppers_BadReference
 
 LABEL_3E43_Submerged:
   ; Check the timer
@@ -9304,7 +9317,7 @@ DATA_3EEC_CarTileDataLookup_Lo:
 DATA_3EF4_CarTilesDataLookup_PageNumber:
 .db :DATA_34958_CarTiles_Sportscars :DATA_34CF0_CarTiles_FourByFour :DATA_35048_CarTiles_Powerboats :DATA_35350_CarTiles_TurboWheels :DATA_30000_CarTiles_FormulaOne :DATA_30330_CarTiles_Warriors :DATA_306D0_CarTiles_Tanks :DATA_1296A_CarTiles_RuffTrux 
 .ifdef UNNECESSARY_CODE
-.db :DATA_30000_CarTiles_Helicopters_BadReference
+.db :DATA_30000_CarTiles_Choppers_BadReference
 .endif
 
 ; Data from 3EFD to 3F04 (8 bytes)
@@ -9679,7 +9692,7 @@ DATA_4105_CarDecoratorOffsets: ; 32 bytes per track type, copied to _RAM_DA00_De
 ; RuffTrux
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
-; Helicopters
+; Choppers
 .db $03 $05 $06 $06 $07 $06 $06 $05 $03 $02 $01 $01 $00 $01 $01 $02
 .db $05 $06 $06 $07 $08 $0A $0B $0B $0C $0B $0B $0A $08 $07 $06 $06
 
@@ -13661,10 +13674,10 @@ DATA_650C_SoundInitialisationData:
 .dw $0000 ; _RAM_D952_EngineSound1ActualTone
 .dw $0000 ; _RAM_D954_EngineSound2ActualTone
 .db $00 ; _RAM_D956_Sound_ToneEngineSoundsIndex
-.db $00 ; _RAM_D957_Sound_HelicopterEngineIndex
+.db $00 ; _RAM_D957_Sound_ChopperEngineIndex
 .db $00 ; _RAM_D958_Sound_LastAttenuation
 .db $00 ; _RAM_D959_Unused
-.db $00 ; _RAM_D95A_Sound_IsHelicopterEngine
+.db $00 ; _RAM_D95A_Sound_IsChopperEngine
 
   DefineEngineSound LOWEST_PITCH_ENGINE_TONE, $03, MAX_ENGINE_VOLUME, $00 $15 $0B $15 ; _RAM_D95B_EngineSound1
 .dstruct SFX_Player1_Init instanceof SFXData data 0, 0, 0, 0, 0, 0 ; _RAM_D963_SFX_Player1
@@ -15982,19 +15995,19 @@ DATA_766A_TrackList_TrackTypes:
 .db TT_5_Warriors 
 .db TT_2_Powerboats 
 .db TT_3_TurboWheels 
-.db TT_8_Helicopters 
+.db TT_8_Choppers 
 .db TT_1_FourByFour 
 .db TT_2_Powerboats 
 .db TT_6_Tanks 
 .db TT_4_FormulaOne 
 .db TT_0_SportsCars 
 .db TT_3_TurboWheels 
-.db TT_8_Helicopters 
+.db TT_8_Choppers 
 .db TT_5_Warriors 
 .db TT_6_Tanks 
 .db TT_0_SportsCars 
 .db TT_2_Powerboats 
-.db TT_8_Helicopters 
+.db TT_8_Choppers 
 .db TT_4_FormulaOne 
 .db TT_6_Tanks 
 .db TT_0_SportsCars 
@@ -16014,19 +16027,19 @@ DATA_7687_TrackList_TrackIndexes:
 .db 1 ; Warriors 
 .db 1 ; Powerboats 
 .db 0 ; TurboWheels
-.db 0 ; Helicopters
+.db 0 ; Choppers
 .db 2 ; FourByFour 
 .db 3 ; Powerboats 
 .db 0 ; Tanks 
 .db 1 ; FormulaOne 
 .db 1 ; SportsCars 
 .db 2 ; TurboWheels
-.db 1 ; Helicopters
+.db 1 ; Choppers
 .db 2 ; Warriors 
 .db 1 ; Tanks 
 .db 2 ; SportsCars 
 .db 2 ; Powerboats 
-.db 2 ; Helicopters
+.db 2 ; Choppers
 .db 2 ; FormulaOne 
 .db 2 ; Tanks 
 .db 2 ; SportsCars 
@@ -16046,19 +16059,19 @@ DATA_76A4_TrackList_TopSpeeds_SMS:
 .db $0A ; Warriors    1 
 .db $09 ; Powerboats  1 
 .db $0B ; TurboWheels 0 
-.db $08 ; Helicopters 0 (8, 8, 8 - unused anyway)
+.db $08 ; Choppers    0 (8, 8, 8 - unused anyway)
 .db $09 ; FourByFour  2 
 .db $09 ; Powerboats  3 
 .db $07 ; Tanks       0 (7, 7, 7)
 .db $0B ; FormulaOne  1 
 .db $0B ; SportsCars  1 
 .db $0B ; TurboWheels 2 
-.db $08 ; Helicopters 1 
+.db $08 ; Choppers    1 
 .db $0A ; Warriors    2 
 .db $07 ; Tanks       1 
 .db $0B ; SportsCars  2 
 .db $09 ; Powerboats  2 
-.db $08 ; Helicopters 2 
+.db $08 ; Choppers    2 
 .db $0B ; FormulaOne  2 
 .db $07 ; Tanks       2 
 .db $0B ; SportsCars  2 
@@ -16078,19 +16091,19 @@ DATA_76C1_TrackList_AccelerationDelay_SMS:
 .db $12 ; Warriors    1
 .db $10 ; Powerboats  1
 .db $0E ; TurboWheels 0
-.db $12 ; Helicopters 0 (12, 12, 12)
+.db $12 ; Choppers    0 (12, 12, 12)
 .db $12 ; FourByFour  2
 .db $10 ; Powerboats  3
 .db $06 ; Tanks       0 (6, 6, 6)
 .db $0F ; FormulaOne  1
 .db $09 ; SportsCars  1
 .db $0D ; TurboWheels 2
-.db $12 ; Helicopters 1
+.db $12 ; Choppers    1
 .db $12 ; Warriors    2
 .db $06 ; Tanks       1
 .db $09 ; SportsCars  2
 .db $10 ; Powerboats  2
-.db $12 ; Helicopters 2
+.db $12 ; Choppers    2
 .db $0F ; FormulaOne  2
 .db $06 ; Tanks       2
 .db $09 ; SportsCars  2
@@ -16110,19 +16123,19 @@ DATA_76DE_TrackList_DecelerationDelay_SMS:
 .db $27 ; Warriors    1
 .db $12 ; Powerboats  1
 .db $19 ; TurboWheels 0
-.db $12 ; Helicopters 0 (12, 12, 12)
+.db $12 ; Choppers    0 (12, 12, 12)
 .db $12 ; FourByFour  2
 .db $12 ; Powerboats  3
 .db $06 ; Tanks       0 (6, 6, 6)
 .db $1A ; FormulaOne  1
 .db $16 ; SportsCars  1
 .db $19 ; TurboWheels 2
-.db $12 ; Helicopters 1
+.db $12 ; Choppers    1
 .db $27 ; Warriors    2
 .db $06 ; Tanks       1
 .db $16 ; SportsCars  2
 .db $12 ; Powerboats  2
-.db $12 ; Helicopters 2
+.db $12 ; Choppers    2
 .db $1A ; FormulaOne  2
 .db $06 ; Tanks       2
 .db $16 ; SportsCars  2
@@ -16142,19 +16155,19 @@ DATA_76FB_TrackList_SteeringDelay_SMS:
 .db $06 ; Warriors    1
 .db $07 ; Powerboats  1
 .db $06 ; TurboWheels 0
-.db $06 ; Helicopters 0 (6, 6, 6)
+.db $06 ; Choppers    0 (6, 6, 6)
 .db $06 ; FourByFour  2
 .db $07 ; Powerboats  3
 .db $09 ; Tanks       0 (9, 9, 9)
 .db $06 ; FormulaOne  1
 .db $06 ; SportsCars  1
 .db $06 ; TurboWheels 2
-.db $06 ; Helicopters 1
+.db $06 ; Choppers    1
 .db $06 ; Warriors    2
 .db $09 ; Tanks       1
 .db $06 ; SportsCars  2
 .db $07 ; Powerboats  2
-.db $06 ; Helicopters 2
+.db $06 ; Choppers    2
 .db $06 ; FormulaOne  2
 .db $09 ; Tanks       2
 .db $06 ; SportsCars  2
@@ -16175,19 +16188,19 @@ DATA_7718_TrackList_TopSpeeds_GG:
 .db $08 ; Warriors    1 
 .db $07 ; Powerboats  1 
 .db $09 ; TurboWheels 0 
-.db $06 ; Helicopters 0 (6, 6, 6)    (SMS - 2)
+.db $06 ; Choppers    0 (6, 6, 6)    (SMS - 2)
 .db $07 ; FourByFour  2 
 .db $07 ; Powerboats  3 
 .db $05 ; Tanks       0 (5, 5, 5)    (SMS - 2)
 .db $09 ; FormulaOne  1 
 .db $0A ; SportsCars  1 
 .db $09 ; TurboWheels 2 
-.db $06 ; Helicopters 1 
+.db $06 ; Choppers    1 
 .db $08 ; Warriors    2 
 .db $05 ; Tanks       1 
 .db $0A ; SportsCars  2 
 .db $07 ; Powerboats  2 
-.db $06 ; Helicopters 2 
+.db $06 ; Choppers    2 
 .db $09 ; FormulaOne  2 
 .db $05 ; Tanks       2 
 .db $0A ; SportsCars  2 
@@ -16208,19 +16221,19 @@ DATA_7735_TrackList_AccelerationDelay_GG:
 .db $17 ; Warriors    1
 .db $14 ; Powerboats  1
 .db $10 ; TurboWheels 0
-.db $14 ; Helicopters 0 (14, 14, 14)     (SMS + 2)
+.db $14 ; Choppers    0 (14, 14, 14)     (SMS + 2)
 .db $14 ; FourByFour  2
 .db $14 ; Powerboats  3
 .db $08 ; Tanks       0 (8, 8, 8)        (SMS + 2)
 .db $11 ; FormulaOne  1
 .db $09 ; SportsCars  1
 .db $0D ; TurboWheels 2
-.db $14 ; Helicopters 1
+.db $14 ; Choppers    1
 .db $17 ; Warriors    2
 .db $08 ; Tanks       1
 .db $09 ; SportsCars  2
 .db $14 ; Powerboats  2
-.db $14 ; Helicopters 2
+.db $14 ; Choppers    2
 .db $11 ; FormulaOne  2
 .db $08 ; Tanks       2
 .db $09 ; SportsCars  2
@@ -16241,19 +16254,19 @@ DATA_7752_TrackList_DecelerationDelay_GG:
 .db $29 ; $27 ; Warriors    1
 .db $14 ; $12 ; Powerboats  1
 .db $1B ; $19 ; TurboWheels 0
-.db $14 ; $12 ; Helicopters 0 (14, 14, 14)     (SMS + 2)
+.db $14 ; $12 ; Choppers    0 (14, 14, 14)     (SMS + 2)
 .db $14 ; $12 ; FourByFour  2
 .db $14 ; $12 ; Powerboats  3
 .db $08 ; $06 ; Tanks       0 (8, 8, 8)        (SMS + 2)
 .db $1C ; $1A ; FormulaOne  1
 .db $18 ; $16 ; SportsCars  1
 .db $1B ; $19 ; TurboWheels 2
-.db $14 ; $12 ; Helicopters 1
+.db $14 ; $12 ; Choppers    1
 .db $29 ; $27 ; Warriors    2
 .db $08 ; $06 ; Tanks       1
 .db $18 ; $16 ; SportsCars  2
 .db $14 ; $12 ; Powerboats  2
-.db $14 ; $12 ; Helicopters 2
+.db $14 ; $12 ; Choppers    2
 .db $1C ; $1A ; FormulaOne  2
 .db $08 ; $06 ; Tanks       2
 .db $18 ; $16 ; SportsCars  2
@@ -16274,19 +16287,19 @@ DATA_776F_TrackList_SteeringDelay_GG:
 .db $07 ; $06 ; Warriors    1
 .db $08 ; $07 ; Powerboats  1
 .db $07 ; $06 ; TurboWheels 0
-.db $07 ; $06 ; Helicopters 0 (7, 7, 7)     (SMS + 1)
+.db $07 ; $06 ; Choppers    0 (7, 7, 7)     (SMS + 1)
 .db $07 ; $06 ; FourByFour  2
 .db $08 ; $07 ; Powerboats  3
 .db $0A ; $09 ; Tanks       0 (a, a, a)     (SMS + 1)
 .db $07 ; $06 ; FormulaOne  1
 .db $07 ; $06 ; SportsCars  1
 .db $07 ; $06 ; TurboWheels 2
-.db $07 ; $06 ; Helicopters 1
+.db $07 ; $06 ; Choppers    1
 .db $07 ; $06 ; Warriors    2
 .db $0A ; $09 ; Tanks       1
 .db $07 ; $06 ; SportsCars  2
 .db $08 ; $07 ; Powerboats  2
-.db $07 ; $06 ; Helicopters 2
+.db $07 ; $06 ; Choppers    2
 .db $07 ; $06 ; FormulaOne  2
 .db $0A ; $09 ; Tanks       2
 .db $07 ; $06 ; SportsCars  2
@@ -17624,7 +17637,7 @@ LABEL_8101_Unknown: ; unreachable?
   ld a,(_RAM_D680_Player1Controls_Menus)
   and BUTTON_1_MASK | BUTTON_2_MASK
   JrNzRet +
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, $8e ; Page $e, high bit ignored
   ld (_RAM_D741_RequestedPageIndex), a
   JumpToRamCode LABEL_3BCEF_Trampoline_Unknown
@@ -17710,7 +17723,7 @@ LABEL_8114_MenuIndex0_TitleScreen_Initialise:
 .endif
 
   ld c, Music_01_TitleScreen
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 
@@ -17726,7 +17739,7 @@ LABEL_81C1_InitialiseSelectGameMenu:
   call LABEL_BAD5_LoadMenuLogoTiles
   call LABEL_BDED_LoadMenuLogoTilemap
   ld c, Music_07_Menus
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, 0
   ld (_RAM_D6C7_IsTwoPlayer), a
   call LABEL_BB95_LoadSelectMenuGraphics
@@ -17789,7 +17802,7 @@ LABEL_8205_InitialiseOnePlayerSelectCharacterMenu:
   call LABEL_BDA6_
   ; Start music
   ld c, Music_02_CharacterSelect
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_A67C_
   call LABEL_97EA_DrawDriverPortraitColumn
   call LABEL_B3AE_
@@ -17824,7 +17837,7 @@ LABEL_8272_:
   call LABEL_BCCF_EmitTilemapRectangleSequence
 
   ld c, Music_05_RaceStart
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, :TEXT_3ECC9_Vehicle_Name_Powerboats
   ld (_RAM_D741_RequestedPageIndex), a
   TilemapWriteAddressToHL 8, 22
@@ -17879,7 +17892,7 @@ LABEL_82DF_MenuIndex1_QualificationResults_Initialise:
   call LABEL_A5B0_EmitToVDP_Text
   ; Music, timer and done
   ld c, Music_08_GameOver
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
 .ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -17953,7 +17966,7 @@ _LABEL_8360_Qualified:
   out (PORT_VDP_DATA), a
   ; Music, timer and done
   ld c, Music_06_Results
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld hl, 8 * 50 ; 8s @ 50Hz, 6.66666666666667s @ 60Hz
   ld (_RAM_D6AB_MenuTimer), hl
   TailCall LABEL_BB75_ScreenOnAtLineFF
@@ -17996,7 +18009,7 @@ LABEL_841C_:
   ld (_RAM_D6AE_), a
   call LABEL_B3AE_
   ld c, Music_02_CharacterSelect
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, (_RAM_DBFB_PortraitCurrentIndex)
   ld (_RAM_D6A2_), a
   ld c, a
@@ -18010,7 +18023,7 @@ LABEL_8486_InitialiseDisplayCase:
   ld (_RAM_D699_MenuScreenIndex), a
   call LABEL_B2BB_DrawMenuScreenBase_WithLine
   ld c, Music_07_Menus
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_A787_
   call LABEL_AD42_DrawDisplayCase
   call LABEL_B230_DisplayCase_BlankRuffTrux
@@ -18057,7 +18070,7 @@ LABEL_84C7_InitialiseOnePlayerTrackIntro:
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld c, Music_05_RaceStart
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
@@ -18165,7 +18178,7 @@ LABEL_8507_MenuIndex2_FourPlayerResults_Initialise:
   
   ; Play music
   ld c, Music_06_Results
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   
   ; Check if we won that one
   ld a, (_RAM_DBCF_LastRacePosition)
@@ -18241,7 +18254,7 @@ LABEL_85F4_:
   ld (_RAM_D6AB_MenuTimer.Lo), a
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld c, Music_09_PlayerOut
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_866C_MenuIndex3_LifeWonOrLost_Initialise:
@@ -18343,7 +18356,7 @@ LABEL_866C_MenuIndex3_LifeWonOrLost_Initialise:
   call LABEL_93CE_UpdateSpriteTable
   ; Music, timer and done
   ld c, Music_0A_LostLife
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, 2.56 * 50 ; 2.56s @ 50Hz, 2.13333333333333s @ 60Hz
   ld (_RAM_D6AB_MenuTimer.Lo), a
   jp LABEL_8826_
@@ -18377,7 +18390,7 @@ _LABEL_8717_GameOver:
   xor a
   out (PORT_VDP_DATA), a
   ld c, Music_08_GameOver
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -18442,7 +18455,7 @@ _LABEL_876B_RuffTruxWon:
   ld (_RAM_D721_SpriteY), a
   call LABEL_93CE_UpdateSpriteTable
   ld c, Music_06_Results
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, 4 * 50 ; 4s @ 50Hz, 3.33333333333333s @ 60Hz
   ld (_RAM_D6AB_MenuTimer.Lo), a
   jp LABEL_8826_
@@ -18470,7 +18483,7 @@ LABEL_87E9_RuffTruxLost:
   xor a
   out (PORT_VDP_DATA), a
   ld c, Music_0A_LostLife
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, 2.56 * 50 ; 2.56s @ 50Hz, 2.13333333333333s @ 60Hz
   ld (_RAM_D6AB_MenuTimer.Lo), a
 LABEL_8826_:
@@ -18559,7 +18572,7 @@ LABEL_8877_:
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld c, Music_05_RaceStart
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 TEXT_8929_TripleWin:    .asc "TRIPLE WIN !!!"
@@ -18619,7 +18632,7 @@ LABEL_8953_InitialiseTwoPlayersMenu:
   call LABEL_97EA_DrawDriverPortraitColumn
   call LABEL_B3AE_
   ld c, Music_02_CharacterSelect
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   TailCall LABEL_BB75_ScreenOnAtLineFF
 
 LABEL_89E2_:
@@ -18644,7 +18657,7 @@ LABEL_89E2_:
   call LABEL_BC0C_LoadSelectMenuTilemaps
   call LABEL_A530_DrawChooseGameText
   ld c, Music_07_Menus
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_9317_InitialiseHandSprites
   xor a
   ld (_RAM_D6A0_MenuSelection), a
@@ -18801,7 +18814,7 @@ LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise:
   ld (_RAM_D6AB_MenuTimer.Hi), a
   ld (_RAM_D6C1_), a
   ld (_RAM_D693_SlowLoadSlideshowTiles), a
-  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based), a
   ld (_RAM_D6CE_), a
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerResult
@@ -18811,7 +18824,7 @@ LABEL_8A38_MenuIndex4_HeadToHeadResults_Initialise:
   jr z, +
   call LABEL_A673_SelectLowSpriteTiles
   ld c, Music_05_RaceStart
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_9317_InitialiseHandSprites
   ld hl, DATA_2B356_SpriteNs_HandLeft
   CallRamCode LABEL_3BBB5_PopulateSpriteNs
@@ -18865,12 +18878,12 @@ _player2:
   call LABEL_AB9B_Decompress3bppTiles_Index160
   call LABEL_ABB0_
   ld c, Music_05_RaceStart
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   jp LABEL_8B9D_
 
 LABEL_8B89_:
   ld c, Music_0B_TwoPlayerResult
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_A0B4_
   call LABEL_B7FF_
   ld a, (_RAM_DC34_IsTournament)
@@ -18952,18 +18965,18 @@ LABEL_8BAB_Handler_MenuScreen_Title:
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, LABEL_8C2C_GoToTwoPlayerMenu
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_81C1_InitialiseSelectGameMenu
 +++:
   jp LABEL_80FC_EndMenuScreenHandler
 
 LABEL_8C23_StartCourseSelect:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_B70B_
   jp LABEL_80FC_EndMenuScreenHandler
 
 LABEL_8C2C_GoToTwoPlayerMenu:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8953_InitialiseTwoPlayersMenu
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -18985,7 +18998,7 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   jr nz, +
 
   ; Reset to the start
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8114_MenuIndex0_TitleScreen_Initialise
   jp LABEL_80FC_EndMenuScreenHandler
 
@@ -19006,7 +19019,7 @@ LABEL_8C35_Handler_MenuScreen_SelectPlayerCount:
   and BUTTON_1_MASK ; $10
   jp nz, LABEL_80FC_EndMenuScreenHandler
   ; And a button was pressed
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_D699_MenuScreenIndex)
   cp MenuScreen_TwoPlayerGameType
   jr z, ++
@@ -19110,7 +19123,7 @@ LABEL_8CE7_Handler_MenuScreen_OnePlayerSelectCharacter:
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
   ld (_RAM_DBFD_), a
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8272_
 LABEL_8D28_MenuScreenHandlerDone:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -19156,7 +19169,7 @@ LABEL_8D2B_Handler_MenuScreen_RaceName:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, $01
   ld (_RAM_D6D5_InGame), a
 +++:
@@ -19186,7 +19199,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
 +:; Timer expired, or button press expired it early
   ld a, $01
   ld (_RAM_D6B9_), a
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
   jr z, +++
@@ -19209,7 +19222,7 @@ LABEL_8D79_Handler_MenuScreen_Qualify:
   or a
   jr nz, +
   ; Timer reached 0, reset to title screen
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 +:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -19242,7 +19255,7 @@ LABEL_8DCC_Handler_MenuScreen_WhoDoYouWantToRace:
   ld (_RAM_DBFC_), a
   ld a, (_RAM_D6AE_)
   ld (_RAM_DBFD_), a
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8486_InitialiseDisplayCase
 +:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -19304,7 +19317,7 @@ LABEL_8E54_:
   ld a, $01
   ld (_RAM_D697_), a
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC0A_WinsInARow)
   cp WINS_IN_A_ROW_FOR_RUFFTRUX
   jr nz, +
@@ -19365,7 +19378,7 @@ LABEL_8E97_Handler_MenuScreen_OnePlayerTrackIntro:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, $01
   ld (_RAM_D6D5_InGame), a
 +++:
@@ -19400,7 +19413,7 @@ LABEL_8F10_:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DBCF_LastRacePosition)
   cp $02
   jr nc, LABEL_8F73_LoseALife
@@ -19481,7 +19494,7 @@ LABEL_8F93_Handler_MenuScreen_UnknownB:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_841C_
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -19584,7 +19597,7 @@ _LABEL_902E_LifeSpriteUpdateDone:
   and BUTTON_1_MASK ; $10
   jr nz, +++
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC38_LifeWonOrLost_Mode)
   dec a
   jr z, ++ ; LifeWonOrLostMode_GameOver
@@ -19644,7 +19657,7 @@ LABEL_9074_Handler_MenuScreen_UnknownD:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, $01
   ld (_RAM_D6D5_InGame), a
 +++:
@@ -19826,11 +19839,11 @@ LABEL_91E8_TitleScreenSlideshow_Increment:
   ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   add a, 1
   ld (_RAM_D691_TitleScreenSlideshowIndex), a
-  ; Skip choppers
-  cp 6
+  ; Skip helicopters
+  cp MenuTT_6_Choppers
   jr z, LABEL_91E8_TitleScreenSlideshow_Increment ; -> self
-  ; Loop 9 -> 0
-  cp 10
+  ; Loop max -> start
+  cp _sizeof__DATA_9254_VehiclePortraitOffsets / 2
   jr nz, +
   xor a
   ld (_RAM_D691_TitleScreenSlideshowIndex), a
@@ -19849,7 +19862,7 @@ LABEL_91E8_TitleScreenSlideshow_Increment:
   ; Point decompressor to the next tileset
   ld a, (_RAM_D691_TitleScreenSlideshowIndex)
   sla a
-  ld d, $00
+  ld d, 0
   ld e, a
   ld hl, _DATA_9254_VehiclePortraitOffsets
   add hl, de
@@ -19888,8 +19901,7 @@ LABEL_91E8_TitleScreenSlideshow_Increment:
 ; Data from 9254 to 9267 (20 bytes)
 _DATA_9254_VehiclePortraitOffsets:
 ; Pointers to compressed tile data for the title screen slideshow
-; Index 0 is special, the value is not used
-; Index 6 is skippwd
+; Indexed by a MenuTT_ enum, cycled through by the slideshow
 .dw DATA_2AB4D_Tiles_Portrait_RuffTrux
 .dw DATA_FAA5_Tiles_Portrait_SportsCars
 .dw DATA_1F3E4_Tiles_Portrait_Powerboats
@@ -21524,13 +21536,13 @@ LABEL_9FB8_DrawOrBlank10PortraitTiles:
   jr z, LABEL_9F74_BlankVRAMRegion
   JumpToRamCode LABEL_3BC53_EmitTen3bppTiles
 
-LABEL_9FC5_:
+LABEL_9FC5_PrintOrFlashProLabel:
   ld a, (_RAM_DC3B_IsTrackSelect)
   or a
-  jr z, +
-  jp LABEL_AA02_
+  jr z, @TwoPLayer  
+  jp LABEL_AA02_ ; ???
 
-+:
+@TwoPLayer:
   ld bc, $0000 ; Offset 5 rows down for SMS
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
@@ -21538,19 +21550,24 @@ LABEL_9FC5_:
   ld bc, TILEMAP_ROW_SIZE * 5 ; $0140
 +:
   ld a, (_RAM_D6CE_)
+  ; Zero -> always draw blanks
   or a
-  jr z, +++
+  jr z, @@Blanks
   ld a, (_RAM_D6AF_FlashingCounter)
+  ; Check for %-----1--, i.e. 8 frames in each state
   sra a
   sra a
-  and $01
-  jp nz, +++
+  and 1
+  jp nz, @@Blanks
+  ; Zero -> draw "PRO"
   ld a, (_RAM_D6CE_)
-  cp $80
+  cp TRACK_SELECT_PRO_POSITION1
   jr z, +
+  ; Position 2
   TilemapWriteAddressToHL 6, 22
   jp ++
-+:TilemapWriteAddressToHL 7, 22
++:; Position 1
+  TilemapWriteAddressToHL 7, 22
 ++:
   add hl, bc
   call LABEL_B35A_VRAMAddressToHL
@@ -21558,7 +21575,7 @@ LABEL_9FC5_:
   ld hl, TEXT_A019_Pro
   jp LABEL_A5B0_EmitToVDP_Text
 
-+++:
+@@Blanks:
   TilemapWriteAddressToHL 6, 22
   add hl, bc
   call LABEL_B35A_VRAMAddressToHL
@@ -21568,22 +21585,40 @@ LABEL_9FC5_:
 
 TEXT_A019_Pro:  .asc "PRO"
 
-LABEL_A01C_:
+LABEL_A01C_GetTwoPlayerTrackSelectTrackType:
+  ; Get data
   ld c, a
-  ld b, $00
-  ld hl, DATA_A02E_
+  ld b, 0
+  ld hl, _DATA_TwoPlayerTrackSelectTrackTypes
   add hl, bc
   ld a, (hl)
   ld c, a
-  and $C0
+  ; High two bits go to _RAM_D6CE_
+  and %11000000 ; $C0
   ld (_RAM_D6CE_), a
   ld a, c
-  and $3F
+  ; Return low six bits
+  and %00111111 ; $3F
   ret
 
 ; Data from A02E to A038 (11 bytes)
-DATA_A02E_:
-.db $FF $01 $81 $03 $43 $08 $07 $05 $02 $04 $06
+_DATA_TwoPlayerTrackSelectTrackTypes:
+; Track type info for 2-player track select
+; $ff = nothing
+; else it's the track type + 1 with the high bit set for "pro"
+.define TRACK_SELECT_PRO_POSITION1 $80
+.define TRACK_SELECT_PRO_POSITION2 $40
+.db $ff
+.db TT_0_SportsCars + 1
+.db TT_0_SportsCars + 1 + TRACK_SELECT_PRO_POSITION1
+.db 3
+.db 3 + TRACK_SELECT_PRO_POSITION2
+.db 8
+.db 7
+.db 5
+.db 2
+.db 4
+.db 6
 
 LABEL_A039_:
   ld de, 0 ; Tilemap offset to apply (SMS)
@@ -22791,7 +22826,7 @@ LABEL_A9EB_:
   sra a
   sra a
   and $01
-  jp nz, LABEL_AA8B_
+  jp nz, LABEL_AA8B_BlankTwoRows
 LABEL_AA02_:
   ld a, (_RAM_DBD8_TrackIndex_Menus)
   sub $01
@@ -22862,7 +22897,7 @@ _LABEL_AA5D_ret:
   CallRamCode LABEL_3BC6A_EmitText
   ret
 
-LABEL_AA8B_:
+LABEL_AA8B_BlankTwoRows:
   ld a, (_RAM_DC3C_IsGameGear)
   dec a
   jr z, +
@@ -22871,10 +22906,10 @@ LABEL_AA8B_:
 +:TilemapWriteAddressToHL 0, 12
 ++:
   call LABEL_B35A_VRAMAddressToHL
-  ld bc, 32
+  ld bc, _sizeof_TEXT_AAAE_Blanks
   ld hl, TEXT_AAAE_Blanks
   call LABEL_A5B0_EmitToVDP_Text
-  ld bc, 32
+  ld bc, _sizeof_TEXT_AAAE_Blanks
   ld hl, TEXT_AAAE_Blanks
   jp LABEL_A5B0_EmitToVDP_Text
 
@@ -22922,19 +22957,19 @@ DATA_AB06_TrackNumberText:
 .asc " 7"
 .asc " 8"
 .asc " 9"
-.db 0,0 ; Helicopter track
+.db 0,0 ; Chopper track
 .asc "10"
 .asc "11"
 .asc "12"
 .asc "13"
 .asc "14"
 .asc "15"
-.db 0,0 ; Helicopter track
+.db 0,0 ; Chopper track
 .asc "16"
 .asc "17"
 .asc "18"
 .asc "19"
-.db 0,0 ; Helicopter track
+.db 0,0 ; Chopper track
 .asc "20"
 .asc "21"
 .asc "22"
@@ -22945,17 +22980,19 @@ DATA_AB06_TrackNumberText:
 
 ; Data from AB3E to AB4C (15 bytes)
 DATA_AB3E_CourseSelect_TrackTypes:
-; Maps the course select index to a track type
-.db TT_4_FormulaOne TT_1_FourByFour TT_5_Warriors TT_7_RuffTrux TT_4_FormulaOne TT_3_TurboWheels TT_5_Warriors TT_2_Powerboats TT_7_RuffTrux TT_6_Tanks TT_4_FormulaOne TT_2_Powerboats TT_8_Helicopters TT_3_TurboWheels TT_1_FourByFour TT_7_RuffTrux TT_6_Tanks TT_5_Warriors TT_8_Helicopters TT_1_FourByFour TT_2_Powerboats TT_6_Tanks TT_3_TurboWheels TT_8_Helicopters TT_1_FourByFour TT_9_Unknown TT_9_Unknown TT_9_Unknown TT_2_Powerboats
+; Maps the course select index to a (menu) track type
+.db MenuTT_4_FourByFour MenuTT_1_SportsCars MenuTT_5_Warriors MenuTT_7_TurboWheels MenuTT_4_FourByFour MenuTT_3_FormulaOne MenuTT_5_Warriors MenuTT_2_Powerboats MenuTT_7_TurboWheels MenuTT_6_Choppers MenuTT_4_FourByFour MenuTT_2_Powerboats MenuTT_8_Tanks MenuTT_3_FormulaOne MenuTT_1_SportsCars MenuTT_7_TurboWheels MenuTT_6_Choppers MenuTT_5_Warriors MenuTT_8_Tanks MenuTT_1_SportsCars MenuTT_2_Powerboats MenuTT_6_Choppers MenuTT_3_FormulaOne MenuTT_8_Tanks MenuTT_1_SportsCars MenuTT_9_RuffTrux MenuTT_9_RuffTrux MenuTT_9_RuffTrux MenuTT_2_Powerboats
 
 LABEL_AB5B_GetPortraitSource_CourseSelect:
   ld a, (_RAM_DBD8_TrackIndex_Menus)
   sub $01
   ld c, a
-  ld b, $00
+  ld b, 0
   ld hl, DATA_AB3E_CourseSelect_TrackTypes
   add hl, bc
   ld a, (hl)
+  ; Fall through
+
 LABEL_AB68_GetPortraitSource_TrackType:
   ld (_RAM_D691_TitleScreenSlideshowIndex), a
   sla a
@@ -22963,7 +23000,7 @@ LABEL_AB68_GetPortraitSource_TrackType:
   add a, e
   ld e, a
   ld a, d
-  adc a, $00
+  adc a, 0
   ld d, a
   ld a, (de)
   ld (_RAM_D7B5_DecompressorSource.Lo), a
@@ -23460,7 +23497,7 @@ LABEL_AF10_CheckGearToGear:
   ld (_RAM_DC41_GearToGearActive), a
   ; Restart music (to indicate connection?)
   ld c, Music_01_TitleScreen
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   jr LABEL_AF5D_BlankControlsRAM ; and ret
 
 .ifdef UNNECESSARY_CODE
@@ -23554,7 +23591,7 @@ LABEL_AFCD_InitialiseOnePlayerMenu:
   call LABEL_94AD_DrawHeaderTilemap
   call LABEL_B305_DrawHorizontalLine_Top
   ld c, Music_07_Menus
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   xor a
   ld (_RAM_D6C7_IsTwoPlayer), a
   call LABEL_BB95_LoadSelectMenuGraphics
@@ -23619,7 +23656,7 @@ LABEL_B06C_Handler_MenuScreen_OnePlayerMode:
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_1_MASK ; $10
   jp nz, LABEL_80FC_EndMenuScreenHandler
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_D6A0_MenuSelection)
   dec a
   jr nz, +
@@ -23672,7 +23709,7 @@ LABEL_B09F_Handler_MenuScreen_TwoPlayerSelectCharacter:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC3F_IsTwoPlayer)
   dec a
   jr z, +
@@ -23812,27 +23849,27 @@ TEXT_B1DD_No_SMS:   .asc "-NO- "
 TEXT_B1E2_No_GG:   .asc " -NO-"
 TEXT_B1E7_Yes:  .asc "-YES-"
 
-LABEL_B1EC_Trampoline_PlayMenuMusic:
+LABEL_B1EC_Trampoline_MusicStart:
 ; c = music index (1-based)
-  ld a, :LABEL_30CE8_MenuSound_StartTrack
+  ld a, :LABEL_30CE8_Music_Start
   ld (_RAM_D741_RequestedPageIndex), a
-  JumpToRamCode LABEL_3BCDC_Trampoline2_PlayMenuMusic
+  JumpToRamCode LABEL_3BCDC_Trampoline2_MusicStart
 
-LABEL_B1F4_Trampoline_StopMenuMusic:
-  ld a, :LABEL_30D28_StopMenuMusic
+LABEL_B1F4_Trampoline_StopMusic:
+  ld a, :LABEL_30D28_StopMusic
   ld (_RAM_D741_RequestedPageIndex), a
-  JumpToRamCode LABEL_3BCE6_Trampoline_StopMenuMusic
+  JumpToRamCode LABEL_3BCE6_Trampoline2_StopMusic
 
 LABEL_B1FC_TwoPlayerTrackSelect_GetIndex:
   ld a, (_RAM_DC34_IsTournament)
   dec a
   JrZRet +
   ld hl, DATA_B219_TwoPlayerTrackSelectIndices
-  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
-  sub $01 ; Make 0-based
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based)
+  sub 1 ; Make 0-based
 -:
   ld e, a
-  ld d, $00
+  ld d, 0
   add hl, de
   ld a, (hl)
   ld (_RAM_DBD8_TrackIndex_Menus), a
@@ -24395,7 +24432,7 @@ TEXT_B54D_RockHardMode: .asc "ROCK HARD MODE"
 LABEL_B56D_Handler_MenuScreen_TrackSelect:
   call LABEL_B9C4_CycleGearToGearTrackSelectIndex
   call LABEL_A2AA_PrintOrFlashMenuScreenText
-  call LABEL_9FC5_
+  call LABEL_9FC5_PrintOrFlashProLabel
   ld a, (_RAM_D6C1_)
   cp $01
   jr z, LABEL_B5E7_
@@ -24432,12 +24469,12 @@ LABEL_B56D_Handler_MenuScreen_TrackSelect:
   jr z, LABEL_B623_
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_L_MASK ; $04
-  jp z, LABEL_B640_
+  jp z, LABEL_B640_TrackSelect_Previous
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
   and BUTTON_R_MASK ; $08
-  jp z, LABEL_B666_
-  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
-  cp $00
+  jp z, LABEL_B666_TrackSelect_Next
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based)
+  cp 0
   jr z, LABEL_B618_
 +++:
   ld a, (_RAM_D6C9_ControllingPlayersLR1Buttons)
@@ -24463,7 +24500,7 @@ LABEL_B5E7_:
   jp LABEL_80FC_EndMenuScreenHandler
 
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
   jr z, +
@@ -24496,49 +24533,52 @@ LABEL_B623_:
   ld (_RAM_D697_), a
   ret
 
-LABEL_B640_:
+LABEL_B640_TrackSelect_Previous:
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
-  jr z, +++
-  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
-  sub $01
-  cp -1
+  jr z, @OnePlayer
+  
+@TwoPLayer:
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based)
+  sub 1
+  cp -1 ; Left at start
   jr z, +
-  or a
+  or a ; Or 1 -> 0
   jr nz, ++
-+:
-  ld a, $09 ; number of tracks in table
++:ld a, _sizeof_DATA_B219_TwoPlayerTrackSelectIndices ; max index
 ++:
-  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based), a
   jp ++++
 
-+++:
+@OnePlayer:
   call LABEL_B27E_DecrementCourseSelectIndex
   call LABEL_AB5B_GetPortraitSource_CourseSelect
-  call LABEL_AA8B_
+  call LABEL_AA8B_BlankTwoRows
   jp +++++
 
-LABEL_B666_:
+LABEL_B666_TrackSelect_Next:
   ld a, (_RAM_DC3B_IsTrackSelect)
   dec a
-  jr z, ++
-  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex)
-  add a, $01
-  cp $0A ; count + 1
+  jr z, @OnePlayer
+  
+@TwoPlayer:
+  ld a, (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based)
+  add a, 1
+  cp _sizeof_DATA_B219_TwoPlayerTrackSelectIndices + 1 ; past end?
   jr nz, +
-  ld a, $01
-+:
-  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
+  ld a, 1
++:ld (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based), a
   jp ++++
 
-++:
+@OnePlayer:
   call LABEL_B298_IncrementCourseSelectIndex
   call LABEL_AB5B_GetPortraitSource_CourseSelect
-  call LABEL_AA8B_
+  call LABEL_AA8B_BlankTwoRows
   jp +++++
 
+_TrackSelect_TwoPlayerUpdate:
 ++++:
-  call LABEL_A01C_
+  call LABEL_A01C_GetTwoPlayerTrackSelectTrackType
   call LABEL_AB68_GetPortraitSource_TrackType
 +++++:
   call LABEL_A0F0_BlankTilemapRectangle
@@ -24576,7 +24616,7 @@ LABEL_B6B1_Handler_MenuScreen_TwoPlayerResult:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   ld a, (_RAM_DC34_IsTournament)
   dec a
   jr z, +++
@@ -24616,7 +24656,7 @@ LABEL_B70B_:
   call LABEL_A296_LoadHandTiles
   ld a, $01
   ld (_RAM_DC3B_IsTrackSelect), a
-  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex), a
+  ld (_RAM_D6CC_TwoPlayerTrackSelectIndex_1Based), a
   ld (_RAM_DBD8_TrackIndex_Menus), a
   ld a, $B2
   ld (_RAM_D6C8_HeaderTilesIndexOffset), a
@@ -24637,7 +24677,7 @@ LABEL_B70B_:
   call LABEL_AB9B_Decompress3bppTiles_Index160
   call LABEL_ABB0_
   ld c, Music_07_Menus
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   call LABEL_A673_SelectLowSpriteTiles
   call LABEL_9317_InitialiseHandSprites
   ld hl, DATA_2B356_SpriteNs_HandLeft
@@ -24785,7 +24825,7 @@ LABEL_B84D_Handler_MenuScreen_TournamentChampion:
   and BUTTON_1_MASK ; $10
   jr nz, ++
 +:
-  call LABEL_B1F4_Trampoline_StopMenuMusic
+  call LABEL_B1F4_Trampoline_StopMusic
   call LABEL_8114_MenuIndex0_TitleScreen_Initialise
 ++:
   jp LABEL_80FC_EndMenuScreenHandler
@@ -24806,12 +24846,12 @@ LABEL_B877_:
   or a
   jr nz, +
   ld c, Music_03_Ending
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   jp ++
 
 +:
   ld c, Music_0C_TwoPlayerTournamentWinner
-  call LABEL_B1EC_Trampoline_PlayMenuMusic
+  call LABEL_B1EC_Trampoline_MusicStart
   ld a, (_RAM_DBCF_LastRacePosition)
   or a
   jr z, ++
@@ -25897,19 +25937,19 @@ DATA_FE25_TrackName_05: .asc "THE CUE-BALL CIRCUIT"
 DATA_FE39_TrackName_06: .asc "  HANDYMANS CURVE   "
 DATA_FE4D_TrackName_07: .asc "  BERMUDA BATHTUB   "
 DATA_FE61_TrackName_08: .asc "   SAHARA SANDPIT   "
-DATA_FE75_TrackName_09: .asc " THE POTTED PASSAGE " ; Helicopter!
+DATA_FE75_TrackName_09: .asc " THE POTTED PASSAGE " ; Choppers!
 DATA_FE89_TrackName_10: .asc "FRUIT-JUICE FOLLIES "
 DATA_FE9D_TrackName_11: .asc "    FOAMY FJORDS    "
 DATA_FEB1_TrackName_12: .asc "BEDROOM BATTLEFIELD "
 DATA_FEC5_TrackName_13: .asc "  PITFALL POCKETS   "
 DATA_FED9_TrackName_14: .asc "  PENCIL PLATEAUX   "
 DATA_FEED_TrackName_15: .asc "THE DARE-DEVIL DUNES"
-DATA_FF01_TrackName_16: .asc "THE SHRUBBERY TWIST " ; Helicopter!
+DATA_FF01_TrackName_16: .asc "THE SHRUBBERY TWIST " ; Choppers!
 DATA_FF15_TrackName_17: .asc " PERILOUS PIT-STOP  "
 DATA_FF29_TrackName_18: .asc "WIDE-AWAKE WAR-ZONE "
 DATA_FF3D_TrackName_19: .asc "   CRAYON CANYONS   "
 DATA_FF51_TrackName_20: .asc "  SOAP-LAKE CITY !  "
-DATA_FF65_TrackName_21: .asc "  THE LEAFY BENDS   " ; Helicopter!
+DATA_FF65_TrackName_21: .asc "  THE LEAFY BENDS   " ; Choppers!
 DATA_FF79_TrackName_22: .asc " CHALK-DUST CHICANE "
 DATA_FF8D_TrackName_23: .asc "     GO FOR IT!     "
 DATA_FFA2_TrackName_24: .asc " WIN THIS RACE TO BE CHAMPION!" ; Special case for length
@@ -28545,21 +28585,21 @@ _UseStart:
   ret
 
 LABEL_23CE6_UpdateAnimatedPalette:
-  ; Updates the top half of the tile palette for Powerboats and Helicopters levels
+  ; Updates the top half of the tile palette for Powerboats and Choppers levels
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS
 
   ; GG
   ld a, (_RAM_DB97_TrackType)
-  cp TT_8_Helicopters
+  cp TT_8_Choppers
   jr z, +
   cp TT_2_Powerboats
   jr z, ++
   ret
 
-+:; Helicopters (unused)
-  ld hl, DATA_1D25_HelicoptersAnimatedPalette_GG
++:; Choppers (unused)
+  ld hl, DATA_1D25_ChoppersAnimatedPalette_GG
   ld (_RAM_DF77_PaletteAnimationData), hl
   jp +++
 
@@ -28608,14 +28648,14 @@ LABEL_23CE6_UpdateAnimatedPalette:
 
 LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS:
   ld a, (_RAM_DB97_TrackType)
-  cp TT_8_Helicopters
+  cp TT_8_Choppers
   jr z, +
   cp TT_2_Powerboats
   jr z, ++
   ret
 
 +:
-  ld hl, DATA_23DA6_HelicoptersAnimatedPalette_SMS
+  ld hl, DATA_23DA6_ChoppersAnimatedPalette_SMS
   ld (_RAM_DF77_PaletteAnimationData), hl
   jp +++
 
@@ -28660,7 +28700,7 @@ LABEL_23D4B_SMS_UpdateAnimatedPalette_SMS:
   ret
 
 ; Data from 23DA6 to 23DB5 (16 bytes)
-DATA_23DA6_HelicoptersAnimatedPalette_SMS
+DATA_23DA6_ChoppersAnimatedPalette_SMS
   SMSCOLOUR $0000FF
   SMSCOLOUR $5555FF
   SMSCOLOUR $AAAAFF
@@ -28715,19 +28755,19 @@ DATA_23DE7_HandlingData_SMS:
 .db $11 $11 $45 $79 $BD $DD $DD $DD ; Warriors 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
 .db $11 $11 $11 $47 $AC $DD $DD $DD ; TurboWheels
-.db $11 $14 $8B $DF $FF $FF $FF $FF ; Helicopters
+.db $11 $14 $8B $DF $FF $FF $FF $FF ; Choppers
 .db $11 $11 $11 $24 $66 $66 $66 $66 ; FourByFour 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Tanks 
 .db $11 $11 $11 $24 $68 $99 $99 $99 ; FormulaOne 
 .db $11 $11 $11 $14 $69 $CD $DD $DD ; SportsCars 
 .db $11 $11 $11 $47 $AC $DD $DD $DD ; TurboWheels
-.db $11 $14 $8B $DF $FF $FF $FF $FF ; Helicopters
+.db $11 $14 $8B $DF $FF $FF $FF $FF ; Choppers
 .db $11 $11 $45 $79 $BD $DD $DD $DD ; Warriors 
 .db $11 $11 $11 $11 $12 $33 $33 $33 ; Tanks 
 .db $11 $11 $11 $14 $69 $CD $DD $DD ; SportsCars 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
-.db $11 $14 $8B $DF $FF $FF $FF $FF ; Helicopters
+.db $11 $14 $8B $DF $FF $FF $FF $FF ; Choppers
 .db $11 $11 $11 $24 $68 $99 $99 $99 ; FormulaOne 
 .db $11 $11 $11 $11 $12 $33 $33 $33 ; Tanks 
 .db $11 $11 $11 $14 $69 $CD $DD $DD ; SportsCars 
@@ -28748,19 +28788,19 @@ DATA_23ECF_HandlingData_GG:
 .db $11 $14 $57 $9B $DD $DD $DD $DD ; Warriors 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
 .db $11 $11 $14 $7A $CD $DD $DD $DD ; TurboWheels
-.db $11 $48 $BD $FF $FF $FF $FF $FF ; Helicopters
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Choppers
 .db $11 $11 $12 $46 $66 $66 $66 $66 ; FourByFour 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Tanks 
 .db $11 $11 $12 $46 $89 $99 $99 $99 ; FormulaOne 
 .db $11 $11 $11 $46 $9C $DD $DD $DD ; SportsCars 
 .db $11 $11 $14 $7A $CD $DD $DD $DD ; TurboWheels
-.db $11 $48 $BD $FF $FF $FF $FF $FF ; Helicopters
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Choppers
 .db $11 $14 $57 $9B $DD $DD $DD $DD ; Warriors 
 .db $11 $11 $11 $11 $23 $33 $33 $33 ; Tanks 
 .db $11 $11 $11 $46 $9C $DD $DD $DD ; SportsCars 
 .db $11 $11 $11 $11 $11 $11 $11 $11 ; Powerboats 
-.db $11 $48 $BD $FF $FF $FF $FF $FF ; Helicopters
+.db $11 $48 $BD $FF $FF $FF $FF $FF ; Choppers
 .db $11 $11 $12 $46 $89 $99 $99 $99 ; FormulaOne 
 .db $11 $11 $11 $11 $23 $33 $33 $33 ; Tanks 
 .db $11 $11 $11 $46 $9C $DD $DD $DD ; SportsCars 
@@ -29036,11 +29076,11 @@ LABEL_2B60E_Engine1Higher_Unused:
 
 LABEL_2B616_GameVBlankUpdateSound:
   ; Generate some cycling numbers
-  ld a, (_RAM_D957_Sound_HelicopterEngineIndex)
+  ld a, (_RAM_D957_Sound_ChopperEngineIndex)
   ld c, a
   inc a
   and $07 ; range 0..7
-  ld (_RAM_D957_Sound_HelicopterEngineIndex), a
+  ld (_RAM_D957_Sound_ChopperEngineIndex), a
   
   ld a, c
   and $03
@@ -29060,9 +29100,9 @@ LABEL_2B616_GameVBlankUpdateSound:
   
 .ifdef UNNECESSARY_CODE
   ; Select between helicopter and regular engine sounds
-  ld a, (_RAM_D95A_Sound_IsHelicopterEngine)
+  ld a, (_RAM_D95A_Sound_IsChopperEngine)
   or a
-  jr nz, LABEL_2B699_Sound_HelicopterEngine
+  jr nz, LABEL_2B699_Sound_ChopperEngine
 .endif
   
   ; And engine sounds (only two)
@@ -29123,7 +29163,7 @@ _UpdateSFXChannel2:
 
 .ifdef UNNECESSARY_CODE
 
-LABEL_2B699_Sound_HelicopterEngine:
+LABEL_2B699_Sound_ChopperEngine:
   ; SFX noise overrides this
   ld a, (_RAM_D963_SFX_Player1.Noise)
   ld c, a
@@ -29131,11 +29171,11 @@ LABEL_2B699_Sound_HelicopterEngine:
   or c
   ret nz
   
-  ld a, (_RAM_D957_Sound_HelicopterEngineIndex)
+  ld a, (_RAM_D957_Sound_ChopperEngineIndex)
   add a, a
   ld c, a
   ld b, $00
-  ld hl, DATA_2B791_HelicopterEngineSoundData
+  ld hl, DATA_2B791_ChopperEngineSoundData
   add hl, bc
   ld a, (hl)
   ; Table contains no 0s
@@ -29243,10 +29283,10 @@ LABEL_2B751_Sound_UpdateTone2WithRandomisedEngineTone:
   RandomiseEngineSoundTone _RAM_D974_SFX_Player2.Control _RAM_D954_EngineSound2ActualTone
 
 ; Data from 2B791 to 2B7A0 (16 bytes)
-DATA_2B791_HelicopterEngineSoundData:
+DATA_2B791_ChopperEngineSoundData:
 ; first is a noise channel mode control byte, or zero to not change it
 ; second is a volume (not attenuation, so $f = loudest)
-; Helicopter engine sound!
+; Chopper engine sound!
 .repeat 2
 .db PSG_NOISE_PERIODIC_FAST    $0F
 .db PSG_NOISE_TONE2            $0B
@@ -29573,7 +29613,7 @@ _SFX_16_Respawn_Noise:    .db PSG_NOISE_TONE2 0 0 PSG_NOISE_SLOW 0 0 PSG_NOISE_M
 .ORG $0000
 ;.section "Bank 11"
 
-DATA_2C000_TrackData_Helicopters_BadReference:
+DATA_2C000_TrackData_Choppers_BadReference:
 
 ; Data from 2C000 to 2FFFF (16384 bytes)
 ; Portrait data (3bpp)
@@ -29638,7 +29678,7 @@ DATA_2FF6F_Tilemap:
 
 .BANK 12
 .ORG $0000
-DATA_30000_CarTiles_Helicopters_BadReference:
+DATA_30000_CarTiles_Choppers_BadReference:
 
 .section "Formula One car tiles" force
 ; Data from 30000 to 30A67 (2664 bytes)
@@ -30347,7 +30387,7 @@ _LABEL_33FF7_ret:
 .ORG $0000
 ;.section "Bank 13"
 
-DATA_34000_Helicopters_Tiles_BadReference: ; Helicopters tiles used to be in this bank (?)
+DATA_34000_Choppers_Tiles_BadReference: ; Choppers tiles used to be in this bank (?)
 
 DATA_34000_FormulaOne_Tiles:
 .incbin "Assets/Formula One/Tiles.compressed" ; 3bpp bitplane separated
@@ -31878,18 +31918,18 @@ LABEL_36484_PatchForLevel:
   ; Also patches other stuff - code?
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
-  jp z, LABEL_3666D_Powerboats
+  jp z, @Powerboats
   cp TT_0_SportsCars
-  jp z, LABEL_366CB_SportsCars
+  jp z, @SportsCars
   cp TT_6_Tanks
-  jp z, LABEL_3665F_Tanks
+  jp z, @Tanks
   cp TT_4_FormulaOne
-  jr z, ++
+  jr z, @FormulaOne
   cp TT_3_TurboWheels
-  jr z, +
+  jr z, @TurboWheels
   ret
 
-+:; Turbo Wheels
+@TurboWheels:
   ; Tile 43 top left -> f, 2, 2, 1
   PatchBehaviourData 43, 1, 1, $0f
   PatchBehaviourData 43, 1, 2, $02
@@ -31897,7 +31937,7 @@ LABEL_36484_PatchForLevel:
   PatchBehaviourData 43, 1, 4, $01
   ret
 
-++: ; F1
+@FormulaOne:
   PatchWallData 58  0 %11000000 ; Hole (right)
   PatchWallData 58 15 %11110000
   PatchWallData 58  1 %00001111
@@ -31997,7 +32037,7 @@ LABEL_36484_PatchForLevel:
   PatchBehaviourData 58, 1, 4; $84
   ret
 
-LABEL_3665F_Tanks:
+@Tanks:
   ld a, (_RAM_DB96_TrackIndexForThisType)
   cp $01
   jr z, +
@@ -32008,7 +32048,7 @@ LABEL_3665F_Tanks:
   PatchLayout 8, 5, $19
   ret
 
-LABEL_3666D_Powerboats:
+@Powerboats:
   PatchBehaviourData 36, 0, 4, $04
   PatchBehaviourData 36, 1, 4; $04
   PatchBehaviourData 36, 2, 4; $04
@@ -32035,21 +32075,24 @@ LABEL_3666D_Powerboats:
 
 +:; Race 2 - Soap-Lake City!
   ; Change soap in tray over track to empty tray
-  PatchLayout 8, 8, $9D
+  PatchLayout 8, 8, $9D ; High bit set?
   ret
 
 ++: ; Race 0 - qualifying
+  ; Move soap in tray near track to the left a bit
   PatchLayout 12, 5, $1E
   PatchLayout 11, 5, $35
   ret
 
-+++: ; Race 1
-  PatchLayout 12, 8, $9D
++++: ; Race 1 - Bermuda Bathtub
+  ; Change soap in tray over track to empty tray
+  PatchLayout 12, 8, $9D ; High bit set?
+  ; Move soap in tray near track to the left a bit
   PatchLayout 17, 8, $35
   PatchLayout 18, 8, $1E
   ret
 
-LABEL_366CB_SportsCars:
+@SportsCars:
   ld a, (_RAM_DB96_TrackIndexForThisType)
   cp $02
   jr z, +
@@ -35359,7 +35402,7 @@ LABEL_3BB31_Emit3bppTileDataToVRAM:
 ; hl = source
 ; de = count of rows (3 bytes data => 1 row of pixels in a tile) to emit
 ; Write address must be set
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d974
 -:ld b, $03
   ld c, PORT_VDP_DATA
@@ -35377,7 +35420,7 @@ LABEL_3BB45_Emit3bppTileDataToVRAM:
 ; hl = source
 ; e = count of rows (3 bytes = 1 row of pixels in a tile) to emit
 ; Write address must be set
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d988
 -:ld b, $03
   ld c, PORT_VDP_DATA
@@ -35395,7 +35438,7 @@ LABEL_3BB57_EmitTilemapRectangle:
 ; Parameters in RAM
 ; Tile index $ff is converted to the blank tile from the font at index $0e
 ; - but if the high bit is set, it needs to be blank at $10e too...
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
 ; Executed in RAM at d99a
 --:
   ld a, (_RAM_D69D_EmitTilemapRectangle_Width)
@@ -35478,7 +35521,7 @@ LABEL_3BBB5_PopulateSpriteNs:
 LABEL_3BBD8_EmitTilemapUnknown2:
 ; hl = source
 ; e = entry count
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ld b, $00
 --:
   ld c, PORT_VDP_DATA
@@ -35505,7 +35548,7 @@ LABEL_3BBF8_EmitTilemapUnknown:
 ; de = dest VRAM address
 ; b = entry count
 ; c = width?
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
 --:
   CallRamCode LABEL_3BCC0_VRAMAddressToDE
 -:ld a, (hl)
@@ -35596,7 +35639,7 @@ LABEL_3BC6A_EmitText: ; Executed in RAM at $daaa
 LABEL_3BC7D_DisplayCase_RestoreRectangle:
 ; Restores tilemap data from hl to de (must be already set)
 ; 5 tiles wide rectangles from 22 tiles wide source data
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
 --:
   ld c, $05   ; Width
 -:ld a, (hl) ; Emit a byte from (hl), high tileset
@@ -35632,7 +35675,7 @@ LABEL_3BC7D_DisplayCase_RestoreRectangle:
 
 ; Executed in RAM at $daef
 LABEL_03BCAF_Emit3bppTiles:
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ; Emit 3bpp tile data for e bytes
 -:ld b, $03
   ld c, PORT_VDP_DATA
@@ -35672,21 +35715,21 @@ LABEL_3BCD5_ReadPagedByte_bc: ; unused?
 .endif
 
 ; Executed in RAM at db1c
-LABEL_3BCDC_Trampoline2_PlayMenuMusic:
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+LABEL_3BCDC_Trampoline2_MusicStart:
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
   ld a, c
-  call LABEL_30CE8_MenuSound_StartTrack
+  call LABEL_30CE8_Music_Start
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
 ; Executed in RAM at db26
-LABEL_3BCE6_Trampoline_StopMenuMusic:
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
-  call LABEL_30D28_StopMenuMusic
+LABEL_3BCE6_Trampoline2_StopMusic:
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
+  call LABEL_30D28_StopMusic
   JumpToRamCode LABEL_3BD08_BackToSlot2
 
 .ifdef UNNECESSARY_CODE
 LABEL_3BCEF_Trampoline_Unknown: ; unused?
-  CallRamCode LABEL_3BCF5_RestorePagingFromD741  ; Code is loaded from LABEL_3BCF5_RestorePagingFromD741
+  CallRamCode LABEL_3BCF5_RestorePagingFromD741
   jp $a003 ; Bad destination at $3a003
 .endif
 
@@ -35759,37 +35802,28 @@ DATA_3EC67_Tilemap_MediumLogo:
 
 .section "Vehicle names" force
 DATA_3ECA9_VehicleNames:
-TEXT_3ECA9_Vehicle_Name_Blank:
-.asc "                "
-TEXT_3ECB9_Vehicle_Name_Sportscars:
-.asc "   SPORTSCARS   "
-TEXT_3ECC9_Vehicle_Name_Powerboats:
-.asc "   POWERBOATS   "
-TEXT_3ECD9_Vehicle_Name_Formula_One:
-.asc "  FORMULA  ONE  "
-TEXT_3ECE9_Vehicle_Name_Four_By_Four:
-.asc "  FOUR BY FOUR  "
-TEXT_3ECF9_Vehicle_Name_Warriors:
-.asc "    WARRIORS    "
-TEXT_3ED09_Vehicle_Name_Choppers:
-.asc "    CHOPPERS    "
-TEXT_3ED19_Vehicle_Name_Turbo_Wheels:
-.asc "  TURBO WHEELS  "
-TEXT_3ED29_Vehicle_Name_Tanks:
-.asc "      TANKS     "
-TEXT_3ED39_Vehicle_Name_Rufftrux:
-.asc "    RUFFTRUX    "
+; Ordered by MenuTT_ enum ordering
+TEXT_3ECA9_Vehicle_Name_Blank:        .asc "                "
+TEXT_3ECB9_Vehicle_Name_Sportscars:   .asc "   SPORTSCARS   "
+TEXT_3ECC9_Vehicle_Name_Powerboats:   .asc "   POWERBOATS   "
+TEXT_3ECD9_Vehicle_Name_Formula_One:  .asc "  FORMULA  ONE  "
+TEXT_3ECE9_Vehicle_Name_Four_By_Four: .asc "  FOUR BY FOUR  "
+TEXT_3ECF9_Vehicle_Name_Warriors:     .asc "    WARRIORS    "
+TEXT_3ED09_Vehicle_Name_Choppers:     .asc "    CHOPPERS    "
+TEXT_3ED19_Vehicle_Name_Turbo_Wheels: .asc "  TURBO WHEELS  "
+TEXT_3ED29_Vehicle_Name_Tanks:        .asc "      TANKS     "
+TEXT_3ED39_Vehicle_Name_Rufftrux:     .asc "    RUFFTRUX    "
 .ends
 
-;.section "Splash screen" force
+.section "Splash screen" force
 DATA_3ED49_SplashScreenCompressed:
 .incbin "Assets/Splash screen/SplashScreen.bin.compressed"
-;.ends
+.ends
 
-;.section "Jon's Squinky Tennis" force
+.section "Jon's Squinky Tennis" force
 DATA_3F753_JonsSquinkyTennisCompressed:
 .incbin "Assets/Jon's Squinky Tennis/JonsSquinkyTennis.gg.compressed"
-;.ends
+.ends
 
 .ifdef BLANK_FILL_ORIGINAL
 ;.section "Bank 15 blank fill" force
