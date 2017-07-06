@@ -53,13 +53,18 @@ VDP_REGISTER_LINEINTERRUPTCOUNTER db
 .dw ((hex >> 20) & %000001111) | ((hex >> 8) & %11110000) | ((hex << 4) & %111100000000)
 .endm
 
+.define PALETTE_ENTRY_SIZE_SMS 1
+.define PALETTE_ENTRY_SIZE_GG 2
+
 .define VRAM_WRITE_MASK $4000
 .define VDP_REGISTER_WRITE_MASK $8000
 .define PALETTE_WRITE_MASK $c000
 .define NAME_TABLE_ADDRESS $3700 ; Extended height mode!
 .define SPRITE_TABLE_ADDRESS $3f00
 
-.define TILE_DATA_SIZE 8*8*4/8 ; 8x8 pixels at 4bpp
+.define TILE_HEIGHT 8
+.define TILE_WIDTH 8
+.define TILE_DATA_SIZE TILE_WIDTH*TILE_WIDTH*4/8 ; 8x8 pixels at 4bpp
 .define TILEMAP_ENTRY_SIZE 2
 .define TILEMAP_WIDTH 32
 .define TILEMAP_HEIGHT 28
