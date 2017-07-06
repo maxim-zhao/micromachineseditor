@@ -293,8 +293,6 @@ namespace MicroMachinesEditor
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            _uiContext = TaskScheduler.FromCurrentSynchronizationContext();
-
             // Populate filename from the commandline
             var args = Environment.GetCommandLineArgs();
             if (args.Length > 1)
