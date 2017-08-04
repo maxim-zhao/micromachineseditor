@@ -94,7 +94,7 @@ _RAM_D930_MenuSound_NoiseData db ; Temporary storage during some processing
 .ende
 
 .section "Music engine" force
-LABEL_30CE8_Music_Start:
+Music_Start:
 ; a = music index (1+)
   or a
   jr nz, +
@@ -140,14 +140,14 @@ LABEL_30CE8_Music_Start:
   ld (_RAM_D78E_MenuSound_Channel2.ChannelDisabled), a
   ret
 
-LABEL_30D28_StopMusic:
+Music_Stop:
   ld hl, _MusicStopData
   ld de, _RAM_D91A_MenuSoundData
   ld bc, _sizeof_OutputSoundData
   ldir
   jp _EmitToPSG
 
-LABEL_30D36_MenuMusicFrameHandler:
+Music_Update:
   ; Replicate bits out from the source counter for various power of 2 counters.
   ; Some are used to slow down attenuation changes.
   ; Issue: it's never incremented, so they all stay at zero forever,
