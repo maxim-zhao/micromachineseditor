@@ -26,6 +26,7 @@ namespace MicroMachinesEditor
         private readonly bool[,] _walls = new bool[TilesPerSide, TilesPerSide];
         private readonly int[,] _behaviour = new int[6, 6];
         private readonly int[,] _unknown = new int[6, 6];
+        private readonly Brush _behaviourOverlayBrush = new SolidBrush(Color.FromArgb(128, Color.HotPink));
 
         #endregion
 
@@ -46,7 +47,8 @@ namespace MicroMachinesEditor
         /// <param name="data2">Buffer holding somewhat unknown </param>
         /// <param name="offset2"></param>
         /// <param name="behaviourLookup"></param>
-        public MetaTile(IList<byte> tileIndexData, int tileIndexDataOffset, IList<SMSGraphics.Tile> tiles, IList<byte> wallData, int wallDataOffset, IList<byte> data2, int offset2, IList<byte> behaviourLookup)
+        /// <param name="trackType"></param>
+        public MetaTile(IReadOnlyList<byte> tileIndexData, int tileIndexDataOffset, IReadOnlyList<SMSGraphics.Tile> tiles, IReadOnlyList<byte> wallData, int wallDataOffset, IList<byte> data2, int offset2, IList<byte> behaviourLookup, TrackTypeData.TrackType trackType)
         {
             // We build up our image
             Bitmap = new Bitmap(PixelsPerSide, PixelsPerSide);
@@ -61,7 +63,7 @@ namespace MicroMachinesEditor
                         _tiles[x, y] = tiles[tileIndex];
 
                         g.DrawImageUnscaled(tiles[tileIndex].Bitmap, x*8, y*8);
-                        /*
+
                         // We also extract the wall solidity data
                         int tileNumber = y*TilesPerSide + x;
                         int wallDataBitNumber = tileNumber % 8;
@@ -76,40 +78,42 @@ namespace MicroMachinesEditor
                             {
                                 g.DrawRectangle(Pens.Black, x*8, y*8, 7, 7);
                             }
-                        }*/
+                        }
                     }
                 }
                 
-                // Then we copy over the data2
+                // Then we copy over the behaviour data
                 for (int y = 0; y < 6; ++y)
                 {
                     for (int x = 0; x < 6; ++x)
                     {
                         int offset = x + y*6 + offset2;
                         int data2Value = offset >= data2.Count ? 0 : data2[offset];
-                        int behaviourIndex = data2Value >> 4;
+                        int behaviourIndex = (data2Value >> 4) & (trackType == TrackTypeData.TrackType.Powerboats ? 0xe : 0xf);
                         int behaviour = behaviourLookup[behaviourIndex];
                         _behaviour[x, y] = behaviour;
 
-                        _unknown[x, y] = data2Value & 0xf;
-/*
+                        _unknown[x, y] = data2Value & (trackType == TrackTypeData.TrackType.Powerboats ? 0x1f : 0x0f);
+
+//#if DRAW_BEHAVIOUR
+
                         if (behaviour > 0)
                         {
-                            g.DrawString(behaviour.ToString("x"), SystemFonts.DefaultFont, Brushes.Fuchsia, x * 16, y * 16);
-                            g.DrawRectangle(Pens.Fuchsia, x * 16, y * 16, 15, 15);
+                            g.FillRectangle(_behaviourOverlayBrush, x * 16, y * 16, 15, 15);
+                            g.DrawString($"{behaviour:x}", SystemFonts.DefaultFont, Brushes.White, x * 16, y * 16);
                             // Values seem to be:
                             // 0 = normal
                             // 1 = fall to floor/die
                             // 2 = chalk/dust
-                            // 3 = ?? (book sides, enter only from 7?)
+                            // 3 = bump on exit, enter from 7
                             // 4 = big jump (folders, enter only from 7?)
                             // 5 = skid (milk, ink, oil, cards)
                             // 6 = bump (cereal, bubbles, soap, top of book, ruler, nails, lego, pencils)
-                            // 7 = ?? (books inner edge)
+                            // 7 = jump entry
                             // 8 = sticky (orange juice, glue)
                             // 9 = pool table hole
                             // a = death? (pool table edges)
-                            // b = ?? (cereal box top, exit only except from d?) (also pool table hole edges)
+                            // b = raised
                             // c = ?? (place mat)
                             // d = ?? (place mat, bumps?)
                             // e = deep water/die (ruff trux)
@@ -117,19 +121,21 @@ namespace MicroMachinesEditor
                             // 12 = deep water/die (turbo wheels)
                             // 13 = pool cue (no effect?)
                         }
-*/
-/*
-                        // Low nibble is unused?
-                        int lowNibble = data2Value & 0xf;
+
+//#endif
+
+#if DRAW_BEHAVIOUR_LOW
+                        // Low 4 bits (5 for powerboats)
+                        int lowNibble = data2Value & (trackType == TrackTypeData.TrackType.Powerboats ? 0x1f : 0xf);
                         if (lowNibble > -1)
                         {
-                            g.DrawString(lowNibble.ToString("x"), SystemFonts.DefaultFont, Brushes.Yellow, x * 16, y * 16);
+//                            g.DrawString(lowNibble.ToString("x"), SystemFonts.DefaultFont, Brushes.Yellow, x * 16, y * 16);
                             //g.DrawRectangle(Pens.Blue, x * 16, y * 16, 15, 15);
                             switch (lowNibble & 0x3)
                             {
                                 case 0:
                                     // -
-                                    g.DrawLine(Pens.Blue, x*16, y*16 + 8, x*16 + 16, y*16 + 8);
+                                    g.DrawLine(Pens.Blue, x * 16, y * 16 + 8, x * 16 + 16, y * 16 + 8);
                                     break;
                                 case 1:
                                     // /
@@ -137,22 +143,23 @@ namespace MicroMachinesEditor
                                     break;
                                 case 2:
                                     // |
-                                    g.DrawLine(Pens.Blue, x*16 + 8, y*16, x*16 + 8, y*16 + 16);
+                                    g.DrawLine(Pens.Blue, x * 16 + 8, y * 16, x * 16 + 8, y * 16 + 16);
                                     break;
                                 case 3:
                                     // \
                                     g.DrawLine(Pens.Blue, x * 16, y * 16 + 16, x * 16 + 16, y * 16);
                                     break;
                             }
-*/
-/*                            if ((lowNibble & 0x8) != 0)
-                            {
-                                g.DrawString("1", SystemFonts.DefaultFont, Brushes.Red, x*16, y*16);
-                            }
-                            else
-                            {
-                                g.DrawString("0", SystemFonts.DefaultFont, Brushes.Red, x * 16, y * 16);
-                            }*/
+                        }
+#endif
+                        /*                            if ((lowNibble & 0x8) != 0)
+                                                    {
+                                                        g.DrawString("1", SystemFonts.DefaultFont, Brushes.Red, x*16, y*16);
+                                                    }
+                                                    else
+                                                    {
+                                                        g.DrawString("0", SystemFonts.DefaultFont, Brushes.Red, x * 16, y * 16);
+                                                    }*/
                         //}
                     }
                 }

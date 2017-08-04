@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
@@ -93,13 +92,13 @@ namespace MicroMachinesEditor
             g.DrawString(s, font, SystemBrushes.ActiveCaptionText, rect);
         }
 
-        internal int TileIndexAt(int x, int y)
+        internal int TileIndexAt(Point p)
         {
-            if (x > 31 || x < 0 || y > 31 || y < 0)
+            if (p.X > 31 || p.X < 0 || p.Y > 31 || p.Y < 0)
             {
                 return -1;
             }
-            return _metaTileIndices[x, y] & 0x3f;
+            return _metaTileIndices[p.X, p.Y] & 0x3f;
         }
 
         internal int FlagsAt(int x, int y)
@@ -145,13 +144,13 @@ namespace MicroMachinesEditor
             }
         }
 
-        internal void SetTileIndex(int x, int y, int metaTileIndex)
+        internal void SetTileIndex(Point p, int metaTileIndex)
         {
-            if (x > 31 || x < 0 || y > 31 || y < 0 || metaTileIndex < 0 || metaTileIndex > 0x3f)
+            if (p.X > 31 || p.X < 0 || p.Y > 31 || p.Y < 0 || metaTileIndex < 0 || metaTileIndex > 0x3f)
             {
                 return;
             }
-            _metaTileIndices[x, y] = (byte)((_metaTileIndices[x, y] & 0xc0) | (metaTileIndex & 0x3f));
+            _metaTileIndices[p.Y, p.Y] = (byte)((_metaTileIndices[p.Y, p.Y] & 0xc0) | (metaTileIndex & 0x3f));
         }
 
         internal int TrackPositionAt(int x, int y)

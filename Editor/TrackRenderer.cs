@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Windows.Forms;
 
@@ -16,6 +17,8 @@ namespace MicroMachinesEditor
         private readonly Brush _nonTrackBrush = new SolidBrush(Color.FromArgb(127, Color.Black));
         private readonly Font _positionNumberFont = new Font(SystemFonts.DefaultFont.FontFamily, 30);
         private readonly StringFormat _positionNumberStringFormat = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
+        private readonly Pen _hoverPen = new Pen(SystemColors.HotTrack, 2) { Alignment = PenAlignment.Inset };
+        private Point _hoveredTile;
 
         public TrackRenderer()
         {
@@ -26,10 +29,6 @@ namespace MicroMachinesEditor
 
         public TrackLayout TrackLayout
         {
-            get
-            {
-                return _trackLayout;
-            }
             set
             {
                 _trackLayout = value;
@@ -39,10 +38,6 @@ namespace MicroMachinesEditor
 
         public IList<MetaTile> MetaTiles
         {
-            get
-            {
-                return _metaTiles;
-            }
             set
             {
                 _metaTiles = value;
@@ -68,13 +63,15 @@ namespace MicroMachinesEditor
             {
                 for (int x = minX; x <= maxX; ++x)
                 {
-                    int index = _trackLayout.TileIndexAt(x, y);
-                    var tileRect = new Rectangle(x * 96, y * 96, 96, 96);
+                    Point p = new Point(x, y);
+                    int index = _trackLayout.TileIndexAt(p);
+                    Rectangle tileRect = RectForTile(p);
                     if (index < 0 || index >= _metaTiles.Count)
                     {
                         // Error
                         e.Graphics.FillRectangle(Brushes.Red, tileRect);
-                        e.Graphics.DrawString($"Invalid metatile index {index}", SystemFonts.DefaultFont, Brushes.White, 0, 0);
+                        e.Graphics.DrawString($"Invalid metatile index {index}", SystemFonts.DefaultFont, Brushes.White, new RectangleF(0, 0, 96, 96));
+                        continue;
                     }
                     MetaTile tile = _metaTiles[index];
                     lock (tile.Bitmap)
@@ -82,7 +79,7 @@ namespace MicroMachinesEditor
                         e.Graphics.DrawImageUnscaled(tile.Bitmap, tileRect);
                     }
 
-                    if (ShowPositions)
+                    if (_showPositions)
                     {
                         int trackPosition = _trackLayout.TrackPositionAt(x, y);
                         if (trackPosition == 0)
@@ -97,30 +94,38 @@ namespace MicroMachinesEditor
                         }
                     }
 
-                    if (ShowGrid)
+                    if (_showGrid)
                     {
                         e.Graphics.DrawRectangle(_gridPen, tileRect);
                     }
 
-                    if (ShowMetaTileFlags)
+                    if (_showMetaTileFlags)
                     {
+                        // These seem to be meaningless...
                         int flags = _trackLayout.FlagsAt(x, y);
                         if (flags != 0)
                         {
+                            e.Graphics.FillRectangle(_nonTrackBrush, tileRect);
                             e.Graphics.DrawString(flags.ToString(CultureInfo.InvariantCulture), SystemFonts.CaptionFont, Brushes.Fuchsia, tileRect);
                         }
+                    }
+
+                    if (p == _hoveredTile)
+                    {
+                        e.Graphics.DrawRectangle(_hoverPen, tileRect);
                     }
                 }
             }
 
         }
 
+        private static Rectangle RectForTile(Point p)
+        {
+            return new Rectangle(p.X * 96, p.Y * 96, 96, 96);
+        }
+
         public bool ShowGrid
         {
-            get
-            {
-                return _showGrid;
-            }
             set
             {
                 _showGrid = value;
@@ -130,10 +135,6 @@ namespace MicroMachinesEditor
 
         public bool ShowPositions
         {
-            get
-            {
-                return _showPositions;
-            }
             set
             {
                 _showPositions = value;
@@ -143,15 +144,30 @@ namespace MicroMachinesEditor
 
         public bool ShowMetaTileFlags
         {
-            get
-            {
-                return _showMetaTileFlags;
-            }
             set
             {
                 _showMetaTileFlags = value;
                 Invalidate();
             }
+        }
+
+        public Point HoveredTile
+        {
+            set
+            {
+                if (_hoveredTile == value)
+                {
+                    return;
+                }
+                InvalidateTile(_hoveredTile);
+                _hoveredTile = value;
+                InvalidateTile(value);
+            }
+        }
+
+        public void InvalidateTile(Point p)
+        {
+            Invalidate(RectForTile(p));
         }
     }
 }

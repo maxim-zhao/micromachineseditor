@@ -42,7 +42,7 @@ namespace MicroMachinesEditor
 
         internal TrackLayout Layout => _layout;
         internal IList<MetaTile> MetaTiles => _trackTypeData.MetaTiles;
-        internal IList<SMSGraphics.Tile> Tiles => _trackTypeData.Tiles;
+        internal IReadOnlyList<SMSGraphics.Tile> Tiles => _trackTypeData.Tiles;
 
         [Description("The rate at which the vehicle speeds up when accelerating. Original values are 6 (strong acceleration) to 18 (weak).")]
         [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]

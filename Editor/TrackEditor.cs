@@ -7,6 +7,7 @@ namespace MicroMachinesEditor
     public partial class TrackEditor : UserControl
     {
         private Track _track;
+        private Point _hoveredPoint = new Point(-1, -1);
 
         public TrackEditor()
         {
@@ -15,10 +16,6 @@ namespace MicroMachinesEditor
 
         public Track Track
         {
-            get
-            {
-                return _track;
-            }
             set
             {
                 _track = value;
@@ -91,25 +88,20 @@ namespace MicroMachinesEditor
                 }
                 else
                 {
-                    SetMetaTile(e.Location);
+                    SetMetaTile(PointFromLocation(e.Location));
                 }
             }
         }
 
-        private void EyeDropper(Point p)
+        private void EyeDropper(Point location)
         {
             if (_track == null)
             {
                 return;
             }
             // Convert to tile coordinates
-            int x = p.X / 96;
-            int y = p.Y / 96;
-            if (x < 0 || x > 31 || y < 0 || y > 31)
-            {
-                return;
-            }
-            int indexUnderMouse = _track.Layout.TileIndexAt(x, y);
+            Point p = PointFromLocation(location);
+            int indexUnderMouse = _track.Layout.TileIndexAt(p);
             metaTileSelector.SelectedMetaTileIndex = indexUnderMouse;
         }
 
@@ -119,14 +111,28 @@ namespace MicroMachinesEditor
             {
                 return;
             }
+            Point p = PointFromLocation(e.Location);
             if (e.Button == MouseButtons.Left)
             {
-                SetMetaTile(e.Location);
+                SetMetaTile(p);
             }
-            // Convert to tile coordinates
-            int x = e.Location.X / 96;
-            int y = e.Location.Y / 96;
-            mouseLocation.Text = $"{x}, {y} @ ${x + y * 32:X} = ${_track.Layout.TileIndexAt(x, y):X}";
+            SetHoveredMetatile(p);
+            mouseLocation.Text = $"{p.X}, {p.Y} @ ${p.X + p.Y * 32:X} = ${_track.Layout.TileIndexAt(_hoveredPoint):X}";
+        }
+
+        private void SetHoveredMetatile(Point p)
+        {
+            if (p == _hoveredPoint)
+            {
+                return;
+            }
+            trackRenderer.HoveredTile = p;
+            _hoveredPoint = p;
+        }
+
+        private static Point PointFromLocation(Point p)
+        {
+            return new Point(p.X / 96, p.Y / 96);
         }
 
         private void SetMetaTile(Point p)
@@ -135,26 +141,18 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            // Convert to tile coordinates
-            int x = p.X / 96;
-            int y = p.Y / 96;
-            if (x < 0 || x > 31 || y < 0 || y > 31)
-            {
-                return;
-            }
             int metaTileIndex = metaTileSelector.SelectedMetaTileIndex;
             if (metaTileIndex < 0)
             {
                 return;
             }
-            int existingIndex = _track.Layout.TileIndexAt(x, y);
+            int existingIndex = _track.Layout.TileIndexAt(p);
             if (existingIndex == metaTileIndex)
             {
                 return;
             }
-            _track.Layout.SetTileIndex(x, y, (byte)metaTileIndex);
-            Rectangle tileRect = new Rectangle(x * 96, y * 96, 96, 96);
-            trackRenderer.Invalidate(tileRect);
+            _track.Layout.SetTileIndex(p, (byte)metaTileIndex);
+            trackRenderer.InvalidateTile(p);
         }
 
         private void tbTogglePositions_Click(object sender, EventArgs e)

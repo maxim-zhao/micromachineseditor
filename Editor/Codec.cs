@@ -262,7 +262,7 @@ namespace MicroMachinesEditor
             return (pageNumber - 2) * 16 * 1024 + offset;
         }
 
-        public static IList<SMSGraphics.Tile> LoadTiles(byte[] file, int offset, IList<Color> palette)
+        public static IReadOnlyList<SMSGraphics.Tile> LoadTiles(byte[] file, int offset, IList<Color> palette)
         {
             // Decompress
             IList<byte> data = Decompress(file, offset);
@@ -296,14 +296,14 @@ namespace MicroMachinesEditor
         /// <param name="trackType">Index as used by the game</param>
         /// <param name="tiles">Tiles for the metatiles to use</param>
         /// <returns>Metatiles</returns>
-        public static IList<MetaTile> LoadMetaTiles(byte[] file, int trackType, IList<SMSGraphics.Tile> tiles)
+        public static IList<MetaTile> LoadMetaTiles(byte[] file, TrackTypeData.TrackType trackType, IReadOnlyList<SMSGraphics.Tile> tiles)
         {
             var result = new List<MetaTile>();
 
             int pageNumber = TrackTypeDataPageNumber(file, trackType);
 
             // The metatile data per-track is in a table at 0x4225
-            int metatileTableOffset = 0x4225 + trackType * 64;
+            int metatileTableOffset = Offset(0x4225, trackType, 64);
 
             int trackDataOffset = pageNumber * 16 * 1024;
             int offsetBehaviourData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 0));
@@ -313,10 +313,10 @@ namespace MicroMachinesEditor
             IList<byte> behaviourData = Decompress(file, offsetBehaviourData);
 
             // Decode wall data
-            IList<byte> wallData = Decompress(file, offsetWallData);
+            IReadOnlyList<byte> wallData = Decompress(file, offsetWallData);
 
             // There are 64 metatiles, always.
-            IList<byte> behaviourLookup = file.Skip(0x242e + trackType * 16).Take(16).ToList();
+            IList<byte> behaviourLookup = file.Skip(Offset(0x242e, trackType, 16)).Take(16).ToList();
             for (int i = 0; i < 64; ++i)
             {
                 // Get the metatile global index
@@ -327,7 +327,7 @@ namespace MicroMachinesEditor
                 offsetWallData = i * 18 + 4;
 
                 // Create a metatile from it
-                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, behaviourData, offsetBehaviourData, behaviourLookup);
+                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, behaviourData, offsetBehaviourData, behaviourLookup, trackType);
 
                 // Add it to the list
                 result.Add(metaTile);
@@ -385,9 +385,9 @@ namespace MicroMachinesEditor
                 .Substring(0, width);
         }
 
-        private static int TrackTypeDataPageNumber(IReadOnlyList<byte> file, int trackType)
+        private static int TrackTypeDataPageNumber(IReadOnlyList<byte> file, TrackTypeData.TrackType trackType)
         {
-            return file[0x3e3a + trackType];
+            return ReadTable(file, 0x3e3a, trackType);
         }
         /*
         private enum ChunkType
@@ -463,7 +463,7 @@ namespace MicroMachinesEditor
             // How many bytes it emits
             public int Length { get; protected set; }
             // How many bytes it is encoded to
-            public int EncodedLength { get; set; }
+            public int EncodedLength { get; protected set; }
             // The compression ratio
             public double CompressionRatio => (Length - EncodedLength + 0.125) / Length;
 
@@ -1288,5 +1288,25 @@ namespace MicroMachinesEditor
             // TODO
             return new List<byte>();
         }
+
+        public static int Offset(int baseAddress, TrackTypeData.TrackType trackType, int stride = 1)
+        {
+            return baseAddress + (int)trackType * stride;
+        }
+
+        public static byte ReadTable(IReadOnlyList<byte> file, int baseAddress, TrackTypeData.TrackType trackType, int stride = 1)
+        {
+            return file[baseAddress + (int)trackType * stride];
+        }
+
+        public static ushort ReadSplitTable(IReadOnlyList<byte> file, int baseAddressLo, int baseAddressHi, TrackTypeData.TrackType trackType)
+        {
+            return BitConverter.ToUInt16(new[]
+            {
+                ReadTable(file, baseAddressLo, trackType),
+                ReadTable(file, baseAddressHi, trackType),
+            }, 0);
+        }
+
     }
 }

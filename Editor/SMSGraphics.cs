@@ -58,7 +58,7 @@ namespace MicroMachinesEditor
             return Color.FromArgb(red, green, blue);
         }
 
-        public static IList<Tile> ReadTiles(byte[] data, int offset, int byteCount, IList<Color> palette, int bitDepth = 4)
+        public static IReadOnlyList<Tile> ReadTiles(byte[] data, int offset, int byteCount, IList<Color> palette, int bitDepth = 4)
         {
             // Build collection of tiles
             int bytesPerTile = 8*bitDepth;

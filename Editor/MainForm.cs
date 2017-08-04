@@ -20,13 +20,13 @@ namespace MicroMachinesEditor
             InitializeComponent();
         }
 
-        private IList<SMSGraphics.Tile> _tiles;
+        private IReadOnlyList<SMSGraphics.Tile> _tiles;
         private IList<Color> _palette;
         private IList<MetaTile> _metaTiles;
         private byte[] _raw;
 
         // Per-track-type data
-        private readonly Dictionary<int, TrackTypeData> _trackTypeData = new Dictionary<int, TrackTypeData>();
+        private readonly Dictionary<TrackTypeData.TrackType, TrackTypeData> _trackTypeData = new Dictionary<TrackTypeData.TrackType, TrackTypeData>();
 
         // The tracks themselved
         private readonly List<Track> _tracks = new List<Track>();
@@ -215,7 +215,7 @@ namespace MicroMachinesEditor
 
         private void LoadLevel()
         {
-            int trackType = cbLevelType.SelectedIndex;
+            TrackTypeData.TrackType trackType = (TrackTypeData.TrackType) cbLevelType.SelectedIndex;
             int trackNumber = Convert.ToInt32(nudStageIndex.Value);
 
             // Read the file
@@ -223,19 +223,19 @@ namespace MicroMachinesEditor
 
             // Load the data for this level
             // Most of the tables are at the start of a page given by a table at 0x3e3a
-            byte trackTypeDataPageNumber = file[0x3e3a + trackType];
+            byte trackTypeDataPageNumber = Codec.ReadTable(file, 0x3e3a, trackType);
             int tableOffset = trackTypeDataPageNumber * 16 * 1024;
             int behaviourDataOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 0));
             int wallDataOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 2));
             int offsetTrack = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 4 + trackNumber * 2));
 
             // But there's tile data (and other stuff) at 0x3dc8
-            byte trackTypeTileDataPageNumber = file[0x3dc8 + trackType];
-            byte[] offset1Buffer = { file[0x3ddc + trackType], file[0x3de4 + trackType] };
-            int offsetTiles = Codec.AbsoluteOffset(trackTypeTileDataPageNumber, BitConverter.ToUInt16(offset1Buffer, 0));
+            byte trackTypeTileDataPageNumber = Codec.ReadTable(file, 0x3dc8, trackType);
+            ushort trackTypeTileDataAddress = Codec.ReadSplitTable(file, 0x3ddc, 0x3de4, trackType);
+            int offsetTiles = Codec.AbsoluteOffset(trackTypeTileDataPageNumber, trackTypeTileDataAddress);
 
             // And the palette table at 0x17ec2. Palettes are in page 5.
-            ushort offsetPalette = BitConverter.ToUInt16(file, 0x17ec2 + trackType * 2);
+            ushort offsetPalette = BitConverter.ToUInt16(file, Codec.Offset(0x17ec2, trackType, 2));
             int absoluteOffsetPalette = Codec.AbsoluteOffset(5, offsetPalette);
 
             // First load the palette
@@ -366,10 +366,10 @@ namespace MicroMachinesEditor
             {
                 Log($"Loading track {i}");
                 int offset = trackTableOffset + i;
-                int trackType = file[offset];
+                TrackTypeData.TrackType trackType = (TrackTypeData.TrackType) file[offset];
 
                 // Helicopters are bad!
-                if (trackType == 8)
+                if (trackType == TrackTypeData.TrackType.Choppers)
                 {
                     continue;
                 }
@@ -406,7 +406,7 @@ namespace MicroMachinesEditor
                 Log($"Track name is \"{name}\"");
 
                 // We decompress it...
-                byte trackTypeDataPageNumber = file[0x3e3a + trackType];
+                byte trackTypeDataPageNumber = file[Codec.Offset(0x3e3a, trackType)];
                 int tableOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, 0x8000);
                 int layoutOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 4 + trackIndex * 2));
                 List<byte> layoutData = Codec.Decompress(file, layoutOffset);
