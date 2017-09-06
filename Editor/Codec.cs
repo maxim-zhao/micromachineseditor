@@ -308,6 +308,7 @@ namespace MicroMachinesEditor
             int trackDataOffset = pageNumber * 16 * 1024;
             int offsetBehaviourData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 0));
             int offsetWallData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 2));
+            int offsetUnknownData = AbsoluteOffset(pageNumber, BitConverter.ToUInt16(file, trackDataOffset + 16));
 
             // Decode behaviour data
             IList<byte> behaviourData = Decompress(file, offsetBehaviourData);
@@ -317,6 +318,7 @@ namespace MicroMachinesEditor
 
             // There are 64 metatiles, always.
             IList<byte> behaviourLookup = file.Skip(Offset(0x242e, trackType, 16)).Take(16).ToList();
+
             for (int i = 0; i < 64; ++i)
             {
                 // Get the metatile global index
@@ -325,9 +327,15 @@ namespace MicroMachinesEditor
                 int offsetTiles = AbsoluteOffset(pageNumber, DecodeSplitPointer(file, 0x4000, 0x41, index));
                 offsetBehaviourData = i * 36 + 4;
                 offsetWallData = i * 18 + 4;
+                var bubblePushDirectionValue = file[0x4425 + index];
+                var bubblePushDirection = bubblePushDirectionValue < 0x10
+                    ? (MetaTile.Direction) bubblePushDirectionValue
+                    : MetaTile.Direction.Invalid;
+
+                var unknownData = file[offsetUnknownData + i];
 
                 // Create a metatile from it
-                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, behaviourData, offsetBehaviourData, behaviourLookup, trackType);
+                var metaTile = new MetaTile(file, offsetTiles, tiles, wallData, offsetWallData, behaviourData, offsetBehaviourData, behaviourLookup, trackType, bubblePushDirection, unknownData);
 
                 // Add it to the list
                 result.Add(metaTile);

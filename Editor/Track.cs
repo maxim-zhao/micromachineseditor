@@ -7,24 +7,22 @@ namespace MicroMachinesEditor
 {
     public class Track
     {
-        private readonly TrackLayout _layout;
-        private readonly TrackTypeData _trackTypeData;
         private string _name;
+        internal readonly byte[] _file;
 
         [SuppressMessage("ReSharper", "UnusedMember.Global")]
-        public string Name { 
-            get { return _name; }
-            set
-            {
-                _name = Codec.ValidateString(value, 20);
-            } 
+        public string Name
+        { 
+            get => _name;
+            set => _name = Codec.ValidateString(value, 20);
         }
 
-        public Track(string name, TrackLayout layout, TrackTypeData trackTypeData)
+        public Track(string name, TrackLayout layout, TrackTypeData trackTypeData, byte[] file)
         {
             _name = name;
-            _layout = layout;
-            _trackTypeData = trackTypeData;
+            _file = file;
+            Layout = layout;
+            TrackTypeData = trackTypeData;
         }
 
         public Bitmap GetThumbnail(int size)
@@ -32,7 +30,7 @@ namespace MicroMachinesEditor
             var result = new Bitmap(size, size);
             using (var g = Graphics.FromImage(result))
             {
-                using (Bitmap bm = _layout.Render(_trackTypeData.MetaTiles))
+                using (var bm = Layout.Render(TrackTypeData.MetaTiles))
                 {
                     g.DrawImage(bm, 0, 0, size, size);
                 }
@@ -40,9 +38,11 @@ namespace MicroMachinesEditor
             return result;
         }
 
-        internal TrackLayout Layout => _layout;
-        internal IList<MetaTile> MetaTiles => _trackTypeData.MetaTiles;
-        internal IReadOnlyList<SMSGraphics.Tile> Tiles => _trackTypeData.Tiles;
+        internal TrackLayout Layout { get; }
+
+        internal IList<MetaTile> MetaTiles => TrackTypeData.MetaTiles;
+        internal IReadOnlyList<SMSGraphics.Tile> Tiles => TrackTypeData.Tiles;
+        internal TrackTypeData TrackTypeData { get; }
 
         [Description("The rate at which the vehicle speeds up when accelerating. Original values are 6 (strong acceleration) to 18 (weak).")]
         [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]

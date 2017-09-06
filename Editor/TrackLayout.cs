@@ -4,10 +4,20 @@ using System.Drawing.Drawing2D;
 
 namespace MicroMachinesEditor
 {
+    /// <summary>
+    /// Holds data related to layout for a track
+    /// * The metatile layout
+    /// * The per-metatile AI data
+    /// * The race positions layout
+    /// </summary>
     public class TrackLayout
     {
-        private byte[,] _metaTileIndices = new byte[32,32];
-        private byte[,] _positions = new byte[32,32];
+        // The metatile at each metatile
+        private int[,] _metaTileIndices = new int[32, 32];
+        // Extra data for each metatile (TODO: make it better typed)
+        private int[,] _metaTileHighBits = new int[32, 32];
+        // The track "progress" value, or 0, for each metatile
+        private int[,] _positions = new int[32,32];
 
         public TrackLayout(IReadOnlyList<byte> metaTileData, IReadOnlyList<byte> positionData)
         {
@@ -15,8 +25,12 @@ namespace MicroMachinesEditor
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    _metaTileIndices[x,y] = metaTileData[x + y * 32];
-                    _positions[x,y] = positionData[x + y * 32];
+                    // Easy ones
+                    _metaTileIndices[x, y] = (byte) (metaTileData[x + y * 32] & 0x3f);
+                    _positions[x, y] = positionData[x + y * 32];
+
+                    // Harder
+                    _metaTileHighBits[x, y] = (byte)(metaTileData[x + y * 32] >> 6);
                 }
             }
         }
@@ -24,6 +38,8 @@ namespace MicroMachinesEditor
         public Bitmap Render(IList<MetaTile> metaTiles)
         {
             // We always render the whole 32x32 range, although the actual level is a subset of it
+            // There is often junk data out of bounds in the game data, it would save space to blank it out
+            // TODO this is only used for thumbnails, should we fall back to TrackEditor to do this work?
             int dimensions = 32*96;
             Bitmap result = new Bitmap(dimensions, dimensions);
             Graphics g = Graphics.FromImage(result);
@@ -37,27 +53,12 @@ namespace MicroMachinesEditor
             {
                 for (int x = 0; x < 32; ++x)
                 {
-                    int metaTileIndex = _metaTileIndices[x,y] & 0x3f; // Other bits do something
+                    int metaTileIndex = _metaTileIndices[x, y];
                     Rectangle tileRect = new Rectangle(x*96, y*96, 96, 96);
                     Bitmap metaTile = metaTiles[metaTileIndex].Bitmap;
                     lock (metaTile)
                     {
                         g.DrawImageUnscaled(metaTile, tileRect);
-                    }
-
-                    byte trackPosition = _positions[x,y];
-                    if (trackPosition != 0)
-                    {
-                        g.DrawRectangle(SystemPens.ActiveCaption, tileRect);
-                        var s = trackPosition.ToString();
-                        DrawTextInBox(g, tileRect, s, font, 1);
-                    }
-
-                    int otherBits = _metaTileIndices[x,y] >> 6;
-                    if (otherBits != 0)
-                    {
-                        var s = otherBits.ToString();
-                        DrawTextInBox(g, tileRect, s, font, 2);
                     }
                 }
             }
@@ -68,37 +69,13 @@ namespace MicroMachinesEditor
             return result;
         }
 
-        private void DrawTextInBox(Graphics g, Rectangle outerRect, string s, Font font, int corner)
-        {
-            SizeF textSize = g.MeasureString(s, font);
-            RectangleF rect;
-            switch (corner)
-            {
-                default:
-                case 1: // Top left
-                    rect = new RectangleF(outerRect.Left, outerRect.Top, textSize.Width, textSize.Height);
-                    break;
-                case 2: // Top right
-                    rect = new RectangleF(outerRect.Right - textSize.Width, outerRect.Top, textSize.Width, textSize.Height);
-                    break;
-                case 3: // Bottom right
-                    rect = new RectangleF(outerRect.Right - textSize.Width, outerRect.Bottom - textSize.Height, textSize.Width, textSize.Height);
-                    break;
-                case 4: // Bottom left
-                    rect = new RectangleF(outerRect.Left, outerRect.Bottom - textSize.Height, textSize.Width, textSize.Height);
-                    break;
-            }
-            g.FillRectangle(SystemBrushes.ActiveCaption, rect);
-            g.DrawString(s, font, SystemBrushes.ActiveCaptionText, rect);
-        }
-
         internal int TileIndexAt(Point p)
         {
             if (p.X > 31 || p.X < 0 || p.Y > 31 || p.Y < 0)
             {
                 return -1;
             }
-            return _metaTileIndices[p.X, p.Y] & 0x3f;
+            return _metaTileIndices[p.X, p.Y];
         }
 
         internal int FlagsAt(int x, int y)
@@ -107,19 +84,20 @@ namespace MicroMachinesEditor
             {
                 return -1;
             }
-            return _metaTileIndices[x, y] >> 6;
+            return _metaTileHighBits[x, y];
         }
 
         internal void Rotate(int dx, int dy)
         {
             Rotate(ref _metaTileIndices, dx, dy);
+            Rotate(ref _metaTileHighBits, dx, dy);
             Rotate(ref _positions, dx, dy);
         }
 
-        private void Rotate(ref byte[,] array, int dx, int dy)
+        private static void Rotate(ref int[,] array, int dx, int dy)
         {
             // I'll just copy into a new one...
-            byte[,] result = new byte[32,32];
+            var result = new int[32,32];
             for (int y = 0; y < 32; ++y)
             {
                 for (int x = 0; x < 32; ++x)
@@ -139,6 +117,7 @@ namespace MicroMachinesEditor
                 for (int x = 0; x < 32; ++x)
                 {
                     _metaTileIndices[x, y] = (byte)metatileIndex;
+                    _metaTileHighBits[x, y] = 0;
                     _positions[x, y] = 0;
                 }
             }
@@ -150,7 +129,7 @@ namespace MicroMachinesEditor
             {
                 return;
             }
-            _metaTileIndices[p.Y, p.Y] = (byte)((_metaTileIndices[p.Y, p.Y] & 0xc0) | (metaTileIndex & 0x3f));
+            _metaTileIndices[p.Y, p.Y] = (byte)(metaTileIndex & 0x3f);
         }
 
         internal int TrackPositionAt(int x, int y)

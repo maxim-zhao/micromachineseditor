@@ -233,7 +233,6 @@
             this.trackRenderer.Location = new System.Drawing.Point(0, 0);
             this.trackRenderer.Margin = new System.Windows.Forms.Padding(12);
             this.trackRenderer.MaximumSize = new System.Drawing.Size(6144, 5908);
-            this.trackRenderer.MetaTiles = null;
             this.trackRenderer.MinimumSize = new System.Drawing.Size(6144, 5908);
             this.trackRenderer.Name = "trackRenderer";
             this.trackRenderer.ShowGrid = false;
@@ -241,7 +240,6 @@
             this.trackRenderer.ShowPositions = false;
             this.trackRenderer.Size = new System.Drawing.Size(6144, 5908);
             this.trackRenderer.TabIndex = 0;
-            this.trackRenderer.TrackLayout = null;
             this.trackRenderer.MouseDown += new System.Windows.Forms.MouseEventHandler(this.trackRenderer_MouseDown);
             this.trackRenderer.MouseMove += new System.Windows.Forms.MouseEventHandler(this.trackRenderer_MouseMove);
             // 

@@ -248,7 +248,7 @@ namespace MicroMachinesEditor
             _metaTiles = Codec.LoadMetaTiles(file, trackType, _tiles); 
 
             // Then the track
-            LoadTrack(file, offsetTrack);
+            var trackLayout = LoadTrack(file, offsetTrack);
 
             // And the track attributes
             // These are defined in the track order table so I need to feed off that? Maybe
@@ -368,7 +368,7 @@ namespace MicroMachinesEditor
                 int offset = trackTableOffset + i;
                 TrackTypeData.TrackType trackType = (TrackTypeData.TrackType) file[offset];
 
-                // Helicopters are bad!
+                // Helicopters don't work
                 if (trackType == TrackTypeData.TrackType.Choppers)
                 {
                     continue;
@@ -410,13 +410,16 @@ namespace MicroMachinesEditor
                 int tableOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, 0x8000);
                 int layoutOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, BitConverter.ToUInt16(file, tableOffset + 4 + trackIndex * 2));
                 List<byte> layoutData = Codec.Decompress(file, layoutOffset);
+                var extraDataPointerOffset = Codec.AbsoluteOffset(trackTypeDataPageNumber, 0x8018);
+                var extraDataOffset = BitConverter.ToUInt16(file, extraDataPointerOffset);
+                var extraData = file.Skip(extraDataOffset).Take(64).ToList();
 
                 // The first half is metatile indices
                 // The second half is position indices
                 int halfCount = layoutData.Count / 2;
                 var layout = new TrackLayout(layoutData.GetRange(0, halfCount), layoutData.GetRange(halfCount, halfCount));
 
-                var track = new Track(name, layout, trackTypeData)
+                var track = new Track(name, layout, trackTypeData, file)
                 {
                     AccelerationDelay = acceleration,
                     DecelerationDelay = deceleration,

@@ -21,14 +21,12 @@ namespace MicroMachinesEditor
                 _track = value;
                 if (value == null)
                 {
-                    trackRenderer.TrackLayout = null;
-                    trackRenderer.MetaTiles = null;
+                    trackRenderer.Track = null;
                     metaTileSelector.MetaTiles = null;
                 }
                 else
                 {
-                    trackRenderer.TrackLayout = _track.Layout;
-                    trackRenderer.MetaTiles = _track.MetaTiles;
+                    trackRenderer.Track = _track;
                     metaTileSelector.MetaTiles = _track.MetaTiles;
                 }
             }
