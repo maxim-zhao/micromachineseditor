@@ -7,6 +7,7 @@
 .define COMPARE_TO_ZERO ; disable to use or a instead of cp 0
 .define GAME_GEAR_CHECKS ; disable to replace runtime Game Gear handling with compile-time - INCOMPLETE
 .define IS_GAME_GEAR ; Only applies when GAME_GEAR_CHECKS is disabled - INCOMPLETE
+.define SLOWER_DIAGONALS ; Undefine to (approximately) maintain speed when driving at an angle
 
 ; Some constants
 .define INFINITE_LIVES_COUNT 5 ; Number of lives we fix at
@@ -49,8 +50,6 @@
 
 .define POWERBOATS_BUBBLES_PUSH_COUNTER_MASK $7 ; Mask for counter, controls deceleration rate
 .define POWERBOATS_BUBBLES_DECELERATION_TARGET_SPEED 6 ; We decelerate while faster than this
-
-.define SLOWER_DIAGONALS ; Undefine to (approximately) maintain speed when driving at an angle
 
 .define LAYOUT_INDEX_MASK %00111111 ; Bits for metatile index from data
 .define LAYOUT_EXTRA_MASK %11000000 ; Extra bits
@@ -910,8 +909,8 @@ Unknown32_b db ; +32
 Unknown33_b db ; +33
 Unknown34_w instanceof Word ; +34
 Unknown36_b_JumpCurveMultiplier db ; +36 Corresponds to _RAM_DF0A_JumpCurveMultiplier
-Unknown37_b db ; +37
-Unknown38_b db ; +38 unused?
+Unknown37_b_JumpCurveStep db ; +37 Corresponds to _RAM_DF02_JumpCurveStep
+Unknown38_b_JumpType db ; +38 Corresponds to _RAM_DF03_JumpType
 Unknown39_w instanceof Word ; +39 ; Pointer to something
 Unknown41_w instanceof Word ; +41
 Unknown43_w instanceof Word ; +43
@@ -1011,7 +1010,7 @@ _RAM_D59D_ db
 _RAM_D59E_ db
 _RAM_D59F_ dw
 _RAM_D5A1_ dw
-_RAM_D5A3_ db
+_RAM_D5A3_CarDirection_ db ; Copied from _RAM_DE90_CarDirection, ???
 _RAM_D5A4_IsReversing db
 _RAM_D5A5_ db
 _RAM_D5A6_TankShotPosition db
@@ -1569,11 +1568,17 @@ _RAM_DEFC_TrackTypeCopy_WriteOnly db ; Seems not needed
 _RAM_DEFD_TrackTypeHighBits db ; Used when we want to calculate TrackType*n, the high bits end up here
 .ende
 
+.enum 0 ; Jump types
+Jump_None db ; 0
+Jump_Bump db ; 1S
+Jump_Large db ; 2
+.ende
+
 .enum $DF00 export
 _RAM_DF00_JumpCurvePosition db ; 0 when on the ground, else an index into DATA_1B232_JumpCurveTable
-_RAM_DF01_ db ; Some jump related flag
+_RAM_DF01_ db ; Some jump related flag, causes some jump behaviour to be skipped. Not sure what it is?
 _RAM_DF02_JumpCurveStep db ; Delta applied to _RAM_DF02_Jump_ZSpeed. Larger numbers mean a smaller jump because we skip entries in the table and finish sooner
-_RAM_DF03_Jump_Active db ; Values 0, 1, 2, not sure what they mean. 2 = big jump?
+_RAM_DF03_JumpType db ; Values 0, 1, 2, not sure what they mean. 2 = big jump?
 _RAM_DF04_CarX_ db
 _RAM_DF05_CarY_ db
 _RAM_DF06_ db
@@ -3616,7 +3621,7 @@ LABEL_EE6_:
 .section "Bank 0 unknown 2" force
 LABEL_EF1_:
   ld a, (_RAM_DE90_CarDirection)
-  ld (_RAM_D5A3_), a
+  ld (_RAM_D5A3_CarDirection_), a
   ld a, (_RAM_DF00_JumpCurvePosition)
   or a
   jr z, +
@@ -3624,9 +3629,9 @@ LABEL_EF1_:
   ld a, (_RAM_DF01_)
   or a
   jr nz, +
-  ld a, (_RAM_DF03_Jump_Active)
-  cp $02
-  jr z, LABEL_F6F_ret
+  ld a, (_RAM_DF03_JumpType)
+  cp Jump_Large
+  JrZRet LABEL_F6F_ret
 +:
   ld a, (_RAM_DEA3_)
   or a
@@ -3757,7 +3762,7 @@ LABEL_F9B_:
   ld hl, DATA_250E_OppositeDirections
   add hl, de
   ld a, (hl)
-  ld (_RAM_D5A3_), a
+  ld (_RAM_D5A3_CarDirection_), a
   ld hl, _RAM_DEAD_
   inc (hl)
   ld a, (hl)
@@ -3943,7 +3948,7 @@ LABEL_1121_:
   ld h, a
   ld d, (hl)
   ld hl, DATA_3FC3_HorizontalAmountByDirection
-  ld a, (_RAM_D5A3_)
+  ld a, (_RAM_D5A3_CarDirection_)
   add a, l
   ld l, a
   ld a, $00
@@ -3962,7 +3967,7 @@ LABEL_1121_:
   ld a, (hl)
   ld (_RAM_DEAF_HScrollDelta), a
   ld hl, DATA_40E5_Sign_Directions_X
-  ld a, (_RAM_D5A3_)
+  ld a, (_RAM_D5A3_CarDirection_)
   add a, l
   ld l, a
   ld a, $00
@@ -3982,7 +3987,7 @@ LABEL_1121_:
   ld hl, _RAM_DEAF_HScrollDelta
 ++:
   ld hl, DATA_3FD3_VerticalAmountByDirection
-  ld a, (_RAM_D5A3_)
+  ld a, (_RAM_D5A3_CarDirection_)
   add a, l
   ld l, a
   ld a, $00
@@ -4001,7 +4006,7 @@ LABEL_1121_:
   ld a, (hl)
   ld (_RAM_DEB1_VScrollDelta), a
   ld hl, DATA_40F5_Sign_Directions_Y
-  ld a, (_RAM_D5A3_)
+  ld a, (_RAM_D5A3_CarDirection_)
   add a, l
   ld l, a
   ld a, $00
@@ -6046,8 +6051,8 @@ _LABEL_2121_Behaviour0_Normal:
   ld (_RAM_DF0A_JumpCurveMultiplier), a
   ld a, $08
   ld (_RAM_DF02_JumpCurveStep), a
-  xor a
-  ld (_RAM_DF03_Jump_Active), a
+  xor a ; Jump_None
+  ld (_RAM_DF03_JumpType), a
   jp LABEL_22A9_
 
 _LABEL_214B_BehaviourD_BumpOnEntry:
@@ -6123,8 +6128,8 @@ _LABEL_2175_Behaviour6_Bump:
   ld (_RAM_DF02_JumpCurveStep), a
   cp JUMP_MAX_CURVE_INDEX
   JpZRet _LABEL_22CC_ret ; ret
-  ld a, $01
-  ld (_RAM_DF03_Jump_Active), a
+  ld a, Jump_Bump
+  ld (_RAM_DF03_JumpType), a
   jp LABEL_22A9_
 
 _LABEL_21BF_BehaviourB_Raised:
@@ -6234,7 +6239,7 @@ _DoJump:
   jr z, +
   ld hl, DATA_24EE_GG_
   jp ++
-+:ld hl, DATA_24CE_SMS_
++:ld hl, DATA_24CE_JumpCurveMultiplierForSpeed_SMS
 ++:
   ld de, (_RAM_DE94_BumpSpeed)
   add hl, de
@@ -6248,7 +6253,7 @@ _DoJump:
   jr z, +
   ld hl, DATA_24FE_GG_
   jp ++
-+:ld hl, DATA_24DE_SMS_
++:ld hl, DATA_24DE_JumpCurveStepForSpeed_SMS
 ++:
   add hl, de
   ld a, (hl)
@@ -6262,8 +6267,8 @@ _DoJump:
   ld a, (_RAM_DE96_Speed)
   ld (_RAM_DF0F_), a
 +:
-  ld a, $02
-  ld (_RAM_DF03_Jump_Active), a
+  ld a, Jump_Large
+  ld (_RAM_DF03_JumpType), a
   ; fall through
   
 LABEL_22A9_:
@@ -6374,8 +6379,8 @@ LABEL_22CD_ProcessCarJump:
   jp LABEL_23D0_
 
 +:
-  ld a, (_RAM_DF03_Jump_Active)
-  cp $02
+  ld a, (_RAM_DF03_JumpType)
+  cp Jump_Large
   jr nz, ++
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_DE90_CarDirection), a
@@ -6490,10 +6495,11 @@ LABEL_23DD_:
 +:ret
 
 ; Behaviour lookup per track type
-; This maps each track's 16 "object types" to some of the ~19 behaviours - although none use all the slots and ghere is special handling elsewhere because the bevaviours are not necessarily constant across each object (!).
+; This maps each track's 16 "object types" to some of the ~19 behaviours - although none use all the slots and there is special handling elsewhere because the bevaviours are not necessarily constant across each object (!).
+; Presumably it was originally 3-bit but they needed more for the F1 tracks and extended it.
 DATA_242E_BehaviourLookup:
 ; TT_0_SportsCars
-; Avoids odd indexes
+; Avoids odd indexes unnecessarily?
 .db Behaviour0_Normal   ; 0 = most tiles
 .db Behaviour0_Normal   ; 
 .db Behaviour1_Fall     ; 2 = floor
@@ -6631,18 +6637,26 @@ DATA_242E_BehaviourLookup:
 .db Behaviour0_Normal        ; 
 .db Behaviour0_Normal        ; 
 
+; Jump adjustment tables
+; These are used to scale DATA_1B232_JumpCurveTable for both magnitude and duration.
+; TODO: determine what the different tables are used for, we have one generic one and two system-specific ones used elsewhere (maybe due to lower speeds for GG)
+; TODO relocate them next to DATA_1B232_JumpCurveTable? No need to keep in low ROM
+; TODO align them for faster lookup? Same applies to most tables...
 DATA_24AE_JumpCurveMultiplierForSpeed: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF0A_JumpCurveMultiplier
-; Maps speed to bump height?
+; Maps speed to bump "height"
 .db $00 $00 $00 $00 $00 $0C $10 $14 $18 $1C $20 $20 $20 $20 $20 $20
 
 DATA_24BE_JumpCurveStepForSpeed: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF02_JumpCurveStep
+; Maps speed to jump duration
 .db JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, 10, 10, 9, 9, 8, 8, 8, 8, 8, 8, 8
 
-DATA_24CE_SMS_: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF0A_JumpCurveMultiplier (same as above!)
+DATA_24CE_JumpCurveMultiplierForSpeed_SMS: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF0A_JumpCurveMultiplier (same as above!)
+; Maps speed to bump "height"
 .db $00 $00 $00 $00 $00 $00 $28 $28 $38 $38 $58 $78 $78 $78 $78 $78
 
 ; Data from 24DE to 24ED (16 bytes)
-DATA_24DE_SMS_: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF02_JumpCurveStep (same as above!)
+DATA_24DE_JumpCurveStepForSpeed_SMS: ; Indexed by _RAM_DE94_BumpSpeed, copied to _RAM_DF02_JumpCurveStep (same as above!)
+; Maps speed to jump duration
 .db JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, JUMP_MAX_CURVE_INDEX, 6, 6, 5, 5, 4, 3, 3, 3, 3, 3
 
 ; Data from 24EE to 24FD (16 bytes)
@@ -11051,11 +11065,11 @@ LABEL_4DAA_:
   ld hl, DATA_24BE_JumpCurveStepForSpeed
   add hl, de
   ld a, (hl)
-  ld (ix+CarData.Unknown37_b), a
+  ld (ix+CarData.Unknown37_b_JumpCurveStep), a
   cp JUMP_MAX_CURVE_INDEX
   JpZRet _LABEL_5A87_ret
-  ld a, $01
-  ld (ix+CarData.Unknown38_b), a
+  ld a, Jump_Bump
+  ld (ix+CarData.Unknown38_b_JumpType), a
   jp LABEL_5A77_
 
 LABEL_4DD4_:
@@ -12658,9 +12672,9 @@ LABEL_594E_:
   ld a, $1C
   ld (ix+CarData.Unknown36_b_JumpCurveMultiplier), a
   ld a, $08
-  ld (ix+CarData.Unknown37_b), a
-  xor a
-  ld (ix+CarData.Unknown38_b), a
+  ld (ix+CarData.Unknown37_b_JumpCurveStep), a
+  xor a ; Jump_None
+  ld (ix+CarData.Unknown38_b_JumpType), a
   jp LABEL_5A77_
 
 _LABEL_5978_ret:
@@ -12772,7 +12786,7 @@ LABEL_5A39_:
   jr z, +
   ld hl, DATA_24EE_GG_
   jp ++
-+:ld hl, DATA_24CE_SMS_
++:ld hl, DATA_24CE_JumpCurveMultiplierForSpeed_SMS
 ++:
   ld a, (_RAM_D5D0_Player2Handicap)
   ld c, a
@@ -12790,13 +12804,13 @@ LABEL_5A39_:
   jp ++
 
 +:
-  ld hl, DATA_24DE_SMS_
+  ld hl, DATA_24DE_JumpCurveStepForSpeed_SMS
 ++:
   add hl, de
   ld a, (hl)
-  ld (ix+CarData.Unknown37_b), a
-  ld a, $02
-  ld (ix+CarData.Unknown38_b), a
+  ld (ix+CarData.Unknown37_b_JumpCurveStep), a
+  ld a, Jump_Large
+  ld (ix+CarData.Unknown38_b_JumpType), a
 LABEL_5A77_:
   ld a, $01
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
@@ -12897,7 +12911,7 @@ LABEL_5A88_:
   ld (ix+CarData.Unknown43_w.Lo), a
   ld a, h
   ld (ix+CarData.Unknown43_w.Hi), a
-  ld a, (ix+CarData.Unknown37_b)
+  ld a, (ix+CarData.Unknown37_b_JumpCurveStep)
   ld l, a
   ld a, (ix+CarData.Unknown20_b_JumpCurvePosition)
   add a, l
@@ -12924,8 +12938,8 @@ LABEL_5A88_:
   jp +++
 
 +:
-  ld a, (ix+CarData.Unknown38_b)
-  cp $02
+  ld a, (ix+CarData.Unknown38_b_JumpType)
+  cp Jump_Large
   JrNzRet _LABEL_5B77_ret
   ; Nothing happens!
   ret
@@ -12945,14 +12959,14 @@ _LABEL_5B77_ret:
   ld a, $0A
   ld (ix+CarData.Unknown36_b_JumpCurveMultiplier), a
   ld a, $0C
-  ld (ix+CarData.Unknown37_b), a
+  ld (ix+CarData.Unknown37_b_JumpCurveStep), a
   jp LABEL_5A77_
 
 +++:
   ld a, $20
   ld (ix+CarData.Unknown36_b_JumpCurveMultiplier), a
   ld a, $08
-  ld (ix+CarData.Unknown37_b), a
+  ld (ix+CarData.Unknown37_b_JumpCurveStep), a
   jp LABEL_5A77_
 
 LABEL_5B9A_:
@@ -13501,7 +13515,7 @@ LABEL_5F5E_:
   ld a, (_RAM_D5A4_IsReversing)
   or a
   jr z, +
-  ld a, (_RAM_D5A3_)
+  ld a, (_RAM_D5A3_CarDirection_)
   jp ++
 
 +:
@@ -14710,7 +14724,7 @@ _LABEL_6895_ret:
   ld a, $78
   ld (_RAM_DCEC_CarData_Blue.Unknown36_b_JumpCurveMultiplier), a
   ld a, $03
-  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b_JumpCurveStep), a
   ld a, (_RAM_D947_PlayoffWon)
   or a
   jr nz, +
@@ -14957,7 +14971,7 @@ LABEL_6A97_:
   ld a, $38
   ld (_RAM_DCAB_CarData_Green.Unknown36_b_JumpCurveMultiplier), a
   ld a, $05
-  ld (_RAM_DCAB_CarData_Green.Unknown37_b), a
+  ld (_RAM_DCAB_CarData_Green.Unknown37_b_JumpCurveStep), a
   ld a, $09
   ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
 LABEL_6B34_:
@@ -15020,7 +15034,7 @@ LABEL_6B60_:
   ld a, $38
   ld (_RAM_DCEC_CarData_Blue.Unknown36_b_JumpCurveMultiplier), a
   ld a, $05
-  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b_JumpCurveStep), a
   ld a, $09
   ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -15079,7 +15093,7 @@ LABEL_6BC2_:
   ld a, $38
   ld (_RAM_DD2D_CarData_Yellow.Unknown36_b_JumpCurveMultiplier), a
   ld a, $05
-  ld (_RAM_DD2D_CarData_Yellow.Unknown37_b), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown37_b_JumpCurveStep), a
   ld a, $09
   ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
   ret
@@ -27398,7 +27412,7 @@ DATA_1B1A2_12x12To6x6:
 
 .section "DATA_1B232_JumpCurveTable" force
 DATA_1B232_JumpCurveTable:
-; Holds a sine curve, padded with an extra 0 at the start and 15 extra at the end
+; Holds a sine curve, padded with an extra 0 at the start (unused) and 15 extra at the end (for stride overruns).
 ; It curves from 0 to 127 to 0 again in the remaining space
 ; 127 |      _
 ;     |     / \
@@ -27406,6 +27420,7 @@ DATA_1B232_JumpCurveTable:
 ;     |   |     |
 ;   0 |--'       `--------
 ;       1   65   130    145
+; This is a high-resolution mapping of the "z" position for jumps. The game scales it and also uses an integer stride to subsample it, to produce different size jumps.
 ; We are able to replicate it with the below:
 .db $00
 .dbsin 0, 128, 180/128, 128, -0.001
@@ -31661,8 +31676,8 @@ PagedFunction_363D9_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   or a
   jr z, +
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown38_b)
-  cp $02
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown38_b_JumpType)
+  cp Jump_Large
   JrZRet _LABEL_36454_ret
 
 +:ld a, (_RAM_DEA4_)
@@ -31997,7 +32012,7 @@ PagedFunction_366DE_:
   ld a, $78
   ld (_RAM_DCEC_CarData_Blue.Unknown36_b_JumpCurveMultiplier), a
   ld a, $03
-  ld (_RAM_DCEC_CarData_Blue.Unknown37_b), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown37_b_JumpCurveStep), a
   ld a, $01
   ld (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition), a
 +:

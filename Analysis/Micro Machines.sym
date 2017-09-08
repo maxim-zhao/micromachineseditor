@@ -245,8 +245,8 @@
 00:242e DATA_242E_BehaviourLookup
 00:24ae DATA_24AE_JumpCurveMultiplierForSpeed
 00:24be DATA_24BE_JumpCurveStepForSpeed
-00:24ce DATA_24CE_SMS_
-00:24de DATA_24DE_SMS_
+00:24ce DATA_24CE_JumpCurveMultiplierForSpeed_SMS
+00:24de DATA_24DE_JumpCurveStepForSpeed_SMS
 00:24ee DATA_24EE_GG_
 00:24fe DATA_24FE_GG_
 00:250e DATA_250E_OppositeDirections
@@ -2349,7 +2349,7 @@
 0000d59e _RAM_D59E_
 0000d59f _RAM_D59F_
 0000d5a1 _RAM_D5A1_
-0000d5a3 _RAM_D5A3_
+0000d5a3 _RAM_D5A3_CarDirection_
 0000d5a4 _RAM_D5A4_IsReversing
 0000d5a5 _RAM_D5A5_
 0000d5a6 _RAM_D5A6_TankShotPosition
@@ -3108,8 +3108,8 @@
 0000dccd _RAM_DCAB_CarData_Green.Unknown34_w.Lo
 0000dcce _RAM_DCAB_CarData_Green.Unknown34_w.Hi
 0000dccf _RAM_DCAB_CarData_Green.Unknown36_b_JumpCurveMultiplier
-0000dcd0 _RAM_DCAB_CarData_Green.Unknown37_b
-0000dcd1 _RAM_DCAB_CarData_Green.Unknown38_b
+0000dcd0 _RAM_DCAB_CarData_Green.Unknown37_b_JumpCurveStep
+0000dcd1 _RAM_DCAB_CarData_Green.Unknown38_b_JumpType
 0000dcd2 _RAM_DCAB_CarData_Green.Unknown39_w
 0000dcd2 _RAM_DCAB_CarData_Green.Unknown39_w.Lo
 0000dcd3 _RAM_DCAB_CarData_Green.Unknown39_w.Hi
@@ -3183,8 +3183,8 @@
 0000dd0e _RAM_DCEC_CarData_Blue.Unknown34_w.Lo
 0000dd0f _RAM_DCEC_CarData_Blue.Unknown34_w.Hi
 0000dd10 _RAM_DCEC_CarData_Blue.Unknown36_b_JumpCurveMultiplier
-0000dd11 _RAM_DCEC_CarData_Blue.Unknown37_b
-0000dd12 _RAM_DCEC_CarData_Blue.Unknown38_b
+0000dd11 _RAM_DCEC_CarData_Blue.Unknown37_b_JumpCurveStep
+0000dd12 _RAM_DCEC_CarData_Blue.Unknown38_b_JumpType
 0000dd13 _RAM_DCEC_CarData_Blue.Unknown39_w
 0000dd13 _RAM_DCEC_CarData_Blue.Unknown39_w.Lo
 0000dd14 _RAM_DCEC_CarData_Blue.Unknown39_w.Hi
@@ -3258,8 +3258,8 @@
 0000dd4f _RAM_DD2D_CarData_Yellow.Unknown34_w.Lo
 0000dd50 _RAM_DD2D_CarData_Yellow.Unknown34_w.Hi
 0000dd51 _RAM_DD2D_CarData_Yellow.Unknown36_b_JumpCurveMultiplier
-0000dd52 _RAM_DD2D_CarData_Yellow.Unknown37_b
-0000dd53 _RAM_DD2D_CarData_Yellow.Unknown38_b
+0000dd52 _RAM_DD2D_CarData_Yellow.Unknown37_b_JumpCurveStep
+0000dd53 _RAM_DD2D_CarData_Yellow.Unknown38_b_JumpType
 0000dd54 _RAM_DD2D_CarData_Yellow.Unknown39_w
 0000dd54 _RAM_DD2D_CarData_Yellow.Unknown39_w.Lo
 0000dd55 _RAM_DD2D_CarData_Yellow.Unknown39_w.Hi
@@ -3840,7 +3840,7 @@
 0000df00 _RAM_DF00_JumpCurvePosition
 0000df01 _RAM_DF01_
 0000df02 _RAM_DF02_JumpCurveStep
-0000df03 _RAM_DF03_Jump_Active
+0000df03 _RAM_DF03_JumpType
 0000df04 _RAM_DF04_CarX_
 0000df05 _RAM_DF05_CarY_
 0000df06 _RAM_DF06_
@@ -4374,8 +4374,8 @@
 00000080 _sizeof_DATA_242E_BehaviourLookup
 00000010 _sizeof_DATA_24AE_JumpCurveMultiplierForSpeed
 00000010 _sizeof_DATA_24BE_JumpCurveStepForSpeed
-00000010 _sizeof_DATA_24CE_SMS_
-00000010 _sizeof_DATA_24DE_SMS_
+00000010 _sizeof_DATA_24CE_JumpCurveMultiplierForSpeed_SMS
+00000010 _sizeof_DATA_24DE_JumpCurveStepForSpeed_SMS
 00000010 _sizeof_DATA_24EE_GG_
 00000010 _sizeof_DATA_24FE_GG_
 00000010 _sizeof_DATA_250E_OppositeDirections
