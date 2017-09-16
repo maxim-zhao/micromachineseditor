@@ -125,8 +125,9 @@ RAM_SpriteTable instanceof SpriteTable
 .endm
 
 
-.include "System definitions.inc"
 .redefine NAME_TABLE_ADDRESS $3800 ; Not extended height mode!
+.define SPRITE_TABLE_ADDRESS $3f00
+.include "System definitions.inc"
 
 .include "VDP macros.inc"
 
@@ -828,13 +829,13 @@ Tilemap:
 ; We define some macros so we can "draw" it in ASCII
 ; This is a bit ugly
 .define TT Tile_Top
-.define TB Tile_Top | TILEMAP_VFLIP
+.define TB Tile_Top | TILEMAP_FLAG_VFLIP
 .define TL Tile_Line
-.define TR Tile_Line | TILEMAP_HFLIP
+.define TR Tile_Line | TILEMAP_FLAG_HFLIP
 .define TD Tile_LineTop1
 .define TE Tile_LineTop2
-.define TF Tile_LineTop1 | TILEMAP_VFLIP
-.define TG Tile_LineTop2 | TILEMAP_VFLIP
+.define TF Tile_LineTop1 | TILEMAP_FLAG_VFLIP
+.define TG Tile_LineTop2 | TILEMAP_FLAG_VFLIP
 
 .dw TT TT TT TT TT TT TT TT TT TD TE TT TT TT TT TT TT TT TT TT
 .dw  0  0  0  0  0  0  0  0  0 TL TR  0  0  0  0  0  0  0  0  0

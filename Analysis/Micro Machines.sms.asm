@@ -54,6 +54,8 @@
 .define LAYOUT_INDEX_MASK %00111111 ; Bits for metatile index from data
 .define LAYOUT_EXTRA_MASK %11000000 ; Extra bits
 
+.define RACE_START_COUNTER_MAXIMUM_VALUE $80 ; Timer counts through the low bits
+
 ; This disassembly was initially created using Emulicious (http://www.emulicious.net)
 .memorymap
 slotsize $7fe0
@@ -75,6 +77,10 @@ banks 14
 .endro
 
 ; SMS stuff
+.define NAME_TABLE_ADDRESS $3700 ; Extended height mode!
+.define SPRITE_TABLE_ADDRESS $3f00
+.define SPRITE_TABLE_TERMINATOR $e0 ; TODO is it really? Or just off-screen? (Y = 224)
+
 .include "System definitions.inc"
 
 ; Some shorthand for the mode control registers
@@ -884,7 +890,7 @@ Unused07 db ; +7 unused, always 0
 YMetatileRelative db ; +8 Y position within metatile (0..12)
 Unused09 db ; +9 unused, always 0
 CurrentLayoutData db ; +10 The layout data under the car
-Unknown11_b_Speed db ; +11
+Unknown11_b_EngineSpeed db ; +11
 Unknown12_b_Direction db ; +12
 Direction db ; +13 Direction (0..15)
 Unknown14_b db ; +14 unused?
@@ -1006,7 +1012,7 @@ _RAM_D599_IsPaused db
 _RAM_D59A_PauseDebounce1 db
 _RAM_D59B_PauseDebounce2 db
 _RAM_D59C_GGStartButtonValue db
-_RAM_D59D_ db
+_RAM_D59D_IsTwoPlayersOnOneGameGear db
 _RAM_D59E_ db
 _RAM_D59F_ dw
 _RAM_D5A1_ dw
@@ -1061,7 +1067,7 @@ _RAM_D5D9_ db
 _RAM_D5DA_ dsb 2 ; unused?
 _RAM_D5DC_ db
 _RAM_D5DD_ db
-_RAM_D5DE_ db
+_RAM_D5DE_LastTrackPositionIndex_Copy db
 _RAM_D5DF_ db
 _RAM_D5E0_TrackSkipThreshold db
 _RAM_D5E1_ dsb 95 ; unused?
@@ -1259,15 +1265,15 @@ _RAM_DBAD_X_ db
 _RAM_DBAE_ db
 _RAM_DBAF_Y_ db
 _RAM_DBB0_ db
-_RAM_DBB1_ dw
-_RAM_DBB3_ dw
+_RAM_DBB1_CurrentMetatileX dw
+_RAM_DBB3_CurrentMetatileY dw
 _RAM_DBB5_LayoutByte_ db
 _RAM_DBB6_ db
 _RAM_DBB7_ db
 _RAM_DBB8_ db
-_RAM_DBB9_ db
-_RAM_DBBA_ db
-_RAM_DBBB_ db
+_RAM_DBB9_CurrentMetatileX_Copy db
+_RAM_DBBA_CurrentMetatileY_Copy db
+_RAM_DBBB_LayoutByte__Copy db
 _RAM_DBBC_ db
 _RAM_DBBD_ db
 _RAM_DBBE_ db
@@ -1396,8 +1402,8 @@ _RAM_DE4B_ db
 _RAM_DE4C_ db
 _RAM_DE4D_ db
 _RAM_DE4E_ db
-_RAM_DE4F_ db
-_RAM_DE50_ db
+_RAM_DE4F_RaceStartCounter db ; Counts up from 0 to RACE_START_COUNTER_MAXIMUM_VALUE before the race starts, used for some stuff during that phase
+_RAM_DE50_RaceStartFlashingState db
 _RAM_DE51_ db
 _RAM_DE52_ db
 _RAM_DE53_ db
@@ -1466,19 +1472,25 @@ _RAM_DE94_BumpSpeed dw ; High byte is always 0
 _RAM_DE96_Speed dw
 .ende
 
+.enum 0
+SteeringMode_NotSteering db
+SteeringMode_Left db
+SteeringMode_Right db
+.ende
+
 .enum $DE99 export
-_RAM_DE99_ db
-_RAM_DE9A_ db
-_RAM_DE9B_ db
-_RAM_DE9C_ db
-_RAM_DE9D_ db
+_RAM_DE99_SteeringMode db ; 0 = not steering, 1 = steering left, 2 = steering right
+_RAM_DE9A_SteeringMode_WriteOnly db ; Seems not to be read
+_RAM_DE9B_SteeringMode_Player2 db
+_RAM_DE9C_SteeringMode_Player2_WriteOnly db ; Seems not to be read
+_RAM_DE9D_ db ; Player 2 equivalent of _RAM_DEAB_
 _RAM_DE9E_ db
-_RAM_DE9F_ db
+_RAM_DE9F_SteeringDelayCounter db
 _RAM_DEA0_ db
-_RAM_DEA1_ db
+_RAM_DEA1_SteeringDelayCounter_Player2 db
 _RAM_DEA2_ db
-_RAM_DEA3_ db
-_RAM_DEA4_ db
+_RAM_DEA3_OutstandingSteeringSteps db ; Seems to count the number of rotation steps applied in a row which haven't been applied?
+_RAM_DEA4_OutstandingSteeringSteps_Player2 db
 _RAM_DEA5_ dw
 _RAM_DEA7_ db
 _RAM_DEA8_ dw
@@ -1688,7 +1700,7 @@ _RAM_DF7C_Powerboats_BubblePush_DecayCounter db ; Rate-limits decay of _RAM_DF7B
 _RAM_DF7D_ db
 _RAM_DF7E_ db
 _RAM_DF7F_ db
-_RAM_DF80_TwoPlayerWinPhase db
+_RAM_DF80_HeadToHeadWinPhase db
 _RAM_DF81_ db
 _RAM_DF82_BubblePush_Strength_X db
 _RAM_DF83_BubblePush_Strength_Y db
@@ -2024,8 +2036,8 @@ LABEL_1E4_:
   ld a, (_RAM_DF7F_)
   or a
   call nz, LABEL_AB1_
-  call LABEL_12D5_Trampoline_PagedFunction_1FA3D_
-  call LABEL_12BF_Trampoline_PagedFunction_35F8A_
+  call LABEL_12D5_Trampoline_PagedFunction_1FA3D_UpdateSteeringState_Player1_
+  call LABEL_12BF_Trampoline_PagedFunction_35F8A_UpdateSteeringState_Player2_
   call LABEL_11BA_
   call LABEL_12CA_Trampoline_PagedFunction_36209_
   ld a, (_RAM_D5B6_SkidDuration)
@@ -3289,19 +3301,19 @@ _LABEL_BAC_ret:
   ret
 
 DATA_BAD_BonusSpriteData: ; Sprite X, N for "BONUS"
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 0, <SpriteIndex_Bonus_Part1 + 0 ; TODO enum for head to head mode
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 1, <SpriteIndex_Bonus_Part1 + 1
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 2, <SpriteIndex_Bonus_Part1 + 2
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 3, <SpriteIndex_Bonus_Part1 + 3
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 4, <SpriteIndex_Bonus_Part2 + 0
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 5, <SpriteIndex_Bonus_Part2 + 1
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 0, <SpriteIndex_Bonus_Part1 + 0 ; TODO enum for head to head mode
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 1, <SpriteIndex_Bonus_Part1 + 1
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 2, <SpriteIndex_Bonus_Part1 + 2
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 3, <SpriteIndex_Bonus_Part1 + 3
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 4, <SpriteIndex_Bonus_Part2 + 0
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 5, <SpriteIndex_Bonus_Part2 + 1
 DATA_BB9_WinnerSpriteData: ; Sprite X, N for "WINNER"
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 0, <SpriteIndex_Winner + 0
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 1, <SpriteIndex_Winner + 1
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 2, <SpriteIndex_Winner + 2
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 3, <SpriteIndex_Winner + 3
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 4, <SpriteIndex_Winner + 4
-.db HEAD_TO_HEAD_TEXT_X + SPRITE_WIDTH * 5, <SpriteIndex_Winner + 5
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 0, <SpriteIndex_Winner + 0
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 1, <SpriteIndex_Winner + 1
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 2, <SpriteIndex_Winner + 2
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 3, <SpriteIndex_Winner + 3
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 4, <SpriteIndex_Winner + 4
+.db HEAD_TO_HEAD_TEXT_X + TILE_WIDTH * 5, <SpriteIndex_Winner + 5
 
 .ends
 
@@ -3318,15 +3330,15 @@ LABEL_BC5_EmitFloorTiles:
   ld a, h
   out (PORT_VDP_ADDRESS), a
   ld hl, _RAM_DC59_FloorTiles
-  ld b, BYTES_PER_TILE * 2
+  ld b, TILE_DATA_SIZE * 2
   ld c, PORT_VDP_DATA
   otir
-  ld hl, _RAM_DC59_FloorTiles + BYTES_PER_TILE
-  ld b, BYTES_PER_TILE ; The the same 2 tiles in the opposite order
+  ld hl, _RAM_DC59_FloorTiles + TILE_DATA_SIZE
+  ld b, TILE_DATA_SIZE ; The the same 2 tiles in the opposite order
   ld c, PORT_VDP_DATA
   otir
   ld hl, _RAM_DC59_FloorTiles
-  ld b, BYTES_PER_TILE
+  ld b, TILE_DATA_SIZE
   ld c, PORT_VDP_DATA
   otir
 +:ret
@@ -3521,7 +3533,7 @@ LABEL_CF8_ScrollFloorTiles_Y_Row:
     .macro RotateBitplaneVertically args direction, bitplane
     ; Calculate offset of top/bottom row
     .if direction == +1
-      .define n BYTES_PER_TILE + BYTES_PER_ROW * 7 + bitplane
+      .define n TILE_DATA_SIZE + BYTES_PER_ROW * 7 + bitplane
     .else
       .define n bitplane
     .endif
@@ -3529,7 +3541,7 @@ LABEL_CF8_ScrollFloorTiles_Y_Row:
     ld a, (_RAM_DC59_FloorTiles + n)
     ld (_RAM_DE59_FloorTileRotationTemp), a
     ; Copy all the others from above/below
-    .repeat SPRITE_HEIGHT * 2 - 1 ; (15 rows)
+    .repeat TILE_HEIGHT * 2 - 1 ; (15 rows)
     ld a, (_RAM_DC59_FloorTiles + n - BYTES_PER_ROW * direction)
     ld (_RAM_DC59_FloorTiles + n), a
       .redefine n, n - BYTES_PER_ROW * direction
@@ -3564,7 +3576,7 @@ LABEL_DCF_ScrollFloorTiles_X_Column:
     .macro RotateBitplaneRowLeft args rowNumber, bitplaneNumber
       ld a, (_RAM_DC59_FloorTiles + (rowNumber * BYTES_PER_ROW) + bitplaneNumber)
       rla
-      rl (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+      rl (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + TILE_DATA_SIZE)
       rl (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber)
     .endm
     ld ix, _RAM_DC59_FloorTiles
@@ -3587,10 +3599,10 @@ LABEL_E3C_ScrollFloorTiles_X_Column_Right:
     ; This is done for 8 rows
     ; (Not necessary to inert the order from above, it works either way)
     .macro RotateBitplaneRowRight args rowNumber, bitplaneNumber
-      ld a, (_RAM_DC59_FloorTiles + (rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+      ld a, (_RAM_DC59_FloorTiles + (rowNumber * BYTES_PER_ROW) + bitplaneNumber + TILE_DATA_SIZE)
       rra
       rr (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber)
-      rr (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + BYTES_PER_TILE)
+      rr (ix+(rowNumber * BYTES_PER_ROW) + bitplaneNumber + TILE_DATA_SIZE)
     .endm
     ld ix, _RAM_DC59_FloorTiles
     RotateBitplaneRowRight 0 2
@@ -3606,15 +3618,15 @@ LABEL_E3C_ScrollFloorTiles_X_Column_Right:
 .ends
 
 .section "Bank 0 unknown" force
-DATA_EA2_: ; Engine velocity related? Maybe somethingt o do with slowing down while turning?
+DATA_EA2_: ; Engine velocity related? Maybe something to do with slowing down while turning?
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00
 .db $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $00 $01 $01
 .db $00 $00 $01 $01 $02 $02 $01 $01 $02 $02 $03 $03 $02 $02 $03 $03 $04 
 .db $04 $03 $03 $04 $04 $05 $05 $04 $04 $05 $05 $06 $06 $05 $05 $06 $06
 .ends
 
-.section "Trampolines 3" force
-LABEL_EE6_:
+.section "LABEL_EE6_Trampoline_PagedFunction_363D9_" force
+LABEL_EE6_Trampoline_PagedFunction_363D9_:
   JumpToPagedFunction PagedFunction_363D9_
 .ends
   
@@ -3633,17 +3645,17 @@ LABEL_EF1_:
   cp Jump_Large
   JrZRet LABEL_F6F_ret
 +:
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   or a
   jr z, ++
   cp $01
   jr z, +
   call LABEL_6593_
 +:
-  ld a, (_RAM_DE99_)
-  or a
+  ld a, (_RAM_DE99_SteeringMode)
+  or a ; SteeringMode_NotSteering
   jr z, ++
-  cp $01
+  cp SteeringMode_Left
   jr z, +
   
   ; Check for L
@@ -3657,7 +3669,7 @@ LABEL_EF1_:
   and BUTTON_R_MASK ; $08
   jr z, LABEL_F75_
 ++:
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   or a
   jr z, LABEL_F75_
   
@@ -3722,11 +3734,11 @@ LABEL_F9B_:
   xor a
   ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jp nz, LABEL_109B_
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   jp nz, LABEL_109B_
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   or a
@@ -3810,7 +3822,7 @@ LABEL_102B_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jr nz, +
-  ld a, (_RAM_D59D_)
+  ld a, (_RAM_D59D_IsTwoPlayersOnOneGameGear)
   or a
   jr z, +
   jp LABEL_10C2_
@@ -4042,12 +4054,12 @@ LABEL_11BA_:
   ld a, (_RAM_DE92_EngineSpeed)
   or a
   jr z, LABEL_11E4_
-  ld a, (_RAM_DE99_)
-  or a
+  ld a, (_RAM_DE99_SteeringMode)
+  or a ; SteeringMode_NotSteering
   JrZRet +
-  cp $01
+  cp SteeringMode_Left
   jr z, +++
-  jp LABEL_1242_
+  jp LABEL_1242_ ; SteeringMode_Right
 
 +:ret
 
@@ -4055,9 +4067,9 @@ LABEL_11E4_:
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_DE90_CarDirection), a
   xor a
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld (_RAM_DEA0_), a
-  ld (_RAM_DE99_), a
+  ld (_RAM_DE99_SteeringMode), a ; SteeringMode_NotSteering
   ld a, $06
   ld (_RAM_DEAC_), a
   ret
@@ -4087,9 +4099,9 @@ _LABEL_121A_ret:
 .endif
 
 ++:
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   DEC_A
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld a, (_RAM_DEAB_)
   cp $01
   jr nz, +
@@ -4122,9 +4134,9 @@ LABEL_1242_:
 +:ret
 
 ++:
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   DEC_A
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld a, (_RAM_DEAB_)
   cp $01
   jr nz, +
@@ -4162,14 +4174,19 @@ LABEL_1295_:
   ld a, (_RAM_DE90_CarDirection)
   cp l
   jr nz, +
-  xor a
-  ld (_RAM_DE99_), a
-  ld (_RAM_DE9A_), a
-  ld (_RAM_DEA3_), a
+
+  ; Direction has not changed
+  xor a ; SteeringMode_NotSteering
+  ld (_RAM_DE99_SteeringMode), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9A_SteeringMode_WriteOnly), a
+.endif
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ret
 
-+:
-  ld a, (_RAM_DEA3_)
++:; Direction has changed
+  ; if _RAM_DEA3_OutstandingSteeringSteps == 4 then _RAM_DEAB_ = 1 else _RAM_DEAB_ = 0
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   cp $04
   jr nz, +
   ld a, $01
@@ -4183,18 +4200,17 @@ LABEL_1295_:
 +:xor a
   ld (_RAM_DEAB_), a
 ++:ret
-
 .ends
 
 .section "Trampolines 4" force
-LABEL_12BF_Trampoline_PagedFunction_35F8A_:
-  JumpToPagedFunction PagedFunction_35F8A_
+LABEL_12BF_Trampoline_PagedFunction_35F8A_UpdateSteeringState_Player2_:
+  JumpToPagedFunction PagedFunction_35F8A_UpdateSteeringState_Player2_
 
 LABEL_12CA_Trampoline_PagedFunction_36209_:
   JumpToPagedFunction PagedFunction_36209_
 
-LABEL_12D5_Trampoline_PagedFunction_1FA3D_:
-  JumpToPagedFunction PagedFunction_1FA3D_
+LABEL_12D5_Trampoline_PagedFunction_1FA3D_UpdateSteeringState_Player1_:
+  JumpToPagedFunction PagedFunction_1FA3D_UpdateSteeringState_Player1_
 .ends
 
 .section "Game screen tilemap drawing" force
@@ -5405,20 +5421,25 @@ DATA_1c82_TileVRAMAddresses: ; VRAM addresses for RuffTrux non-car sprites
   TileWriteAddressData SpriteIndex_RuffTrux_Water2
   TileWriteAddressData SpriteIndex_RuffTrux_Blank2
 
-LABEL_1C98_:
+LABEL_1C98_ComputeCurrentAbsolutePosition:
+  ; Compute the player car's "current metatile" coordinates
+  ; This is the screen coordinates plus the relative coordinates
   ld de, (_RAM_DBA0_TopLeftMetatileX)
   ld hl, (_RAM_DE79_CurrentMetatile_OffsetX)
   add hl, de
-  ld (_RAM_DBB1_), hl
+  ld (_RAM_DBB1_CurrentMetatileX), hl
+  
   ld de, (_RAM_DBA2_TopLeftMetatileY)
   ld hl, (_RAM_DE7B_CurrentMetatile_OffsetY)
   add hl, de
-  ld (_RAM_DBB3_), hl
+  ld (_RAM_DBB3_CurrentMetatileY), hl
+  
   ld a, (_RAM_DE7D_CurrentLayoutData)
   and LAYOUT_INDEX_MASK
   ld (_RAM_DBB5_LayoutByte_), a
+  
   ld a, (_RAM_DF4F_LastTrackPositionIndex)
-  ld (_RAM_D5DE_), a
+  ld (_RAM_D5DE_LastTrackPositionIndex_Copy), a
   ret
 
 LABEL_1CBD_GetCurrentMetatileIndex:
@@ -5825,9 +5846,9 @@ LABEL_1DF2_:
   ld a, $01
   ld (_RAM_DF01_), a
   xor a
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld (_RAM_DEA0_), a
-  ld (_RAM_DE99_), a
+  ld (_RAM_DE99_SteeringMode), a ; SteeringMode_NotSteering
   ld a, $06
   ld (_RAM_DEAC_), a
 +:
@@ -5948,7 +5969,7 @@ _LABEL_1FDC_NoWall:
   ld (_RAM_DEF9_CurrentBehaviour), a
 
   ; If it's a 2-player win phase then we do not process the behaviour
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_20E3_BehaviourEnd_ret
 
@@ -6385,9 +6406,9 @@ LABEL_22CD_ProcessCarJump:
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_DE90_CarDirection), a
   xor a
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld (_RAM_DEA0_), a
-  ld (_RAM_DE99_), a
+  ld (_RAM_DE99_SteeringMode), a ; SteeringMode_NotSteering
   ld a, $06
   ld (_RAM_DEAC_), a
   xor a
@@ -6914,7 +6935,7 @@ LABEL_2724_:
   ret
 
 LABEL_27B1_:
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jr nz, LABEL_27FB_
   ld a, (_RAM_DB7D_)
@@ -6956,7 +6977,7 @@ LABEL_27FB_:
   ld a, (_RAM_D5B0_)
   or a
   JrNzRet _LABEL_284F_ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_284F_ret
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -7134,9 +7155,9 @@ _Powerboats:
   ld a, (_RAM_DE91_CarDirectionPrevious)
   ld (_RAM_DE90_CarDirection), a
   xor a
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
   ld (_RAM_DEA0_), a
-  ld (_RAM_DE99_), a
+  ld (_RAM_DE99_SteeringMode), a ; SteeringMode_NotSteering
   ld a, $06
   ld (_RAM_DEAC_), a
   ret
@@ -7179,7 +7200,7 @@ LABEL_2961_:
   ld a, $01
   ld (ix+CarData.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ; Add 8 to Unknown39_w and store 0 at the pointed result
   ld a, (ix+CarData.Unknown39_w.Lo)
@@ -7313,12 +7334,12 @@ LABEL_2A4A_:
   jr z, -
 LABEL_2A55_:
   xor a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld (_RAM_DE92_EngineSpeed), a
   ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld a, $02
-  ld (_RAM_DF80_TwoPlayerWinPhase), a
+  ld (_RAM_DF80_HeadToHeadWinPhase), a
   ld a, $01
   ld (_RAM_DF81_), a
   ld a, (_RAM_DCEC_CarData_Blue.SpriteX)
@@ -8616,7 +8637,8 @@ LABEL_35E0_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   jr z, +
-  ld a, (_RAM_DE50_)
+  ; Challenge mode only: flash player car
+  ld a, (_RAM_DE50_RaceStartFlashingState)
   cp $01
   jr z, ++
 +:
@@ -8627,7 +8649,8 @@ LABEL_35E0_:
   cp $01
   jr z, +++
 ++:
-  ld a, $E0
+  ; Car Y to off-screen
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (_RAM_DE85_Y), a
 +++:
   ld a, (_RAM_DF59_CarState)
@@ -8740,7 +8763,7 @@ LABEL_370F_:
   ld a, (_RAM_DE41_)
   cp $01
   jr z, +
-  ld a, $E0
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (_RAM_DE85_Y), a
 +:
   ld a, (_RAM_DF5A_CarState3)
@@ -8813,7 +8836,7 @@ LABEL_37BE_:
   ld a, (_RAM_DE42_)
   cp $01
   jr z, +
-  ld a, $E0
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (_RAM_DE85_Y), a
 +:
   ld a, (_RAM_DF5B_)
@@ -8934,7 +8957,7 @@ LABEL_38B9_:
   ld a, (_RAM_DE43_)
   cp $01
   jr z, +
-  ld a, $E0
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (_RAM_DE85_Y), a
 +:
   ld a, (_RAM_DF5C_)
@@ -9505,10 +9528,10 @@ LABEL_3D59_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   JrNzRet _LABEL_3DBC_ret
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet _LABEL_3DBC_ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_3DBC_ret
   ld a, (_RAM_DCEC_CarData_Blue.CurrentLayoutData)
@@ -9528,11 +9551,11 @@ LABEL_3D59_:
   ld (_RAM_D5BA_), a
   jr z, +
   ; Decrement down to 6
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp $06
   jr c, +
   DEC_A
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
 +:ld a, (_RAM_DCEC_CarData_Blue.CurrentLayoutData)
   call LABEL_9B2_ConvertMetatileIndexToDataIndex
   ld e, a
@@ -9573,7 +9596,7 @@ DATA_3DE4_TrackTypeTileDataPointerHi:
 
 LABEL_3DEC_RuffTrux_:
   ; Disable some sprites?
-  ld a, $E0
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (iy+9), a
   ld (iy+10), a
   ld (iy+11), a
@@ -10113,13 +10136,13 @@ LABEL_4465_Powerboats_BubblePush_GetData:
   cp TT_2_Powerboats
   JrNzRet ++
   
-  ; ???
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ; If not in race start phase
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet ++
   
   ; Win phase -> skip
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet ++
   
@@ -10174,7 +10197,7 @@ LABEL_44C3_Powerboats_BubblePush_ApplyData:
   cp TT_2_Powerboats
   JrNzRet +
   ; Not in win phase
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet +
   ; Only if _RAM_DF7B_Powerboats_BubblePush_Strength is set
@@ -10419,7 +10442,7 @@ LABEL_4622_:
   ld a, (_RAM_DF58_ResettingCarToTrack)
   or a
   JpNzRet _LABEL_46C8_ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JpNzRet _LABEL_46C8_ret
   ld a, (_RAM_DE7D_CurrentLayoutData)
@@ -10642,7 +10665,7 @@ LABEL_479E_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack)
   or a
   JrNzRet _LABEL_479D_ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_479D_ret
   ld ix, _RAM_DCEC_CarData_Blue
@@ -11057,7 +11080,7 @@ LABEL_4DAA_:
   JpNzRet _LABEL_5A87_ret
   ld hl, DATA_24AE_JumpCurveMultiplierForSpeed
   ld d, $00
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   ld e, a
   add hl, de
   ld a, (hl)
@@ -11092,7 +11115,7 @@ LABEL_4DD4_:
   ld a, $01
   ld (_RAM_DCAB_CarData_Green.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE67_), a
   ld (_RAM_DE31_CarUnknowns.1.Unknown0_Direction), a
@@ -11137,7 +11160,7 @@ LABEL_4E49_:
   ld a, $01
   ld (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE68_), a
   ld (_RAM_DE31_CarUnknowns.2.Unknown0_Direction), a
@@ -11182,11 +11205,11 @@ LABEL_4EAB_:
   ld (_RAM_DEAF_HScrollDelta), a
   ld (_RAM_DEB1_VScrollDelta), a
   ld (_RAM_DE92_EngineSpeed), a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld (_RAM_D5A4_IsReversing), a
   ld (_RAM_D5A5_), a
   ld a, $01
-  ld (_RAM_DF80_TwoPlayerWinPhase), a
+  ld (_RAM_DF80_HeadToHeadWinPhase), a
   ld (_RAM_DF81_), a
   ld a, (_RAM_DBA4_CarX)
   ld e, a
@@ -11227,7 +11250,7 @@ LABEL_4EFA_:
   ld a, $01
   ld (_RAM_DD2D_CarData_Yellow.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE69_), a
   ld (_RAM_DE31_CarUnknowns.3.Unknown0_Direction), a
@@ -11661,7 +11684,7 @@ LABEL_51DA_:
   ld ix, _RAM_DCEC_CarData_Blue
   ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   ld (_RAM_DE57_), a
   ld a, $01
   ld (_RAM_D59E_), a
@@ -11687,37 +11710,47 @@ LABEL_522C_:
 LABEL_523B_:
   xor a
   ld (_RAM_D59E_), a
-  ld a, (_RAM_DE4F_)
-  cp $80
-  jr z, LABEL_52B7_
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
+  jr z, _LABEL_52B7_
+  ; In race start phase
+  ; Increment counter
   inc a
-  ld (_RAM_DE4F_), a
+  ld (_RAM_DE4F_RaceStartCounter), a
+  ; Flash car every 16 frames
   and $0F
   jr nz, +
-  ld a, (_RAM_DE50_)
-  xor $01
-  ld (_RAM_DE50_), a
+  ld a, (_RAM_DE50_RaceStartFlashingState)
+  xor 1
+  ld (_RAM_DE50_RaceStartFlashingState), a
 +:
-  call LABEL_1C98_
-  ld a, (_RAM_DBB1_)
-  ld (_RAM_DBB9_), a
-  ld a, (_RAM_DBB3_)
-  ld (_RAM_DBBA_), a
+  call LABEL_1C98_ComputeCurrentAbsolutePosition
+  ld a, (_RAM_DBB1_CurrentMetatileX)
+  ld (_RAM_DBB9_CurrentMetatileX_Copy), a
+  ld a, (_RAM_DBB3_CurrentMetatileY)
+  ld (_RAM_DBBA_CurrentMetatileY_Copy), a
   ld a, (_RAM_DBB5_LayoutByte_)
-  ld (_RAM_DBBB_), a
+  ld (_RAM_DBBB_LayoutByte__Copy), a
+  
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, LABEL_5298_
-  ld a, (_RAM_DE4F_)
+  ; For GG:
+  ; If it is below 44...
+  ld a, (_RAM_DE4F_RaceStartCounter)
   cp $2C
   JrNcRet _LABEL_5297_ret
+  
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, LABEL_5283_
+  ; Head to head
   ld a, $01
   call +
+  
 LABEL_5283_:
-  ld a, (_RAM_DE4F_)
+  ; While it is above 22...
+  ld a, (_RAM_DE4F_RaceStartCounter)
   cp $16
   JrNcRet _LABEL_5297_ret
   ld a, $01
@@ -11733,7 +11766,8 @@ LABEL_5298_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   dec a
   JrNzRet _LABEL_5297_ret
-  ld a, (_RAM_DE4F_)
+  ; While it is above 8...
+  ld a, (_RAM_DE4F_RaceStartCounter)
   cp $08
   JrNcRet _LABEL_5297_ret
   call LABEL_5283_
@@ -11745,7 +11779,7 @@ LABEL_5298_:
   ld (_RAM_DEB2_), a
   ret
 
-LABEL_52B7_:
+_LABEL_52B7_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   dec a
   jp z, LABEL_51DA_
@@ -11759,19 +11793,19 @@ LABEL_52B7_:
   ld ix, _RAM_DCAB_CarData_Green
   ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   ld (_RAM_DE57_), a
   call LABEL_5304_
   ld ix, _RAM_DCEC_CarData_Blue
   ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   ld (_RAM_DE57_), a
   call LABEL_5304_
   ld ix, _RAM_DD2D_CarData_Yellow
   ld a, (ix+CarData.Direction)
   ld (_RAM_DE56_), a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   ld (_RAM_DE57_), a
 LABEL_5304_:
   ld a, (_RAM_DC3D_IsHeadToHead)
@@ -11789,7 +11823,7 @@ LABEL_5304_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack)
   or a
   jp nz, LABEL_522C_
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jr nz, LABEL_536C_
   ld a, (_RAM_DF7F_)
@@ -11808,13 +11842,13 @@ LABEL_5304_:
   ld a, (_RAM_D5A5_)
   or a
   jr nz, +
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   or a
   jr nz, ++
 +:
   ld a, $02
   ld (_RAM_DE57_), a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld a, $01
   ld (_RAM_D5A5_), a
   ld a, (_RAM_DCEC_CarData_Blue.Direction)
@@ -11831,7 +11865,7 @@ LABEL_536C_:
   or a
   jr z, +
   xor a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld (_RAM_D5A5_), a
 +:
   ld a, (ix+CarData.Unknown26_b_HasFinished)
@@ -11851,13 +11885,13 @@ LABEL_537F_:
   cp b
   jp c, LABEL_544A_
   ld (ix+CarData.Unknown61_b), $00
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   or a
   jp z, LABEL_544A_
   ld a, (ix+CarData.Unknown20_b_JumpCurvePosition)
   or a
   jp nz, LABEL_544A_
-  dec (ix+CarData.Unknown11_b_Speed)
+  dec (ix+CarData.Unknown11_b_EngineSpeed)
   jp LABEL_544A_
 
 +++:
@@ -11885,13 +11919,13 @@ LABEL_537F_:
 +++:
   ld b, a
 ++++:
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jp nz, LABEL_522C_
   ld a, (_RAM_DC3D_IsHeadToHead)
   dec a
   jr nz, ++
-  ld a, (_RAM_D59D_)
+  ld a, (_RAM_D59D_IsTwoPlayersOnOneGameGear)
   or a
   jr z, +
   jp ++
@@ -11900,7 +11934,7 @@ LABEL_537F_:
   ld a, (_RAM_DB21_Player2Controls)
   and BUTTON_1_MASK ; $10
   jr z, ++
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   or a
   jr nz, LABEL_537F_
   ld a, (_RAM_DB99_AccelerationDelay)
@@ -11925,14 +11959,14 @@ LABEL_537F_:
   ld a, (ix+CarData.TopSpeed)
   sub l
   ld l, a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   cp l
   jr z, LABEL_544A_
   jr c, +++
   jr ++
 
 +:
-  ld l, (ix+CarData.Unknown11_b_Speed)
+  ld l, (ix+CarData.Unknown11_b_EngineSpeed)
   ld a, (ix+CarData.TopSpeed)
   cp l
   jr z, LABEL_544A_
@@ -11941,14 +11975,14 @@ LABEL_537F_:
   ld a, (ix+CarData.Unknown20_b_JumpCurvePosition)
   or a
   jr nz, LABEL_544A_
-  dec (ix+CarData.Unknown11_b_Speed)
+  dec (ix+CarData.Unknown11_b_EngineSpeed)
   jp LABEL_544A_
 
 +++:
   ld a, (ix+CarData.Unknown20_b_JumpCurvePosition)
   or a
   jr nz, LABEL_544A_
-  inc (ix+CarData.Unknown11_b_Speed)
+  inc (ix+CarData.Unknown11_b_EngineSpeed)
 LABEL_544A_:
   ld a, (_RAM_D59E_)
   or a
@@ -12151,7 +12185,7 @@ LABEL_5451_:
   ld (ix+CarData.YPosition.Lo), l
   ld (ix+CarData.YPosition.Hi), h
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown15_b), a
   ld (ix+CarData.Unknown16_b), a
   ld (_RAM_DF7D_), a
@@ -12169,7 +12203,7 @@ LABEL_55FA_:
   ld a, $00
   jr nz, +
   inc a
-+:ld (ix+CarData.Unknown11_b_Speed), a
++:ld (ix+CarData.Unknown11_b_EngineSpeed), a
 LABEL_5608_:
   ld hl, DATA_25D0_TimesTable36Lo
   ld a, (ix+CarData.CurrentLayoutData)
@@ -12276,7 +12310,7 @@ LABEL_56C0_:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jr z, +
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jp nz, LABEL_5764_
   ld a, (_RAM_D5D9_)
@@ -12320,11 +12354,11 @@ LABEL_56C0_:
   cp $02
   jr c, ++
   ld b, a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   cp d
   jr c, +
   dec a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
 +:
   ld a, b
 ++:
@@ -12357,11 +12391,11 @@ LABEL_573C_:
   cp $02
   jr c, ++
   ld b, a
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   cp d
   jr c, +
   dec a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
 +:
   ld a, b
 ++:
@@ -12386,7 +12420,7 @@ LABEL_5769_:
   ld a, (ix+CarData.Unknown46_b_ResettingCarToTrack)
   or a
   jp nz, LABEL_586B_
-  ld l, (ix+CarData.Unknown11_b_Speed)
+  ld l, (ix+CarData.Unknown11_b_EngineSpeed)
   ld a, (_RAM_DB98_TopSpeed)
   cp l
   jr nz, +
@@ -12397,7 +12431,7 @@ LABEL_5769_:
   or a
   jr nz, ++ ; no-op
 ++:
-  call LABEL_EE6_
+  call LABEL_EE6_Trampoline_PagedFunction_363D9_
 +++:
   ; Look up pointer (index 0..16)
   ld hl, DATA_1D65__Lo
@@ -12572,7 +12606,7 @@ LABEL_5872_:
 +:
   ld a, b
   ld (ix+CarData.Unknown29_b), a
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_5902_ret
   ld a, (ix+CarData.Unknown29_b)
@@ -12608,7 +12642,7 @@ _LABEL_5902_ret:
   ret
 
 +:
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   cp $07
   JrCRet +
   ld a, (ix+CarData.Unknown34_w.Lo)
@@ -12625,7 +12659,7 @@ _LABEL_5902_ret:
 +:ret
 
 ++:
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   or a
   jr z, +++
   ld a, (ix+CarData.Unknown34_w.Lo)
@@ -12768,7 +12802,7 @@ LABEL_59FC_:
   ld (ix+CarData.YPosition.Lo), l
   ld (ix+CarData.YPosition.Hi), h
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown15_b), a
   ld (ix+CarData.Unknown16_b), a
   ld (_RAM_DF7D_), a
@@ -12791,7 +12825,7 @@ LABEL_5A39_:
   ld a, (_RAM_D5D0_Player2Handicap)
   ld c, a
   ld d, $00
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   add a, c
   ld e, a
   add hl, de
@@ -13217,7 +13251,7 @@ LABEL_5DB9_:
   ld (_RAM_D5D9_), a
 +:
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld a, (ix+CarData.Unknown53_w.Lo)
   ld (_RAM_DEF1_Multiply_Result.Lo), a
@@ -13373,7 +13407,7 @@ LABEL_5E3A_:
 ++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13395,7 +13429,7 @@ _Normal:
   jr nz, ++
   ld a, (_RAM_DE92_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -13411,7 +13445,7 @@ _Normal:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
   ld (_RAM_DE92_EngineSpeed), a
 _LABEL_5F52_ret:
   ret
@@ -13525,7 +13559,7 @@ LABEL_5F5E_:
 +++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp l
   jr c, +++
   ld c, a
@@ -13565,7 +13599,7 @@ LABEL_6054_:
   jr nz, ++
   ld a, (_RAM_DE92_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -13592,7 +13626,7 @@ LABEL_6054_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld (_RAM_DE92_EngineSpeed), a
 _LABEL_609C_ret:
   ret
@@ -13682,7 +13716,7 @@ LABEL_60AE_:
 ++:
   ld a, (_RAM_DE2F_)
   ld l, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13703,7 +13737,7 @@ LABEL_60AE_:
   jr nz, ++
   ld a, (_RAM_DE92_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -13719,7 +13753,7 @@ LABEL_60AE_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
   ld (_RAM_DE92_EngineSpeed), a
 _LABEL_618F_ret:
   ret
@@ -13797,7 +13831,7 @@ LABEL_619B_:
   call LABEL_6582_
   ld a, (_RAM_DE31_CarUnknowns.1.Unknown1)
   ld l, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13810,7 +13844,7 @@ LABEL_619B_:
 ++:
   ld a, (_RAM_DE31_CarUnknowns.2.Unknown1)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13824,9 +13858,9 @@ LABEL_619B_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -13843,8 +13877,8 @@ LABEL_619B_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ret
 
 LABEL_6295_:
@@ -13919,7 +13953,7 @@ LABEL_629A_:
   call LABEL_6582_
   ld a, (_RAM_DE31_CarUnknowns.1.Unknown1)
   ld l, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13932,7 +13966,7 @@ LABEL_629A_:
 ++:
   ld a, (_RAM_DE31_CarUnknowns.3.Unknown1)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -13946,9 +13980,9 @@ LABEL_629A_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -13965,8 +13999,8 @@ LABEL_629A_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
 _LABEL_6393_ret:
   ret
 
@@ -14037,7 +14071,7 @@ LABEL_6394_:
   call LABEL_6582_
   ld a, (_RAM_DE31_CarUnknowns.2.Unknown1)
   ld l, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -14050,7 +14084,7 @@ LABEL_6394_:
 ++:
   ld a, (_RAM_DE31_CarUnknowns.3.Unknown1)
   ld l, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp l
   jr c, ++
   cp $02
@@ -14064,9 +14098,9 @@ LABEL_6394_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_5_Warriors
   jr nz, ++
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   ld l, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   sub l
   jr nc, +
   xor $FF
@@ -14083,8 +14117,8 @@ LABEL_6394_:
   call LABEL_2961_
 ++:
   xor a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
 _LABEL_648D_ret:
   ret
 
@@ -14686,7 +14720,7 @@ _LABEL_6895_ret:
   ld a, (_RAM_D5B0_)
   or a
   jr nz, LABEL_6947_
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   cp $01
   jr z, +
   cp $02
@@ -14756,7 +14790,7 @@ LABEL_6947_:
   ld (_RAM_DE31_CarUnknowns.2.Unknown1), a
   ld (_RAM_DEB5_), a
   ld (_RAM_DF0F_), a
-  ld (_RAM_DF80_TwoPlayerWinPhase), a
+  ld (_RAM_DF80_HeadToHeadWinPhase), a
   ld (_RAM_DF7F_), a
   ld (_RAM_DB80_), a
   ld (_RAM_DB81_), a
@@ -14911,7 +14945,7 @@ LABEL_6A97_:
 +:ret
 
 ++:
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jr nz, +++
   ld a, (_RAM_DF59_CarState)
@@ -14935,7 +14969,7 @@ LABEL_6A97_:
   ld a, CarState_2_Respawning
   ld (_RAM_DF5A_CarState3), a
   xor a
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
   jp LABEL_7295_
 
 +:
@@ -14973,7 +15007,7 @@ LABEL_6A97_:
   ld a, $05
   ld (_RAM_DCAB_CarData_Green.Unknown37_b_JumpCurveStep), a
   ld a, $09
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
 LABEL_6B34_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack)
   or a
@@ -14984,13 +15018,13 @@ LABEL_6B34_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown51_b)
   or a
   jr nz, +
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   jr nz, LABEL_6BC2_
   ld a, $02
   ld (_RAM_DF5B_), a
   xor a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   jp LABEL_72CA_
 
 +:
@@ -15036,7 +15070,7 @@ LABEL_6B60_:
   ld a, $05
   ld (_RAM_DCEC_CarData_Blue.Unknown37_b_JumpCurveStep), a
   ld a, $09
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld a, (_RAM_DC3D_IsHeadToHead)
   or a
   jr z, LABEL_6BC2_
@@ -15055,7 +15089,7 @@ LABEL_6BC2_:
   ld a, $02
   ld (_RAM_DF5C_), a
   xor a
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
   jp LABEL_7332_
 
 +:ret
@@ -15095,7 +15129,7 @@ LABEL_6BC2_:
   ld a, $05
   ld (_RAM_DD2D_CarData_Yellow.Unknown37_b_JumpCurveStep), a
   ld a, $09
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
   ret
 
 ; Data from 6C31 to 6C38 (8 bytes)
@@ -15422,7 +15456,7 @@ _RaceFinished:
   ; Inspect high bit
   and %10000000
   jr nz, +
-  call LABEL_1C98_
+  call LABEL_1C98_ComputeCurrentAbsolutePosition
 +:
   ; Copy "current position" to "last position"
   ld a, (_RAM_D587_CurrentTrackPositionIndex)
@@ -15911,12 +15945,12 @@ LABEL_7176_:
 
 LABEL_718B_:
   ld a, (_RAM_DCEC_CarData_Blue.XMetatile)
-  ld (_RAM_DBB9_), a
+  ld (_RAM_DBB9_CurrentMetatileX_Copy), a
   ld a, (_RAM_DCEC_CarData_Blue.YMetatile)
-  ld (_RAM_DBBA_), a
+  ld (_RAM_DBBA_CurrentMetatileY_Copy), a
   ld a, (_RAM_DCEC_CarData_Blue.CurrentLayoutData)
   and LAYOUT_INDEX_MASK
-  ld (_RAM_DBBB_), a
+  ld (_RAM_DBBB_LayoutByte__Copy), a
   ret
 
 LABEL_71A0_:
@@ -15930,11 +15964,11 @@ LABEL_71A0_:
   ret
 
 LABEL_71B5_:
-  ld a, (_RAM_DBB9_)
-  ld (_RAM_DBB1_), a
-  ld a, (_RAM_DBBA_)
-  ld (_RAM_DBB3_), a
-  ld a, (_RAM_DBBB_)
+  ld a, (_RAM_DBB9_CurrentMetatileX_Copy)
+  ld (_RAM_DBB1_CurrentMetatileX), a
+  ld a, (_RAM_DBBA_CurrentMetatileY_Copy)
+  ld (_RAM_DBB3_CurrentMetatileY), a
+  ld a, (_RAM_DBBB_LayoutByte__Copy)
   ld (_RAM_DBB5_LayoutByte_), a
 LABEL_71C7_:
   ld a, (_RAM_D945_)
@@ -15957,7 +15991,7 @@ LABEL_71C7_:
   add hl, de
   ld (_RAM_D943_), hl
 ++:
-  ld a, (_RAM_DBB1_)
+  ld a, (_RAM_DBB1_CurrentMetatileX)
   ld (_RAM_DEF5_Multiply_Parameter1), a
 .ifdef UNNECESSARY_CODE
   ld a, 96
@@ -15987,7 +16021,7 @@ LABEL_71C7_:
   ld a, (_RAM_DBB5_LayoutByte_)
   call LABEL_7367_AddXOffset_
   ld (_RAM_DBAD_X_), hl
-  ld a, (_RAM_DBB3_)
+  ld a, (_RAM_DBB3_CurrentMetatileY)
 .ifdef UNNECESSARY_CODE
   ld (_RAM_DEF5_Multiply_Parameter1), a
   ld a, 96
@@ -16026,7 +16060,7 @@ LABEL_71C7_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_7_RuffTrux
   JrNzRet + ; ret
-  ld a, (_RAM_D5DE_)
+  ld a, (_RAM_D5DE_LastTrackPositionIndex_Copy)
   ld (_RAM_DF4F_LastTrackPositionIndex), a
   ld (_RAM_D587_CurrentTrackPositionIndex), a
 +:ret
@@ -16077,7 +16111,7 @@ LABEL_72CA_:
   ld hl, (_RAM_DCEC_CarData_Blue.YPosition)
   ld (_RAM_D943_), hl
 ++:
-  ld a, (_RAM_DBB9_)
+  ld a, (_RAM_DBB9_CurrentMetatileX_Copy)
   ld (_RAM_DEF5_Multiply_Parameter1), a
 .ifdef UNNECESSARY_CODE
   ld a, 96
@@ -16085,10 +16119,10 @@ LABEL_72CA_:
 .endif
   call LABEL_3100_MultiplyBy96
   ld hl, (_RAM_DEF1_Multiply_Result)
-  ld a, (_RAM_DBBB_)
+  ld a, (_RAM_DBBB_LayoutByte__Copy)
   call LABEL_7367_AddXOffset_
   ld (_RAM_DCEC_CarData_Blue.XPosition), hl
-  ld a, (_RAM_DBBA_)
+  ld a, (_RAM_DBBA_CurrentMetatileY_Copy)
   ld (_RAM_DEF5_Multiply_Parameter1), a
 .ifdef UNNECESSARY_CODE
   ld a, 96
@@ -16096,7 +16130,7 @@ LABEL_72CA_:
 .endif
   call LABEL_3100_MultiplyBy96
   ld hl, (_RAM_DEF1_Multiply_Result)
-  ld a, (_RAM_DBBB_)
+  ld a, (_RAM_DBBB_LayoutByte__Copy)
   call LABEL_7393_AddYOffset_
   ld (_RAM_DCEC_CarData_Blue.YPosition), hl
   ld a, (_RAM_D940_)
@@ -16354,7 +16388,7 @@ LABEL_74E6_HeadToHeadResults:
   jr nz, +
   ; Qualifying race only
   ; Set player qualified flag?
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   cp $01
   jr z, ++
   xor a
@@ -17292,7 +17326,7 @@ LABEL_79C8_:
   ld a, $01
   ld (_RAM_DCAB_CarData_Green.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   xor a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE67_), a
@@ -17317,7 +17351,7 @@ LABEL_79C8_:
   ld a, $01
   ld (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   xor a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE68_), a
@@ -17339,7 +17373,7 @@ LABEL_7A38_:
   ld a, $01
   ld (_RAM_DD2D_CarData_Yellow.Unknown46_b_ResettingCarToTrack), a
   xor a
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   xor a
   ld (ix+CarData.Unknown20_b_JumpCurvePosition), a
   ld (_RAM_DE69_), a
@@ -17442,7 +17476,7 @@ LABEL_7AC4_HeadToHead_RedWins:
   ld (_RAM_DF6A_), a
   xor a
   ld (_RAM_DF7F_), a
-  ld (_RAM_DF80_TwoPlayerWinPhase), a
+  ld (_RAM_DF80_HeadToHeadWinPhase), a
   ld (_RAM_DF81_), a
 -:ret
 
@@ -19066,7 +19100,7 @@ _LABEL_876B_RuffTruxWon:
 +:ld a, $90 ; GG
 ++:
   ld (_RAM_D6E1_SpriteX), a
-  ld a, $E0
+  ld a, SPRITE_TABLE_TERMINATOR
   ld (_RAM_D721_SpriteY), a
   call LABEL_93CE_UpdateSpriteTable
   ld c, Music_06_Results
@@ -27525,8 +27559,9 @@ PagedFunction_1BAFD_:
 .endif
 
   ; If not head to head...
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ; ...and race is active:
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet -
   ld a, (_RAM_DF58_ResettingCarToTrack)
   or a
@@ -27534,7 +27569,7 @@ PagedFunction_1BAFD_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack)
   or a
   JrNzRet -
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet -
   ld a, (_RAM_DF00_JumpCurvePosition)
@@ -28191,7 +28226,7 @@ PagedFunction_1BF17_:
   ld a, $00
   jr nz, +
   inc a
-+:ld (ix+CarData.Unknown11_b_Speed), a
++:ld (ix+CarData.Unknown11_b_EngineSpeed), a
 .endif
 
 ++: ret
@@ -28518,51 +28553,66 @@ _ApplyFasterVehiclesCheat:
 +:ret
 .ends
 
-.section "PagedFunction_1FA3D_" force
-PagedFunction_1FA3D_:
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+.section "PagedFunction_1FA3D_UpdateSteeringState_Player1_" force
+PagedFunction_1FA3D_UpdateSteeringState_Player1_:
+  ; Not in win phase
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _ret
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ; Or race start phase
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet _ret
+  ; Or resetting car to track
   ld a, (_RAM_DF58_ResettingCarToTrack)
   or a
   JrNzRet _ret
+  ; Or submerged
   ld a, (_RAM_DF74_RuffTruxSubmergedCounter)
   or a
   JrNzRet _ret
+  
+  ; Check player count
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jr nz, +
-  ld a, (_RAM_D59D_)
+  
+  ; Single player
+  ld a, (_RAM_D59D_IsTwoPlayersOnOneGameGear)
   or a
   jr z, +
+  
+  ; Two players on one game gear: use U/D as L/R
   ld a, (_RAM_DB20_Player1Controls)
   ld d, a
   and BUTTON_U_MASK ; $01
-  jr z, +++
+  jr z, _Player1Left
   ld a, d
   and BUTTON_D_MASK ; $02
-  jr z, _LABEL_1FAE5_
+  jr z, _Player1Right
   jp ++
 
-+:ld a, (_RAM_DB20_Player1Controls)
++:; Regular mode: use L/R as L/R
+  ld a, (_RAM_DB20_Player1Controls)
   ld d, a
   and BUTTON_L_MASK ; $04
-  jr z, +++
+  jr z, _Player1Left
   ld a, d
   and BUTTON_R_MASK ; $08
-  jr z, _LABEL_1FAE5_
-++:
-  ld hl, _RAM_DE9F_
+  jr z, _Player1Right
+
+++:; No turning buttons pressed
+  ; Decrement _RAM_DE9F_SteeringDelayCounter if not zero
+  ld hl, _RAM_DE9F_SteeringDelayCounter
   ld a, (hl)
   or a
   jr z, +
   dec (hl)
-+:ld a, (_RAM_DE99_)
++:
+  ; Decrement _RAM_DEA0_ if not zero, and _RAM_DE99_SteeringMode is not SteeringMode_NotSteering
+  ld a, (_RAM_DE99_SteeringMode)
   or a
-  JrNzRet _ret
+  JrNzRet _ret ; return if SteeringMode_NotSteering
   ld hl, _RAM_DEA0_
   ld a, (hl)
   or a
@@ -28571,44 +28621,52 @@ PagedFunction_1FA3D_:
 _ret:
   ret
 
-+++:
-  ld a, (_RAM_DE9F_)
+_Player1Left:
+  ; Decrement _RAM_DE9F_SteeringDelayCounter if not zero
+  ld a, (_RAM_DE9F_SteeringDelayCounter)
   or a
   jr z, +
   DEC_A
-  ld (_RAM_DE9F_), a
+  ld (_RAM_DE9F_SteeringDelayCounter), a
   ret
 
-+:
-  ld a, (_RAM_DE99_)
-  or a
++:; Else if _RAM_DE99_SteeringMode == SteeringMode_NotSteering, _RAM_DE99_SteeringMode = _RAM_DE9A_SteeringMode_WriteOnly = SteeringMode_Left
+  ld a, (_RAM_DE99_SteeringMode)
+  or a ; SteeringMode_NotSteering
   jr nz, +
-  ld a, $01
-  ld (_RAM_DE99_), a
-  ld (_RAM_DE9A_), a
-+:
-  ld a, (_RAM_DE99_)
-  cp $02
+  ld a, SteeringMode_Left
+  ld (_RAM_DE99_SteeringMode), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9A_SteeringMode_WriteOnly), a
+.endif
++:; If _RAM_DE99_SteeringMode == SteeringMode_Right, decrement _RAM_DEA3_OutstandingSteeringSteps
+  ld a, (_RAM_DE99_SteeringMode)
+  cp SteeringMode_Right
   jr nz, +
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   DEC_A
   jp ++
 
-+:
-  ld a, (_RAM_DEA3_)
++:; Else increment _RAM_DEA3_OutstandingSteeringSteps
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   INC_A
 ++:
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
+
+  ; If engine is not going, steering delay is 7, else use the normal value
   ld a, (_RAM_DE92_EngineSpeed)
   or a
   jr nz, +
   ld a, $07
   jp ++
-
-+:
-  ld a, (_RAM_DB9B_SteeringDelay)
++:ld a, (_RAM_DB9B_SteeringDelay)
 ++:
-  ld (_RAM_DE9F_), a
+  ; Put that in _RAM_DE9F_SteeringDelayCounter
+  ld (_RAM_DE9F_SteeringDelayCounter), a
+  
+  ; Rotate left
+  ; Would be quicker to ld a, (nnnn); inc a; and $f; ld (nnnn),a
+  ; TODO variable name seems wrong
   ld hl, _RAM_DE91_CarDirectionPrevious
   dec (hl)
   ld a, (hl)
@@ -28616,44 +28674,50 @@ _ret:
   ld (_RAM_DE91_CarDirectionPrevious), a
   jp LABEL_1295_
 
-_LABEL_1FAE5_:
-  ld a, (_RAM_DE9F_)
+_Player1Right:
+  ; Similar to above...
+  ; Decrement _RAM_DE9F_SteeringDelayCounter if not zero
+  ld a, (_RAM_DE9F_SteeringDelayCounter)
   CP_0
   jr z, +
   DEC_A
-  ld (_RAM_DE9F_), a
+  ld (_RAM_DE9F_SteeringDelayCounter), a
   ret
 
-+:
-  ld a, (_RAM_DE99_)
++:; Else if _RAM_DE99_SteeringMode == SteeringMode_NotSteering, _RAM_DE99_SteeringMode = _RAM_DE9A_SteeringMode_WriteOnly = SteeringMode_Right
+  ld a, (_RAM_DE99_SteeringMode)
   or a
   jr nz, +
-  ld a, $02
-  ld (_RAM_DE99_), a
-  ld (_RAM_DE9A_), a
-+:
-  ld a, (_RAM_DE99_)
-  cp $01
+  ld a, SteeringMode_Right
+  ld (_RAM_DE99_SteeringMode), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9A_SteeringMode_WriteOnly), a
+.endif
++:; Else if _RAM_DE99_SteeringMode == SteeringMode_Left, decrement _RAM_DEA3_OutstandingSteeringSteps
+  ld a, (_RAM_DE99_SteeringMode)
+  cp SteeringMode_Left
   jr nz, +
-  ld a, (_RAM_DEA3_)
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   DEC_A
   jp ++
 
-+:
-  ld a, (_RAM_DEA3_)
++:; Else increment _RAM_DEA3_OutstandingSteeringSteps
+  ld a, (_RAM_DEA3_OutstandingSteeringSteps)
   INC_A
 ++:
-  ld (_RAM_DEA3_), a
+  ld (_RAM_DEA3_OutstandingSteeringSteps), a
+  
+  ; Select new value for steering delay counter
   ld a, (_RAM_DE92_EngineSpeed)
   or a
   jr nz, +
   ld a, $07
   jp ++
-
-+:
-  ld a, (_RAM_DB9B_SteeringDelay)
++:ld a, (_RAM_DB9B_SteeringDelay)
 ++:
-  ld (_RAM_DE9F_), a
+  ld (_RAM_DE9F_SteeringDelayCounter), a
+  
+  ; Rotate right
   ld hl, _RAM_DE91_CarDirectionPrevious
   inc (hl)
   ld a, (hl)
@@ -28668,7 +28732,7 @@ PagedFunction_1FB35_:
   cp TT_1_FourByFour
   jr z, _FourByFour
   
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   or a
   JrZRet +++  ; 0-1 -> no effect
   cp 1
@@ -28679,7 +28743,7 @@ PagedFunction_1FB35_:
   jp ++
 +:DEC_A
 ++:
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
 
   ; Play SFX if enabled
   ld a, (ix+CarData.EffectsEnabled)
@@ -28690,7 +28754,7 @@ PagedFunction_1FB35_:
 +++:ret
 
 _FourByFour:
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   cp 3
   JrCRet +++  ; 0-3 -> no effect
   cp 4
@@ -28699,7 +28763,7 @@ _FourByFour:
   jp ++
 +:DEC_A
 ++:
-  ld (ix+CarData.Unknown11_b_Speed), a
+  ld (ix+CarData.Unknown11_b_EngineSpeed), a
   
   ; Play SFX if enabled
   ld a, (ix+CarData.EffectsEnabled)
@@ -29029,7 +29093,7 @@ PagedFunction_239C6_:
   ld a, (_RAM_DB97_TrackType)
   cp TT_2_Powerboats
   JrNzRet +
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet +
   ld a, (_RAM_D5B9_)
@@ -29445,7 +29509,7 @@ PagedFunction_23C68_ReadGGPauseButton:
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   jr nz, _UseStart
-  ld a, (_RAM_D59D_)
+  ld a, (_RAM_D59D_IsTwoPlayersOnOneGameGear)
   or a
   jr z, _UseStart
   
@@ -30993,55 +31057,70 @@ PagedFunction_35F41_InitialiseHeadToHeadHUDSprites:
 .endif
 .ends
 
-.section "PagedFunction_35F8A_" force
-PagedFunction_35F8A_:
+.section "PagedFunction_35F8A_UpdateSteeringState_Player2_" force
+; Player 2 (head to head) version of PagedFunction_1FA3D_UpdateSteeringState_Player1_
+PagedFunction_35F8A_UpdateSteeringState_Player2_:
+  ; Must be single player? Seems odd?
   ld a, (_RAM_DC3F_IsTwoPlayer)
   or a
   JrNzRet _ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ; And not in the win phase
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _ret
+  ; And head to head
   ld a, (_RAM_DC3D_IsHeadToHead)
-  cp $01
+  cp 1 ; Would be better to or a; ret z
   JrNzRet _ret
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ; And not in the start phase
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet _ret
+  ; And not resetting the blue car
   ld a, (_RAM_DCEC_CarData_Blue.Unknown46_b_ResettingCarToTrack)
   or a
   JrNzRet _ret
+  ; Now branch based on the system
+.ifdef GAME_GEAR_CHECKS
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, +
+  ; If gear to gear, player 2 controls are in the right place already
   ld a, (_RAM_DC41_GearToGearActive)
   or a
   jr nz, +
+  ; Else we use Start = right, 1 = left for two players on one game gear
   in a, (PORT_GG_START)
   and PORT_GG_START_MASK
-  jp z, _LABEL_3603C_
+  jp z, _Player2Right
   ld a, (_RAM_DB20_Player1Controls)
   and BUTTON_1_MASK ; $10
-  jp z, +++
-  jp ++
-
+  jp z, _Player2Left
+  jp _Player2NotTurning
 +:
+.endif
+
+  ; Get player 2 controls
   ld a, (_RAM_DB21_Player2Controls)
   ld d, a
+  ; Check for left
   and BUTTON_L_MASK ; $04
-  jr z, +++
+  jr z, _Player2Left
   ld a, d
   and BUTTON_R_MASK ; $08
-  jr z, _LABEL_3603C_
-++:
-  ld hl, _RAM_DEA1_
+  jr z, _Player2Right
+  
+_Player2NotTurning:
+  ld hl, _RAM_DEA1_SteeringDelayCounter_Player2
   ld a, (hl)
   or a
   jr z, +
   dec (hl)
 +:
-  ld a, (_RAM_DE9B_)
+  ; Decrement _RAM_DEA2_ if not zero, and _RAM_DE9B_SteeringMode_Player2 is not SteeringMode_NotSteering
+  ld a, (_RAM_DE9B_SteeringMode_Player2)
   or a
-  JrNzRet _ret
+  JrNzRet _ret ; return if SteeringMode_NotSteering
   ld hl, _RAM_DEA2_
   ld a, (hl)
   or a
@@ -31050,44 +31129,50 @@ PagedFunction_35F8A_:
 _ret:
   ret
 
-+++:
-  ld a, (_RAM_DEA1_)
+_Player2Left:
+  ; Decrement _RAM_DEA1_SteeringDelayCounter_Player2 if not zero
+  ld a, (_RAM_DEA1_SteeringDelayCounter_Player2)
   CP_0
   jr z, +
   DEC_A
-  ld (_RAM_DEA1_), a
+  ld (_RAM_DEA1_SteeringDelayCounter_Player2), a
   ret
 
-+:
-  ld a, (_RAM_DE9B_)
-  or a
++:; Else if _RAM_DE9B_SteeringMode_Player2 == SteeringMode_NotSteering, _RAM_DE9B_SteeringMode_Player2 = _RAM_DE9C_SteeringMode_Player2_WriteOnly = SteeringMode_Left
+  ld a, (_RAM_DE9B_SteeringMode_Player2)
+  or a ; SteeringMode_NotSteering
   jr nz, +
-  ld a, $01
-  ld (_RAM_DE9B_), a
-  ld (_RAM_DE9C_), a
-+:
-  ld a, (_RAM_DE9B_)
-  cp $02
+  ld a, SteeringMode_Left
+  ld (_RAM_DE9B_SteeringMode_Player2), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9C_SteeringMode_Player2_WriteOnly), a
+.endif
++:; If _RAM_DE9B_SteeringMode_Player2 == SteeringMode_Right, decrement _RAM_DEA4_OutstandingSteeringSteps_Player2
+  ld a, (_RAM_DE9B_SteeringMode_Player2)
+  cp SteeringMode_Right
   jr nz, +
-  ld a, (_RAM_DEA4_)
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   DEC_A
   jp ++
 
-+:
-  ld a, (_RAM_DEA4_)
++:; Else increment _RAM_DEA4_OutstandingSteeringSteps_Player2
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   INC_A
 ++:
-  ld (_RAM_DEA4_), a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
+  
+  ; If engine is not going, steering delay is 7, else use the normal value  
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   or a
   jr nz, +
   ld a, $07
   jp ++
-
-+:
-  ld a, (_RAM_DB9B_SteeringDelay)
++:ld a, (_RAM_DB9B_SteeringDelay)
 ++:
-  ld (_RAM_DEA1_), a
+  ; Put that in _RAM_DEA1_SteeringDelayCounter_Player2
+  ld (_RAM_DEA1_SteeringDelayCounter_Player2), a
+  
+  ; Rotate left
   ld hl, _RAM_DCEC_CarData_Blue.Direction
   dec (hl)
   ld a, (hl)
@@ -31095,69 +31180,70 @@ _ret:
   ld (_RAM_DCEC_CarData_Blue.Direction), a
   jp LABEL_3608C_
 
-_LABEL_3603C_:
-  ld a, (_RAM_DEA1_)
+_Player2Right:
+  ; Similar to above...
+  ld a, (_RAM_DEA1_SteeringDelayCounter_Player2)
   CP_0
   jr z, +
   DEC_A
-  ld (_RAM_DEA1_), a
+  ld (_RAM_DEA1_SteeringDelayCounter_Player2), a
   ret
 
-+:
-  ld a, (_RAM_DE9B_)
++:ld a, (_RAM_DE9B_SteeringMode_Player2)
   or a
   jr nz, +
-  ld a, $02
-  ld (_RAM_DE9B_), a
-  ld (_RAM_DE9C_), a
+  ld a, SteeringMode_Right
+  ld (_RAM_DE9B_SteeringMode_Player2), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9C_SteeringMode_Player2_WriteOnly), a
+.endif
 +:
-  ld a, (_RAM_DE9B_)
-  cp $01
+  ld a, (_RAM_DE9B_SteeringMode_Player2)
+  cp SteeringMode_Left
   jr nz, +
-  ld a, (_RAM_DEA4_)
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   DEC_A
   jp ++
 
-+:
-  ld a, (_RAM_DEA4_)
++:ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   INC_A
 ++:
-  ld (_RAM_DEA4_), a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   or a
   jr nz, +
   ld a, $07
   jp ++
-
-+:
-  ld a, (_RAM_DB9B_SteeringDelay)
++:ld a, (_RAM_DB9B_SteeringDelay)
 ++:
-  ld (_RAM_DEA1_), a
+  ld (_RAM_DEA1_SteeringDelayCounter_Player2), a
+  
+  ; Rotate right
   ld hl, _RAM_DCEC_CarData_Blue.Direction
   inc (hl)
   ld a, (hl)
   and $0F
   ld (_RAM_DCEC_CarData_Blue.Direction), a
-.ifdef UNNECESSARY_CODE
   jp LABEL_3608C_
-.endif
 .ends
 
 .section "LABEL_3608C_" force
 LABEL_3608C_:
+  ; PLayer 2 equivalent of LABEL_1295_
   ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld l, a
   ld a, (_RAM_DCEC_CarData_Blue.Unknown12_b_Direction)
   cp l
   jr nz, +
-  ld a, $00
-  ld (_RAM_DE9B_), a
-  ld (_RAM_DE9C_), a
-  ld (_RAM_DEA4_), a
+  ld a, SteeringMode_NotSteering
+  ld (_RAM_DE9B_SteeringMode_Player2), a
+.ifdef UNNECESSARY_CODE
+  ld (_RAM_DE9C_SteeringMode_Player2_WriteOnly), a
+.endif
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
   ret
 
-+:
-  ld a, (_RAM_DEA4_)
++:ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   cp $04
   jr nz, +
   ld a, $01
@@ -31186,7 +31272,7 @@ PagedFunction_360B9_:
   ld a, (_RAM_D5C5_)
   cp $01
   JrZRet -
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet -
   call _LABEL_36152_
@@ -31389,28 +31475,29 @@ PagedFunction_36209_:
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
   JrNzRet +
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   or a
   jr z, ++
-  ld a, (_RAM_DE9B_)
+  ld a, (_RAM_DE9B_SteeringMode_Player2)
   or a
-  JrZRet +
-  cp $01
-  jr z, +++
-  jp LABEL_36287_
+  JrZRet + ; return if SteeringMode_NotSteering
+  cp SteeringMode_Left
+  jr z, _PLayer2Left
+  jp _Player2Right
 
 +:ret
 
 ++:
+  ; No engine
   ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld (_RAM_DCEC_CarData_Blue.Unknown12_b_Direction), a
   ld a, $00
-  ld (_RAM_DEA4_), a
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
   ld (_RAM_DEA2_), a
-  ld (_RAM_DE9B_), a
+  ld (_RAM_DE9B_SteeringMode_Player2), a ; SteeringMode_NotSteering
   ret
 
-+++:
+_PLayer2Left:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   or a
   JrNzRet +
@@ -31430,9 +31517,9 @@ _ret:
 .endif
 
 ++:
-  ld a, (_RAM_DEA4_)
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   DEC_A
-  ld (_RAM_DEA4_), a
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
   ld a, (_RAM_DE9D_)
   cp $01
   jr nz, +
@@ -31450,7 +31537,7 @@ _ret:
   ld (_RAM_DCEC_CarData_Blue.Unknown12_b_Direction), a
   jp LABEL_3608C_
 
-LABEL_36287_:
+_Player2Right:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   or a
   JrNzRet +
@@ -31465,9 +31552,9 @@ LABEL_36287_:
 +:ret
 
 ++:
-  ld a, (_RAM_DEA4_)
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   DEC_A
-  ld (_RAM_DEA4_), a
+  ld (_RAM_DEA4_OutstandingSteeringSteps_Player2), a
   ld a, (_RAM_DE9D_)
   cp $01
   jr nz, +
@@ -31487,7 +31574,7 @@ LABEL_36287_:
 
 _LABEL_362C7_:
   ld hl, _RAM_DB86_HandlingData
-  ld de, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld de, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   ld d, $00
   add hl, de
   ld a, (hl)
@@ -31545,21 +31632,21 @@ _SpeedTo3IfInRange:
   cp c
   jr nc, +
   ld a, TANK_SPEED_THROUGH_CHESSBOARD
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
 +:ld a, (_RAM_DF51_BlueCarCurrentLapProgress)
   cp b
   jr c, +
   cp c
   jr nc, +
   ld a, TANK_SPEED_THROUGH_CHESSBOARD
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
 +:ld a, (_RAM_DF52_YellowCarCurrentLapProgress)
   cp b
   JrCRet +
   cp c
   JrNcRet +
   ld a, TANK_SPEED_THROUGH_CHESSBOARD
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
 +:ret
 
 _SportsCars:
@@ -31580,7 +31667,7 @@ _SpeedTo12IfInRange:
   cp c
   jr nc, +
   ld a, SPEED_THROUGH_JUMP
-  ld (_RAM_DCAB_CarData_Green.Unknown11_b_Speed), a
+  ld (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed), a
 +:
   ld a, (_RAM_DF51_BlueCarCurrentLapProgress)
   cp b
@@ -31588,7 +31675,7 @@ _SpeedTo12IfInRange:
   cp c
   jr nc, +
   ld a, SPEED_THROUGH_JUMP
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
 +:
   ld a, (_RAM_DF52_YellowCarCurrentLapProgress)
   cp b
@@ -31596,7 +31683,7 @@ _SpeedTo12IfInRange:
   cp c
   JrNcRet +
   ld a, SPEED_THROUGH_JUMP
-  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed), a
+  ld (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed), a
 +:ret
 .ends
 
@@ -31638,7 +31725,7 @@ _LABEL_3639C_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   or a
   JrNzRet _ret
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp $06
   JrCRet _ret
   ld a, (_RAM_DB97_TrackType)
@@ -31668,28 +31755,29 @@ PagedFunction_363D0_:
   jr --
 
 PagedFunction_363D9_:
+  ; Head to head only
   ld a, (_RAM_DC3D_IsHeadToHead)
   cp $01
-  JrNzRet _LABEL_36454_ret
-  
-  ; Head to head only
+  JrNzRet _ret2
+
+  ; Not in a large jump
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   or a
   jr z, +
   ld a, (_RAM_DCEC_CarData_Blue.Unknown38_b_JumpType)
   cp Jump_Large
-  JrZRet _LABEL_36454_ret
+  JrZRet _ret2
 
-+:ld a, (_RAM_DEA4_)
++:ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   or a
   jr z, ++
   cp $01
   jr z, +
   call _LABEL_3639C_
-+:ld a, (_RAM_DE9B_)
-  CP_0
++:ld a, (_RAM_DE9B_SteeringMode_Player2)
+  CP_0 ; SteeringMode_NotSteering
   jr z, ++
-  cp $01
+  cp SteeringMode_Left
   jr z, +
   ld a, (_RAM_DB21_Player2Controls)
   and BUTTON_L_MASK ; $04
@@ -31701,7 +31789,7 @@ PagedFunction_363D9_:
   and BUTTON_R_MASK ; $08
   jr z, _LABEL_3645B_
 ++:
-  ld a, (_RAM_DEA4_)
+  ld a, (_RAM_DEA4_OutstandingSteeringSteps_Player2)
   CP_0
   jr z, _LABEL_3645B_
   ld a, (_RAM_DB21_Player2Controls)
@@ -31710,7 +31798,7 @@ PagedFunction_363D9_:
   jr z, +
   ld a, l
   and BUTTON_R_MASK ; $08
-  JrNzRet _LABEL_36454_ret
+  JrNzRet _ret2
 +:
   ld a, $01
   ld (_RAM_DEAA_), a
@@ -31731,14 +31819,15 @@ _LABEL_3643D_:
   add hl, de
   ld a, (hl)
   ld l, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   sub l
+  ; Check for underflow (could just check carry)
   ld l, a
   and $80
   jr nz, +
   ld a, l
   ld (_RAM_DE57_), a
-_LABEL_36454_ret:
+_ret2:
   ret
 
 +:ld a, $00
@@ -31764,7 +31853,7 @@ _LABEL_3645B_:
   ld a, $00
   ld (_RAM_DEA8_), a
   ld (_RAM_DEAA_), a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   ld (_RAM_DE57_), a
   ret
 .ends
@@ -31983,7 +32072,7 @@ PagedFunction_36484_PatchForLevel:
 
 .section "PagedFunction_366DE_" force
 PagedFunction_366DE_:
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   cp $01
   jp z, _LABEL_36798_
   cp $02
@@ -32358,13 +32447,13 @@ PagedFunction_36937_:
 
 .section "PagedFunction_36971_" force
 PagedFunction_36971_:
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JpNzRet _ret
   ld a, (_RAM_D5C5_)
   or a
   JpNzRet _ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   CP_0
   JpNzRet _ret
   ld a, (_RAM_DF7F_)
@@ -32953,8 +33042,8 @@ _DecrementTimer:
   ld a, (_RAM_DF65_HasFinished)
   cp $01
   JrZRet _ret
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet _ret
 
   ; Increment frame counter
@@ -33594,7 +33683,7 @@ PagedFunction_3730C_GameVBlankPart3:
   jr nc, LABEL_373F3_
   ld a, (_RAM_DCAB_CarData_Green.Unknown20_b_JumpCurvePosition)
   ld b, a
-  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_Speed)
+  ld a, (_RAM_DCAB_CarData_Green.Unknown11_b_EngineSpeed)
   ex af, af'
   ld a, (_RAM_D594_)
   jp ++
@@ -33602,7 +33691,7 @@ PagedFunction_3730C_GameVBlankPart3:
 LABEL_373F3_:
   ld a, (_RAM_DD2D_CarData_Yellow.Unknown20_b_JumpCurvePosition)
   ld b, a
-  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_Speed)
+  ld a, (_RAM_DD2D_CarData_Yellow.Unknown11_b_EngineSpeed)
   ex af, af'
   ld a, (_RAM_D596_)
   jp ++
@@ -33616,7 +33705,7 @@ LABEL_373F3_:
 LABEL_37408_:
   ld a, (_RAM_DCEC_CarData_Blue.Unknown20_b_JumpCurvePosition)
   ld b, a
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   ex af, af'
     ld a, (_RAM_D595_)
 ++: ld (_RAM_D597_), a
@@ -33729,6 +33818,12 @@ DATA_3751E_11TimesTable:
 
 .section "PagedFunction_37529_" force
 PagedFunction_37529_: ; initialises some stuff, TODO
+; _RAM_DC54_IsGameGear        0 -> set to 0
+; _RAM_DC41_GearToGearActive  1 -> set to 0
+; _RAM_DC3D_IsHeadToHead      0 -> set to 0
+;                             1 -> set to 1
+
+
   ld a, (_RAM_DC54_IsGameGear)
   or a
   jr z, ++
@@ -33739,7 +33834,7 @@ PagedFunction_37529_: ; initialises some stuff, TODO
   jp ++
 +:ld a, (_RAM_DC3D_IsHeadToHead)
 ++:
-  ld (_RAM_D59D_), a ; !IsGameGear || GearToGearActive || IsHeadToHead
+  ld (_RAM_D59D_IsTwoPlayersOnOneGameGear), a ; IsGameGear && !GearToGearActive && IsHeadToHead
   ld a, HEAD_TO_HEAD_TOTAL_POINTS / 2
   ld (_RAM_DB7B_HeadToHead_RedPoints), a
   ld a, $01
@@ -34125,25 +34220,25 @@ PagedFunction_3779F_:
   jr +++++
 
 ++++:
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
   cp $04
   jr nc, +
   ld a, $00
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld (_RAM_DE31_CarUnknowns.2.Unknown1), a
   ld a, (_RAM_DCEC_CarData_Blue.Direction)
   ld (_RAM_DCEC_CarData_Blue.Unknown12_b_Direction), a
   ret
 
 +:
-  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed)
+  ld a, (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed)
 +++++:
   and $FE
   rr a
   ld (_RAM_DE31_CarUnknowns.2.Unknown1), a
   and $FE
   rr a
-  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_Speed), a
+  ld (_RAM_DCEC_CarData_Blue.Unknown11_b_EngineSpeed), a
   ld d, $00
   ld a, c
   ld e, a
@@ -34621,13 +34716,13 @@ _CheckForNewShot_Red:
   and BUTTON_1_MASK | BUTTON_2_MASK ; Both buttons pressed
   JrNzRet _LABEL_37BEE_ret
 ++:
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JrNzRet _LABEL_37BEE_ret
   ld a, (_RAM_DF58_ResettingCarToTrack)
   or a
   JrNzRet _LABEL_37BEE_ret
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_37BEE_ret
   ld a, (_RAM_DE91_CarDirectionPrevious)
@@ -34952,11 +35047,11 @@ LABEL_37D9C_CheckForInitiateShot_OtherPlayers:
   JpNzRet _LABEL_37E61_ret
 ++:
   ; If we get here than either player 2 is not there, or he has pressed 1+2
-  ; (so CPU cars shoot continuously(!))
+  ; (so CPU cars shoot continuously(?!))
   ; We still do nothing if:
-  ; - high bit of _RAM_DE4F_ is set
-  ld a, (_RAM_DE4F_)
-  cp $80
+  ; - race is in start phase
+  ld a, (_RAM_DE4F_RaceStartCounter)
+  cp RACE_START_COUNTER_MAXIMUM_VALUE
   JpNzRet _LABEL_37E61_ret
   ; - Effects are disabled (car is off-screen)
   ld a, (ix+CarData.EffectsEnabled)
@@ -34990,7 +35085,7 @@ LABEL_37D9C_CheckForInitiateShot_OtherPlayers:
 
 +:; Head to head
   ; Can't shoot during "win phase"
-  ld a, (_RAM_DF80_TwoPlayerWinPhase)
+  ld a, (_RAM_DF80_HeadToHeadWinPhase)
   or a
   JrNzRet _LABEL_37E61_ret
   
@@ -35000,7 +35095,7 @@ LABEL_37D9C_CheckForInitiateShot_OtherPlayers:
   ld a, (ix+CarData.Direction)
   ld (ix+CarData.Unknown62_b_ShotDirection), a
   ; And the car's speed + 6 (subject to an upper bound)
-  ld a, (ix+CarData.Unknown11_b_Speed)
+  ld a, (ix+CarData.Unknown11_b_EngineSpeed)
   add a, TANK_SHOT_RELATIVE_SPEED
   and MAXIMUM_SPEED_MASK
   ld (ix+CarData.Unknown64_b_ShotSpeed), a
